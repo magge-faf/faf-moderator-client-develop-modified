@@ -277,6 +277,14 @@ public class ModerationReportController implements Controller<Region> {
             }
             ChooseableStatus selectedItem = statusChoiceBox.getSelectionModel().getSelectedItem();
 
+            if (selectedItem.toString().equals("ALL")) {;
+                if (selectedItem != null && selectedItem.getModerationReportStatus() != null) {
+                    ModerationReportStatus moderationReportStatus = selectedItem.getModerationReportStatus();
+                    return moderationReportFx.getReportStatus() == moderationReportStatus;
+                }
+                return true;
+            }
+
             if (selectedItem != null) {
                 ModerationReportStatus moderationReportStatus = selectedItem.getModerationReportStatus();
 
@@ -315,9 +323,7 @@ public class ModerationReportController implements Controller<Region> {
                             }
                         }
                     }
-
                 }
-
 
                 AwaitingReportsTotalTextArea.setText(
                         "Total awaiting: " + (counter_awaiting_total_reports) +
