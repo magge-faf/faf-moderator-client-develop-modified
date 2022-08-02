@@ -1,0 +1,33 @@
+target/
+build
+.gradle
+!.mvn/wrapper/maven-wrapper.jar
+
+### IntelliJ IDEA ###
+*.iws
+*.iml
+*.ipr
+
+# User-specific stuff:
+account_credentials.txt
+BlacklistedPermanentIP.txt
+BlacklistedPermanentVSN.txt
+BlacklistedTemporaryVSN.txt
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/dictionaries
+.idea/sonarIssues.xml
+
+
+# Sensitive or high-churn files:
+.idea/dataSources
+.idea/dataSources*
+.idea/shelf
+.idea/dataSources.ids
+.idea/dataSources.xml
+.idea/sqlDataSources.xml
+.idea/dynamic.xml
+.idea/uiDesigner.xml
+.idea/inspectionProfiles/
+.idea/libraries
+.idea/libraries-with-intellij-classes.xml

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<GridPane xmlns:fx="http://javafx.com/fxml/1" fx:id="root" hgap="2.0" vgap="2.0"
+          xmlns="http://javafx.com/javafx/8.0.141"
+          fx:controller="com.faforever.moderatorclient.ui.moderation_reports.EditModerationReportController">
+    <rowConstraints>
+        <RowConstraints minHeight="2.0" prefHeight="30.0"/>
+        <RowConstraints minHeight="2.0"/>
+        <RowConstraints minHeight="2.0"/>
+        <RowConstraints minHeight="2.0"/>
+    </rowConstraints>
+    <columnConstraints>
+        <ColumnConstraints minWidth="2.0"/>
+        <ColumnConstraints minWidth="2.0"/>
+    </columnConstraints>
+    <children>
+        <Label text="Status">
+            <GridPane.margin>
+                <Insets bottom="2.0" left="2.0" right="2.0" top="2.0"/>
+            </GridPane.margin>
+        </Label>
+
+
+    <Label text="Private Note" GridPane.rowIndex="1">
+            <GridPane.margin>
+                <Insets bottom="2.0" left="2.0" right="2.0" top="2.0"/>
+            </GridPane.margin>
+        </Label>
+
+        <Label text="Public Note" GridPane.rowIndex="2">
+            <GridPane.margin>
+                <Insets bottom="2.0" left="2.0" right="2.0" top="2.0"/>
+            </GridPane.margin>
+        </Label>
+        <TextArea fx:id="privateNoteTextArea" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
+                  prefHeight="100.0" prefWidth="400.0" GridPane.columnIndex="1" GridPane.rowIndex="1"/>
+        <TextArea fx:id="publicNoteTextArea" maxHeight="1.7976931348623157E308"
+                  maxWidth="1.7976931348623157E308" prefHeight="100.0" prefWidth="400.0" GridPane.columnIndex="1"
+                  GridPane.rowIndex="2"/>
+        <ChoiceBox fx:id="statusChoiceBox" GridPane.columnIndex="1"/>
+
+    <HBox alignment="TOP_RIGHT" spacing="2.0" GridPane.columnIndex="1" GridPane.rowIndex="3">
+            <children>
+                <Button fx:id="PasteTemplateCompletedButton" prefHeight="30" mnemonicParsing="false" onAction="#PasteTemplateCompletedButton" text="Blueprint-COMPLETED">
+                </Button>
+                <Button fx:id="PasteTemplateDiscardedButton" prefHeight="30" mnemonicParsing="false" onAction="#PasteTemplateDiscardedButton" text="Blueprint-DISCARDED">
+                </Button>
+                <Button mnemonicParsing="false" prefHeight="30" onAction="#close" text="Cancel">
+                    <HBox.margin>
+                        <Insets/>
+                    </HBox.margin>
+                </Button>
+                <Button defaultButton="true" prefHeight="30" mnemonicParsing="false" text="Save" onAction="#onSave">
+                <HBox.margin>
+                        <Insets/>
+                    </HBox.margin>
+                </Button>
+
+            </children>
+        </HBox>
+
+    </children>
+
+    <padding>
+        <Insets bottom="2.0" left="2.0" right=".0" top="2.0"/>
+    </padding>
+</GridPane>

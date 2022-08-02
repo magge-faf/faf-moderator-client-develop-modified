@@ -1,0 +1,11 @@
+%s,
+
+- Generic insults
+- Reclaiming/Killing friendly units
+- Off mapping
+- CTRL+K all units, leaving game on own terms
+- CTRL+K ACU, leaving game on own terms
+        
+!stickwhip %s warned for insults, reclaiming/killing friendly units and ruining the game experience for other players.
+
+Account suspended for 2 days. Reason: Insults, reclaiming/killing friendly units and ruining the game experience for other players.

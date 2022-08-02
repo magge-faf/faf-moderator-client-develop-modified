@@ -1,0 +1,94 @@
+import org.gradle.internal.os.OperatingSystem
+
+plugins {
+    id 'application'
+    id 'com.github.johnrengelman.shadow' version '7.1.2'
+}
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://jitpack.io' }
+}
+
+compileJava() {
+    options.compilerArgs << "-Amapstruct.defaultComponentModel=jsr330"
+}
+
+project.ext.javafxPlatform = "${javafxPlatform}"
+
+if (javafxPlatform == "unspecified") {
+    switch (OperatingSystem.current()) {
+        case OperatingSystem.LINUX:
+            project.ext.javafxPlatform = "linux"
+            break
+        case OperatingSystem.MAC_OS:
+            project.ext.javafxPlatform = "mac"
+            break
+        case OperatingSystem.WINDOWS:
+            project.ext.javafxPlatform = "win"
+            break
+    }
+}
+
+println "Platform is: ${javafxPlatform}"
+
+dependencies {
+    def springBootVersion = "2.5.8"
+    def mapStructVersion = "1.3.1.Final"
+    def commonsVersion = "9a877cee8c77ea89f35995c326702c173036e048"
+
+    annotationProcessor(platform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}"))
+    implementation(platform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}"))
+
+    annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
+    annotationProcessor("org.projectlombok:lombok")
+    annotationProcessor("org.mapstruct:mapstruct-processor:${mapStructVersion}")
+    implementation("org.projectlombok:lombok")
+    implementation("org.jetbrains:annotations:23.0.0")
+    implementation("org.springframework.boot:spring-boot-starter")
+    implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("org.springframework.security.oauth.boot:spring-security-oauth2-autoconfigure:${springBootVersion}")
+    implementation("javax.inject:javax.inject:1")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8")
+    implementation("com.github.jasminb:jsonapi-converter:0.11")
+    implementation("com.github.FAForever.faf-java-commons:faf-commons-data:${commonsVersion}")
+    implementation("com.github.FAForever.faf-java-commons:faf-commons-api:${commonsVersion}")
+    implementation("org.apache.httpcomponents:httpclient:4.5.13")
+    implementation("com.github.rutledgepaulv:q-builders:1.6")
+    implementation("com.google.guava:guava:31.1-jre")
+    implementation("org.mapstruct:mapstruct:${mapStructVersion}")
+    implementation("org.openjfx:javafx-base:${javafxVersion}:${javafxPlatform}")
+    implementation("org.openjfx:javafx-controls:${javafxVersion}:${javafxPlatform}")
+    implementation("org.openjfx:javafx-graphics:${javafxVersion}:${javafxPlatform}")
+    implementation("org.openjfx:javafx-fxml:${javafxVersion}:${javafxPlatform}")
+    implementation("org.openjfx:javafx-web:${javafxVersion}:${javafxPlatform}")
+    implementation("org.openjfx:javafx-media:${javafxVersion}:${javafxPlatform}")
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
+}
+
+mainClassName = 'com.faforever.moderatorclient.Launcher'
+
+group = 'com.faforever'
+description = 'faf-moderator-client'
+sourceCompatibility = '17'
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+// This fixes the "line too long" error when running the .bat with windows CLI
+tasks.withType(CreateStartScripts).each { task ->
+    task.doLast {
+        String text = task.windowsScript.text
+        // Replaces the per file classpath (which are all jars in "lib") with a wildcard on lib
+        text = text.replaceFirst(/(set CLASSPATH=%APP_HOME%\\lib\\).*/, { "${it[1]}*" })
+        task.windowsScript.write text
+    }
+}
+
+distZip {
+    doLast {
+        file("$destinationDir/$archiveName").renameTo("$destinationDir/$baseName-$version-${javafxPlatform}.zip")
+    }
+}

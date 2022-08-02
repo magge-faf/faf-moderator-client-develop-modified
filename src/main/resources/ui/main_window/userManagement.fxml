@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ChoiceBox?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.SplitPane?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.control.TextArea?>
+
+<SplitPane xmlns:fx="http://javafx.com/fxml/1" fx:id="root" dividerPositions="0.3" orientation="VERTICAL"
+           prefHeight="200.0" prefWidth="160.0" xmlns="http://javafx.com/javafx/8.0.171"
+           fx:controller="com.faforever.moderatorclient.ui.main_window.UserManagementController">
+    <HBox>
+        <VBox minWidth="220.0" spacing="1.0">
+            <ComboBox fx:id="searchUserProperties" promptText="Search by"/>
+            <TextField fx:id="userSearchTextField" onAction="#onUserSearch">
+            </TextField>
+            <Button mnemonicParsing="false" onAction="#onUserSearch" text="Search" alignment="CENTER">
+            </Button>
+            <TextArea fx:id="SearchHistoryTextField"  editable="false" maxHeight="300" maxWidth="220"
+                      promptText="history (resets with new start)">
+            </TextArea>
+            <TextArea fx:id="NotesTextArea" wrapText="true" maxHeight="300" maxWidth="220"
+                      promptText="notes (resets with new start)">
+            </TextArea>
+        </VBox>
+        <TableView fx:id="userSearchTableView" maxHeight="1.7976931348623157E308"
+                   maxWidth="1.7976931348623157E308" minWidth="550.0" prefHeight="200.0" HBox.hgrow="ALWAYS"/>
+    </HBox>
+    <TabPane minHeight="200.0" tabClosingPolicy="UNAVAILABLE">
+        <Tab fx:id="notesTab" text="Notes">
+            <VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308">
+                <TableView fx:id="userNoteTableView" prefHeight="200.0" prefWidth="200.0"
+                           VBox.vgrow="ALWAYS">
+                    <VBox.margin>
+                        <Insets bottom="10.0"/>
+                    </VBox.margin>
+                </TableView>
+                <HBox alignment="CENTER">
+                    <padding>
+                        <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
+                    </padding>
+                    <Button fx:id="addNoteButton" mnemonicParsing="false" onAction="#addNote"
+                            text="Add note"/>
+                    <Button fx:id="editNoteButton" mnemonicParsing="false" onAction="#editNote"
+                            text="Edit selected note">
+                        <HBox.margin>
+                            <Insets left="10.0"/>
+                        </HBox.margin>
+                    </Button>
+                </HBox>
+            </VBox>
+        </Tab>
+        <Tab fx:id="bansTab" text="Bans">
+            <VBox>
+                <TableView fx:id="userBansTableView" prefHeight="200.0" prefWidth="200.0"
+                           VBox.vgrow="ALWAYS">
+                    <VBox.margin>
+                        <Insets bottom="10.0"/>
+                    </VBox.margin>
+                </TableView>
+                <HBox alignment="CENTER">
+                    <VBox.margin>
+                        <Insets/>
+                    </VBox.margin>
+                    <padding>
+                        <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
+                    </padding>
+                    <Button fx:id="newBanButton" disable="true" mnemonicParsing="false"
+                            onAction="#onNewBan" text="Apply new ban">
+                        <HBox.margin>
+                            <Insets/>
+                        </HBox.margin>
+                    </Button>
+                    <Button fx:id="editBanButton" disable="true" mnemonicParsing="false"
+                            onAction="#onEditBan" text="Edit selected ban">
+                        <HBox.margin>
+                            <Insets left="10.0"/>
+                        </HBox.margin>
+                    </Button>
+                </HBox>
+            </VBox>
+        </Tab>
+        <Tab fx:id="teamkillsTab" text="Teamkills">
+            <TableView fx:id="userTeamkillsTableView" prefHeight="200.0" prefWidth="200.0"/>
+        </Tab>
+        <Tab fx:id="nameHistoryTab" text="Name History">
+            <TableView fx:id="userNameHistoryTableView" maxHeight="1.7976931348623157E308"
+                       maxWidth="1.7976931348623157E308" prefHeight="200.0"/>
+        </Tab>
+        <Tab fx:id="lastGamesTab" text="Last Games">
+            <VBox>
+                <HBox spacing="10">
+                    <VBox.margin>
+                        <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
+                    </VBox.margin>
+                    <Label maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
+                           text="Show featured Mods:"/>
+                    <ChoiceBox fx:id="featuredModFilterChoiceBox" minWidth="150.0"/>
+                    <Button fx:id="loadMoreGamesButton" onAction="#loadMoreGames" text="Load more"/>
+                </HBox>
+                <TableView fx:id="userLastGamesTable" maxHeight="1.7976931348623157E308"
+                           maxWidth="1.7976931348623157E308" VBox.vgrow="ALWAYS"/>
+            </VBox>
+        </Tab>
+        <Tab fx:id="avatarsTab" text="Avatars">
+            <VBox>
+                <TableView fx:id="userAvatarsTableView" maxHeight="1.7976931348623157E308"
+                           maxWidth="1.7976931348623157E308" prefHeight="200.0" prefWidth="200.0"
+                           VBox.vgrow="ALWAYS"/>
+                <HBox alignment="CENTER" spacing="10.0">
+                    <padding>
+                        <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
+                    </padding>
+                    <Button fx:id="giveAvatarButton" mnemonicParsing="false"
+                            onAction="#onGiveAvatar"
+                            text="Give selected avatar from main avatar tab"/>
+                    <Separator orientation="VERTICAL"/>
+                    <TextField fx:id="expiresAtTextfield" promptText="2018-12-31T23:59:59Z"/>
+                    <Button fx:id="setExpiresAtButton" mnemonicParsing="false"
+                            onAction="#onSetExpiresAt" text="Set expires at"/>
+                    <Separator orientation="VERTICAL"/>
+                    <Button fx:id="takeAvatarButton" mnemonicParsing="false"
+                            onAction="#onTakeAvatar" text="Take avatar"/>
+                </HBox>
+            </VBox>
+        </Tab>
+        <Tab fx:id="userGroupsTab" text="User Groups">
+            <VBox>
+                <HBox VBox.vgrow="ALWAYS">
+                    <TableView fx:id="userGroupsTableView" maxHeight="1.7976931348623157E308"
+                               maxWidth="1.7976931348623157E308" prefHeight="200.0" prefWidth="200.0"
+                               HBox.hgrow="ALWAYS"/>
+                    <TableView fx:id="permissionsTableView" maxHeight="1.7976931348623157E308"
+                               maxWidth="1.7976931348623157E308" prefHeight="200.0" prefWidth="200.0"
+                               HBox.hgrow="ALWAYS"/>
+                </HBox>
+                <HBox VBox.vgrow="NEVER" maxHeight="50" spacing="10.0" alignment="CENTER">
+                    <Button text="Add User To Group" onAction="#openGroupDialog"/>
+                    <Button fx:id="removeGroupButton" text="Remove User from Group"
+                            onAction="#onRemoveGroup"/>
+                </HBox>
+            </VBox>
+        </Tab>
+    </TabPane>
+</SplitPane>
