@@ -304,8 +304,9 @@ public class ViewHelper {
                 case TEMPORARY -> {
                     Date date = new Date();
                     Instant instantFromDate = date.toInstant();
-                    Duration duration = Duration.between(instantFromDate, banInfo.getExpiresAt());
-                    yield "%s days, %s hours".formatted(duration.toDays(), duration.toHoursPart());
+                    Duration duration_left = Duration.between(instantFromDate, banInfo.getExpiresAt());
+                    Duration duration_total = Duration.between(banInfo.getCreateTime(), banInfo.getExpiresAt());
+                    yield "%s days, %s hours (%s days, %s hours)".formatted(duration_total.toDays(), duration_total.toHoursPart(),duration_left.toDays(), duration_left.toHoursPart());
                 }
             };
         }, o.getValue().durationProperty()));

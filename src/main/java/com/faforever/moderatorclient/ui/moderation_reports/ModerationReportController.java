@@ -158,18 +158,6 @@ public class ModerationReportController implements Controller<Region> {
             setSysClipboardText(content);
         }
 
-        String report_template = String.format("""
-        %s,
-
-        - Generic insults
-        - Reclaiming/Killing friendly units
-        - Off mapping
-        - CTRL+K all units, leaving game on own terms
-        - CTRL+K ACU, leaving game on own terms
-        
-        !offlinemessage %s Warned for insults, reclaiming/killing friendly units and ruining the game experience for other players.
-        Account suspended for 2 days. Reason: Insults, reclaiming/killing friendly units and ruining the game experience for other players.
-        """,report_id, reported_name_array[0]);
     }
 
     public static class GlobalConstants
