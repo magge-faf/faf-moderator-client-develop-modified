@@ -22,10 +22,10 @@
             <TextField fx:id="playerNameFilterTextField" promptText="Enter player name to search"/>
             <Button fx:id="editReportButton" mnemonicParsing="false" minWidth="93" onAction="#onEdit" text="Edit"/>
             <Button mnemonicParsing="false" onAction="#onRefreshAllReports" minWidth="93" text="Refresh"/>
-            <CheckBox fx:id="hideReportsRU" selected="true" mnemonicParsing="false"
+            <CheckBox fx:id="hideReportsRU" selected="false" mnemonicParsing="false"
                       text="Ignore RU">
             </CheckBox>
-            <CheckBox fx:id="hideAlreadyTakenReportsCheckbox" selected="true" mnemonicParsing="false"
+            <CheckBox fx:id="hideAlreadyTakenReportsCheckbox" selected="false" mnemonicParsing="false"
                       text="Hide taken reports">
             </CheckBox>
             <CheckBox fx:id="FilterLogCheckBox" selected="true" mnemonicParsing="false"

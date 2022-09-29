@@ -1,7 +1,9 @@
 package com.faforever.moderatorclient.ui.main_window;
 
 import com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController;
+import javafx.event.ActionEvent;
 import javafx.scene.control.Button;
+import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
@@ -25,6 +27,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController.setSysClipboardText;
+
 @Component
 @Slf4j
 @RequiredArgsConstructor
@@ -42,6 +46,8 @@ public class SettingsController implements Controller<Region> {
     public Button TemplateCompletedButton;
     public Button TemplateDiscardedButton;
     public Button TemplateReportButton;
+    public TextField MostReportsOffendersTextfield;
+
 
     @Override
     public VBox getRoot() {return root;}
@@ -91,6 +97,10 @@ public class SettingsController implements Controller<Region> {
     public void BanDataPermanentIP() throws IOException {
         ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "BlacklistedPermanentIP.txt");
         pb.start();
+    }
+
+    public void AllModeratorStatsTextField() {
+
     }
 
     public void LoadAllModeratorStatsButton() {
@@ -153,10 +163,11 @@ public class SettingsController implements Controller<Region> {
             Collections.reverse(shallowCopy);
 
             AllModeratorStatsTextField.setText(String.valueOf(finalList));
+            GlobalConstants.AllReportsStats = String.valueOf(finalList);
+
         }catch (Exception e) {
             AllModeratorStatsTextField.setText("Refresh reports first");
             }
-
     }
     public void TemplateCompletedButton() throws IOException {
         ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "TemplateCompleted.txt");
@@ -171,4 +182,62 @@ public class SettingsController implements Controller<Region> {
         ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "TemplateReport.txt");
         pb.start();
     }
+
+    public void LoadAllReportsAndModeratorStatsForZulipButton(ActionEvent actionEvent) {
+        LoadAllModeratorStatsButton();
+        List<String> totalProcessedReports = new ArrayList<>();
+        List<String> totalProcessedReportsA = new ArrayList<>();
+
+        String allOffendersString = String.valueOf(ModerationReportController.GlobalConstants.allOffenders);
+
+        String allOffendersStringA = allOffendersString.replace("[","");
+        String allOffendersStringB = allOffendersStringA.replace("]","");
+
+        List<String> allOffendersList = new ArrayList<>(Arrays.asList(allOffendersStringB.split(",")));
+
+
+        Set<String> mySet = new HashSet<String>(allOffendersList);
+
+
+        String stringA = "";
+        StringBuilder stringB = new StringBuilder("");
+
+        for(String s: mySet){
+            stringA = s + " " + Collections.frequency(allOffendersList,s);
+            //System.out.println(s + " " + Collections.frequency(allOffendersList,s));
+
+            if (stringA.endsWith("1") || stringA.endsWith("2")){
+                continue;
+            }
+            else {
+                System.out.println(stringA);
+                stringB.append(stringA);
+
+            }
+        }
+        MostReportsOffendersTextfield.setText(String.valueOf(stringB));
+
+        //Set<String> st = new HashSet<String>(GlobalConstants.AllReportsStats.split());
+
+        //log.debug(GlobalConstants.AllReportsStats);
+
+
+
+
+        //HashSet<String> hs = new HashSet<String>(myList);
+        //int totalDuplicates =myList.size() - hs.size();
+
+        //log.debug(String.valueOf(myList));;
+        //log.debug(AwaitingReportsTotalTextArea.getPromptText());
+        //setSysClipboardText(myList + "\n\n");// + AwaitingReportsTotalTextArea.getPromptText());
+    }
+
+    public static class GlobalConstants
+            //TODO
+    {
+        public static String AllReportsStats = "";
+
+        public static  ArrayList<String> allReports = new ArrayList<>();
+    }
+
 }

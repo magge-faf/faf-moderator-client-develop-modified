@@ -306,7 +306,8 @@ public class ViewHelper {
                     Instant instantFromDate = date.toInstant();
                     Duration duration_left = Duration.between(instantFromDate, banInfo.getExpiresAt());
                     Duration duration_total = Duration.between(banInfo.getCreateTime(), banInfo.getExpiresAt());
-                    yield "%s days, %s hours (%s days, %s hours)".formatted(duration_total.toDays(), duration_total.toHoursPart(),duration_left.toDays(), duration_left.toHoursPart());
+                    //TODO
+                    yield "%s days (%s days, %s hours)".formatted(duration_total.toDays()+1, duration_left.toDays(), duration_left.toHoursPart());
                 }
             };
         }, o.getValue().durationProperty()));
@@ -1873,11 +1874,13 @@ public class ViewHelper {
         idColumn.setCellValueFactory(o -> o.getValue().idProperty());
         idColumn.setComparator(Comparator.comparingInt(Integer::parseInt));
         tableView.getColumns().add(idColumn);
+        //idColumn.setMinWidth(10);
         extractors.put(idColumn, ModerationReportFX::getId);
 
         TableColumn<ModerationReportFX, ModerationReportStatus> statusColumn = new TableColumn<>("Status");
         statusColumn.setCellValueFactory(param -> param.getValue().reportStatusProperty());
         tableView.getColumns().add(statusColumn);
+        //statusColumn.setMinWidth(10);
         statusColumn.setCellFactory(new Callback<TableColumn<ModerationReportFX, ModerationReportStatus>, TableCell<ModerationReportFX, ModerationReportStatus>>() {
             @Override
             public TableCell<ModerationReportFX, ModerationReportStatus> call(TableColumn<ModerationReportFX, ModerationReportStatus> param) {
@@ -1910,27 +1913,28 @@ public class ViewHelper {
                     }
                 };
             }
+
         });
         extractors.put(statusColumn, ModerationReportFX::getReportStatus);
 
         TableColumn<ModerationReportFX, PlayerFX> reporterColumn = new TableColumn<>("Reporter");
         reporterColumn.setCellFactory(tableColumn -> ViewHelper.playerFXCellFactory(tableColumn, PlayerFX::getLogin));
         reporterColumn.setCellValueFactory(param -> new SimpleObjectProperty<>(param.getValue().getReporter()));
-        reporterColumn.setMinWidth(100);
+        //reporterColumn.setMinWidth(80);
         tableView.getColumns().add(reporterColumn);
         extractors.put(reporterColumn, reportFx -> reportFx.getReporter().getRepresentation());
 
-        TableColumn<ModerationReportFX, String> reportedUsersColumn = new TableColumn<>("Reported user(s)");
+        TableColumn<ModerationReportFX, String> reportedUsersColumn = new TableColumn<>("Offender");
         reportedUsersColumn.setCellValueFactory(param -> new SimpleObjectProperty<>(param.getValue().getReportedUsers().stream()
                         .map(PlayerFX::getLogin)
                         .collect(Collectors.joining("\n"))
                 )
         );
-        reportedUsersColumn.setMinWidth(140);
+        //reportedUsersColumn.setMinWidth(80);
         tableView.getColumns().add(reportedUsersColumn);
 
-        TableColumn<ModerationReportFX, String> reportDescriptionColumn = new TableColumn<>("Report Description");
-        reportDescriptionColumn.setMinWidth(150);
+        TableColumn<ModerationReportFX, String> reportDescriptionColumn = new TableColumn<>("Description");
+        reportDescriptionColumn.setMinWidth(600);
         reportDescriptionColumn.setCellValueFactory(param -> param.getValue().reportDescriptionProperty());
         reportDescriptionColumn.setCellFactory(column -> {
             TableCell<ModerationReportFX, String> cell = new TableCell<>();
@@ -1946,7 +1950,7 @@ public class ViewHelper {
         extractors.put(reportDescriptionColumn, ModerationReportFX::getReportDescription);
 
         TableColumn<ModerationReportFX, String> incidentTimeCodeColumn = new TableColumn<>("Incident Timecode");
-        incidentTimeCodeColumn.setMinWidth(140);
+        //incidentTimeCodeColumn.setMaxWidth(80);
         incidentTimeCodeColumn.setCellValueFactory(param -> param.getValue().gameIncidentTimecodeProperty());
         tableView.getColumns().add(incidentTimeCodeColumn);
         extractors.put(incidentTimeCodeColumn, ModerationReportFX::getGameIncidentTimecode);
@@ -1959,7 +1963,6 @@ public class ViewHelper {
             }
             return game.getId();
         }, o.getValue().gameProperty()));
-        gameColumn.setMinWidth(80);
         tableView.getColumns().add(gameColumn);
         extractors.put(gameColumn, reportFx -> reportFx.getGame() == null ? null : reportFx.getGame().getId());
 
@@ -1985,7 +1988,7 @@ public class ViewHelper {
         }
 
         TableColumn<ModerationReportFX, String> privateNoteColumn = new TableColumn<>("Private Notice");
-        privateNoteColumn.setMinWidth(150);
+        privateNoteColumn.setMinWidth(60);
         privateNoteColumn.setCellValueFactory(param -> param.getValue().moderatorPrivateNoteProperty());
         tableView.getColumns().add(privateNoteColumn);
         extractors.put(privateNoteColumn, ModerationReportFX::getModeratorPrivateNote);

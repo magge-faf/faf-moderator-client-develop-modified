@@ -47,6 +47,7 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -157,7 +158,6 @@ public class ModerationReportController implements Controller<Region> {
         else {
             setSysClipboardText(content);
         }
-
     }
 
     public static class GlobalConstants
@@ -168,6 +168,7 @@ public class ModerationReportController implements Controller<Region> {
         public static String numpad_three_game_id = "";
 
         public static  ArrayList<String> allReports = new ArrayList<>();
+        public static  ArrayList<String> allOffenders = new ArrayList<>();
     }
 
     @FXML
@@ -261,6 +262,10 @@ public class ModerationReportController implements Controller<Region> {
     int counter_awaiting_total_ru_reports = 0;
     int counter_already_taken_from_mod = 0;
 
+    List Offenders = new List();
+    List Reporters = new List();
+    List Games = new List();
+
     private void renewFilter() {
         counter_awaiting_total_reports = 0;
         counter_awaiting_total_ru_reports = 0;
@@ -292,12 +297,27 @@ public class ModerationReportController implements Controller<Region> {
                     String current_line = moderationReportFx.getId() + ":" + moderationReportFx.getLastModerator().getRepresentation() + ":" + moderationReportFx.getReportStatus();
                     if(!GlobalConstants.allReports.contains(current_line) && !moderationReportFx.getReportStatus().toString().equals("AWAITING")){
                         GlobalConstants.allReports.add(current_line);
+
                     }
                 }
                 catch (Exception ignored){} // com.faforever.moderatorclient.ui.domain.ModerationReportFX.getLastModerator()" is null
 
                 if (moderationReportFx.getReportStatus().toString().equals("AWAITING")) {
                     counter_awaiting_total_reports += 1;
+
+                    //Reporters.add(moderationReportFx.getReporter().getRepresentation());
+                    //Offenders.add(moderationReportFx.getReportedUsers().toString());
+                    //log.debug(moderationReportFx.getReporter().getRepresentation());
+                    //log.debug(moderationReportFx.getReportedUsers().toString());
+                    //log.debug(String.valueOf(moderationReportFx.getReportedUsers().stream().toList()));
+
+                    for (PlayerFX temp : moderationReportFx.getReportedUsers().stream().toList()) {
+                        log.debug(String.valueOf(temp.getRepresentation()));
+                        GlobalConstants.allOffenders.add(String.valueOf(temp.getRepresentation()));
+                    }
+
+
+                    //log.debug(moderationReportFx.getGame().getId());
 
                     if (moderationReportFx.getModeratorPrivateNote() != null || moderationReportFx.getLastModerator() != null
                     ){
@@ -325,13 +345,25 @@ public class ModerationReportController implements Controller<Region> {
                     }
                 }
 
+
+
+
                 AwaitingReportsTotalTextArea.setText(
                         "Total awaiting: " + (counter_awaiting_total_reports) +
                                 "\nTotal RU awaiting: " + (counter_awaiting_total_ru_reports) +
                                 "\nTotal non RU awaiting: " + (counter_awaiting_total_reports - counter_awaiting_total_ru_reports));
 
+                //log.debug("______");
+                //int occurrences = Collections.frequency(Offenders.getItems(), "bat");
+
+                //log.debug(Offenders.toString());
+
+                //for( String oneItem : GlobalConstants.allReports ) {
+                //    log.debug(oneItem);
+                //}
                 return moderationReportFx.getReportStatus() == moderationReportStatus;
             }
+
             return true;
         });
     }

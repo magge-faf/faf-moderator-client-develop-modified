@@ -128,24 +128,26 @@ public class LoginController implements Controller<Pane> {
                 } catch (Exception ignored) {}
                 try {
                     loginWebView.getEngine().executeScript(String.format("javascript:document.getElementsByName('password')[0].value = '%s'", Password));
-                } catch (Exception ignored) {}
+                }  catch (Exception e) {
+                    log.debug(String.valueOf(e));
+                    return;
+                }
             }
             if (!newValue) {
                 try {
                     loginWebView.getEngine().executeScript("javascript:document.querySelector('input[type=\"submit\"][value=\"Log in\"]').click()");
-                } catch (Exception ignored) {
+                }  catch (Exception e2) {
+                    log.debug(String.valueOf(e2));
+                    return;
                 }
+
+            }
                 try {
                     loginWebView.getEngine().executeScript("javascript:document.querySelector('input[type=\"submit\"][value=\"Authorize\"]').click()");
                 } catch (Exception ignored) {
                     resetPageFuture.complete(null);
                 }
-                }
             }
-            else {
-                if (!newValue) {
-                resetPageFuture.complete(null);
-            }}
         }));
         loginWebView.getEngine().locationProperty().addListener((observable, oldValue, newValue) -> {
             List<NameValuePair> params;
