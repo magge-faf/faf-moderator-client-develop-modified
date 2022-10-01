@@ -18,7 +18,7 @@
     <Separator prefHeight="10" />
     <TextField fx:id="AllModeratorStatsTextField" minWidth="300" promptText="Refresh Reports to see stats about moderators - total sum of DISCARDED and COMPLETED"/>
     <Button fx:id="LoadAllModeratorStatsButton" text="Load all stats" mnemonicParsing="false" onAction="#LoadAllModeratorStatsButton"/>
-    <Button fx:id="LoadAllReportsAndModeratorStatsForZulipButton" text="load 3 or more reports against:" mnemonicParsing="false" onAction="#LoadAllReportsAndModeratorStatsForZulipButton"/>
+    <Button fx:id="LoadAllReportsAndModeratorStatsForZulipButton" text="Load current top offenders (3+):" mnemonicParsing="false" onAction="#LoadAllReportsAndModeratorStatsForZulipButton"/>
     <Separator prefHeight="10" />
     <TextField fx:id="MostReportsOffendersTextfield" minWidth="100" promptText="MostReportsOffendersTextfield"/>
     <Separator prefHeight="10" />
