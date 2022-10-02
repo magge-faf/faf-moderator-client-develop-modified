@@ -68,24 +68,23 @@ public class LoginController implements Controller<Pane> {
 
         loginWebView.getEngine().getLoadWorker().runningProperty().addListener(((observable, oldValue, newValue) -> {
 
+            List<String> result;
+            String NameOrEmail = "";
+            String Password = "";
+
+            File f = new File("account_credentials.txt");
+
+            if(f.exists() && !f.isDirectory()) {
+                try (Stream<String> lines = Files.lines(Paths.get("account_credentials.txt"))) {
+                    result = lines.collect(Collectors.toList());
+                    if (!result.get(0).equals("")){
+                        NameOrEmail = result.get(0);
+                        Password = result.get(1);
+                    }
+                } catch (Exception error) {log.debug(String.valueOf(error));}
+            }
+
             if (!newValue) {
-
-                List<String> result;
-                String NameOrEmail = "";
-                String Password = "";
-
-                File f = new File("account_credentials.txt");
-
-                if(f.exists() && !f.isDirectory()) {
-                    try (Stream<String> lines = Files.lines(Paths.get("account_credentials.txt"))) {
-                        result = lines.collect(Collectors.toList());
-                        if (!result.get(0).equals("")){
-                            NameOrEmail = result.get(0);
-                            Password = result.get(1);
-                        }
-                    } catch (Exception error) {log.debug(String.valueOf(error));}
-                }
-
                 if (!NameOrEmail.equals("")) {
                     try {
                         if (loginWebView.getEngine().executeScript("javascript:document.getElementById('form-header');") != null) {
@@ -94,7 +93,6 @@ public class LoginController implements Controller<Pane> {
                         loginWebView.getEngine().executeScript("javascript:document.querySelector('input[type=\"submit\"][value=\"Log in\"]').click()");
                         }
                     }catch (Exception error) { log.debug(String.valueOf(error));}
-
                 }
 
                 //TODO - why does this fuck up the whole login process WHEN IT FUCKING WORKED BEFORE whyyyyyyyyyyyyypeaifpeofjw FUCK THIS SRSLY
