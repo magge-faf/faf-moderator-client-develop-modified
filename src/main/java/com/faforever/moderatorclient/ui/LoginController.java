@@ -1,8 +1,4 @@
 package com.faforever.moderatorclient.ui;
-import java.awt.*;
-import java.awt.datatransfer.Clipboard;
-import java.awt.datatransfer.StringSelection;
-import java.awt.event.KeyEvent;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.FafUserCommunicationService;
 import com.faforever.moderatorclient.api.TokenService;
@@ -32,7 +28,6 @@ import java.nio.file.Paths;
 import java.text.MessageFormat;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -64,6 +59,7 @@ public class LoginController implements Controller<Pane> {
 
     @FXML
     public void initialize() throws IOException {
+
         applicationProperties.getEnvironments().forEach(
                 (key, environmentProperties) -> environmentComboBox.getItems().add(key)
         );
@@ -72,85 +68,53 @@ public class LoginController implements Controller<Pane> {
 
         loginWebView.getEngine().getLoadWorker().runningProperty().addListener(((observable, oldValue, newValue) -> {
 
-            List<String> result;
-            String NameOrEmail = "";
-            String Password = "";
-
-            File f = new File("account_credentials.txt");
-            if(f.exists() && !f.isDirectory()) {
-                try (Stream<String> lines = Files.lines(Paths.get("account_credentials.txt"))) {
-                    result = lines.collect(Collectors.toList());
-                    if (!result.get(0).equals("")){
-                        NameOrEmail = result.get(0);
-                        Password = result.get(1);
-                    }
-                } catch (Exception e) {
-                    log.debug(String.valueOf(e));
-                }
-            if (!NameOrEmail.equals("")) {
-                Robot robot = null;
-                try {
-
-                    robot = new Robot();
-                } catch (AWTException e) {
-                    throw new RuntimeException(e);
-                }
-
-                // copy from clipboard, common solution for java
-                //StringSelection stringSelectionNameOrEmail = new StringSelection(NameOrEmail);
-                //Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
-                //clipboard.setContents(stringSelectionNameOrEmail, stringSelectionNameOrEmail);
-
-                //select NameOrEmail in loginform via tab
-                //robot.keyPress(KeyEvent.VK_TAB);
-/*
-                // paste from clipboard
-                robot.keyPress(KeyEvent.VK_CONTROL);
-                robot.keyPress(KeyEvent.VK_V);
-                robot.keyRelease(KeyEvent.VK_V);
-                robot.keyRelease(KeyEvent.VK_CONTROL);
-
-                //select Password in loginform via tab
-                robot.keyPress(KeyEvent.VK_TAB);
-
-                StringSelection stringSelectionPassword = new StringSelection(Password);
-                Clipboard clipboardstringSelectionPassword = Toolkit.getDefaultToolkit().getSystemClipboard();
-                clipboardstringSelectionPassword.setContents(stringSelectionPassword, stringSelectionPassword);
-
-                robot.keyPress(KeyEvent.VK_CONTROL);
-                robot.keyPress(KeyEvent.VK_V);
-                robot.keyRelease(KeyEvent.VK_V);
-                robot.keyRelease(KeyEvent.VK_CONTROL);
-
- */
-                try {
-                    loginWebView.getEngine().executeScript(String.format("javascript:document.getElementsByName('usernameOrEmail')[0].value = '%s'", NameOrEmail));
-                } catch (Exception ignored) {}
-                try {
-                    loginWebView.getEngine().executeScript(String.format("javascript:document.getElementsByName('password')[0].value = '%s'", Password));
-                }  catch (Exception e) {
-                    log.debug(String.valueOf(e));
-                    return;
-                }
-            }
             if (!newValue) {
-                try {
-                    loginWebView.getEngine().executeScript("javascript:document.querySelector('input[type=\"submit\"][value=\"Log in\"]').click()");
-                }  catch (Exception e2) {
-                    log.debug(String.valueOf(e2));
-                    return;
+
+                List<String> result;
+                String NameOrEmail = "";
+                String Password = "";
+
+                File f = new File("account_credentials.txt");
+
+                if(f.exists() && !f.isDirectory()) {
+                    try (Stream<String> lines = Files.lines(Paths.get("account_credentials.txt"))) {
+                        result = lines.collect(Collectors.toList());
+                        if (!result.get(0).equals("")){
+                            NameOrEmail = result.get(0);
+                            Password = result.get(1);
+                        }
+                    } catch (Exception error) {
+                        log.debug(String.valueOf(error));
+                        }
                 }
 
-            }
-                try {
-                    loginWebView.getEngine().executeScript("javascript:document.querySelector('input[type=\"submit\"][value=\"Authorize\"]').click()");
-                } catch (Exception ignored) {
-                    resetPageFuture.complete(null);
+                if (!NameOrEmail.equals("")) {
+                    try {
+                        loginWebView.getEngine().executeScript(String.format("javascript:document.getElementsByName('usernameOrEmail')[0].value = '%s'", NameOrEmail));
+                    } catch (Exception error) { log.debug(String.valueOf(error));}
+
+                    try {
+                        loginWebView.getEngine().executeScript(String.format("javascript:document.getElementsByName('password')[0].value = '%s'", Password));
+                    } catch (Exception error) { log.debug(String.valueOf(error));}
+
+                    try {
+                        loginWebView.getEngine().executeScript("javascript:document.querySelector('input[type=\"submit\"][value=\"Log in\"]').click()");
+                    } catch (Exception error) { log.debug(String.valueOf(error));}
+
+                    //TODO - check if element is visible then run javascript
+                    //try {
+                    //    loginWebView.getEngine().executeScript("javascript:document.querySelector('input[type=\"submit\"][value=\"Authorize\"]').click()");
+                    //} catch (Exception error) { log.debug(String.valueOf(error));}
+
                 }
+
+                resetPageFuture.complete(null);
             }
         }));
+
         loginWebView.getEngine().locationProperty().addListener((observable, oldValue, newValue) -> {
             List<NameValuePair> params;
+
             try {
                 params = URLEncodedUtils.parse(new URI(newValue), StandardCharsets.UTF_8);
             } catch (URISyntaxException e) {
@@ -197,6 +161,7 @@ public class LoginController implements Controller<Pane> {
         });
     }
 
+
     public void reloadLogin() {
         resetPageFuture = new CompletableFuture<>();
         resetPageFuture.thenAccept(aVoid -> Platform.runLater(this::loadLoginPage));
@@ -204,14 +169,12 @@ public class LoginController implements Controller<Pane> {
         if (!loginWebView.getEngine().getLoadWorker().isRunning()) {
             resetPageFuture.complete(null);
         }
-
     }
+
 
     private void loadLoginPage(){
         loginWebView.getEngine().setJavaScriptEnabled(true);
-
         loginWebView.getEngine().load(getHydraUrl());
-
     }
 
 
