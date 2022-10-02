@@ -83,9 +83,7 @@ public class LoginController implements Controller<Pane> {
                             NameOrEmail = result.get(0);
                             Password = result.get(1);
                         }
-                    } catch (Exception error) {
-                        log.debug(String.valueOf(error));
-                        }
+                    } catch (Exception error) {log.debug(String.valueOf(error));}
                 }
 
                 if (!NameOrEmail.equals("")) {
