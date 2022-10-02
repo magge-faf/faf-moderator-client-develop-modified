@@ -90,29 +90,20 @@ public class LoginController implements Controller<Pane> {
                     try {
                         if (loginWebView.getEngine().executeScript("javascript:document.getElementById('form-header');") != null) {
                         loginWebView.getEngine().executeScript(String.format("javascript:document.getElementsByName('usernameOrEmail')[0].value = '%s'", NameOrEmail));
+                        loginWebView.getEngine().executeScript(String.format("javascript:document.getElementsByName('password')[0].value = '%s'", Password));
+                        loginWebView.getEngine().executeScript("javascript:document.querySelector('input[type=\"submit\"][value=\"Log in\"]').click()");
                         }
                     }catch (Exception error) { log.debug(String.valueOf(error));}
 
-                    try {
-                        if (loginWebView.getEngine().executeScript("javascript:document.getElementById('form-header');") != null) {
-                            loginWebView.getEngine().executeScript(String.format("javascript:document.getElementsByName('password')[0].value = '%s'", Password));
-                        }
-                    } catch (Exception error) { log.debug(String.valueOf(error));}
-
-                    try {
-                        if (loginWebView.getEngine().executeScript("javascript:document.getElementById('form-header');") != null) {
-                            loginWebView.getEngine().executeScript("javascript:document.querySelector('input[type=\"submit\"][value=\"Log in\"]').click()");
-                        }
-                    } catch (Exception error) { log.debug(String.valueOf(error));}
-
-                    //TODO - any 4th try block fucks up the whole login process whyyyyyyyyyyyyypeaifpeofjw
-                    //try {
-                    //    if (loginWebView.getEngine().executeScript("javascript:document.getElementById('confirmation-form');") != null) {
-                    //        loginWebView.getEngine().executeScript("javascript:document.querySelector('input[type=\"submit\"][value=\"Authorize\"]').click()");
-                    //    }
-                    //} catch (Exception error) { log.debug(String.valueOf(error));}
-
                 }
+
+                //TODO - why does this fuck up the whole login process WHEN IT FUCKING WORKED BEFORE whyyyyyyyyyyyyypeaifpeofjw FUCK THIS SRSLY
+
+                //try {
+                //    if (loginWebView.getEngine().executeScript("javascript:document.getElementById('confirmation-form');") != null) {
+                //        loginWebView.getEngine().executeScript("javascript:document.querySelector('input[type=\"submit\"][value=\"Authorize\"]').click()");
+                //    }
+                //} catch (Exception error) { log.debug(String.valueOf(error));}
 
                 resetPageFuture.complete(null);
             }
