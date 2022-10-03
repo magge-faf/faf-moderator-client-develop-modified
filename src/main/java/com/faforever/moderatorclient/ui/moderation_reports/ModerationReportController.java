@@ -192,11 +192,16 @@ public class ModerationReportController implements Controller<Region> {
                         reportedPlayersOfCurrentlySelectedReport.setAll(newValue.getReportedUsers());
                     }
 
-                    if (newValue == null) {
-                        chatLogTextArea.setText("Game ID is invalid or missing.");
-                    }
+                    try {
+                        if (newValue.getGame().getId() == null) {
+                            chatLogTextArea.setText("Game ID is invalid or missing.");
+                        }
+                    } catch (Exception error) {
+                        //log.debug(String.valueOf(error));
+                        log.debug("No Game ID");
+                    ;}
 
-                    if (AutomaticallyLoadChatLogCheckBox.isSelected() && newValue != null) {
+                    if (AutomaticallyLoadChatLogCheckBox.isSelected() && newValue.getGame() != null) {
                         showChatLog(newValue);
                         log.debug("[LoadChatLog] log automatically loaded");
                     }
