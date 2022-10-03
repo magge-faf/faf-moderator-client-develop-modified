@@ -95,6 +95,7 @@ public class LoginController implements Controller<Pane> {
                         loginWebView.getEngine().executeScript(String.format("javascript:document.getElementsByName('password')[0].value = '%s'", Password));
                         log.debug("[autologin] Account credentials were entered.");
                         loginWebView.getEngine().executeScript("javascript:document.querySelector('input[type=\"submit\"][value=\"Log in\"]').click()");
+                        log.debug("[autologin] Log in button was automatically clicked.");
                         }
                     }catch (Exception error) { log.debug(String.valueOf(error));}
                 }
