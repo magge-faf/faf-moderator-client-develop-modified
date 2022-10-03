@@ -160,7 +160,6 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     public static class GlobalConstants
-            //TODO
     {
         public static String AwaitingReportsTotalTextArea = "";
         public static ArrayList<String> allReports = new ArrayList<>();
@@ -191,38 +190,42 @@ public class ModerationReportController implements Controller<Region> {
                     if (newValue != null) {
                         currentlySelectedItemNotNull = newValue;
                         reportedPlayersOfCurrentlySelectedReport.setAll(newValue.getReportedUsers());
-                        if (newValue.getGame() == null) {
-                            chatLogTextArea.setText("not available");
-                        } else {
-                            try {
-                                for (PlayerFX item : newValue.getReportedUsers()) {
-                                    CreateReportButton.setId(StringUtils.substringBetween(item.getRepresentation()," [id ", "]"));
-                                    CreateReportButton.setText("Create report for " + StringUtils.substringBetween(item.getRepresentation()," [id ", "]"));
+                    }
 
-                                    CopyReportedUserID.setId(item.getRepresentation());
-                                    CopyReportedUserID.setText(item.getRepresentation());
-                                }
-                            }
-                            catch (Exception e) {
-                                log.debug(String.valueOf(e));
-                            }
+                    if (newValue.getGame() == null) {
+                        chatLogTextArea.setText("Game ID is invalid or missing.");
+                    }
 
-                            CopyReportID.setId(newValue.getId());
+                    if (AutomaticallyLoadChatLogCheckBox.isSelected() && newValue.getGame() != null) {
+                        showChatLog(newValue);
+                        log.debug("[LoadChatLog] log automatically loaded");
+                    }
 
-                            CopyGameID.setText("Game ID: " + newValue.getGame().getId());
-                            CopyGameID.setId(newValue.getGame().getId());
-
-                            StartReplay.setId(CopyGameID.getId());
-                            StartReplay.setText("Start Replay: "+ CopyGameID.getId());
-
-                            if (AutomaticallyLoadChatLogCheckBox.isSelected()){
-                                showChatLog(newValue);
-                                log.debug("Game Log automatically loaded");
-                                GlobalConstants.AwaitingReportsTotalTextArea = newValue.getReportedUsers().toString();
-                            } else {
-                                chatLogTextArea.setText("not loaded yet");
+                    try {
+                        //TODO need to test several offenders at once
+                        for (PlayerFX item : newValue.getReportedUsers()) {
+                            CreateReportButton.setId(StringUtils.substringBetween(item.getRepresentation()," [id ", "]"));
+                            CreateReportButton.setText("Create report for " + StringUtils.substringBetween(item.getRepresentation()," [id ", "]"));
+                            CopyReportedUserID.setId(item.getRepresentation());
+                            CopyReportedUserID.setText(item.getRepresentation());
                             }
                         }
+                        catch (Exception error) {
+                            log.debug(String.valueOf(error));
+                        }
+
+                    CopyReportID.setId(newValue.getId());
+
+                    if (newValue.getGame() == null){
+                        CopyGameID.setText("Game ID does not exist");
+                        CopyGameID.setId("Game ID does not exist");
+                        StartReplay.setText("Game ID does not exist");
+                        StartReplay.setId("");
+                    } else {
+                        CopyGameID.setText("Game ID: " + newValue.getGame().getId());
+                        CopyGameID.setId(newValue.getGame().getId());
+                        StartReplay.setId(CopyGameID.getId());
+                        StartReplay.setText("Start Replay: "+ CopyGameID.getId());
                     }
                 });
 
@@ -230,7 +233,6 @@ public class ModerationReportController implements Controller<Region> {
 
         ViewHelper.buildUserTableView(platformService, reportedPlayerView, reportedPlayersOfCurrentlySelectedReport, this::addBan,
                 playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), communicationService);
-
     }
 
     public static void setSysClipboardText(String writeMe) {
