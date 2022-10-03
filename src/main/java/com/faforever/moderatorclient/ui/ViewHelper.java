@@ -306,8 +306,7 @@ public class ViewHelper {
                     Instant instantFromDate = date.toInstant();
                     Duration duration_left = Duration.between(instantFromDate, banInfo.getExpiresAt());
                     Duration duration_total = Duration.between(banInfo.getCreateTime(), banInfo.getExpiresAt());
-                    //TODO
-                    yield "%s days (%s days, %s hours)".formatted(duration_total.toDays()+1, duration_left.toDays(), duration_left.toHoursPart());
+                    yield "%s days (%s days, %s hours)".formatted(duration_total.toDays(), duration_left.toDays(), duration_left.toHoursPart());
                 }
             };
         }, o.getValue().durationProperty()));
