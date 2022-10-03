@@ -126,7 +126,7 @@ public class BanInfoController implements Controller<Pane> {
             } else {
                 revocationTimeTextField.setText(OffsetDateTime.now().atZoneSameInstant(ZoneOffset.UTC).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
             }
-            // chat and vault ban does not even work?!
+            // chat and vault ban are not working
             //chatOnlyBanRadioButton.setSelected(banInfo.getLevel() == BanLevel.CHAT);
             //vaultBanRadioButton.setSelected(banInfo.getLevel() == BanLevel.VAULT);
             globalBanRadioButton.setSelected(banInfo.getLevel() == BanLevel.GLOBAL);
