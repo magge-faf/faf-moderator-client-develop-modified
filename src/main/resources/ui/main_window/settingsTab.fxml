@@ -16,7 +16,7 @@
     <Button fx:id="BanDataTemporaryVSN" text="Open BlacklistedTemporaryVSN" mnemonicParsing="false" onAction="#BanDataTemporaryVSN"/>
     <Button fx:id="BanDataPermanentIP" text="Open BlacklistedPermanentIP" mnemonicParsing="false" onAction="#BanDataPermanentIP"/>
     <Separator prefHeight="10" />
-    <Button fx:id="LoadAllReportsAndModeratorStatsAndTopOffendersButton" text="Load all Moderator stats and print out current top offenders (3 or more reports):" mnemonicParsing="false" onAction="#LoadAllReportsAndModeratorStatsAndTopOffendersButton"/>
+    <Button fx:id="LoadAllReportsAndModeratorStatsAndTopOffendersButton" text="Load Moderator stats and current top offenders with 3 or more reports (+copy content to clipboard for zulip):" mnemonicParsing="false" onAction="#LoadAllReportsAndModeratorStatsAndTopOffendersButton"/>
     <Separator prefHeight="10" />
     <TextField fx:id="AllModeratorStatsTextField" minWidth="300" promptText="Refresh Reports to see stats about moderators - total sum of DISCARDED and COMPLETED"/>
     <Separator prefHeight="10" />
@@ -27,5 +27,4 @@
     <Separator minHeight="10" />
     <Button fx:id="TemplateReportButton" text="Open template for report" mnemonicParsing="false" onAction="#TemplateReportButton"/>
     <Button fx:id="LoadAllModeratorStatsButton" text="Load all stats" mnemonicParsing="false" visible="false" onAction="#LoadAllModeratorStatsButton"/>
-
 </VBox>

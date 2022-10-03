@@ -24,6 +24,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.awt.datatransfer.StringSelection;
+import java.awt.Toolkit;
+import java.awt.datatransfer.Clipboard;
 
 
 @Component
@@ -158,6 +161,16 @@ public class SettingsController implements Controller<Region> {
             AllModeratorStatsTextField.setText(String.valueOf(finalList));
             GlobalConstants.AllReportsStats = String.valueOf(finalList);
 
+            String AwaitingReportsTotalTextAreaString = String.valueOf(ModerationReportController.GlobalConstants.AwaitingReportsTotalTextArea);
+            log.debug(AwaitingReportsTotalTextAreaString);
+
+            String myString = AllModeratorStatsTextField.getText() + "\n\n" + AwaitingReportsTotalTextAreaString;
+            StringSelection stringSelection = new StringSelection(myString);
+            Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+            clipboard.setContents(stringSelection, null);
+
+
+
         }catch (Exception e) {
             AllModeratorStatsTextField.setText("Refresh reports first");
             }
@@ -180,13 +193,10 @@ public class SettingsController implements Controller<Region> {
 
     public void LoadAllReportsAndModeratorStatsAndTopOffendersButton() {
         LoadAllModeratorStatsButton();
-
         String allOffendersString = String.valueOf(ModerationReportController.GlobalConstants.allOffenders);
         String allOffendersStringProcessed = allOffendersString.replace("[","").replace("]","");
         List<String> allOffendersList = new ArrayList<>(Arrays.asList(allOffendersStringProcessed.split(",")));
-        
         Set<String> mySet = new HashSet<>(allOffendersList);
-
         String TotalAmountReportsForOffender;
         StringBuilder OffenderNameAndID = new StringBuilder();
 
@@ -209,5 +219,4 @@ public class SettingsController implements Controller<Region> {
         {
             public static String AllReportsStats = "";
         }
-
 }
