@@ -19,12 +19,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 
-import java.io.IOException;
-
 @Configuration
 @EnableConfigurationProperties(ApplicationProperties.class)
 @ComponentScan
 @Slf4j
+
 public class FafModeratorClientApplication extends Application {
 
     private ConfigurableApplicationContext applicationContext;
@@ -43,12 +42,8 @@ public class FafModeratorClientApplication extends Application {
     @Override
     public void start(Stage primaryStage) {
         Font.loadFont(getClass().getResource("/style/NotoEmoji-Regular.ttf").toExternalForm(), 12);
-
-
-
         StageHolder.setStage(primaryStage);
         primaryStage.setTitle("magge's modified Mordor");
-
         UiService uiService = applicationContext.getBean(UiService.class);
         MainController mainController = uiService.loadFxml("ui/mainWindow.fxml");
         mainController.display();
