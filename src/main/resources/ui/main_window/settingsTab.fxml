@@ -16,14 +16,16 @@
     <Button fx:id="BanDataTemporaryVSN" text="Open BlacklistedTemporaryVSN" mnemonicParsing="false" onAction="#BanDataTemporaryVSN"/>
     <Button fx:id="BanDataPermanentIP" text="Open BlacklistedPermanentIP" mnemonicParsing="false" onAction="#BanDataPermanentIP"/>
     <Separator prefHeight="10" />
-    <TextField fx:id="AllModeratorStatsTextField" minWidth="300" promptText="Refresh Reports to see stats about moderators - total sum of DISCARDED and COMPLETED"/>
-    <Button fx:id="LoadAllModeratorStatsButton" text="Load all stats" mnemonicParsing="false" onAction="#LoadAllModeratorStatsButton"/>
-    <Button fx:id="LoadAllReportsAndModeratorStatsForZulipButton" text="Load current top offenders (3+):" mnemonicParsing="false" onAction="#LoadAllReportsAndModeratorStatsForZulipButton"/>
+    <Button fx:id="LoadAllReportsAndModeratorStatsAndTopOffendersButton" text="Load all Moderator stats and print out current top offenders (3 or more reports):" mnemonicParsing="false" onAction="#LoadAllReportsAndModeratorStatsAndTopOffendersButton"/>
     <Separator prefHeight="10" />
-    <TextField fx:id="MostReportsOffendersTextfield" minWidth="100" promptText="MostReportsOffendersTextfield"/>
+    <TextField fx:id="AllModeratorStatsTextField" minWidth="300" promptText="Refresh Reports to see stats about moderators - total sum of DISCARDED and COMPLETED"/>
+    <Separator prefHeight="10" />
+    <TextField fx:id="MostReportsOffendersTextField" minWidth="100" promptText="MostReportsOffendersTextField"/>
     <Separator prefHeight="10" />
     <Button fx:id="TemplateCompletedButton" text="Open template for completed" mnemonicParsing="false" onAction="#TemplateCompletedButton"/>
     <Button fx:id="TemplateDiscardedButton" text="Open template for discarded" mnemonicParsing="false" onAction="#TemplateDiscardedButton"/>
     <Separator minHeight="10" />
     <Button fx:id="TemplateReportButton" text="Open template for report" mnemonicParsing="false" onAction="#TemplateReportButton"/>
+    <Button fx:id="LoadAllModeratorStatsButton" text="Load all stats" mnemonicParsing="false" visible="false" onAction="#LoadAllModeratorStatsButton"/>
+
 </VBox>

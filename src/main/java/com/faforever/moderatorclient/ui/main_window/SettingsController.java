@@ -1,9 +1,7 @@
 package com.faforever.moderatorclient.ui.main_window;
 
 import com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController;
-import javafx.event.ActionEvent;
 import javafx.scene.control.Button;
-import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
@@ -27,7 +25,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController.setSysClipboardText;
 
 @Component
 @Slf4j
@@ -46,8 +43,8 @@ public class SettingsController implements Controller<Region> {
     public Button TemplateCompletedButton;
     public Button TemplateDiscardedButton;
     public Button TemplateReportButton;
-    public TextField MostReportsOffendersTextfield;
-
+    public TextField MostReportsOffendersTextField;
+    public Button LoadAllReportsAndModeratorStatsAndTopOffendersButton;
 
     @Override
     public VBox getRoot() {return root;}
@@ -99,10 +96,6 @@ public class SettingsController implements Controller<Region> {
         pb.start();
     }
 
-    public void AllModeratorStatsTextField() {
-
-    }
-
     public void LoadAllModeratorStatsButton() {
         try {
             String allReportsString = String.valueOf(ModerationReportController.GlobalConstants.allReports);
@@ -120,21 +113,21 @@ public class SettingsController implements Controller<Region> {
             }
 
             Set<String> unique = new HashSet<>(test);
-            List<String> totalProcessedReports = new ArrayList<>();
-            List<String> totalProcessedReportsA = new ArrayList<>();
+            List<String> totalProcessedReportsRaw = new ArrayList<>();
+            List<String> totalProcessedReportsProcessed = new ArrayList<>();
 
             for (String key : unique) {
                 if (!key.equals("")){
-                    totalProcessedReports.add(key + ": " + Collections.frequency(test, key));
+                    totalProcessedReportsRaw.add(key + ": " + Collections.frequency(test, key));
                 }
             }
 
-            for (String item : totalProcessedReports) {
+            for (String item : totalProcessedReportsRaw) {
                 item = item.replaceAll("\\[", "").replaceAll("]", "").replaceAll(" ", "");
-                totalProcessedReportsA.add(item);
+                totalProcessedReportsProcessed.add(item);
             }
 
-            totalProcessedReportsA.sort(new Comparator<String>() {
+            totalProcessedReportsProcessed.sort(new Comparator<String>() {
                 public int compare(String o1, String o2) {
                     return extractInt(o1) - extractInt(o2);
                 }
@@ -148,8 +141,8 @@ public class SettingsController implements Controller<Region> {
 
             List<String> finalList = new ArrayList<>();
 
-            // give their numbers back
-            for (String item : totalProcessedReportsA){
+            // give 'em their numbers back
+            for (String item : totalProcessedReportsProcessed){
                 if (item.contains("angelofd")||item.contains("maudlin")){
                     item = item.replaceAll("angelofd","angelofd347h");
                     item = item.replaceAll("maudlin","maudlin27");
@@ -169,10 +162,12 @@ public class SettingsController implements Controller<Region> {
             AllModeratorStatsTextField.setText("Refresh reports first");
             }
     }
+
     public void TemplateCompletedButton() throws IOException {
         ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "TemplateCompleted.txt");
         pb.start();
     }
+
     public void TemplateDiscardedButton() throws IOException {
         ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "TemplateDiscarded.txt");
         pb.start();
@@ -183,61 +178,36 @@ public class SettingsController implements Controller<Region> {
         pb.start();
     }
 
-    public void LoadAllReportsAndModeratorStatsForZulipButton(ActionEvent actionEvent) {
+    public void LoadAllReportsAndModeratorStatsAndTopOffendersButton() {
         LoadAllModeratorStatsButton();
-        List<String> totalProcessedReports = new ArrayList<>();
-        List<String> totalProcessedReportsA = new ArrayList<>();
 
         String allOffendersString = String.valueOf(ModerationReportController.GlobalConstants.allOffenders);
+        String allOffendersStringProcessed = allOffendersString.replace("[","").replace("]","");
+        List<String> allOffendersList = new ArrayList<>(Arrays.asList(allOffendersStringProcessed.split(",")));
+        
+        Set<String> mySet = new HashSet<>(allOffendersList);
 
-        String allOffendersStringA = allOffendersString.replace("[","");
-        String allOffendersStringB = allOffendersStringA.replace("]","");
-
-        List<String> allOffendersList = new ArrayList<>(Arrays.asList(allOffendersStringB.split(",")));
-
-
-        Set<String> mySet = new HashSet<String>(allOffendersList);
-
-
-        String stringA = "";
-        StringBuilder stringB = new StringBuilder("");
+        String TotalAmountReportsForOffender;
+        StringBuilder OffenderNameAndID = new StringBuilder();
 
         for(String s: mySet){
-            stringA = s + " " + Collections.frequency(allOffendersList,s);
-            //System.out.println(s + " " + Collections.frequency(allOffendersList,s));
+            TotalAmountReportsForOffender = s + " " + Collections.frequency(allOffendersList,s);
 
-            if (stringA.endsWith("1") || stringA.endsWith("2")){
+            if (TotalAmountReportsForOffender.endsWith("1") || TotalAmountReportsForOffender.endsWith("2")){
+                //ignore offenders with only 1 or 2 reports
+                //will be a problem for future me when result is 11 or 12, 21, 22, etc
                 continue;
             }
             else {
-                System.out.println(stringA);
-                stringB.append(stringA);
-
-            }
+                OffenderNameAndID.append(TotalAmountReportsForOffender).append(" | ");}
         }
-        MostReportsOffendersTextfield.setText(String.valueOf(stringB));
-
-        //Set<String> st = new HashSet<String>(GlobalConstants.AllReportsStats.split());
-
-        //log.debug(GlobalConstants.AllReportsStats);
-
-
-
-
-        //HashSet<String> hs = new HashSet<String>(myList);
-        //int totalDuplicates =myList.size() - hs.size();
-
-        //log.debug(String.valueOf(myList));;
-        //log.debug(AwaitingReportsTotalTextArea.getPromptText());
-        //setSysClipboardText(myList + "\n\n");// + AwaitingReportsTotalTextArea.getPromptText());
+        MostReportsOffendersTextField.setText(String.valueOf(OffenderNameAndID));
     }
 
     public static class GlobalConstants
-            //TODO
-    {
-        public static String AllReportsStats = "";
-
-        public static  ArrayList<String> allReports = new ArrayList<>();
-    }
+        //carried the status of all reports from the ReportsTab to SettingsController for further processing
+        {
+            public static String AllReportsStats = "";
+        }
 
 }
