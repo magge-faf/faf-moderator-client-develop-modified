@@ -18,9 +18,6 @@ import javafx.stage.Stage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
@@ -31,10 +28,6 @@ import java.util.function.Supplier;
 public class BansController implements Controller<HBox> {
     private final UiService uiService;
     private final BanService banService;
-
-
-
-
     public HBox root;
     public ToggleGroup filterGroup;
     public TextField filter;
@@ -67,23 +60,11 @@ public class BansController implements Controller<HBox> {
                 filteredList.setPredicate(banInfoFX -> !onlyActiveCheckBox.isSelected() || banInfoFX.getBanStatus() == BanStatus.BANNED);
         onlyActiveCheckBox.selectedProperty().addListener(onlyActiveBansChangeListener);
         onlyActiveBansChangeListener.invalidated(onlyActiveCheckBox.selectedProperty());
-
-
-
-
     }
 
     public void onRefreshLatestBans() {
         banService.getLatestBans().thenAccept(banInfoFXES -> Platform.runLater(() -> itemList.setAll(banInfoFXES))).exceptionally(throwable -> {
             log.error("error loading bans", throwable);
-
-
-
-            // TODO get ban ids
-
-
-
-
             return null;
         });
         filter.clear();
