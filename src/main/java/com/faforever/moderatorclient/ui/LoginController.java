@@ -28,6 +28,7 @@ import java.nio.file.Paths;
 import java.text.MessageFormat;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -57,6 +58,8 @@ public class LoginController implements Controller<Pane> {
         return root;
     }
 
+    boolean successful_login = false;
+
     @FXML
     public void initialize() throws IOException {
 
@@ -67,41 +70,42 @@ public class LoginController implements Controller<Pane> {
         environmentComboBox.getSelectionModel().select(0);
 
         loginWebView.getEngine().getLoadWorker().runningProperty().addListener(((observable, oldValue, newValue) -> {
-
-            List<String> result;
-            String NameOrEmail = "";
-            String Password = "";
-
-            File f = new File("account_credentials.txt");
-
-            if(f.exists() && !f.isDirectory()) {
-                try (Stream<String> lines = Files.lines(Paths.get("account_credentials.txt"))) {
-                    result = lines.collect(Collectors.toList());
-                    if (!result.get(0).equals("")){
-                        NameOrEmail = result.get(0);
-                        Password = result.get(1);
-                    }
-                } catch (Exception error) {log.debug(String.valueOf(error));}
-            }
-
             if (!newValue) {
+
+                List<String> AccountCredentials;
+                String NameOrEmail = "";
+                String Password = "";
+
+                File f = new File("account_credentials.txt");
+
+                if(f.exists() && !f.isDirectory()) {
+                    try (Stream<String> lines = Files.lines(Paths.get("account_credentials.txt"))) {
+                        AccountCredentials = lines.collect(Collectors.toList());
+                        if (!AccountCredentials.get(0).equals("")){
+                            NameOrEmail = AccountCredentials.get(0);
+                            Password = AccountCredentials.get(1);
+                        }
+                    } catch (Exception error) {log.debug(String.valueOf(error));}
+                }
+
                 if (!NameOrEmail.equals("")) {
                     try {
                         if (loginWebView.getEngine().executeScript("javascript:document.getElementById('form-header');") != null) {
                         loginWebView.getEngine().executeScript(String.format("javascript:document.getElementsByName('usernameOrEmail')[0].value = '%s'", NameOrEmail));
                         loginWebView.getEngine().executeScript(String.format("javascript:document.getElementsByName('password')[0].value = '%s'", Password));
+                        log.debug("[autologin] Account credentials were entered.");
                         loginWebView.getEngine().executeScript("javascript:document.querySelector('input[type=\"submit\"][value=\"Log in\"]').click()");
                         }
                     }catch (Exception error) { log.debug(String.valueOf(error));}
                 }
 
-                //TODO - why does this fuck up the whole login process WHEN IT FUCKING WORKED BEFORE whyyyyyyyyyyyyypeaifpeofjw FUCK THIS SRSLY
-
-                //try {
-                //    if (loginWebView.getEngine().executeScript("javascript:document.getElementById('confirmation-form');") != null) {
-                //        loginWebView.getEngine().executeScript("javascript:document.querySelector('input[type=\"submit\"][value=\"Authorize\"]').click()");
-                //    }
-                //} catch (Exception error) { log.debug(String.valueOf(error));}
+                try {
+                    if (loginWebView.getEngine().executeScript("javascript:document.getElementById('denial-form');") != null && !successful_login) {
+                        loginWebView.getEngine().executeScript("javascript:document.querySelector('input[type=\"submit\"][value=\"Authorize\"]').click()");
+                        log.debug("[autologin] Authorize button was automatically clicked.");
+                        successful_login = true;
+                    }
+                } catch (Exception error) { log.debug(String.valueOf(error));}
 
                 resetPageFuture.complete(null);
             }
@@ -177,6 +181,7 @@ public class LoginController implements Controller<Pane> {
         Platform.runLater(() ->
                 ViewHelper.errorDialog("Login Failed", MessageFormat.format("Something went wrong while logging in please see the details from the user service. Error: {0}", message)));
     }
+
 
     public String getHydraUrl() {
         EnvironmentProperties environmentProperties = applicationProperties.getEnvironments().get(environmentComboBox.getValue());
