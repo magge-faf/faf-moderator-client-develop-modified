@@ -47,7 +47,6 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -163,12 +162,9 @@ public class ModerationReportController implements Controller<Region> {
     public static class GlobalConstants
             //TODO
     {
-        public static String numpad_one_reported_user_id = "";
-        public static String numpad_two_chat_log = "";
-        public static String numpad_three_game_id = "";
-
-        public static  ArrayList<String> allReports = new ArrayList<>();
-        public static  ArrayList<String> allOffenders = new ArrayList<>();
+        public static String AwaitingReportsTotalTextArea = "";
+        public static ArrayList<String> allReports = new ArrayList<>();
+        public static ArrayList<String> allOffenders = new ArrayList<>();
     }
 
     @FXML
@@ -222,8 +218,7 @@ public class ModerationReportController implements Controller<Region> {
                             if (AutomaticallyLoadChatLogCheckBox.isSelected()){
                                 showChatLog(newValue);
                                 log.debug("Game Log automatically loaded");
-                                GlobalConstants.numpad_one_reported_user_id = newValue.getReportedUsers().toString();
-                                GlobalConstants.numpad_three_game_id = newValue.getGame().getId();
+                                GlobalConstants.AwaitingReportsTotalTextArea = newValue.getReportedUsers().toString();
                             } else {
                                 chatLogTextArea.setText("not loaded yet");
                             }
@@ -262,11 +257,8 @@ public class ModerationReportController implements Controller<Region> {
     int counter_awaiting_total_ru_reports = 0;
     int counter_already_taken_from_mod = 0;
 
-    List Offenders = new List();
-    List Reporters = new List();
-    List Games = new List();
-
     private void renewFilter() {
+        //reset the numbers
         counter_awaiting_total_reports = 0;
         counter_awaiting_total_ru_reports = 0;
         counter_already_taken_from_mod = 0;
@@ -282,7 +274,7 @@ public class ModerationReportController implements Controller<Region> {
             }
             ChooseableStatus selectedItem = statusChoiceBox.getSelectionModel().getSelectedItem();
 
-            if (selectedItem.toString().equals("ALL")) {;
+            if (selectedItem.toString().equals("ALL")) {
                 if (selectedItem != null && selectedItem.getModerationReportStatus() != null) {
                     ModerationReportStatus moderationReportStatus = selectedItem.getModerationReportStatus();
                     return moderationReportFx.getReportStatus() == moderationReportStatus;
@@ -297,7 +289,6 @@ public class ModerationReportController implements Controller<Region> {
                     String current_line = moderationReportFx.getId() + ":" + moderationReportFx.getLastModerator().getRepresentation() + ":" + moderationReportFx.getReportStatus();
                     if(!GlobalConstants.allReports.contains(current_line) && !moderationReportFx.getReportStatus().toString().equals("AWAITING")){
                         GlobalConstants.allReports.add(current_line);
-
                     }
                 }
                 catch (Exception ignored){} // com.faforever.moderatorclient.ui.domain.ModerationReportFX.getLastModerator()" is null
@@ -312,18 +303,14 @@ public class ModerationReportController implements Controller<Region> {
                     //log.debug(String.valueOf(moderationReportFx.getReportedUsers().stream().toList()));
 
                     for (PlayerFX temp : moderationReportFx.getReportedUsers().stream().toList()) {
-                        log.debug(String.valueOf(temp.getRepresentation()));
+                        //log.debug(String.valueOf(temp.getRepresentation()));
                         GlobalConstants.allOffenders.add(String.valueOf(temp.getRepresentation()));
                     }
 
-
-                    //log.debug(moderationReportFx.getGame().getId());
-
-                    if (moderationReportFx.getModeratorPrivateNote() != null || moderationReportFx.getLastModerator() != null
-                    ){
+                    if (moderationReportFx.getModeratorPrivateNote() != null ||
+                            moderationReportFx.getLastModerator() != null){
                         counter_awaiting_total_ru_reports +=1;
-                    }else {
-                        for(int i = 0; i < moderationReportFx.getReportDescription().length(); i++) {
+                        } else { for(int i = 0; i < moderationReportFx.getReportDescription().length(); i++) {
                             if(Character.UnicodeBlock.of(moderationReportFx.getReportDescription().charAt(i)).equals(Character.UnicodeBlock.CYRILLIC)) {
                                 // contains Cyrillic
                                 counter_awaiting_total_ru_reports +=1;
@@ -345,41 +332,32 @@ public class ModerationReportController implements Controller<Region> {
                     }
                 }
 
-
-
-
                 AwaitingReportsTotalTextArea.setText(
-                        "Total awaiting: " + (counter_awaiting_total_reports) +
-                                "\nTotal RU awaiting: " + (counter_awaiting_total_ru_reports) +
-                                "\nTotal non RU awaiting: " + (counter_awaiting_total_reports - counter_awaiting_total_ru_reports));
+                    "Total awaiting: " + (counter_awaiting_total_reports) +
+                    "\nTotal RU awaiting: " + (counter_awaiting_total_ru_reports) +
+                    "\nTotal non RU awaiting: " + (counter_awaiting_total_reports - counter_awaiting_total_ru_reports));
 
-                //log.debug("______");
-                //int occurrences = Collections.frequency(Offenders.getItems(), "bat");
+                GlobalConstants.AwaitingReportsTotalTextArea = AwaitingReportsTotalTextArea.getText();
 
-                //log.debug(Offenders.toString());
-
-                //for( String oneItem : GlobalConstants.allReports ) {
-                //    log.debug(oneItem);
-                //}
                 return moderationReportFx.getReportStatus() == moderationReportStatus;
             }
-
             return true;
         });
     }
 
     public void onRefreshAllReports() {
+        //reset counter
         counter_awaiting_total_reports = 0;
         counter_awaiting_total_ru_reports = 0;
         counter_already_taken_from_mod = 0;
         moderationReportService.getAllReports().thenAccept(reportFxes -> Platform.runLater(() -> itemList.setAll(reportFxes))).exceptionally(throwable -> {
             log.error("error loading reports", throwable);
-
             return null;
         });
     }
 
     public void onEdit() {
+        //reset counter
         counter_awaiting_total_reports = 0;
         counter_awaiting_total_ru_reports = 0;
         counter_already_taken_from_mod = 0;
@@ -447,7 +425,6 @@ public class ModerationReportController implements Controller<Region> {
             }
             CopyChatLog.setId(chat_log_cleaned.toString());
             CopyChatLog.setText("Copy Chat Log");
-            GlobalConstants.numpad_two_chat_log = chat_log_cleaned.toString();
             chatLogTextArea.setText(chat_log_cleaned.toString());
 
         } catch (Exception e) {
