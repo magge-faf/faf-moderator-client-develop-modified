@@ -199,9 +199,11 @@ public class ModerationReportController implements Controller<Region> {
                     } catch (Exception error) {
                         //log.debug(String.valueOf(error));
                         log.debug("No Game ID");
-                    ;}
+                        chatLogTextArea.setText("Game ID is invalid or missing.");
 
-                    if (AutomaticallyLoadChatLogCheckBox.isSelected() && newValue.getGame() != null) {
+                        ;}
+
+                    if (AutomaticallyLoadChatLogCheckBox.isSelected() && newValue != null) {
                         showChatLog(newValue);
                         log.debug("[LoadChatLog] log automatically loaded");
                     }
