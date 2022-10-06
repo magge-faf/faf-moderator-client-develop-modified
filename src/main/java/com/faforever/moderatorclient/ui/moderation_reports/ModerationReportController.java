@@ -92,7 +92,6 @@ public class ModerationReportController implements Controller<Region> {
     public Button CopyGameID;
     public Button StartReplay;
 
-
     private FilteredList<ModerationReportFX> filteredItemList;
     private ObservableList<ModerationReportFX> itemList;
     private ModerationReportFX currentlySelectedItemNotNull;
@@ -409,7 +408,8 @@ public class ModerationReportController implements Controller<Region> {
             String line;
             StringBuilder chat_log_cleaned = new StringBuilder();
             String compile_sentences = "Can you give me some mass, |Can you give me some energy, |" +
-                    "Can you give me one Engineer, | to notify: | to allies: Sent Mass | to allies: Sent Energy ";
+                    "Can you give me one Engineer, | to notify: | to allies: Sent Mass | to allies: Sent Energy |" +
+                    " to allies: sent ";
             while( (line=bufReader.readLine()) != null )
             {
                 Pattern pattern = Pattern.compile(compile_sentences);
