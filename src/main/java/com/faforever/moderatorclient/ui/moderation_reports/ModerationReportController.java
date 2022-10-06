@@ -415,9 +415,7 @@ public class ModerationReportController implements Controller<Region> {
                 Pattern pattern = Pattern.compile(compile_sentences);
                 Matcher matcher = pattern.matcher(line);
                 boolean matchFound = matcher.find();
-                if (matchFound & FilterLogCheckBox.isSelected()) {
-                    // throw away current chat line
-                }else {
+                if (!matchFound & FilterLogCheckBox.isSelected()) {
                     chat_log_cleaned.append(line).append("\n");
                 }
             }
