@@ -192,16 +192,19 @@ public class ModerationReportController implements Controller<Region> {
                         reportedPlayersOfCurrentlySelectedReport.setAll(newValue.getReportedUsers());
                     }
 
-                    try {
-                        if (newValue.getGame().getId() == null) {
-                            chatLogTextArea.setText("Game ID is invalid or missing.");
-                        }
-                    } catch (Exception error) {
-                        //log.debug(String.valueOf(error));
-                        log.debug("No Game ID");
+                    if (newValue == null) {
                         chatLogTextArea.setText("Game ID is invalid or missing.");
-
-                        ;}
+                        CopyGameID.setText("Game ID does not exist");
+                        CopyGameID.setId("");
+                        StartReplay.setText("Game ID does not exist");
+                        StartReplay.setId("");
+                    } else {
+                        CopyReportID.setId(newValue.getId());
+                        CopyGameID.setText("Game ID: " + newValue.getGame().getId());
+                        CopyGameID.setId(newValue.getGame().getId());
+                        StartReplay.setId(CopyGameID.getId());
+                        StartReplay.setText("Start Replay: "+ CopyGameID.getId());
+                    }
 
                     if (AutomaticallyLoadChatLogCheckBox.isSelected() && newValue != null) {
                         showChatLog(newValue);
@@ -220,20 +223,6 @@ public class ModerationReportController implements Controller<Region> {
                         catch (Exception error) {
                             log.debug(String.valueOf(error));
                         }
-
-                    CopyReportID.setId(newValue.getId());
-
-                    if (newValue.getGame() == null){
-                        CopyGameID.setText("Game ID does not exist");
-                        CopyGameID.setId("Game ID does not exist");
-                        StartReplay.setText("Game ID does not exist");
-                        StartReplay.setId("");
-                    } else {
-                        CopyGameID.setText("Game ID: " + newValue.getGame().getId());
-                        CopyGameID.setId(newValue.getGame().getId());
-                        StartReplay.setId(CopyGameID.getId());
-                        StartReplay.setText("Start Replay: "+ CopyGameID.getId());
-                    }
                 });
 
         chatLogTextArea.setText("select a report first");
