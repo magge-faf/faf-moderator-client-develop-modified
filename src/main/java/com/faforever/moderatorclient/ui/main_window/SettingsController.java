@@ -212,6 +212,8 @@ public class SettingsController implements Controller<Region> {
                 OffenderNameAndID.append(TotalAmountReportsForOffender).append(" | ");}
         }
         MostReportsOffendersTextField.setText(String.valueOf(OffenderNameAndID));
+        //reset list
+        ModerationReportController.GlobalConstants.allOffenders = new ArrayList<String>();
     }
 
     public static class GlobalConstants
