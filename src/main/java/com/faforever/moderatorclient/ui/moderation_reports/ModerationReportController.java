@@ -186,42 +186,55 @@ public class ModerationReportController implements Controller<Region> {
         reportTableView.getSelectionModel()
                 .selectedItemProperty()
                 .addListener((observable, oldValue, newValue) -> {
-                    if (newValue != null) {
-                        currentlySelectedItemNotNull = newValue;
-                        reportedPlayersOfCurrentlySelectedReport.setAll(newValue.getReportedUsers());
-                    }
-
-                    if (newValue == null) {
-                        chatLogTextArea.setText("Game ID is invalid or missing.");
-                        CopyGameID.setText("Game ID does not exist");
-                        CopyGameID.setId("");
-                        StartReplay.setText("Game ID does not exist");
-                        StartReplay.setId("");
-                    } else {
-                        CopyReportID.setId(newValue.getId());
-                        CopyGameID.setText("Game ID: " + newValue.getGame().getId());
-                        CopyGameID.setId(newValue.getGame().getId());
-                        StartReplay.setId(CopyGameID.getId());
-                        StartReplay.setText("Start Replay: "+ CopyGameID.getId());
-                    }
-
-                    if (AutomaticallyLoadChatLogCheckBox.isSelected() && newValue != null) {
-                        showChatLog(newValue);
-                        log.debug("[LoadChatLog] log automatically loaded");
-                    }
+                    //catch all null exceptions
 
                     try {
-                        //TODO need to test several offenders at once
-                        for (PlayerFX item : newValue.getReportedUsers()) {
-                            CreateReportButton.setId(StringUtils.substringBetween(item.getRepresentation()," [id ", "]"));
-                            CreateReportButton.setText("Create report for " + StringUtils.substringBetween(item.getRepresentation()," [id ", "]"));
-                            CopyReportedUserID.setId(item.getRepresentation());
-                            CopyReportedUserID.setText(item.getRepresentation());
+                        reportedPlayersOfCurrentlySelectedReport.setAll(newValue.getReportedUsers());
+                        currentlySelectedItemNotNull = newValue;
+
+                        CopyReportID.setId(newValue.getId());
+                        CopyReportID.setText("Report ID: "+newValue.getId());
+                        CopyGameID.setId(newValue.getGame().getId());
+                        CopyGameID.setText("Game ID: " + newValue.getGame().getId());
+                        StartReplay.setId(CopyGameID.getId());
+                        StartReplay.setText("Start Replay: "+ CopyGameID.getId());
+
+                        if (AutomaticallyLoadChatLogCheckBox.isSelected()) {
+                            showChatLog(newValue);
+                            log.debug("[LoadChatLog] log automatically loaded");
+                        }
+
+                        try {
+                            //TODO need to test several offenders at once
+                            //If game ID is missing, then no offender for whatever reason
+                            for (PlayerFX item : reportedPlayersOfCurrentlySelectedReport) {
+                                log.debug("Selected report id - offenders: " + item.getRepresentation());
+                                CopyReportedUserID.setId(item.getRepresentation());
+                                CopyReportedUserID.setText(item.getRepresentation());
+                                CreateReportButton.setId(StringUtils.substringBetween(item.getRepresentation()," [id ", "]"));
+                                CreateReportButton.setText("Create report for " + StringUtils.substringBetween(item.getRepresentation()," [id ", "]"));
                             }
+                        } catch (Exception ErrorPlayerFX) {
+                            log.debug("Exception in PlayerFX item: ");
+                            log.debug(String.valueOf(ErrorPlayerFX));
                         }
-                        catch (Exception error) {
-                            log.debug(String.valueOf(error));
-                        }
+
+                    } catch (Exception ErrorSelectedReport) {
+                        log.debug("Exception for selected report: ");
+                        log.debug(String.valueOf(ErrorSelectedReport));
+
+                        chatLogTextArea.setText("Game ID is invalid or missing.");
+                        CopyChatLog.setText("Chat does not exist");
+                        CopyChatLog.setId("");
+                        CopyGameID.setText("Game ID does not exist");
+                        CopyGameID.setId("");
+                        StartReplay.setText("Replay does not exist");
+                        StartReplay.setId("");
+                        CreateReportButton.setText("no value / missing Game ID");
+                        CreateReportButton.setId("");
+                        CopyReportedUserID.setText("no value / missing Game ID");
+                        CopyReportedUserID.setId("");
+                    }
                 });
 
         chatLogTextArea.setText("select a report first");
