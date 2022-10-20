@@ -164,12 +164,33 @@ public class SettingsController implements Controller<Region> {
             String AwaitingReportsTotalTextAreaString = String.valueOf(ModerationReportController.GlobalConstants.AwaitingReportsTotalTextArea);
             log.debug(AwaitingReportsTotalTextAreaString);
 
-            String myString = AllModeratorStatsTextField.getText() + "\n\n" + AwaitingReportsTotalTextAreaString;
+            String allOffendersString = String.valueOf(ModerationReportController.GlobalConstants.allOffenders);
+            String allOffendersStringProcessed = allOffendersString.replace("[","").replace("]","");
+            List<String> allOffendersList = new ArrayList<>(Arrays.asList(allOffendersStringProcessed.split(",")));
+            Set<String> mySet = new HashSet<>(allOffendersList);
+            String TotalAmountReportsForOffender;
+            StringBuilder OffenderNameAndID = new StringBuilder();
+
+            for(String s: mySet){
+                TotalAmountReportsForOffender = s + " " + Collections.frequency(allOffendersList,s);
+
+                if (TotalAmountReportsForOffender.endsWith("1") || TotalAmountReportsForOffender.endsWith("2") || TotalAmountReportsForOffender.endsWith("3")){
+                    //ignore offenders with only 1 or 2 reports
+                    //will be a problem for future me when result is 11 or 12, 21, 22, etc
+                    continue;
+                }
+                else {
+                    OffenderNameAndID.append(TotalAmountReportsForOffender).append(" | ");}
+            }
+            MostReportsOffendersTextField.setText(String.valueOf(OffenderNameAndID));
+
+            //paste into clipboard for zulip
+            String myString = AllModeratorStatsTextField.getText() + "\n\n" + AwaitingReportsTotalTextAreaString + "\n\n" +
+                    "Most repeated offender:\n\n"+OffenderNameAndID;
+
             StringSelection stringSelection = new StringSelection(myString);
             Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
             clipboard.setContents(stringSelection, null);
-
-
 
         }catch (Exception e) {
             AllModeratorStatsTextField.setText("Refresh reports first");
@@ -193,27 +214,6 @@ public class SettingsController implements Controller<Region> {
 
     public void LoadAllReportsAndModeratorStatsAndTopOffendersButton() {
         LoadAllModeratorStatsButton();
-        String allOffendersString = String.valueOf(ModerationReportController.GlobalConstants.allOffenders);
-        String allOffendersStringProcessed = allOffendersString.replace("[","").replace("]","");
-        List<String> allOffendersList = new ArrayList<>(Arrays.asList(allOffendersStringProcessed.split(",")));
-        Set<String> mySet = new HashSet<>(allOffendersList);
-        String TotalAmountReportsForOffender;
-        StringBuilder OffenderNameAndID = new StringBuilder();
-
-        for(String s: mySet){
-            TotalAmountReportsForOffender = s + " " + Collections.frequency(allOffendersList,s);
-
-            if (TotalAmountReportsForOffender.endsWith("1") || TotalAmountReportsForOffender.endsWith("2")){
-                //ignore offenders with only 1 or 2 reports
-                //will be a problem for future me when result is 11 or 12, 21, 22, etc
-                continue;
-            }
-            else {
-                OffenderNameAndID.append(TotalAmountReportsForOffender).append(" | ");}
-        }
-        MostReportsOffendersTextField.setText(String.valueOf(OffenderNameAndID));
-        //reset list
-        ModerationReportController.GlobalConstants.allOffenders = new ArrayList<String>();
     }
 
     public static class GlobalConstants
