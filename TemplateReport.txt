@@ -6,6 +6,6 @@
 - CTRL+K all units, leaving game on own terms
 - CTRL+K ACU, leaving game on own terms
         
-!stickwhip %s warned for being offensive to other players, reclaiming/killing friendly units and ruining the game experience for other players.
+!stickwhip %s warned for unsportsmanlike conduct. Please respect the guidelines at www.faforever.com/rules
 
-Account suspended for 2 days. Reason: Offensive behavior, reclaiming/killing friendly units and ruining the game experience for other players.
+Account 2 days suspended for unsportsmanlike conduct. Please respect the guidelines at www.faforever.com/rules
