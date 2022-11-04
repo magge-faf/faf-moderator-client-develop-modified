@@ -80,9 +80,9 @@ public class BansController implements Controller<HBox> {
         log.debug(selectedItem.getId());
         log.debug(selectedItem.getPlayer().getRepresentation());
 
-        for (UniqueIdFx banInfoFX : selectedItem.getPlayer().getUniqueIds()) {
-            log.debug(banInfoFX.getVolumeSerialNumber());
-            }
+        //for (UniqueIdFx banInfoFX : selectedItem.getPlayer().getUniqueIds()) {
+        //    log.debug(banInfoFX.getVolumeSerialNumber());
+        //    }
 
         openBanDialog(selectedItem, false);
     }
