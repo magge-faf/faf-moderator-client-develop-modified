@@ -1,5 +1,6 @@
 package com.faforever.moderatorclient.ui;
 
+import java.io.*;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
@@ -92,23 +93,13 @@ import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.net.URL;
 import java.text.MessageFormat;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
-import java.time.temporal.Temporal;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Optional;
-import java.util.Set;
-import java.util.TimeZone;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -737,6 +728,215 @@ public class ViewHelper {
             );
         });
 
+        MenuItem MenuItemaddToBanPermanentList = new MenuItem("Add to banlist");
+
+        MenuItemaddToBanPermanentList.disableProperty().bind(Bindings.createBooleanBinding(() -> {
+            PlayerFX selectedPlayer = tableView.getSelectionModel().getSelectedItem();
+            return selectedPlayer == null || selectedPlayer.getAccountLinks() == null;
+        }, tableView.getSelectionModel().selectedItemProperty()));
+
+        MenuItemaddToBanPermanentList.setOnAction(action -> {
+            PlayerFX playerFX = tableView.getSelectionModel().getSelectedItem();
+            log.debug(playerFX.getRepresentation() + " unique items were added to all ban lists.");
+
+            try {
+                String fileName = "BlacklistedIP.txt";
+                Scanner scanner = new Scanner(new File(fileName));
+                FileWriter fw = new FileWriter(fileName, true); //the true will append new data
+                boolean alreadyExists = false;
+                while (scanner.hasNextLine()) {
+                    try {
+                        String line = scanner.next();
+                        if (line.equals(playerFX.getRecentIpAddress())) {
+                            log.debug(playerFX.getRecentIpAddress() + " was already added.");
+                            alreadyExists = true;
+                            break;
+                        }
+                    } catch (NoSuchElementException e) {
+                        log.debug(String.valueOf(e));
+                    }
+                }
+
+                if (!alreadyExists){
+                    fw.write(playerFX.getRecentIpAddress() + "\n");
+                    fw.flush();
+                    log.debug(playerFX.getRecentIpAddress() + " was added.");
+                }
+
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
+
+            List<String> ListHash = playerFX.getUniqueIds().stream().map(UniqueIdFx::getHash).toList();
+
+            for (String element : ListHash) {
+                log.debug("checking for hash " + element);
+
+                try {
+                    String fileName = "BlacklistedHash.txt";
+                    Scanner scanner = new Scanner(new File(fileName));
+                    FileWriter fw = new FileWriter(fileName, true); //the true will append new data
+                    boolean flag = false;
+
+                    while (scanner.hasNextLine()) {
+                        try {
+                            String line = scanner.next();
+                            if (line.equals(element)) {
+                                flag = true;
+                                break;
+                            }
+                        } catch (Exception e) {
+                            log.debug(String.valueOf(e));
+                        }
+                    }
+                    if(flag) {
+                        log.debug(element + " already exists.");
+                    } else {
+                        fw.write(element + "\n");
+                        fw.flush();
+                        log.debug(element + " was added.");                    }
+                } catch (IOException e) {
+                    log.debug(String.valueOf(e));
+                }
+            }
+
+
+            List<String> ListUUID = playerFX.getUniqueIds().stream().map(UniqueIdFx::getUuid).toList();
+
+            for (String element : ListUUID) {
+                log.debug("checking for UUID " + element);
+
+                try {
+                    String fileName = "BlacklistedUUID.txt";
+                    Scanner scanner = new Scanner(new File(fileName));
+                    FileWriter fw = new FileWriter(fileName, true); //the true will append new data
+                    boolean flag = false;
+
+                    while (scanner.hasNextLine()) {
+                        try {
+                            String line = scanner.next();
+                            if (line.equals(element)) {
+                                flag = true;
+                                break;
+                            }
+                        } catch (Exception e) {
+                            log.debug(String.valueOf(e));
+                        }
+                    }
+                    if(flag) {
+                        log.debug(element + " already exists.");
+                    } else {
+                        fw.write(element + "\n");
+                        fw.flush();
+                        log.debug(element + " was added.");                    }
+                } catch (IOException e) {
+                    log.debug(String.valueOf(e));
+                }
+            }
+
+            List<String> ListMemorySN = playerFX.getUniqueIds().stream().map(UniqueIdFx::getMemorySerialNumber).toList();
+
+            for (String element : ListMemorySN) {
+                log.debug("checking for Memory S/N " + element);
+
+                try {
+                    String fileName = "BlacklistedMemorySN.txt";
+                    Scanner scanner = new Scanner(new File(fileName));
+                    FileWriter fw = new FileWriter(fileName, true); //the true will append new data
+                    boolean flag = false;
+
+                    while (scanner.hasNextLine()) {
+                        try {
+                            String line = scanner.next();
+                            if (line.equals(element)) {
+                                flag = true;
+                                break;
+                            }
+                        } catch (Exception e) {
+                            log.debug(String.valueOf(e));
+                        }
+                    }
+                    if(flag) {
+                        log.debug(element + " already exists.");
+                    } else {
+                        fw.write(element + "\n");
+                        fw.flush();
+                        log.debug(element + " was added.");                    }
+                } catch (IOException e) {
+                    log.debug(String.valueOf(e));
+                }
+            }
+
+            List<String> ListSN = playerFX.getUniqueIds().stream().map(UniqueIdFx::getSerialNumber).toList();
+
+            for (String element : ListSN) {
+                log.debug("checking for S/N " + element);
+
+                try {
+                    String fileName = "BlacklistedSN.txt";
+                    Scanner scanner = new Scanner(new File(fileName));
+                    FileWriter fw = new FileWriter(fileName, true); //the true will append new data
+                    boolean flag = false;
+
+                    while (scanner.hasNextLine()) {
+                        try {
+                            String line = scanner.next();
+                            if (line.equals(element)) {
+                                flag = true;
+                                break;
+                            }
+                        } catch (Exception e) {
+                            log.debug(String.valueOf(e));
+                        }
+                    }
+                    if(flag) {
+                        log.debug(element + " already exists.");
+                    } else {
+                        fw.write(element + "\n");
+                        fw.flush();
+                        log.debug(element + " was added.");                    }
+                } catch (IOException e) {
+                    log.debug(String.valueOf(e));
+                }
+            }
+
+
+            List<String> ListVolumeSN = playerFX.getUniqueIds().stream().map(UniqueIdFx::getVolumeSerialNumber).toList();
+
+            for (String element : ListVolumeSN) {
+                log.debug("checking for Volume S/N " + element);
+
+                try {
+                    String fileName = "BlacklistedVolumeSN.txt";
+                    Scanner scanner = new Scanner(new File(fileName));
+                    FileWriter fw = new FileWriter(fileName, true); //the true will append new data
+                    boolean flag = false;
+
+                    while (scanner.hasNextLine()) {
+                        try {
+                            String line = scanner.next();
+                            if (line.equals(element)) {
+                                flag = true;
+                                break;
+                            }
+                        } catch (Exception e) {
+                            log.debug(String.valueOf(e));
+                        }
+                    }
+                    if(flag) {
+                        log.debug(element + " already exists.");
+                    } else {
+                        fw.write(element + "\n");
+                        fw.flush();
+                        log.debug(element + " was added.");                    }
+                } catch (IOException e) {
+                    log.debug(String.valueOf(e));
+                }
+            }
+
+        });
+
         MenuItem gogLookupMenuItem = new MenuItem("Lookup GogID");
         gogLookupMenuItem.disableProperty().bind(Bindings.createBooleanBinding(() -> {
             PlayerFX selectedPlayer = tableView.getSelectionModel().getSelectedItem();
@@ -749,6 +949,7 @@ public class ViewHelper {
             );
         });
 
+
         contextMenu.getItems().add(steamLookupMenuItem);
 
         if (communicationService.hasPermission(ROLE_ADMIN_ACCOUNT_NAME_CHANGE)) {
@@ -759,6 +960,7 @@ public class ViewHelper {
             });
             contextMenu.getItems().add(forceRenameMenuItem);
             contextMenu.getItems().add(gogLookupMenuItem);
+            contextMenu.getItems().add(MenuItemaddToBanPermanentList);
         }
     }
 

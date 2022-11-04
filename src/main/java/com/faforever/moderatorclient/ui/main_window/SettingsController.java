@@ -10,9 +10,7 @@ import javafx.fxml.FXML;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -39,9 +37,13 @@ public class SettingsController implements Controller<Region> {
     public TextField AccountPasswordTextField;
     public Button SaveAccountButton;
     public TextField PathAccountFile;
-    public Button BanDataPermanentVSN;
-    public Button BanDataTemporaryVSN;
-    public Button BanDataPermanentIP;
+    public Button BlacklistedHash;
+    public Button BlacklistedIP;
+    public Button BlacklistedMemorySN;
+    public Button BlacklistedSN;
+    public Button BlacklistedUUID;
+    public Button BlacklistedVolumeSN;
+    public Button excludedItems;
     public TextField AllModeratorStatsTextField;
     public Button TemplateCompletedButton;
     public Button TemplateDiscardedButton;
@@ -53,7 +55,17 @@ public class SettingsController implements Controller<Region> {
     public VBox getRoot() {return root;}
 
     @FXML
-    public void initialize() {
+    public void initialize() throws IOException {
+
+        String[] BlacklistedFiles = {"BlacklistedHash", "BlacklistedIP", "BlacklistedMemorySN",
+                "BlacklistedSN", "BlacklistedUUID", "BlacklistedVolumeSN", "excludedItems" };
+
+        // initialize default blacklisted files if they do not exist
+        for (String element : BlacklistedFiles) {
+            File yourFile = new File(element + ".txt");
+            yourFile.createNewFile();
+        }
+
         File f = new File("account_credentials.txt");
         if(f.exists() && !f.isDirectory()) {
             Path pathCredentialsFile = Path.of("account_credentials.txt");
@@ -84,20 +96,41 @@ public class SettingsController implements Controller<Region> {
         }
     }
 
-    public void BanDataPermanentVSN() throws IOException {
-        ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "BlacklistedPermanentVSN.txt");
+    public void BlacklistedHash() throws IOException {
+        ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "BlacklistedHash.txt");
         pb.start();
     }
 
-    public void BanDataTemporaryVSN() throws IOException {
-        ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "BlacklistedTemporaryVSN.txt");
+    public void BlacklistedIP() throws IOException {
+        ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "BlacklistedIP.txt");
         pb.start();
     }
 
-    public void BanDataPermanentIP() throws IOException {
-        ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "BlacklistedPermanentIP.txt");
+    public void BlacklistedSN() throws IOException {
+        ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "BlacklistedSN.txt");
         pb.start();
     }
+
+    public void BlacklistedUUID() throws IOException {
+        ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "BlacklistedUUID.txt");
+        pb.start();
+    }
+
+    public void BlacklistedVolumeSN() throws IOException {
+        ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "BlacklistedVolumeSN.txt");
+        pb.start();
+    }
+
+    public void BlacklistedMemorySN() throws IOException {
+        ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "BlacklistedMemorySN.txt");
+        pb.start();
+    }
+
+    public void excludedItems() throws IOException {
+        ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "excludedItems.txt");
+        pb.start();
+    }
+
 
     public void LoadAllModeratorStatsButton() {
         try {
@@ -174,7 +207,7 @@ public class SettingsController implements Controller<Region> {
             for(String s: mySet){
                 TotalAmountReportsForOffender = s + " " + Collections.frequency(allOffendersList,s);
 
-                if (TotalAmountReportsForOffender.endsWith("1") || TotalAmountReportsForOffender.endsWith("2") || TotalAmountReportsForOffender.endsWith("3")){
+                if (TotalAmountReportsForOffender.endsWith("1") || TotalAmountReportsForOffender.endsWith("2")){
                     //ignore offenders with only 1 or 2 reports
                     //will be a problem for future me when result is 11 or 12, 21, 22, etc
                     continue;
@@ -186,7 +219,7 @@ public class SettingsController implements Controller<Region> {
 
             //paste into clipboard for zulip
             String myString = AllModeratorStatsTextField.getText() + "\n\n" + AwaitingReportsTotalTextAreaString + "\n\n" +
-                    "Most repeated offender:\n\n"+OffenderNameAndID;
+                    "Repeat offenders:\n\n"+OffenderNameAndID;
 
             StringSelection stringSelection = new StringSelection(myString);
             Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
