@@ -12,12 +12,12 @@
     <Text textAlignment="CENTER"  text="If credentials are wrong and you can not auto login anymore, change them in account_credentials.txt -> File is in project folder."/>
     <TextField fx:id="PathAccountFile"/>
     <Text textAlignment="CENTER"  text="For every line one item, without brackets whatsoever. Same path as ↑"/>
-    <Button fx:id="BlacklistedHash" text="Open BlacklistedPermanentHash" mnemonicParsing="false" onAction="#BlacklistedHash"/>
-    <Button fx:id="BlacklistedIP" text="Open BlacklistedPermanentIP" mnemonicParsing="false" onAction="#BlacklistedIP"/>
-    <Button fx:id="BlacklistedMemorySN" text="Open BlacklistedPermanentMemorySN" mnemonicParsing="false" onAction="#BlacklistedMemorySN"/>
-    <Button fx:id="BlacklistedSN" text="Open BlacklistedPermanentSN" mnemonicParsing="false" onAction="#BlacklistedSN"/>
-    <Button fx:id="BlacklistedUUID" text="Open BlacklistedPermanentUUID" mnemonicParsing="false" onAction="#BlacklistedUUID"/>
-    <Button fx:id="BlacklistedVolumeSN" text="Open BlacklistedPermanentVolumeSN" mnemonicParsing="false" onAction="#BlacklistedVolumeSN"/>
+    <Button fx:id="BlacklistedHash" text="Open BlacklistedHash" mnemonicParsing="false" onAction="#BlacklistedHash"/>
+    <Button fx:id="BlacklistedIP" text="Open BlacklistedIP" mnemonicParsing="false" onAction="#BlacklistedIP"/>
+    <Button fx:id="BlacklistedMemorySN" text="Open BlacklistedMemorySN" mnemonicParsing="false" onAction="#BlacklistedMemorySN"/>
+    <Button fx:id="BlacklistedSN" text="Open BlacklistedSN" mnemonicParsing="false" onAction="#BlacklistedSN"/>
+    <Button fx:id="BlacklistedUUID" text="Open BlacklistedUUID" mnemonicParsing="false" onAction="#BlacklistedUUID"/>
+    <Button fx:id="BlacklistedVolumeSN" text="Open BlacklistedVolumeSN" mnemonicParsing="false" onAction="#BlacklistedVolumeSN"/>
     <Button fx:id="excludedItems" text="Open excludedItems" mnemonicParsing="false" onAction="#excludedItems"/>
     <Separator prefHeight="10" />
     <Button fx:id="LoadAllReportsAndModeratorStatsAndTopOffendersButton" text="Load Moderator stats and current top offenders with 3 or more reports (+copy content to clipboard for zulip):" mnemonicParsing="false" onAction="#LoadAllReportsAndModeratorStatsAndTopOffendersButton"/>
