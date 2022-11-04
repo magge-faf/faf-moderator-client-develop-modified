@@ -1,4 +1,4 @@
-%s,
+%report_id%,
 
 - Generic insults
 - Reclaiming/Killing friendly units
@@ -6,6 +6,6 @@
 - CTRL+K all units, leaving game on own terms
 - CTRL+K ACU, leaving game on own terms
         
-!stickwhip %s warned for unsportsmanlike conduct. Please respect the guidelines at www.faforever.com/rules
+!stickwhip %offender% warned for unsportsmanlike conduct. Please respect the guidelines at www.faforever.com/rules
 
 Account 2 days suspended for unsportsmanlike conduct. Please respect the guidelines at www.faforever.com/rules

@@ -49,8 +49,10 @@
             <Separator minHeight="10" />
             <Button fx:id="CreateReportButton" mnemonicParsing="false" minWidth="93" onAction="#CreateReportButton"
                     text="Create report"/>
+            <Separator prefHeight="10"/>
             <Button fx:id="CopyReportTemplate" mnemonicParsing="false" minWidth="93" onAction="#CopyReportTemplate"
                     text="Copy report template"/>
+            <Separator prefHeight="10"/>
         </VBox>
         <TableView fx:id="reportTableView" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
                    HBox.hgrow="ALWAYS"/>

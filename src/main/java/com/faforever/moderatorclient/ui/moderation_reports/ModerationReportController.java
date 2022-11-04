@@ -117,6 +117,10 @@ public class ModerationReportController implements Controller<Region> {
         setSysClipboardText(CopyGameID.getId());
     }
 
+    public void CopyReporterButton() {
+        setSysClipboardText(CopyGameID.getId());
+    }
+
     public void CreateReportButton() throws IOException {
         String reported_user_id = CreateReportButton.getId();
         String url = ("https://forum.faforever.com/search?term=" + reported_user_id + "&in=titles");
@@ -145,17 +149,36 @@ public class ModerationReportController implements Controller<Region> {
 
     public void CopyReportTemplate() throws FileNotFoundException {
         String report_id = CopyReportID.getId();
-        String[] reported_name_array = CopyReportedUserID.getId().split(" ", 2);
+        String game_id = CopyGameID.getId();
+        String[] offender = CopyReportedUserID.getId().split(" ", 2);
+        //String report_created_time = String.valueOf(currentlySelectedItemNotNull.createTimeProperty());
 
         String content = new Scanner(new File("TemplateReport.txt")).useDelimiter("\\Z").next();
 
-        if (content.contains("%s")) {
-            String report_template = String.format(content, report_id, reported_name_array[0]);
-            setSysClipboardText(report_template);
-        }
-        else {
-            setSysClipboardText(content);
-        }
+        // %report_id%
+        // %game_id%
+        // %offender%
+        // %create_time%
+
+        String template_report_id = "%report_id%";
+        String template_game_id = "%game_id%";
+        String template_offender = "%offender%";
+        //String template_create_time = "%create_time%";
+
+        String content_2 = content.replace(template_report_id, report_id);
+        String content_3 = content_2.replace(template_offender, offender[0]);
+        //String content_4 = content_3.replace(template_create_time, report_created_time);
+        String content_5 = content_3.replace(template_game_id, game_id);
+
+        setSysClipboardText(content_5);
+
+        //if (content.contains("%s")) {
+        //    String report_template = String.format(content, report_id, offender[0]);
+        //    setSysClipboardText(report_template);
+        //}
+        //else {
+        //    setSysClipboardText(content);
+        //}
     }
 
     public static class GlobalConstants

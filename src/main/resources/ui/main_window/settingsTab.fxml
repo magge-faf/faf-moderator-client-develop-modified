@@ -30,5 +30,6 @@
     <Button fx:id="TemplateDiscardedButton" text="Open template for discarded" mnemonicParsing="false" onAction="#TemplateDiscardedButton"/>
     <Separator minHeight="10" />
     <Button fx:id="TemplateReportButton" text="Open template for report" mnemonicParsing="false" onAction="#TemplateReportButton"/>
+    <Text textAlignment="CENTER"  text="Available variables: %report_id% %game_id% %offender% "/>
     <Button fx:id="LoadAllModeratorStatsButton" text="Load all stats" mnemonicParsing="false" visible="false" onAction="#LoadAllModeratorStatsButton"/>
 </VBox>
