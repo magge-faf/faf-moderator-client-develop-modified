@@ -10,7 +10,7 @@
     <PasswordField fx:id="AccountPasswordTextField" minWidth="300" promptText="Password"/>
     <Button fx:id="SaveAccountButton" text="Save" mnemonicParsing="false" onAction="#SaveAccountButton"/>
     <Text textAlignment="CENTER"  text="If credentials are wrong and you can not auto login anymore, change them in account_credentials.txt -> File is in project folder."/>
-    <TextField fx:id="PathAccountFile"/>
+    <TextField fx:id="PathAccountFile" text="restart Mordor to see path"/>
     <Text textAlignment="CENTER"  text="For every line one item, without brackets whatsoever. Same path as ↑"/>
     <Button fx:id="BlacklistedHash" text="Open BlacklistedHash" mnemonicParsing="false" onAction="#BlacklistedHash"/>
     <Button fx:id="BlacklistedIP" text="Open BlacklistedIP" mnemonicParsing="false" onAction="#BlacklistedIP"/>
