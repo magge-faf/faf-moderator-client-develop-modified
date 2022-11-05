@@ -728,7 +728,7 @@ public class ViewHelper {
             );
         });
 
-        MenuItem MenuItemaddToBanPermanentList = new MenuItem("Add to banlist");
+        MenuItem MenuItemaddToBanPermanentList = new MenuItem("Add to blacklist");
 
         MenuItemaddToBanPermanentList.disableProperty().bind(Bindings.createBooleanBinding(() -> {
             PlayerFX selectedPlayer = tableView.getSelectionModel().getSelectedItem();
@@ -737,7 +737,7 @@ public class ViewHelper {
 
         MenuItemaddToBanPermanentList.setOnAction(action -> {
             PlayerFX playerFX = tableView.getSelectionModel().getSelectedItem();
-            log.debug(playerFX.getRepresentation() + " unique items were added to all ban lists.");
+            log.debug("[Add to banlist] Adding: " + playerFX.getRepresentation());
 
             try {
                 String fileName = "BlacklistedIP.txt";
@@ -882,9 +882,12 @@ public class ViewHelper {
                     while (scanner.hasNextLine()) {
                         try {
                             String line = scanner.next();
-                            if (line.equals(element)) {
-                                flag = true;
-                                break;
+                            if (!line.equals(""))
+                            {
+                                if (line.equals(element)) {
+                                    flag = true;
+                                    break;
+                                }
                             }
                         } catch (Exception e) {
                             log.debug(String.valueOf(e));
@@ -895,7 +898,9 @@ public class ViewHelper {
                     } else {
                         fw.write(element + "\n");
                         fw.flush();
-                        log.debug(element + " was added.");                    }
+                        log.debug(element + " was added.");
+
+                    }
                 } catch (IOException e) {
                     log.debug(String.valueOf(e));
                 }
