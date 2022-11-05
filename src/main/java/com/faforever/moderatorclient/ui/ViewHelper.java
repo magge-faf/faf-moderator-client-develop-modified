@@ -893,7 +893,7 @@ public class ViewHelper {
                     if(flag) {
                         log.debug(element + " already exists.");
                     } else {
-                        fw.write(element + "\r");
+                        fw.write(element + "\n");
                         fw.flush();
                         log.debug(element + " was added.");
 
