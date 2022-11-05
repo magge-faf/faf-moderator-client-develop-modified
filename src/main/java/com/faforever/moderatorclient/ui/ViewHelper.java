@@ -737,7 +737,7 @@ public class ViewHelper {
 
         MenuItemaddToBanPermanentList.setOnAction(action -> {
             PlayerFX playerFX = tableView.getSelectionModel().getSelectedItem();
-            log.debug("[Add to banlist] Adding: " + playerFX.getRepresentation());
+            log.debug("[Add to blacklist] Adding: " + playerFX.getRepresentation());
 
             try {
                 String fileName = "BlacklistedIP.txt";
@@ -746,7 +746,7 @@ public class ViewHelper {
                 boolean alreadyExists = false;
                 while (scanner.hasNextLine()) {
                     try {
-                        String line = scanner.next();
+                        String line = scanner.nextLine();
                         if (line.equals(playerFX.getRecentIpAddress())) {
                             log.debug(playerFX.getRecentIpAddress() + " was already added.");
                             alreadyExists = true;
@@ -781,7 +781,7 @@ public class ViewHelper {
 
                     while (scanner.hasNextLine()) {
                         try {
-                            String line = scanner.next();
+                            String line = scanner.nextLine();
                             if (line.equals(element)) {
                                 flag = true;
                                 break;
@@ -815,7 +815,7 @@ public class ViewHelper {
 
                     while (scanner.hasNextLine()) {
                         try {
-                            String line = scanner.next();
+                            String line = scanner.nextLine();
                             if (line.equals(element)) {
                                 flag = true;
                                 break;
@@ -848,7 +848,7 @@ public class ViewHelper {
 
                     while (scanner.hasNextLine()) {
                         try {
-                            String line = scanner.next();
+                            String line = scanner.nextLine();
                             if (line.equals(element)) {
                                 flag = true;
                                 break;
@@ -881,14 +881,11 @@ public class ViewHelper {
 
                     while (scanner.hasNextLine()) {
                         try {
-                            String line = scanner.next();
-                            if (!line.equals(""))
-                            {
+                            String line = scanner.nextLine();
                                 if (line.equals(element)) {
                                     flag = true;
                                     break;
                                 }
-                            }
                         } catch (Exception e) {
                             log.debug(String.valueOf(e));
                         }
@@ -896,7 +893,7 @@ public class ViewHelper {
                     if(flag) {
                         log.debug(element + " already exists.");
                     } else {
-                        fw.write(element + "\n");
+                        fw.write(element + "\r");
                         fw.flush();
                         log.debug(element + " was added.");
 
@@ -920,12 +917,13 @@ public class ViewHelper {
 
                     while (scanner.hasNextLine()) {
                         try {
-                            String line = scanner.next();
+                            String line = scanner.nextLine();
                             if (line.equals(element)) {
                                 flag = true;
                                 break;
                             }
                         } catch (Exception e) {
+                            flag = true;
                             log.debug(String.valueOf(e));
                         }
                     }
