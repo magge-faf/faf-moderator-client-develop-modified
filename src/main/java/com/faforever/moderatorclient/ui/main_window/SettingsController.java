@@ -50,6 +50,7 @@ public class SettingsController implements Controller<Region> {
     public Button TemplateReportButton;
     public TextField MostReportsOffendersTextField;
     public Button LoadAllReportsAndModeratorStatsAndTopOffendersButton;
+    public TextField GenericJunk;
 
     @Override
     public VBox getRoot() {return root;}
