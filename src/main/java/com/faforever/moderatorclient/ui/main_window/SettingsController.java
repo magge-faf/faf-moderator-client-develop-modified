@@ -186,7 +186,7 @@ public class SettingsController implements Controller<Region> {
 
             List<String> finalList = new ArrayList<>();
 
-            // give 'em their numbers back
+            // refactor this someday - side effect is happening for numbers in moderator name
             for (String item : totalProcessedReportsProcessed){
                 if (item.contains("angelofd")||item.contains("maudlin")){
                     item = item.replaceAll("angelofd","angelofd347h");
