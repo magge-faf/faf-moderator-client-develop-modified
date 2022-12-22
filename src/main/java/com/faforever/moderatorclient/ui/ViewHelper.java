@@ -293,11 +293,13 @@ public class ViewHelper {
             return switch (banInfo.getDuration()) {
                 case PERMANENT -> "PERMANENT";
                 case TEMPORARY -> {
-                    Date date = new Date();
-                    Instant instantFromDate = date.toInstant();
-                    Duration duration_left = Duration.between(instantFromDate, banInfo.getExpiresAt());
-                    Duration duration_total = Duration.between(banInfo.getCreateTime(), banInfo.getExpiresAt());
-                    yield "%s days (%s days, %s hours)".formatted(duration_total.toDays(), duration_left.toDays(), duration_left.toHoursPart());
+                    Instant now = Instant.now();
+                    Duration totalDuration = Duration.between(banInfo.getCreateTime(), banInfo.getExpiresAt());
+                    Duration remainingDuration = Duration.between(now, banInfo.getExpiresAt());
+                    long totalDays = totalDuration.toDays();
+                    long remainingDays = remainingDuration.toDays();
+                    long remainingHours = remainingDuration.toHoursPart();
+                    yield "%s days (%s days, %s hours)".formatted(totalDays, remainingDays, remainingHours);
                 }
             };
         }, o.getValue().durationProperty()));
