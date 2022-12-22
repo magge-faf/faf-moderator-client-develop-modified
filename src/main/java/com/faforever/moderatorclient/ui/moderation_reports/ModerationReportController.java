@@ -28,7 +28,6 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.Region;
 import javafx.stage.Stage;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -165,10 +164,6 @@ public class ModerationReportController implements Controller<Region> {
 
     @FXML
     public void initialize() {
-        counter_awaiting_total_reports = 0;
-        counter_awaiting_total_ru_reports = 0;
-        counter_already_taken_from_mod = 0;
-
         statusChoiceBox.setItems(FXCollections.observableArrayList(ChooseableStatus.values()));
         statusChoiceBox.getSelectionModel().select(ChooseableStatus.AWAITING); // default selected filter
         editReportButton.disableProperty().bind(reportTableView.getSelectionModel().selectedItemProperty().isNull());
@@ -187,39 +182,29 @@ public class ModerationReportController implements Controller<Region> {
         reportTableView.getSelectionModel()
                 .selectedItemProperty()
                 .addListener((observable, oldValue, newValue) -> {
-                    //catch all null exceptions
-
                     try {
                         reportedPlayersOfCurrentlySelectedReport.setAll(newValue.getReportedUsers());
                         currentlySelectedItemNotNull = newValue;
 
                         CopyReportID.setId(newValue.getId());
-                        CopyReportID.setText("Report ID: "+newValue.getId());
+                        CopyReportID.setText("Report ID: " + newValue.getId());
                         CopyGameID.setId(newValue.getGame().getId());
                         CopyGameID.setText("Game ID: " + newValue.getGame().getId());
                         StartReplay.setId(CopyGameID.getId());
-                        StartReplay.setText("Start Replay: "+ CopyGameID.getId());
+                        StartReplay.setText("Start Replay: " + CopyGameID.getId());
 
                         if (AutomaticallyLoadChatLogCheckBox.isSelected()) {
                             showChatLog(newValue);
                             log.debug("[LoadChatLog] log automatically loaded");
                         }
 
-                        try {
-                            //TODO need to test several offenders at once
-                            //If game ID is missing, then no offender for whatever reason
-                            for (PlayerFX item : reportedPlayersOfCurrentlySelectedReport) {
-                                log.debug("Selected report id - offenders: " + item.getRepresentation());
-                                CopyReportedUserID.setId(item.getRepresentation());
-                                CopyReportedUserID.setText(item.getRepresentation());
-                                CreateReportButton.setId(StringUtils.substringBetween(item.getRepresentation()," [id ", "]"));
-                                CreateReportButton.setText("Create report for " + StringUtils.substringBetween(item.getRepresentation()," [id ", "]"));
-                            }
-                        } catch (Exception ErrorPlayerFX) {
-                            log.debug("Exception in PlayerFX item: ");
-                            log.debug(String.valueOf(ErrorPlayerFX));
+                        for (PlayerFX item : reportedPlayersOfCurrentlySelectedReport) {
+                            log.debug("Selected report id - offenders: " + item.getRepresentation());
+                            CopyReportedUserID.setId(item.getRepresentation());
+                            CopyReportedUserID.setText(item.getRepresentation());
+                            CreateReportButton.setId(StringUtils.substringBetween(item.getRepresentation(), " [id ", "]"));
+                            CreateReportButton.setText("Create report for " + StringUtils.substringBetween(item.getRepresentation(), " [id ", "]"));
                         }
-
                     } catch (Exception ErrorSelectedReport) {
                         log.debug("Exception for selected report: ");
                         log.debug(String.valueOf(ErrorSelectedReport));
@@ -236,6 +221,7 @@ public class ModerationReportController implements Controller<Region> {
                         CopyReportedUserID.setText("no value / missing Game ID");
                         CopyReportedUserID.setId("");
                     }
+
                 });
 
         chatLogTextArea.setText("select a report first");
@@ -251,6 +237,12 @@ public class ModerationReportController implements Controller<Region> {
         clip.setContents(tText, null);
     }
 
+    private void resetCounters() {
+        counterAwaitingTotalReports = 0;
+        counterAwaitingTotalRuReports = 0;
+        counterAlreadyTakenFromMod = 0;
+    }
+
     private void addBan(PlayerFX accountFX) {
         BanInfoController banInfoController = uiService.loadFxml("ui/banInfo.fxml");
         BanInfoFX ban = new BanInfoFX();
@@ -264,15 +256,12 @@ public class ModerationReportController implements Controller<Region> {
         banInfoDialog.showAndWait();
     }
 
-    int counter_awaiting_total_reports = 0;
-    int counter_awaiting_total_ru_reports = 0;
-    int counter_already_taken_from_mod = 0;
+    int counterAwaitingTotalReports = 0;
+    int counterAwaitingTotalRuReports = 0;
+    int counterAlreadyTakenFromMod = 0;
 
     private void renewFilter() {
-        //refactor this messy filter...
-        counter_awaiting_total_reports = 0;
-        counter_awaiting_total_ru_reports = 0;
-        counter_already_taken_from_mod = 0;
+        resetCounters();
 
         filteredItemList.setPredicate(moderationReportFx -> {
             String playerFilter = playerNameFilterTextField.getText().toLowerCase();
@@ -283,19 +272,16 @@ public class ModerationReportController implements Controller<Region> {
                     return false;
                 }
             }
+
             ChooseableStatus selectedItem = statusChoiceBox.getSelectionModel().getSelectedItem();
 
-            if (selectedItem.toString().equals("ALL")) {
-                if (selectedItem != null && selectedItem.getModerationReportStatus() != null) {
-                    ModerationReportStatus moderationReportStatus = selectedItem.getModerationReportStatus();
-                    return moderationReportFx.getReportStatus() == moderationReportStatus;
-                }
-                return true;
+            if (selectedItem != null && "ALL".equals(selectedItem.toString()) && selectedItem.getModerationReportStatus() != null) {
+                ModerationReportStatus moderationReportStatus = selectedItem.getModerationReportStatus();
+                return moderationReportFx.getReportStatus() == moderationReportStatus;
             }
 
             if (selectedItem != null) {
                 ModerationReportStatus moderationReportStatus = selectedItem.getModerationReportStatus();
-
                 try{
                     String current_line = moderationReportFx.getId() + ":" + moderationReportFx.getLastModerator().getRepresentation() + ":" + moderationReportFx.getReportStatus();
                     if(!GlobalConstants.allReports.contains(current_line) && !moderationReportFx.getReportStatus().toString().equals("AWAITING")){
@@ -304,8 +290,9 @@ public class ModerationReportController implements Controller<Region> {
                 }
                 catch (Exception ignored){} // com.faforever.moderatorclient.ui.domain.ModerationReportFX.getLastModerator()" is null
 
+
                 if (moderationReportFx.getReportStatus().toString().equals("AWAITING")) {
-                    counter_awaiting_total_reports += 1;
+                    counterAwaitingTotalReports += 1;
 
                     for (PlayerFX temp : moderationReportFx.getReportedUsers().stream().toList()) {
                         GlobalConstants.allOffenders.add(String.valueOf(temp.getRepresentation()));
@@ -313,13 +300,12 @@ public class ModerationReportController implements Controller<Region> {
 
                     if (moderationReportFx.getModeratorPrivateNote() != null ||
                             moderationReportFx.getLastModerator() != null){
-                        counter_awaiting_total_ru_reports +=1;
+                        counterAwaitingTotalRuReports +=1;
                         } else { for(int i = 0; i < moderationReportFx.getReportDescription().length(); i++) {
                             if(Character.UnicodeBlock.of(moderationReportFx.getReportDescription().charAt(i)).equals(Character.UnicodeBlock.CYRILLIC)) {
                                 // contains Cyrillic
-                                counter_awaiting_total_ru_reports +=1;
+                                counterAwaitingTotalRuReports +=1;
                                 for (PlayerFX temp : moderationReportFx.getReportedUsers().stream().toList()) {
-                                    //log.debug(String.valueOf(temp.getRepresentation()));
                                     GlobalConstants.allRUOffenders.add(String.valueOf(temp.getRepresentation()));
                                 }
                                 break;
@@ -338,9 +324,9 @@ public class ModerationReportController implements Controller<Region> {
                 }
 
                 AwaitingReportsTotalTextArea.setText(
-                    "Total awaiting: " + (counter_awaiting_total_reports) +
-                    "\nTotal RU awaiting: " + (counter_awaiting_total_ru_reports) +
-                    "\nTotal non RU awaiting: " + (counter_awaiting_total_reports - counter_awaiting_total_ru_reports));
+                    "Total awaiting: " + (counterAwaitingTotalReports) +
+                    "\nTotal RU awaiting: " + (counterAwaitingTotalRuReports) +
+                    "\nTotal non RU awaiting: " + (counterAwaitingTotalReports - counterAwaitingTotalRuReports));
 
                 GlobalConstants.AwaitingReportsTotalTextArea = AwaitingReportsTotalTextArea.getText();
 
@@ -351,10 +337,7 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     public void onRefreshAllReports() {
-        //reset counter
-        counter_awaiting_total_reports = 0;
-        counter_awaiting_total_ru_reports = 0;
-        counter_already_taken_from_mod = 0;
+        resetCounters();
         moderationReportService.getAllReports().thenAccept(reportFxes -> Platform.runLater(() -> itemList.setAll(reportFxes))).exceptionally(throwable -> {
             log.error("error loading reports", throwable);
             return null;
@@ -362,10 +345,7 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     public void onEdit() {
-        //reset counter
-        counter_awaiting_total_reports = 0;
-        counter_awaiting_total_ru_reports = 0;
-        counter_already_taken_from_mod = 0;
+        resetCounters();
         EditModerationReportController editModerationReportController = uiService.loadFxml("ui/edit_moderation_report.fxml");
         editModerationReportController.setModerationReportFx(reportTableView.getSelectionModel().getSelectedItem());
         editModerationReportController.setOnSaveRunnable(() -> Platform.runLater(this::onRefreshAllReports));
@@ -438,7 +418,7 @@ public class ModerationReportController implements Controller<Region> {
         } catch (Exception e) {
             log.error("Loading replay {} failed", game, e);
             StartReplay.setText("Replay not available");
-            CopyChatLog.setText("Chat Log not available");
+            CopyChatLog.setText("Chat log not available");
             chatLogTextArea.setText(header + format("Loading replay failed due to {0}: \n{1}", e, e.getMessage()));
         }
         Files.delete(tempFilePath);
