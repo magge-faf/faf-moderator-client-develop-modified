@@ -57,7 +57,7 @@ public class LoginController implements Controller<Pane> {
         return root;
     }
 
-    boolean successful_login = false;
+    boolean successfulLogin = false;
 
     @FXML
     public void initialize() throws IOException {
@@ -101,10 +101,10 @@ public class LoginController implements Controller<Pane> {
                 }
 
                 try {
-                    if (loginWebView.getEngine().executeScript("javascript:document.getElementById('denial-form');") != null && !successful_login) {
+                    if (loginWebView.getEngine().executeScript("javascript:document.getElementById('denial-form');") != null && !successfulLogin) {
                         loginWebView.getEngine().executeScript("javascript:document.querySelector('input[type=\"submit\"][value=\"Authorize\"]').click()");
                         log.debug("[autologin] Authorize button was automatically clicked.");
-                        successful_login = true;
+                        successfulLogin = true;
                     }
                 } catch (Exception error) {
                     log.debug(String.valueOf(error));
