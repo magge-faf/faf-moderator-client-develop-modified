@@ -13,15 +13,7 @@ import org.springframework.stereotype.Component;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.*;
 import java.awt.datatransfer.StringSelection;
 import java.awt.Toolkit;
 import java.awt.datatransfer.Clipboard;
@@ -57,79 +49,95 @@ public class SettingsController implements Controller<Region> {
 
     @FXML
     public void initialize() throws IOException {
-
-        String[] BlacklistedFiles = {"BlacklistedHash", "BlacklistedIP", "BlacklistedMemorySN",
+        String[] blacklistedFiles = { "BlacklistedHash", "BlacklistedIP", "BlacklistedMemorySN",
                 "BlacklistedSN", "BlacklistedUUID", "BlacklistedVolumeSN", "excludedItems" };
 
-        // initialize default blacklisted files if they do not exist
-        for (String element : BlacklistedFiles) {
-            File yourFile = new File(element + ".txt");
-            yourFile.createNewFile();
+        // create default blacklisted files if they do not exist
+        for (String file : blacklistedFiles) {
+            File f = new File(file + ".txt");
+            if (!f.exists()) {
+                f.createNewFile();
+            }
         }
 
         File f = new File("account_credentials.txt");
-        if(f.exists() && !f.isDirectory()) {
+        if (f.exists() && !f.isDirectory()) {
             Path pathCredentialsFile = Path.of("account_credentials.txt");
             PathAccountFile.setText(String.valueOf(pathCredentialsFile.toAbsolutePath()));
-            List<String> result;
-            try (Stream<String> lines = Files.lines(pathCredentialsFile)) {
-                result = lines.collect(Collectors.toList());
-                String nameOrEmail = result.get(0);
-                String password = result.get(1);
+            try {
+                List<String> credentials = Files.readAllLines(pathCredentialsFile);
+                String nameOrEmail = credentials.get(0);
+                String password = credentials.get(1);
                 AccountNameOrEmailTextField.setText(nameOrEmail);
                 AccountPasswordTextField.setText(password);
-            }catch (Exception e){
-                log.debug(String.valueOf(e));
+            } catch (Exception e) {
+                log.debug("Error reading account credentials: " + e.getMessage());
             }
         }
     }
 
-    public void SaveAccountButton() {
+    public void saveAccount() {
+        String accountNameOrEmail = AccountNameOrEmailTextField.getText();
+        String accountPassword = AccountPasswordTextField.getText();
+        String data = accountNameOrEmail + "\n" + accountPassword;
         try {
-            FileWriter fw = new FileWriter("account_credentials.txt",false);
-            fw.write(AccountNameOrEmailTextField.getText() + "\n" + AccountPasswordTextField.getText());
+            FileWriter fw = new FileWriter("account_credentials.txt", false);
+            fw.write(data);
             fw.flush();
             fw.close();
             SaveAccountButton.setText("Credentials were saved.");
+        } catch (IOException e) {
+            log.error("Error saving account credentials: " + e.getMessage());
         }
-        catch(Exception e) {
-            log.error(String.valueOf(e));
-        }
+    }
+
+    public void SaveAccountButton() {
+        saveAccount();
+    }
+
+    public void openFile(String fileName) throws IOException {
+        ProcessBuilder pb = new ProcessBuilder("Notepad.exe", fileName);
+        pb.start();
     }
 
     public void BlacklistedHash() throws IOException {
-        ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "BlacklistedHash.txt");
-        pb.start();
+        openFile("BlacklistedHash.txt");
     }
 
     public void BlacklistedIP() throws IOException {
-        ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "BlacklistedIP.txt");
-        pb.start();
+        openFile("BlacklistedIP.txt");
     }
 
     public void BlacklistedSN() throws IOException {
-        ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "BlacklistedSN.txt");
-        pb.start();
+        openFile("BlacklistedSN.txt");
     }
 
     public void BlacklistedUUID() throws IOException {
-        ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "BlacklistedUUID.txt");
-        pb.start();
+        openFile("BlacklistedUUID.txt");
     }
 
     public void BlacklistedVolumeSN() throws IOException {
-        ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "BlacklistedVolumeSN.txt");
-        pb.start();
+        openFile("BlacklistedVolumeSN.txt");
     }
 
     public void BlacklistedMemorySN() throws IOException {
-        ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "BlacklistedMemorySN.txt");
-        pb.start();
+        openFile("BlacklistedMemorySN.txt");
     }
 
     public void excludedItems() throws IOException {
-        ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "excludedItems.txt");
-        pb.start();
+        openFile("excludedItems.txt");
+    }
+
+    public void TemplateCompletedButton() throws IOException {
+        openFile("TemplateCompleted.txt");
+    }
+
+    public void TemplateDiscardedButton() throws IOException {
+        openFile("TemplateDiscarded.txt");
+    }
+
+    public void TemplateReportButton() throws IOException {
+        openFile("TemplateReport.txt");
     }
 
 
@@ -142,20 +150,20 @@ public class SettingsController implements Controller<Region> {
             allReportsString = allReportsString.replaceAll("angelofd347h","angelofd");
 
             String[] dataList = allReportsString.split(",");
-            List<String> test = new ArrayList<>(Collections.singletonList(""));
+            List<String> Moderator = new ArrayList<>(Collections.singletonList(""));
 
             for (String item : dataList) {
                 item = Arrays.toString(item.split(":"));
-                test.add(Arrays.toString(new String[]{item.split(",")[1]}));
+                Moderator.add(Arrays.toString(new String[]{item.split(",")[1]}));
             }
 
-            Set<String> unique = new HashSet<>(test);
+            Set<String> unique = new HashSet<>(Moderator);
             List<String> totalProcessedReportsRaw = new ArrayList<>();
             List<String> totalProcessedReportsProcessed = new ArrayList<>();
 
             for (String key : unique) {
                 if (!key.equals("")){
-                    totalProcessedReportsRaw.add(key + ": " + Collections.frequency(test, key));
+                    totalProcessedReportsRaw.add(key + ": " + Collections.frequency(Moderator, key));
                 }
             }
 
@@ -193,34 +201,45 @@ public class SettingsController implements Controller<Region> {
             Collections.reverse(shallowCopy);
 
             AllModeratorStatsTextField.setText(String.valueOf(finalList));
-            GlobalConstants.AllReportsStats = String.valueOf(finalList);
 
             String AwaitingReportsTotalTextAreaString = String.valueOf(ModerationReportController.GlobalConstants.AwaitingReportsTotalTextArea);
-            log.debug(AwaitingReportsTotalTextAreaString);
 
-            String allOffendersString = String.valueOf(ModerationReportController.GlobalConstants.allOffenders);
-            String allOffendersStringProcessed = allOffendersString.replace("[","").replace("]","");
-            List<String> allOffendersList = new ArrayList<>(Arrays.asList(allOffendersStringProcessed.split(",")));
-            Set<String> mySet = new HashSet<>(allOffendersList);
-            String TotalAmountReportsForOffender;
-            StringBuilder OffenderNameAndID = new StringBuilder();
+            List<String> allOffendersListGlobal = ModerationReportController.GlobalConstants.allOffenders;
+            List<String> allRUOffendersList = ModerationReportController.GlobalConstants.allRUOffenders;
 
-            for(String s: mySet){
-                TotalAmountReportsForOffender = s + " " + Collections.frequency(allOffendersList,s);
-
-                if (TotalAmountReportsForOffender.endsWith("1") || TotalAmountReportsForOffender.endsWith("2")){
-                    //ignore offenders with only 1 or 2 reports
-                    //will be a problem for future me when result is 11 or 12, 21, 22, etc
-                    continue;
-                }
-                else {
-                    OffenderNameAndID.append(TotalAmountReportsForOffender).append(" | ");}
+            allOffendersListGlobal.removeAll(allRUOffendersList);
+            Map<String, Integer> offenderCounts = new HashMap<>();
+            for (String offender : allOffendersListGlobal) {
+                offenderCounts.put(offender, offenderCounts.getOrDefault(offender, 0) + 1);
             }
-            MostReportsOffendersTextField.setText(String.valueOf(OffenderNameAndID));
+
+            for (Map.Entry<String, Integer> entry : offenderCounts.entrySet()) {
+                String offender = entry.getKey();
+                int frequency = entry.getValue();
+                String text = offender + ": " + frequency;
+                if (frequency > 3) {
+                    MostReportsOffendersTextField.setText(MostReportsOffendersTextField.getText() + text + " | ");
+                }
+            }
+
+            // Count the frequency of offenders in allRUOffendersList
+            Map<String, Integer> ruOffenderCounts = new HashMap<>();
+            for (String offender : allRUOffendersList) {
+                ruOffenderCounts.put(offender, ruOffenderCounts.getOrDefault(offender, 0) + 1);
+            }
+
+            for (Map.Entry<String, Integer> entry : ruOffenderCounts.entrySet()) {
+                String offender = entry.getKey();
+                int frequency = entry.getValue();
+                String text = offender + ": " + frequency;
+                if (frequency > 3) {
+                    MostReportsOffendersTextField.setText(MostReportsOffendersTextField.getText() + text + " <-RU | ");
+                }
+            }
 
             //paste into clipboard for zulip
             String myString = AllModeratorStatsTextField.getText() + "\n\n" + AwaitingReportsTotalTextAreaString + "\n\n" +
-                    "Repeat offenders:\n\n"+OffenderNameAndID;
+                    "Repeat offenders:\n\n"+MostReportsOffendersTextField.getText();
 
             StringSelection stringSelection = new StringSelection(myString);
             Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
@@ -231,28 +250,7 @@ public class SettingsController implements Controller<Region> {
             }
     }
 
-    public void TemplateCompletedButton() throws IOException {
-        ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "TemplateCompleted.txt");
-        pb.start();
-    }
-
-    public void TemplateDiscardedButton() throws IOException {
-        ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "TemplateDiscarded.txt");
-        pb.start();
-    }
-
-    public void TemplateReportButton() throws IOException {
-        ProcessBuilder pb = new ProcessBuilder("Notepad.exe", "TemplateReport.txt");
-        pb.start();
-    }
-
     public void LoadAllReportsAndModeratorStatsAndTopOffendersButton() {
         LoadAllModeratorStatsButton();
     }
-
-    public static class GlobalConstants
-        //carried the status of all reports from the ReportsTab to SettingsController for further processing
-        {
-            public static String AllReportsStats = "";
-        }
 }

@@ -28,7 +28,6 @@ import java.nio.file.Paths;
 import java.text.MessageFormat;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -62,42 +61,43 @@ public class LoginController implements Controller<Pane> {
 
     @FXML
     public void initialize() throws IOException {
-
-        applicationProperties.getEnvironments().forEach(
-                (key, environmentProperties) -> environmentComboBox.getItems().add(key)
+        applicationProperties.getEnvironments().forEach((key, environmentProperties) ->
+                environmentComboBox.getItems().add(key)
         );
         reloadLogin();
         environmentComboBox.getSelectionModel().select(0);
 
-        loginWebView.getEngine().getLoadWorker().runningProperty().addListener(((observable, oldValue, newValue) -> {
+        loginWebView.getEngine().getLoadWorker().runningProperty().addListener((observable, oldValue, newValue) -> {
             if (!newValue) {
-
-                List<String> AccountCredentials;
-                String NameOrEmail = "";
-                String Password = "";
+                List<String> accountCredentials;
+                String nameOrEmail = "";
+                String password = "";
 
                 File f = new File("account_credentials.txt");
-
-                if(f.exists() && !f.isDirectory()) {
+                if (f.exists() && !f.isDirectory()) {
                     try (Stream<String> lines = Files.lines(Paths.get("account_credentials.txt"))) {
-                        AccountCredentials = lines.collect(Collectors.toList());
-                        if (!AccountCredentials.get(0).equals("")){
-                            NameOrEmail = AccountCredentials.get(0);
-                            Password = AccountCredentials.get(1);
+                        accountCredentials = lines.collect(Collectors.toList());
+                        if (!accountCredentials.get(0).equals("")) {
+                            nameOrEmail = accountCredentials.get(0);
+                            password = accountCredentials.get(1);
                         }
-                    } catch (Exception error) {log.debug(String.valueOf(error));}
+                    } catch (Exception error) {
+                        log.debug(String.valueOf(error));
+                    }
                 }
 
-                if (!NameOrEmail.equals("")) {
+                if (!nameOrEmail.equals("")) {
                     try {
                         if (loginWebView.getEngine().executeScript("javascript:document.getElementById('form-header');") != null) {
-                        loginWebView.getEngine().executeScript(String.format("javascript:document.getElementsByName('usernameOrEmail')[0].value = '%s'", NameOrEmail));
-                        loginWebView.getEngine().executeScript(String.format("javascript:document.getElementsByName('password')[0].value = '%s'", Password));
-                        log.debug("[autologin] Account credentials were entered.");
-                        loginWebView.getEngine().executeScript("javascript:document.querySelector('input[type=\"submit\"][value=\"Log in\"]').click()");
-                        log.debug("[autologin] Log in button was automatically clicked.");
+                            loginWebView.getEngine().executeScript(String.format("javascript:document.getElementsByName('usernameOrEmail')[0].value = '%s'", nameOrEmail));
+                            loginWebView.getEngine().executeScript(String.format("javascript:document.getElementsByName('password')[0].value = '%s'", password));
+                            log.debug("[autologin] Account credentials were entered.");
+                            loginWebView.getEngine().executeScript("javascript:document.querySelector('input[type=\"submit\"][value=\"Log in\"]').click()");
+                            log.debug("[autologin] Log in button was automatically clicked.");
                         }
-                    }catch (Exception error) { log.debug(String.valueOf(error));}
+                    } catch (Exception error) {
+                        log.debug(String.valueOf(error));
+                    }
                 }
 
                 try {
@@ -106,11 +106,13 @@ public class LoginController implements Controller<Pane> {
                         log.debug("[autologin] Authorize button was automatically clicked.");
                         successful_login = true;
                     }
-                } catch (Exception error) { log.debug(String.valueOf(error));}
+                } catch (Exception error) {
+                    log.debug(String.valueOf(error));
+                }
 
                 resetPageFuture.complete(null);
             }
-        }));
+        });
 
         loginWebView.getEngine().locationProperty().addListener((observable, oldValue, newValue) -> {
             List<NameValuePair> params;

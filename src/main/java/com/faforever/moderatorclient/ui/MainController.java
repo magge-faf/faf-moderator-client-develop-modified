@@ -91,20 +91,20 @@ public class MainController implements Controller<TabPane> {
     }
 
     private void initializeAfterLogin() {
-        initSettingsTab();
-        initUserManagementTab();
-        initMatchmakerMapPoolTab();
-        initMapVaultTab();
-        initModVaultTab();
         initAvatarTab();
-        initRecentActivityTab();
-        initDomainBlacklistTab();
         initBanTab();
-        initVotingTab();
+        initDomainBlacklistTab();
+        initMapVaultTab();
+        initMatchmakerMapPoolTab();
         initMessagesTab();
-        initTutorialTab();
-        initReportTab();
+        initModVaultTab();
         initPermissionTab();
+        initRecentActivityTab();
+        initReportTab();
+        initSettingsTab();
+        initTutorialTab();
+        initUserManagementTab();
+        initVotingTab();
     }
 
     private void initSettingsTab() {
@@ -121,6 +121,7 @@ public class MainController implements Controller<TabPane> {
                 dataLoadingState.put(tab, true);
                 loadingFunction.run();
             }
+
         });
     }
 

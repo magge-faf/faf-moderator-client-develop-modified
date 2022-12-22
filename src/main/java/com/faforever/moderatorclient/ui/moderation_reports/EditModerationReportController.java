@@ -68,14 +68,19 @@ public class EditModerationReportController implements Controller<Pane> {
 		Stage stage = (Stage) root.getScene().getWindow();
 		stage.close();
 	}
-    public void PasteTemplateCompletedButton() throws FileNotFoundException {
-		String content = new Scanner(new File("TemplateCompleted.txt")).useDelimiter("\\Z").next();
+
+	public void pasteTemplate(String templateName, ModerationReportStatus status) throws FileNotFoundException {
+		String content = new Scanner(new File(templateName)).useDelimiter("\\Z").next();
 		publicNoteTextArea.setText(content);
-		statusChoiceBox.getSelectionModel().select(ModerationReportStatus.valueOf("COMPLETED"));
+		statusChoiceBox.getSelectionModel().select(status);
 	}
-	public void PasteTemplateDiscardedButton() throws FileNotFoundException {
-		String content = new Scanner(new File("TemplateDiscarded.txt")).useDelimiter("\\Z").next();
-		publicNoteTextArea.setText(content);
-		statusChoiceBox.getSelectionModel().select(ModerationReportStatus.valueOf("DISCARDED"));
+
+	public void pasteCompletedTemplate() throws FileNotFoundException {
+		pasteTemplate("TemplateCompleted.txt", ModerationReportStatus.COMPLETED);
 	}
+
+	public void pasteDiscardedTemplate() throws FileNotFoundException {
+		pasteTemplate("TemplateDiscarded.txt", ModerationReportStatus.DISCARDED);
+	}
+
 }

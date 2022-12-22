@@ -77,13 +77,6 @@ public class BansController implements Controller<HBox> {
             log.info("Could not delete ban, there was no message selected");
             return;
         }
-        log.debug(selectedItem.getId());
-        log.debug(selectedItem.getPlayer().getRepresentation());
-
-        //for (UniqueIdFx banInfoFX : selectedItem.getPlayer().getUniqueIds()) {
-        //    log.debug(banInfoFX.getVolumeSerialNumber());
-        //    }
-
         openBanDialog(selectedItem, false);
     }
 

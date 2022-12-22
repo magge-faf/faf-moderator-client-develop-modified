@@ -1,6 +1,5 @@
 package com.faforever.moderatorclient.ui;
 
-
 import com.faforever.commons.api.dto.TutorialCategory;
 import com.faforever.moderatorclient.api.domain.TutorialService;
 import javafx.fxml.FXML;
@@ -23,12 +22,14 @@ import java.text.MessageFormat;
 @RequiredArgsConstructor
 public class CategoryAddController implements Controller<Pane> {
     private final TutorialService tutorialService;
-
-    public TextField categoryField;
-    public Label errorLabel;
-    public GridPane root;
-
     private Runnable onSaveRunnable;
+
+    @FXML
+    private TextField categoryField;
+    @FXML
+    private Label errorLabel;
+    @FXML
+    private GridPane root;
 
     @Override
     public Pane getRoot() {
@@ -41,25 +42,27 @@ public class CategoryAddController implements Controller<Pane> {
         errorLabel.setVisible(false);
     }
 
+    @FXML
     public void onSave() {
         if (!validate()) {
             return;
         }
+
         TutorialCategory tutorialCategory = new TutorialCategory();
         tutorialCategory.setCategoryKey(categoryField.getText());
 
         try {
             if (tutorialService.createCategory(tutorialCategory) == null) {
-                error("Not saved unknown error");
+                showError("Not saved unknown error");
                 return;
             }
         } catch (Exception e) {
-            error(MessageFormat.format("Unable to save Tutorial error is:`{0}`", e.getMessage()));
+            showError(MessageFormat.format("Unable to save Tutorial error is: `{0}`", e.getMessage()));
             log.warn("Tutorial not saved", e);
             return;
         }
 
-        close();
+        closeWindow();
         if (onSaveRunnable != null) {
             onSaveRunnable.run();
         }
@@ -67,18 +70,18 @@ public class CategoryAddController implements Controller<Pane> {
 
     private boolean validate() {
         if (categoryField.getText().isEmpty()) {
-            return error("Category Key can not be empty");
+            showError("Category Key can not be empty");
+            return false;
         }
         return true;
     }
 
-    private boolean error(String message) {
+    private void showError(String message) {
         errorLabel.setVisible(true);
         errorLabel.setText(message);
-        return false;
     }
 
-    private void close() {
+    private void closeWindow() {
         Stage stage = (Stage) root.getScene().getWindow();
         stage.close();
     }
@@ -87,4 +90,3 @@ public class CategoryAddController implements Controller<Pane> {
         this.onSaveRunnable = onSaveRunnable;
     }
 }
-

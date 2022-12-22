@@ -117,21 +117,16 @@ public class ModerationReportController implements Controller<Region> {
         setSysClipboardText(CopyGameID.getId());
     }
 
-    public void CopyReporterButton() {
-        setSysClipboardText(CopyGameID.getId());
-    }
-
     public void CreateReportButton() throws IOException {
-        String reported_user_id = CreateReportButton.getId();
-        String url = ("https://forum.faforever.com/search?term=" + reported_user_id + "&in=titles");
-        String cmd = "cmd /c " + "start chrome " + url;
-        Runtime run = Runtime.getRuntime();
-        run.exec(cmd);
+        String reportedUserId = CreateReportButton.getId();
+        String url = "https://forum.faforever.com/search?term=" + reportedUserId + "&in=titles";
+        String cmd = "cmd /c start chrome " + url;
+        Runtime.getRuntime().exec(cmd);
     }
 
     public void StartReplay() throws IOException, InterruptedException {
-
-        String replayUrl = "https://replay.faforever.com/"+StartReplay.getId();
+        String replayId = StartReplay.getId();
+        String replayUrl = "https://replay.faforever.com/" + replayId;
         Path tempFilePath = Files.createTempFile("faf_replay_", ".fafreplay");
 
         HttpRequest request = HttpRequest.newBuilder()
@@ -140,52 +135,32 @@ public class ModerationReportController implements Controller<Region> {
 
         httpClient.send(request, HttpResponse.BodyHandlers.ofFile(tempFilePath));
 
-        Runtime run = Runtime.getRuntime();
-        log.debug("tempFilePath: " + tempFilePath);
         String cmd = "cmd /c " + tempFilePath;
-        run.exec(cmd);
-        //Files.delete(tempFilePath);  // We overwriting the old file
+        Runtime.getRuntime().exec(cmd);
     }
 
+
     public void CopyReportTemplate() throws FileNotFoundException {
-        String report_id = CopyReportID.getId();
-        String game_id = CopyGameID.getId();
+        String reportId = CopyReportID.getId();
+        String gameId = CopyGameID.getId();
         String[] offender = CopyReportedUserID.getId().split(" ", 2);
-        //String report_created_time = String.valueOf(currentlySelectedItemNotNull.createTimeProperty());
 
         String content = new Scanner(new File("TemplateReport.txt")).useDelimiter("\\Z").next();
 
-        // %report_id%
-        // %game_id%
-        // %offender%
-        // %create_time%
+        content = content.replace("%report_id%", reportId);
+        content = content.replace("%game_id%", gameId);
+        content = content.replace("%offender%", offender[0]);
 
-        String template_report_id = "%report_id%";
-        String template_game_id = "%game_id%";
-        String template_offender = "%offender%";
-        //String template_create_time = "%create_time%";
-
-        String content_2 = content.replace(template_report_id, report_id);
-        String content_3 = content_2.replace(template_offender, offender[0]);
-        //String content_4 = content_3.replace(template_create_time, report_created_time);
-        String content_5 = content_3.replace(template_game_id, game_id);
-
-        setSysClipboardText(content_5);
-
-        //if (content.contains("%s")) {
-        //    String report_template = String.format(content, report_id, offender[0]);
-        //    setSysClipboardText(report_template);
-        //}
-        //else {
-        //    setSysClipboardText(content);
-        //}
+        setSysClipboardText(content);
     }
+
 
     public static class GlobalConstants
     {
         public static String AwaitingReportsTotalTextArea = "";
         public static ArrayList<String> allReports = new ArrayList<>();
         public static ArrayList<String> allOffenders = new ArrayList<>();
+        public static ArrayList<String> allRUOffenders = new ArrayList<>();
     }
 
     @FXML
@@ -203,9 +178,12 @@ public class ModerationReportController implements Controller<Region> {
         renewFilter();
         SortedList<ModerationReportFX> sortedItemList = new SortedList<>(filteredItemList);
         sortedItemList.comparatorProperty().bind(reportTableView.comparatorProperty());
+
         ViewHelper.buildModerationReportTableView(reportTableView, sortedItemList, this::showChatLog);
+
         statusChoiceBox.getSelectionModel().selectedItemProperty().addListener(observable -> renewFilter());
         playerNameFilterTextField.textProperty().addListener(observable -> renewFilter());
+
         reportTableView.getSelectionModel()
                 .selectedItemProperty()
                 .addListener((observable, oldValue, newValue) -> {
@@ -291,7 +269,7 @@ public class ModerationReportController implements Controller<Region> {
     int counter_already_taken_from_mod = 0;
 
     private void renewFilter() {
-        //reset the numbers
+        //refactor this messy filter...
         counter_awaiting_total_reports = 0;
         counter_awaiting_total_ru_reports = 0;
         counter_already_taken_from_mod = 0;
@@ -329,14 +307,7 @@ public class ModerationReportController implements Controller<Region> {
                 if (moderationReportFx.getReportStatus().toString().equals("AWAITING")) {
                     counter_awaiting_total_reports += 1;
 
-                    //Reporters.add(moderationReportFx.getReporter().getRepresentation());
-                    //Offenders.add(moderationReportFx.getReportedUsers().toString());
-                    //log.debug(moderationReportFx.getReporter().getRepresentation());
-                    //log.debug(moderationReportFx.getReportedUsers().toString());
-                    //log.debug(String.valueOf(moderationReportFx.getReportedUsers().stream().toList()));
-
                     for (PlayerFX temp : moderationReportFx.getReportedUsers().stream().toList()) {
-                        //log.debug(String.valueOf(temp.getRepresentation()));
                         GlobalConstants.allOffenders.add(String.valueOf(temp.getRepresentation()));
                     }
 
@@ -347,22 +318,23 @@ public class ModerationReportController implements Controller<Region> {
                             if(Character.UnicodeBlock.of(moderationReportFx.getReportDescription().charAt(i)).equals(Character.UnicodeBlock.CYRILLIC)) {
                                 // contains Cyrillic
                                 counter_awaiting_total_ru_reports +=1;
+                                for (PlayerFX temp : moderationReportFx.getReportedUsers().stream().toList()) {
+                                    //log.debug(String.valueOf(temp.getRepresentation()));
+                                    GlobalConstants.allRUOffenders.add(String.valueOf(temp.getRepresentation()));
+                                }
                                 break;
                             }
                         }
                     }
 
-                    if (hideAlreadyTakenReportsCheckbox.isSelected()){
-                        if (moderationReportFx.getLastModerator() != null) {return false;}
+                    if (hideAlreadyTakenReportsCheckbox.isSelected() && moderationReportFx.getLastModerator() != null) {
+                        return false;
                     }
-                    if (hideReportsRU.isSelected()){
-                        for(int i = 0; i < moderationReportFx.getReportDescription().length(); i++) {
-                            if(Character.UnicodeBlock.of(moderationReportFx.getReportDescription().charAt(i)).equals(Character.UnicodeBlock.CYRILLIC)) {
-                                // contains Cyrillic
-                                return false;
-                            }
-                        }
+
+                    if (hideReportsRU.isSelected() && moderationReportFx.getReportDescription().chars().anyMatch(c -> Character.UnicodeBlock.of(c) == Character.UnicodeBlock.CYRILLIC)) {
+                        return false;
                     }
+
                 }
 
                 AwaitingReportsTotalTextArea.setText(
@@ -411,13 +383,17 @@ public class ModerationReportController implements Controller<Region> {
         COMPLETED(ModerationReportStatus.COMPLETED),
         DISCARDED(ModerationReportStatus.DISCARDED);
 
-        @Getter
         private final ModerationReportStatus moderationReportStatus;
 
         ChooseableStatus(ModerationReportStatus moderationReportStatus) {
             this.moderationReportStatus = moderationReportStatus;
         }
+
+        public ModerationReportStatus getModerationReportStatus() {
+            return moderationReportStatus;
+        }
     }
+
 
     @SneakyThrows
     private void showChatLog(ModerationReportFX report) {
@@ -441,23 +417,23 @@ public class ModerationReportController implements Controller<Region> {
                     .collect(Collectors.joining("\n"));
 
             BufferedReader bufReader = new BufferedReader(new StringReader(chatLog));
-            String line;
-            StringBuilder chat_log_cleaned = new StringBuilder();
-            String compile_sentences = "Can you give me some mass, |Can you give me some energy, |" +
+
+            StringBuilder chatLogFiltered = new StringBuilder();
+            String compileSentences = "Can you give me some mass, |Can you give me some energy, |" +
                     "Can you give me one Engineer, | to notify: | to allies: Sent Mass | to allies: Sent Energy |" +
                     " to allies: sent ";
-            while( (line=bufReader.readLine()) != null )
-            {
-                Pattern pattern = Pattern.compile(compile_sentences);
-                Matcher matcher = pattern.matcher(line);
+            Pattern pattern = Pattern.compile(compileSentences);
+            String chatLine;
+            while((chatLine = bufReader.readLine()) != null) {
+                Matcher matcher = pattern.matcher(chatLine);
                 boolean matchFound = matcher.find();
-                if (!matchFound & FilterLogCheckBox.isSelected()) {
-                    chat_log_cleaned.append(line).append("\n");
+                if(!matchFound && FilterLogCheckBox.isSelected()) {
+                    chatLogFiltered.append(chatLine).append("\n");
                 }
             }
-            CopyChatLog.setId(chat_log_cleaned.toString());
+            CopyChatLog.setId(chatLogFiltered.toString());
             CopyChatLog.setText("Copy Chat Log");
-            chatLogTextArea.setText(chat_log_cleaned.toString());
+            chatLogTextArea.setText(chatLogFiltered.toString());
 
         } catch (Exception e) {
             log.error("Loading replay {} failed", game, e);

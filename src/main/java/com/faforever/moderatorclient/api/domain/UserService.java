@@ -15,20 +15,9 @@ import com.faforever.moderatorclient.mapstruct.PlayerMapper;
 import com.faforever.moderatorclient.mapstruct.TeamkillMapper;
 import com.faforever.moderatorclient.mapstruct.UserNoteMapper;
 import com.faforever.moderatorclient.ui.domain.*;
-import com.faforever.moderatorclient.api.domain.UserService;
-import com.faforever.moderatorclient.config.BanData;
-import javafx.collections.ObservableList;
-import javafx.collections.ObservableSet;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
-
-import java.io.FileWriter;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.stream.IntStream;
-
 import java.util.Collections;
 import java.util.List;
 
@@ -40,13 +29,6 @@ public class UserService {
     private final FeaturedModMapper featuredModMapper;
     private final UserNoteMapper userNoteMapper;
     private final TeamkillMapper teamkillMapper;
-
-
-
-
-
-
-
 
     public UserService(FafApiCommunicationService fafApi, PlayerMapper playerMapper, FeaturedModMapper featuredModMapper, UserNoteMapper userNoteMapper, TeamkillMapper teamkillMapper) {
         this.fafApi = fafApi;
@@ -96,69 +78,12 @@ public class UserService {
     public List<PlayerFX> findUsersByAttribute(@NotNull String attribute, @NotNull String pattern) {
 
         log.debug("Searching for player by attribute '{}' with pattern: {}", attribute, pattern);
-        // Searching for player by attribute 'id' with pattern: 1337
         ElideNavigatorOnCollection<Player> navigator = ElideNavigator.of(Player.class)
                 .collection()
                 .setFilter(ElideNavigator.qBuilder().string(attribute).eq(pattern));
         addModeratorIncludes(navigator);
-
         List<Player> result = fafApi.getAll(Player.class, navigator);
-        //log.trace("found {} users", result.size());
 
-        /*
-        IntStream.range(1, 300000).forEachOrdered(i -> { //448232
-            String s=Integer.toString(i);
-            //System.out.println(i);
-            ElideNavigatorOnCollection<Player> navigator2 = ElideNavigator.of(Player.class)
-                    .collection()
-                    .setFilter(ElideNavigator.qBuilder().string("id").eq(s));
-            addModeratorIncludes(navigator2);
-            List<Player> player_data = fafApi.getAll(Player.class, navigator2);
-            List<PlayerFX> player_specific = playerMapper.mapToFx(player_data);
-
-         */
-
-
-            /*
-
-            List<String> list_vsn = new ArrayList<>(); // new list per player
-            Boolean banned = true;  // already banned true/false
-            for (PlayerFX account_data : player_specific) {
-                if (banned.equals(account_data.isBannedGlobally())) {
-                    //System.out.println("[!] Account isBannedGlobally. " + account_data.getRepresentation());
-                    continue;
-                }
-
-                //System.out.println("[+] Current selected: " + account_data.getRepresentation()) ;
-
-                for (UniqueIdFx item : account_data.getUniqueIds()){
-                    //System.out.println("[+] VSN: " + item.getVolumeSerialNumber() + " , " + account_data.getRepresentation()) ;
-
-                    list_vsn.add(item.getUuid());
-                }
-
-            }
-
-            int listCount = list_vsn.size();
-            if (listCount >= 15) {
-                try
-                {
-                    String filename= "potential_spoof_user.txt";
-                    FileWriter fw = new FileWriter(filename,true); //the true will append the new data
-                    fw.write(list_vsn + "\n");
-                    fw.flush();
-                    fw.close();
-                }
-                catch(IOException ioe)
-                {
-                    System.err.println("IOException: " + ioe.getMessage());
-                }
-            }
-
-
-             */
-
-        ;
         return playerMapper.mapToFx(result);
     }
 
