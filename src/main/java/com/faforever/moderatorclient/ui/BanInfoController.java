@@ -9,11 +9,9 @@ import com.faforever.moderatorclient.ui.domain.BanInfoFX;
 import com.faforever.moderatorclient.ui.domain.ModerationReportFX;
 import com.faforever.moderatorclient.ui.domain.PlayerFX;
 import com.faforever.moderatorclient.mapstruct.PlayerMapper;
+import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.RadioButton;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
@@ -67,6 +65,9 @@ public class BanInfoController implements Controller<Pane> {
     public TextField revocationTimeTextField;
     public VBox revokeOptions;
     public TextField reportIdTextField;
+    public ToggleGroup banDuration;
+    public Button templateButtonPermanentBan;
+    public Button templateButtonTemporaryBan;
 
     @Getter
     private BanInfoFX banInfo;
@@ -329,5 +330,15 @@ public class BanInfoController implements Controller<Pane> {
     public void preSetReportId(String id) {
         reportIdTextField.setText(id);
         reportIdTextField.setDisable(true);
+    }
+
+    public void templateButtonPermanentBan(ActionEvent actionEvent) {
+        banReasonTextField.setText("Your account has been locked for misuse of FAF's services.");
+        permanentBanRadioButton.setSelected(true);
+    }
+
+    public void templateButtonTemporaryBan(ActionEvent actionEvent) {
+        banReasonTextField.setText("Account 2 days suspended for unsportsmanlike conduct. Please respect the guidelines at www.faforever.com/rules");
+        forNoOfDaysBanRadioButton.setSelected(true);
     }
 }
