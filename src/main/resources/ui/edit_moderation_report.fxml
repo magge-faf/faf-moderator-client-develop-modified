@@ -44,9 +44,9 @@
 
     <HBox alignment="TOP_RIGHT" spacing="2.0" GridPane.columnIndex="1" GridPane.rowIndex="3">
             <children>
-                <Button fx:id="PasteTemplateCompletedButton" prefHeight="30" mnemonicParsing="false" onAction="#PasteTemplateCompletedButton" text="Blueprint-COMPLETED">
+                <Button fx:id="pasteDiscardedTemplate" prefHeight="30" mnemonicParsing="false" onAction="#pasteCompletedTemplate" text="Blueprint-COMPLETED">
                 </Button>
-                <Button fx:id="PasteTemplateDiscardedButton" prefHeight="30" mnemonicParsing="false" onAction="#PasteTemplateDiscardedButton" text="Blueprint-DISCARDED">
+                <Button fx:id="pasteCompletedTemplate" prefHeight="30" mnemonicParsing="false" onAction="#pasteDiscardedTemplate" text="Blueprint-DISCARDED">
                 </Button>
                 <Button mnemonicParsing="false" prefHeight="30" onAction="#close" text="Cancel">
                     <HBox.margin>

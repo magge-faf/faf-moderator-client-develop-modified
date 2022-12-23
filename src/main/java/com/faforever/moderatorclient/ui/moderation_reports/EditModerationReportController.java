@@ -24,10 +24,10 @@ public class EditModerationReportController implements Controller<Pane> {
 	public TextArea publicNoteTextArea;
 	public ChoiceBox<ModerationReportStatus> statusChoiceBox;
 	public Pane root;
-	public Button PasteTemplateDiscardedButton;
 	private Runnable onSaveRunnable;
 	private ModerationReportFX moderationReportFx;
-	public Button PasteTemplateCompletedButton;
+	public Button pasteDiscardedTemplate;
+	public Button pasteCompletedTemplate;
 
 	@FXML
 	public void initialize() {
