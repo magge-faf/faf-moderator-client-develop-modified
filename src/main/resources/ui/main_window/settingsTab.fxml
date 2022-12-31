@@ -18,7 +18,7 @@
     <Button fx:id="BlacklistedSN" text="Open BlacklistedSN" mnemonicParsing="false" onAction="#BlacklistedSN"/>
     <Button fx:id="BlacklistedUUID" text="Open BlacklistedUUID" mnemonicParsing="false" onAction="#BlacklistedUUID"/>
     <Button fx:id="BlacklistedVolumeSN" text="Open BlacklistedVolumeSN" mnemonicParsing="false" onAction="#BlacklistedVolumeSN"/>
-    <Button fx:id="excludedItems" text="Open excludedItems" mnemonicParsing="false" onAction="#excludedItems"/>
+    <Button fx:id="ExcludedItems" text="Open ExcludedItems" mnemonicParsing="false" onAction="#ExcludedItems"/>
     <Text textAlignment="CENTER"  text="Check link for newest list of junk/malformed hardware IDs"/>
     <TextField fx:id="GenericJunk" minWidth="300" text="https://faforever.zulipchat.com/#narrow/stream/203851-moderators/topic/modified.20mordor"/>
     <Separator prefHeight="10" />
