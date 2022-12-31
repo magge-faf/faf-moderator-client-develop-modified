@@ -19,6 +19,8 @@ import java.util.*;
 import java.awt.datatransfer.StringSelection;
 import java.awt.datatransfer.Clipboard;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 @Component
@@ -142,15 +144,20 @@ public class SettingsController implements Controller<Region> {
         openFile("TemplateReport.txt");
     }
 
+    int extractInt(String s) {
+        Pattern pattern = Pattern.compile("\\d+");
+        Matcher matcher = pattern.matcher(s);
+        if (matcher.find()) {
+            return Integer.parseInt(matcher.group());
+        } else {
+            return 0;
+        }
+    }
 
     public void LoadAllModeratorStatsButton() {
         try {
             String allReportsString = String.valueOf(ModerationReportController.GlobalConstants.allReports);
-            // There was a bug when moderator has numbers in their name, need to refactor that,but for now it works:
-            allReportsString = allReportsString.replaceAll("\\[.*?]","");
-            allReportsString = allReportsString.replaceAll("maudlin27","maudlin");
-            allReportsString = allReportsString.replaceAll("angelofd347h","angelofd");
-
+            allReportsString = allReportsString.replaceAll("\\[.*?]",""); // remove []
             String[] dataList = allReportsString.split(",");
             List<String> Moderator = new ArrayList<>(Collections.singletonList(""));
 
@@ -176,25 +183,18 @@ public class SettingsController implements Controller<Region> {
 
             totalProcessedReportsProcessed.sort(new Comparator<String>() {
                 public int compare(String o1, String o2) {
-                    return extractInt(o1) - extractInt(o2);
-                }
-
-                int extractInt(String s) {
-                    String num = s.replaceAll("\\D", "");
-                    // return 0 if no digits found
-                    return num.isEmpty() ? 0 : Integer.parseInt(num);
+                    // Extract the number of reports processed from each string
+                    int num1 = extractInt(o1);
+                    int num2 = extractInt(o2);
+                    // Compare the numbers
+                    return num1 - num2;
                 }
             });
 
             List<String> finalList = new ArrayList<>();
 
-            // refactor this someday - side effect is happening for numbers in moderator name
             for (String item : totalProcessedReportsProcessed){
-                if (item.contains("angelofd")||item.contains("maudlin")){
-                    item = item.replaceAll("angelofd","angelofd347h");
-                    item = item.replaceAll("maudlin","maudlin27");
-                }
-                if (!item.contains("DISCARDED")){  // one bugged report which has discarded as moderator name ...
+                if (!item.contains("DISCARDED")){  // ignore legacy reports which has DISCARDED as moderator name
                     finalList.add(item);
                 }
             }
@@ -239,10 +239,11 @@ public class SettingsController implements Controller<Region> {
                     MostReportsOffendersTextArea.appendText(text + "\n");
                 }
             }
-
-            //paste into clipboard for zulip
-            String myString = AllModeratorStatsTextField.getText() + "\n\n" + AwaitingReportsTotalTextAreaString + "\n\n" +
-                    "Repeat offenders:\n\n"+MostReportsOffendersTextArea.getText();
+            // Concatenate the moderator stats, awaiting reports, and repeat offenders and paste into clipboard
+            String myString = AllModeratorStatsTextField.getText() + "\n\n"
+                    + AwaitingReportsTotalTextAreaString + "\n\n"
+                    + "Repeat offenders:\n\n"
+                    + MostReportsOffendersTextArea.getText();
 
             StringSelection stringSelection = new StringSelection(myString);
             Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
