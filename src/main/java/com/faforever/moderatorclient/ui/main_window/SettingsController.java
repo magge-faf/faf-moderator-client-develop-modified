@@ -39,7 +39,7 @@ public class SettingsController implements Controller<Region> {
     public Button BlacklistedSN;
     public Button BlacklistedUUID;
     public Button BlacklistedVolumeSN;
-    public Button excludedItems;
+    public Button ExcludedItems;
     public TextField AllModeratorStatsTextField;
     public Button TemplateCompletedButton;
     public Button TemplateDiscardedButton;
@@ -54,15 +54,26 @@ public class SettingsController implements Controller<Region> {
     @FXML
     public void initialize() throws IOException {
         String[] blacklistedFiles = { "BlacklistedHash", "BlacklistedIP", "BlacklistedMemorySN",
-                "BlacklistedSN", "BlacklistedUUID", "BlacklistedVolumeSN", "excludedItems" };
+                "BlacklistedSN", "BlacklistedUUID", "BlacklistedVolumeSN", "ExcludedItems" };
 
         // create default blacklisted files if they do not exist
         for (String file : blacklistedFiles) {
             File f = new File(file + ".txt");
-            if (!f.exists()) {
-                f.createNewFile();
+            try {
+                if (!f.exists()) {
+                    if (f.createNewFile()) {
+                        log.info("[info] " + f + " was successfully created.");
+                    } else {
+                        log.info("[info] " + f + " already exists.");
+                    }
+                }
+            } catch (IOException e) {
+                // Print the stack trace for the exception
+                e.printStackTrace();
+                // You can also log the exception here, or handle it in some other way
             }
         }
+
 
         File f = new File("account_credentials.txt");
         if (f.exists() && !f.isDirectory()) {
@@ -128,7 +139,7 @@ public class SettingsController implements Controller<Region> {
         openFile("BlacklistedMemorySN.txt");
     }
 
-    public void excludedItems() throws IOException {
+    public void ExcludedItems() throws IOException {
         openFile("excludedItems.txt");
     }
 
@@ -181,15 +192,14 @@ public class SettingsController implements Controller<Region> {
                 totalProcessedReportsProcessed.add(item);
             }
 
-            totalProcessedReportsProcessed.sort(new Comparator<String>() {
-                public int compare(String o1, String o2) {
-                    // Extract the number of reports processed from each string
-                    int num1 = extractInt(o1);
-                    int num2 = extractInt(o2);
-                    // Compare the numbers
-                    return num1 - num2;
-                }
+            totalProcessedReportsProcessed.sort((o1, o2) -> {
+                // Extract the number of reports processed from each string
+                int num1 = extractInt(o1);
+                int num2 = extractInt(o2);
+                // Compare the numbers
+                return num1 - num2;
             });
+
 
             List<String> finalList = new ArrayList<>();
 
