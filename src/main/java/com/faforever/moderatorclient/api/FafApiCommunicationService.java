@@ -1,5 +1,7 @@
 package com.faforever.moderatorclient.api;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.faforever.commons.api.dto.MeResult;
 import com.faforever.commons.api.elide.ElideEntity;
 import com.faforever.commons.api.elide.ElideNavigator;
@@ -47,6 +49,7 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 public class FafApiCommunicationService {
+    private static final Logger logger = LoggerFactory.getLogger(FafApiCommunicationService.class);
     private final ResourceConverter defaultResourceConverter;
     private final ResourceConverter updateResourceConverter;
     private final OAuthTokenInterceptor oAuthTokenInterceptor;
@@ -244,6 +247,7 @@ public class FafApiCommunicationService {
     }
 
     public <T extends ElideEntity> List<T> getAll(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder, java.util.Map<String, Serializable> params) {
+        logger.debug("getAll method called with parameters: clazz={}, routeBuilder={}, params={}", clazz, routeBuilder, params);
         return getMany(clazz, routeBuilder, environmentProperties.getMaxResultSize(), params);
     }
 
@@ -269,6 +273,7 @@ public class FafApiCommunicationService {
     @SuppressWarnings("unchecked")
     @SneakyThrows
     public <T extends ElideEntity> List<T> getPage(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder, int pageSize, int page, MultiValueMap<String, String> params) {
+        logger.debug("getPage method called with parameters: clazz={}, routeBuilder={}, pageSize={}, page={}, params={}", clazz, routeBuilder, pageSize, page, params);
         authorizedLatch.await();
         String route = routeBuilder
                 .pageSize(pageSize)
