@@ -8,6 +8,7 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.control.TextArea?>
 <?import javafx.scene.control.CheckBox?>
+
 <VBox xmlns:fx="http://javafx.com/fxml/1" fx:id="root" alignment="TOP_CENTER" xmlns="http://javafx.com/javafx/8.0.111"
       fx:controller="com.faforever.moderatorclient.ui.main_window.RecentActivityController">
     <Button minWidth="200.0" mnemonicParsing="false" onAction="#refresh" text="refresh">
@@ -15,37 +16,22 @@
             <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
         </VBox.margin>
     </Button>
-    <CheckBox fx:id="IncludeGlobalBannedUserCheckBox" mnemonicParsing="false" text="Include already banned users">
+    <CheckBox fx:id="includeGlobalBannedUserCheckBox" mnemonicParsing="false" text="Include already banned users">
     </CheckBox>
     <CheckBox fx:id="excludedItemsCheckBox" selected="true" mnemonicParsing="false" text="Exclude junk/malformed items (see Settings)">
     </CheckBox>
-
-    <!--
-<CheckBox fx:id="CheckSteamAccountAgeCheckBox" mnemonicParsing="false" text="Check steam account age">
-</CheckBox>
--->
-    <TextArea fx:id="SuspiciousUserTextArea" editable="false"/>
+    <TextArea fx:id="suspiciousUserTextArea" editable="false" prefRowCount="20"/>
     <ScrollPane fitToWidth="true" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308">
-        <content>
-            <VBox>
-                <children>
-                    <TitledPane fx:id="userRegistrationFeedPane" text="Latest Registrations">
-                        <content>
-                            <TableView fx:id="userRegistrationFeedTableView"/>
-                        </content>
-                    </TitledPane>
-                    <TitledPane fx:id="teamkillFeedPane" expanded="false" text="Latest Teamkills">
-                        <content>
-                            <TableView fx:id="teamkillFeedTableView"/>
-                        </content>
-                    </TitledPane>
-                    <TitledPane fx:id="mapUploadFeedPane" expanded="false" text="Latest map uploads">
-                        <content>
-                            <TableView fx:id="mapUploadFeedTableView"/>
-                        </content>
-                    </TitledPane>
-                </children>
-            </VBox>
-        </content>
+        <VBox>
+            <TitledPane fx:id="userRegistrationFeedPane" text="Latest Registrations">
+                <TableView fx:id="userRegistrationFeedTableView"/>
+            </TitledPane>
+            <TitledPane fx:id="teamkillFeedPane" expanded="false" text="Latest Teamkills">
+                <TableView fx:id="teamkillFeedTableView"/>
+            </TitledPane>
+            <TitledPane fx:id="mapUploadFeedPane" expanded="false" text="Latest map uploads">
+                <TableView fx:id="mapUploadFeedTableView"/>
+            </TitledPane>
+        </VBox>
     </ScrollPane>
 </VBox>
