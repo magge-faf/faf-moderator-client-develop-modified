@@ -154,7 +154,7 @@ public class SettingsController implements Controller<Region> {
         }
     }
 
-    public void LoadAllModeratorStatsButton() {
+    public void LoadAllReportsAndModeratorStatsAndTopOffendersButton() {
         try {
             String allReportsString = String.valueOf(ModerationReportController.GlobalConstants.allReports);
             allReportsString = allReportsString.replaceAll("\\[.*?]",""); // remove []
@@ -252,9 +252,5 @@ public class SettingsController implements Controller<Region> {
         }catch (Exception e) {
             AllModeratorStatsTextField.setText("Refresh reports first");
             }
-    }
-    //TODO remove that legacy, combine that other button into one
-    public void LoadAllReportsAndModeratorStatsAndTopOffendersButton() {
-        LoadAllModeratorStatsButton();
     }
 }
