@@ -3,6 +3,7 @@ package com.faforever.moderatorclient.ui.main_window;
 import com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController;
 import javafx.scene.control.Button;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextArea;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import com.faforever.moderatorclient.ui.*;
@@ -10,13 +11,14 @@ import javafx.fxml.FXML;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import java.awt.*;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.awt.datatransfer.StringSelection;
-import java.awt.Toolkit;
 import java.awt.datatransfer.Clipboard;
+import java.util.List;
 
 
 @Component
@@ -40,7 +42,7 @@ public class SettingsController implements Controller<Region> {
     public Button TemplateCompletedButton;
     public Button TemplateDiscardedButton;
     public Button TemplateReportButton;
-    public TextField MostReportsOffendersTextField;
+    public TextArea MostReportsOffendersTextArea;
     public Button LoadAllReportsAndModeratorStatsAndTopOffendersButton;
     public TextField GenericJunk;
 
@@ -144,7 +146,7 @@ public class SettingsController implements Controller<Region> {
     public void LoadAllModeratorStatsButton() {
         try {
             String allReportsString = String.valueOf(ModerationReportController.GlobalConstants.allReports);
-
+            // There was a bug when moderator has numbers in their name, need to refactor that,but for now it works:
             allReportsString = allReportsString.replaceAll("\\[.*?]","");
             allReportsString = allReportsString.replaceAll("maudlin27","maudlin");
             allReportsString = allReportsString.replaceAll("angelofd347h","angelofd");
@@ -216,9 +218,10 @@ public class SettingsController implements Controller<Region> {
             for (Map.Entry<String, Integer> entry : offenderCounts.entrySet()) {
                 String offender = entry.getKey();
                 int frequency = entry.getValue();
-                String text = offender + ": " + frequency;
+                String text = offender + " : " + frequency;
                 if (frequency > 3) {
-                    MostReportsOffendersTextField.setText(MostReportsOffendersTextField.getText() + text + " | ");
+                    MostReportsOffendersTextArea.appendText(text + "\n");
+
                 }
             }
 
@@ -231,15 +234,15 @@ public class SettingsController implements Controller<Region> {
             for (Map.Entry<String, Integer> entry : ruOffenderCounts.entrySet()) {
                 String offender = entry.getKey();
                 int frequency = entry.getValue();
-                String text = offender + ": " + frequency;
+                String text = offender + ": " + frequency + " -> RU";
                 if (frequency > 3) {
-                    MostReportsOffendersTextField.setText(MostReportsOffendersTextField.getText() + text + " <-RU | ");
+                    MostReportsOffendersTextArea.appendText(text + "\n");
                 }
             }
 
             //paste into clipboard for zulip
             String myString = AllModeratorStatsTextField.getText() + "\n\n" + AwaitingReportsTotalTextAreaString + "\n\n" +
-                    "Repeat offenders:\n\n"+MostReportsOffendersTextField.getText();
+                    "Repeat offenders:\n\n"+MostReportsOffendersTextArea.getText();
 
             StringSelection stringSelection = new StringSelection(myString);
             Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
@@ -249,7 +252,7 @@ public class SettingsController implements Controller<Region> {
             AllModeratorStatsTextField.setText("Refresh reports first");
             }
     }
-
+    //TODO remove that legacy, combine that other button into one
     public void LoadAllReportsAndModeratorStatsAndTopOffendersButton() {
         LoadAllModeratorStatsButton();
     }
