@@ -24,7 +24,8 @@ import javafx.stage.Stage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import java.io.File;
+
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
@@ -83,14 +84,15 @@ public class RecentActivityController implements Controller<VBox> {
         }
 
     }
-    private void checkBlacklistedItem(List<String> blacklistedItems, String item, PlayerFX account) {
+    private void checkBlacklistedItem(String fileName, List<String> blacklistedItems, String item, PlayerFX account) {
         for (String blacklistedItem : blacklistedItems) {
             if (blacklistedItem.equals(item)) {
-                log.debug("[!] Blacklisted item found: " + blacklistedItem + " for " + account.getRepresentation());
-                SuspiciousUserTextArea.setText(SuspiciousUserTextArea.getText() + "[!] Blacklisted item found: " + blacklistedItem + " for " + account.getRepresentation() + "\n");
+                log.debug("[!] " + fileName + " : " + blacklistedItem + " for " + account.getRepresentation());
+                SuspiciousUserTextArea.setText(SuspiciousUserTextArea.getText() + "[!] " + fileName + " : " + blacklistedItem + " for " + account.getRepresentation() + "\n");
             }
         }
     }
+
 
     private void addBan(PlayerFX playerFX) {
         BanInfoController banInfoController = uiService.loadFxml("ui/banInfo.fxml");
@@ -111,24 +113,31 @@ public class RecentActivityController implements Controller<VBox> {
     }
 
     private void loadList(File file, List<String> list, List<String> excludedItems) {
-        try {
-            Scanner s = new Scanner(file);
+        try (Scanner s = new Scanner(file)) {
             while (s.hasNext()) {
                 String blacklistedItem = s.next();
-                for (String item : excludedItems) {
-                    if (blacklistedItem.equals(item)) {
-                        blacklistedItem = "";
-                        break;
-                    }
+                if (!excludedItems.contains(blacklistedItem)) {
+                    list.add(blacklistedItem);
                 }
-                list.add(blacklistedItem);
             }
-            s.close();
-            log.debug("[info] " + file + " loaded.");
-        } catch (Exception e) {
+        } catch (FileNotFoundException e) {
+            log.debug(String.valueOf(e));
+        }
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String line = reader.readLine();
+            int lineCount = 0;
+            while (line != null) {
+                excludedItems.add(line);
+                lineCount++;
+                line = reader.readLine();
+            }
+            log.debug("[info] " + file + " loaded. Total items: " + lineCount);
+        } catch (IOException e) {
             log.debug(String.valueOf(e));
         }
     }
+
 
     public void refresh() {
         teamkills.setAll(userService.findLatestTeamkills());
@@ -186,12 +195,12 @@ public class RecentActivityController implements Controller<VBox> {
 
                 for (UniqueIdFx item : accountUniqueIds) {
                     // cycle through all unique ids
-                    checkBlacklistedItem(BlacklistedHash, item.getHash(), account);
-                    checkBlacklistedItem(BlacklistedIP, account.getRecentIpAddress(), account);
-                    checkBlacklistedItem(BlacklistedMemorySN, item.getMemorySerialNumber(), account);
-                    checkBlacklistedItem(BlacklistedSN, item.getSerialNumber(), account);
-                    checkBlacklistedItem(BlacklistedUUID, item.getUuid(), account);
-                    checkBlacklistedItem(BlacklistedVolumeSN, item.getVolumeSerialNumber(), account);
+                    checkBlacklistedItem("BlacklistedHash", BlacklistedHash, item.getHash(), account);
+                    checkBlacklistedItem("BlacklistedIP", BlacklistedIP, account.getRecentIpAddress(), account);
+                    checkBlacklistedItem("BlacklistedMemorySN", BlacklistedMemorySN, item.getMemorySerialNumber(), account);
+                    checkBlacklistedItem("BlacklistedSN", BlacklistedSN, item.getSerialNumber(), account);
+                    checkBlacklistedItem("BlacklistedUUID", BlacklistedUUID, item.getUuid(), account);
+                    checkBlacklistedItem("BlacklistedVolumeSN", BlacklistedVolumeSN, item.getVolumeSerialNumber(), account);
                 }
             }
         }
