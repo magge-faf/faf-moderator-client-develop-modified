@@ -26,7 +26,7 @@
     <Separator prefHeight="10" />
     <TextField fx:id="AllModeratorStatsTextField" minWidth="300" promptText="Load all reports, then click button to see stats about moderators - total sum of DISCARDED and COMPLETED"/>
     <Separator prefHeight="10" />
-    <TextField fx:id="MostReportsOffendersTextField" minWidth="100" promptText="Load all reports, then click button."/>
+    <TextArea fx:id="MostReportsOffendersTextArea" minWidth="100" promptText="Load all reports, then click button."/>
     <Separator prefHeight="10" />
     <Button fx:id="TemplateCompletedButton" text="Open template for completed" mnemonicParsing="false" onAction="#TemplateCompletedButton"/>
     <Button fx:id="TemplateDiscardedButton" text="Open template for discarded" mnemonicParsing="false" onAction="#TemplateDiscardedButton"/>
