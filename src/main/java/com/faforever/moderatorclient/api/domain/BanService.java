@@ -62,7 +62,7 @@ public class BanService {
                     .addInclude("author")
                     .addInclude("revokeAuthor")
                             .addSortingRule("createTime", false),
-                    100,
+                    1000,
                     1,
                     ImmutableMap.of()
             );
