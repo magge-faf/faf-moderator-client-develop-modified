@@ -138,7 +138,6 @@ public class ModerationReportController implements Controller<Region> {
         Runtime.getRuntime().exec(cmd);
     }
 
-
     public void CopyReportTemplate() throws FileNotFoundException {
         String reportId = CopyReportID.getId();
         String gameId = CopyGameID.getId();
@@ -152,7 +151,6 @@ public class ModerationReportController implements Controller<Region> {
 
         setSysClipboardText(content);
     }
-
 
     public static class GlobalConstants
     {
@@ -262,7 +260,6 @@ public class ModerationReportController implements Controller<Region> {
 
     private void renewFilter() {
         resetCounters();
-
         filteredItemList.setPredicate(moderationReportFx -> {
             String playerFilter = playerNameFilterTextField.getText().toLowerCase();
             if (!Strings.isNullOrEmpty(playerFilter)) {
@@ -272,67 +269,48 @@ public class ModerationReportController implements Controller<Region> {
                     return false;
                 }
             }
-
-            ChooseableStatus selectedItem = statusChoiceBox.getSelectionModel().getSelectedItem();
-
-            if (selectedItem != null && "ALL".equals(selectedItem.toString()) && selectedItem.getModerationReportStatus() != null) {
-                ModerationReportStatus moderationReportStatus = selectedItem.getModerationReportStatus();
-                return moderationReportFx.getReportStatus() == moderationReportStatus;
-            }
-
-            if (selectedItem != null) {
-                ModerationReportStatus moderationReportStatus = selectedItem.getModerationReportStatus();
-                try{
-                    String current_line = moderationReportFx.getId() + ":" + moderationReportFx.getLastModerator().getRepresentation() + ":" + moderationReportFx.getReportStatus();
-                    if(!GlobalConstants.allReports.contains(current_line) && !moderationReportFx.getReportStatus().toString().equals("AWAITING")){
-                        GlobalConstants.allReports.add(current_line);
-                    }
+            ChooseableStatus selectedItemChoiceBox = statusChoiceBox.getSelectionModel().getSelectedItem();
+            if(selectedItemChoiceBox.toString().equals("ALL")) return true;
+            ModerationReportStatus moderationReportStatus = selectedItemChoiceBox.getModerationReportStatus();
+            try{
+                String current_line = moderationReportFx.getId() + ":" + moderationReportFx.getLastModerator().getRepresentation() + ":" + moderationReportFx.getReportStatus();
+                if(!GlobalConstants.allReports.contains(current_line) && !moderationReportFx.getReportStatus().toString().equals("AWAITING")){
+                    GlobalConstants.allReports.add(current_line);
                 }
-                catch (Exception ignored){} // com.faforever.moderatorclient.ui.domain.ModerationReportFX.getLastModerator()" is null
-
-
-                if (moderationReportFx.getReportStatus().toString().equals("AWAITING")) {
-                    counterAwaitingTotalReports += 1;
-
-                    for (PlayerFX temp : moderationReportFx.getReportedUsers().stream().toList()) {
-                        GlobalConstants.allOffenders.add(String.valueOf(temp.getRepresentation()));
-                    }
-
-                    if (moderationReportFx.getModeratorPrivateNote() != null ||
-                            moderationReportFx.getLastModerator() != null){
-                        counterAwaitingTotalRuReports +=1;
-                        } else { for(int i = 0; i < moderationReportFx.getReportDescription().length(); i++) {
-                            if(Character.UnicodeBlock.of(moderationReportFx.getReportDescription().charAt(i)).equals(Character.UnicodeBlock.CYRILLIC)) {
-                                // contains Cyrillic
-                                counterAwaitingTotalRuReports +=1;
-                                for (PlayerFX temp : moderationReportFx.getReportedUsers().stream().toList()) {
-                                    GlobalConstants.allRUOffenders.add(String.valueOf(temp.getRepresentation()));
-                                }
-                                break;
+            }
+            catch (Exception ignored){} // com.faforever.moderatorclient.ui.domain.ModerationReportFX.getLastModerator()" is null
+            if (moderationReportFx.getReportStatus().toString().equals("AWAITING")) {
+                counterAwaitingTotalReports += 1;
+                for (PlayerFX temp : moderationReportFx.getReportedUsers().stream().toList()) {
+                    GlobalConstants.allOffenders.add(String.valueOf(temp.getRepresentation()));
+                }
+                if (moderationReportFx.getModeratorPrivateNote() != null ||
+                        moderationReportFx.getLastModerator() != null){
+                    counterAwaitingTotalRuReports +=1;
+                    } else { for(int i = 0; i < moderationReportFx.getReportDescription().length(); i++) {
+                        if(Character.UnicodeBlock.of(moderationReportFx.getReportDescription().charAt(i)).equals(Character.UnicodeBlock.CYRILLIC)) {
+                            // contains Cyrillic
+                            counterAwaitingTotalRuReports +=1;
+                            for (PlayerFX temp : moderationReportFx.getReportedUsers().stream().toList()) {
+                                GlobalConstants.allRUOffenders.add(String.valueOf(temp.getRepresentation()));
                             }
+                            break;
                         }
                     }
-
-                    if (hideAlreadyTakenReportsCheckbox.isSelected() && moderationReportFx.getLastModerator() != null) {
-                        return false;
-                    }
-
-                    if (hideReportsRU.isSelected() && moderationReportFx.getReportDescription().chars().anyMatch(c -> Character.UnicodeBlock.of(c) == Character.UnicodeBlock.CYRILLIC)) {
-                        return false;
-                    }
-
                 }
-
-                AwaitingReportsTotalTextArea.setText(
-                    "Total awaiting: " + (counterAwaitingTotalReports) +
-                    "\nTotal RU awaiting: " + (counterAwaitingTotalRuReports) +
-                    "\nTotal non RU awaiting: " + (counterAwaitingTotalReports - counterAwaitingTotalRuReports));
-
-                GlobalConstants.AwaitingReportsTotalTextArea = AwaitingReportsTotalTextArea.getText();
-
-                return moderationReportFx.getReportStatus() == moderationReportStatus;
+                if (hideAlreadyTakenReportsCheckbox.isSelected() && moderationReportFx.getLastModerator() != null) {
+                    return false;
+                }
+                if (hideReportsRU.isSelected() && moderationReportFx.getReportDescription().chars().anyMatch(c -> Character.UnicodeBlock.of(c) == Character.UnicodeBlock.CYRILLIC)) {
+                    return false;
+                }
             }
-            return true;
+            AwaitingReportsTotalTextArea.setText(
+                "Total awaiting: " + (counterAwaitingTotalReports) +
+                "\nTotal RU awaiting: " + (counterAwaitingTotalRuReports) +
+                "\nTotal non RU awaiting: " + (counterAwaitingTotalReports - counterAwaitingTotalRuReports));
+            GlobalConstants.AwaitingReportsTotalTextArea = AwaitingReportsTotalTextArea.getText();
+            return moderationReportFx.getReportStatus() == moderationReportStatus;
         });
     }
 
