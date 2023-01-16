@@ -1,9 +1,11 @@
 package com.faforever.moderatorclient.ui.main_window;
 
 import com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController;
+import javafx.event.ActionEvent;
 import javafx.scene.control.Button;
-import javafx.scene.control.TextField;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import com.faforever.moderatorclient.ui.*;
@@ -47,6 +49,51 @@ public class SettingsController implements Controller<Region> {
     public TextArea MostReportsOffendersTextArea;
     public Button LoadAllReportsAndModeratorStatsAndTopOffendersButton;
     public TextField GenericJunk;
+    public MenuItem optionUserManagementTab;
+    public MenuItem optionReportTab;
+    public MenuItem optionRecentActivityTab;
+    public javafx.scene.control.Menu menuBarText;
+
+    private static final String USER_CHOICE_FILENAME = "userChoiceDefaultTab.txt";
+
+    public void handleOptionUserManagementTabClicked() {
+        try {
+            File file = new File(USER_CHOICE_FILENAME);
+            FileWriter fileWriter = new FileWriter(file);
+            fileWriter.write("userManagementTab");
+            fileWriter.flush();
+            fileWriter.close();
+            menuBarText.setText("current default is userManagementTab");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void handleOptionReportTabClicked() {
+        try {
+            File file = new File(USER_CHOICE_FILENAME);
+            FileWriter fileWriter = new FileWriter(file);
+            fileWriter.write("reportTab");
+            fileWriter.flush();
+            fileWriter.close();
+            menuBarText.setText("current default is reportTab");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void handleOptionRecentActivityTabClicked() {
+        try {
+            File file = new File(USER_CHOICE_FILENAME);
+            FileWriter fileWriter = new FileWriter(file);
+            fileWriter.write("recentActivityTab");
+            fileWriter.flush();
+            fileWriter.close();
+            menuBarText.setText("current default is recentActivityTab");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
     @Override
     public VBox getRoot() {return root;}
@@ -68,12 +115,9 @@ public class SettingsController implements Controller<Region> {
                     }
                 }
             } catch (IOException e) {
-                // Print the stack trace for the exception
                 e.printStackTrace();
-                // You can also log the exception here, or handle it in some other way
             }
         }
-
 
         File f = new File("account_credentials.txt");
         if (f.exists() && !f.isDirectory()) {
