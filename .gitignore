@@ -9,14 +9,11 @@ build
 *.ipr
 
 # User-specific stuff:
-account_credentials.txt
-BlacklistedPermanentIP.txt
-BlacklistedPermanentVSN.txt
-BlacklistedTemporaryVSN.txt
 .idea/workspace.xml
 .idea/tasks.xml
 .idea/dictionaries
 .idea/sonarIssues.xml
+*.txt
 
 
 # Sensitive or high-churn files:
@@ -31,5 +28,3 @@ BlacklistedTemporaryVSN.txt
 .idea/inspectionProfiles/
 .idea/libraries
 .idea/libraries-with-intellij-classes.xml
-/.idea/.name
-/.idea/
