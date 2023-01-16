@@ -75,23 +75,23 @@ public class FafModeratorClientApplication extends Application {
                 String elapsedTimeStr = String.format("%02d:%02d:%02d", TimeUnit.SECONDS.toHours(elapsedTime),
                         TimeUnit.SECONDS.toMinutes(elapsedTime) % TimeUnit.HOURS.toMinutes(1),
                         TimeUnit.SECONDS.toSeconds(elapsedTime) % TimeUnit.MINUTES.toSeconds(1));
-                if (elapsedTime >= 414 && elapsedTime <=420) {
-                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr + " (o︵o )"));
-                    waitSecond();
-                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr + " (o︵o)"));
-                    waitSecond();
-                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr + " ( o︵o)"));
-                    waitSecond();
-                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr + " ( o︵o)/"));
-                    waitSecond();
-                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr + " ( o︵o)y─"));
-                    waitSecond();
-                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr + " ( o︵o)y─🔥"));
-                    waitSecond();
-                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr + " ( *‿*)y─┛~"));
-                    waitSecond();
-                    }
                 Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr));
+                if (elapsedTime >= 254 && elapsedTime <=260) {
+                    //TODO refactor the hardcoded time
+                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: 00:04:14" + " (o︵o )"));
+                    waitSecond();
+                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: 00:04:15" + " (o︵o)"));
+                    waitSecond();
+                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: 00:04:16" + " ( o︵o)"));
+                    waitSecond();
+                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: 00:04:17" + " ( o︵o)/"));
+                    waitSecond();
+                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: 00:04:18" + " ( o︵o)y─"));
+                    waitSecond();
+                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: 00:04:19" + " ( o︵o)y─🔥"));
+                    waitSecond();
+                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: 00:04:20" + " ( *‿*)y─┛~"));
+                    }
                 waitSecond();
             }
         });
