@@ -29,6 +29,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
+import java.io.*;
 import java.text.MessageFormat;
 import java.util.HashMap;
 import java.util.Map;
@@ -77,6 +78,35 @@ public class MainController implements Controller<TabPane> {
 
     @Override
     public TabPane getRoot() {
+        String userChoiceDefaultTab = "";
+        try {
+            File file = new File("userChoiceDefaultTab.txt");
+            if (!file.exists()) {
+                boolean isFileCreated = file.createNewFile();
+                if (isFileCreated) {
+                    log.debug("File created successfully");
+                } else {
+                    log.debug("File already exists or an error occurred");
+                }
+                FileWriter fileWriter = new FileWriter(file);
+                fileWriter.write("userManagementTab");
+                fileWriter.flush();
+                fileWriter.close();
+            }
+            FileReader fileReader = new FileReader(file);
+            BufferedReader bufferedReader = new BufferedReader(fileReader);
+            userChoiceDefaultTab = bufferedReader.readLine();
+            log.debug("userChoice: " + userChoiceDefaultTab);
+            bufferedReader.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        switch (userChoiceDefaultTab) {
+            case "userManagementTab" -> root.getSelectionModel().select(userManagementTab);
+            case "reportTab" -> root.getSelectionModel().select(reportTab);
+            case "recentActivityTab" -> root.getSelectionModel().select(recentActivityTab);
+        }
         return root;
     }
 
@@ -108,7 +138,6 @@ public class MainController implements Controller<TabPane> {
     }
 
     private void initSettingsTab() {
-
         settingsController = uiService.loadFxml("ui/main_window/settingsTab.fxml");
         settingsTab.setContent(settingsController.getRoot());
 
