@@ -219,11 +219,8 @@ public class ModerationReportController implements Controller<Region> {
                         CopyReportedUserID.setText("no value / missing Game ID");
                         CopyReportedUserID.setId("");
                     }
-
                 });
-
         chatLogTextArea.setText("select a report first");
-
         ViewHelper.buildUserTableView(platformService, reportedPlayerView, reportedPlayersOfCurrentlySelectedReport, this::addBan,
                 playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), communicationService);
     }
@@ -259,6 +256,7 @@ public class ModerationReportController implements Controller<Region> {
     int counterAlreadyTakenFromMod = 0;
 
     private void renewFilter() {
+        //TODO GlobalConstants refactor with private static ?
         resetCounters();
         filteredItemList.setPredicate(moderationReportFx -> {
             String playerFilter = playerNameFilterTextField.getText().toLowerCase();
@@ -270,26 +268,29 @@ public class ModerationReportController implements Controller<Region> {
                 }
             }
             ChooseableStatus selectedItemChoiceBox = statusChoiceBox.getSelectionModel().getSelectedItem();
-            if(selectedItemChoiceBox.toString().equals("ALL")) return true;
+            if (selectedItemChoiceBox.toString().equals("ALL")) return true;
             ModerationReportStatus moderationReportStatus = selectedItemChoiceBox.getModerationReportStatus();
-            try{
+            try {
                 String current_line = moderationReportFx.getId() + ":" + moderationReportFx.getLastModerator().getRepresentation() + ":" + moderationReportFx.getReportStatus();
                 if(!GlobalConstants.allReports.contains(current_line) && !moderationReportFx.getReportStatus().toString().equals("AWAITING")){
                     GlobalConstants.allReports.add(current_line);
                 }
             }
             catch (Exception ignored){} // com.faforever.moderatorclient.ui.domain.ModerationReportFX.getLastModerator()" is null
+
             if (moderationReportFx.getReportStatus().toString().equals("AWAITING")) {
-                counterAwaitingTotalReports += 1;
+                counterAwaitingTotalReports +=1;
                 for (PlayerFX temp : moderationReportFx.getReportedUsers().stream().toList()) {
                     GlobalConstants.allOffenders.add(String.valueOf(temp.getRepresentation()));
                 }
-                if (moderationReportFx.getModeratorPrivateNote() != null ||
-                        moderationReportFx.getLastModerator() != null){
-                    counterAwaitingTotalRuReports +=1;
-                    } else { for(int i = 0; i < moderationReportFx.getReportDescription().length(); i++) {
+                if ("RU".equals(moderationReportFx.getModeratorPrivateNote())) {
+                        counterAwaitingTotalRuReports +=1;
+                        for (PlayerFX temp : moderationReportFx.getReportedUsers().stream().toList()) {
+                            GlobalConstants.allRUOffenders.add(String.valueOf(temp.getRepresentation()));
+                        }
+                } else {
+                    for(int i = 0; i < moderationReportFx.getReportDescription().length(); i++) {
                         if(Character.UnicodeBlock.of(moderationReportFx.getReportDescription().charAt(i)).equals(Character.UnicodeBlock.CYRILLIC)) {
-                            // contains Cyrillic
                             counterAwaitingTotalRuReports +=1;
                             for (PlayerFX temp : moderationReportFx.getReportedUsers().stream().toList()) {
                                 GlobalConstants.allRUOffenders.add(String.valueOf(temp.getRepresentation()));
@@ -346,12 +347,10 @@ public class ModerationReportController implements Controller<Region> {
         ChooseableStatus(ModerationReportStatus moderationReportStatus) {
             this.moderationReportStatus = moderationReportStatus;
         }
-
         public ModerationReportStatus getModerationReportStatus() {
             return moderationReportStatus;
         }
     }
-
 
     @SneakyThrows
     private void showChatLog(ModerationReportFX report) {
