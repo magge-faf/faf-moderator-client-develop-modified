@@ -58,28 +58,41 @@ public class FafModeratorClientApplication extends Application {
         startTimerThread(primaryStage);
     }
 
+    private void waitSecond() {
+        try {
+            // Sleep cycle has a slight delay by ~5ms for executing code. Not important to have it that accurate
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
     private void startTimerThread(Stage primaryStage) {
         long startTime = System.currentTimeMillis();
         Thread timerThread = new Thread(() -> {
             while (true) {
-                long elapsedTime = System.currentTimeMillis() - startTime;
-                log.debug(String.valueOf(elapsedTime));
-                String elapsedTimeStr = String.format("%02d:%02d:%02d", TimeUnit.MILLISECONDS.toHours(elapsedTime),
-                        TimeUnit.MILLISECONDS.toMinutes(elapsedTime) % TimeUnit.HOURS.toMinutes(1),
-                        TimeUnit.MILLISECONDS.toSeconds(elapsedTime) % TimeUnit.MINUTES.toSeconds(1));
-                if (elapsedTime >= 68000 && elapsedTime <= 69000) {
-                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr + " nice"));
-                } else if (elapsedTime >= 419000 && elapsedTime <= 420000) {
-                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr + " ( *∀*)y─┛"));
-                } else {
-                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr));
-                }
-                try {
-                    // Sleep cycle has a slight delay by ~5ms for executing code. Not important to have it that accurate
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
+                long elapsedTime = (System.currentTimeMillis() - startTime) / 1000;
+                String elapsedTimeStr = String.format("%02d:%02d:%02d", TimeUnit.SECONDS.toHours(elapsedTime),
+                        TimeUnit.SECONDS.toMinutes(elapsedTime) % TimeUnit.HOURS.toMinutes(1),
+                        TimeUnit.SECONDS.toSeconds(elapsedTime) % TimeUnit.MINUTES.toSeconds(1));
+                if (elapsedTime >= 414 && elapsedTime <=420) {
+                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr + " (o︵o )"));
+                    waitSecond();
+                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr + " (o︵o)"));
+                    waitSecond();
+                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr + " ( o︵o)"));
+                    waitSecond();
+                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr + " ( o︵o)/"));
+                    waitSecond();
+                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr + " ( o︵o)y─"));
+                    waitSecond();
+                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr + " ( o︵o)y─🔥"));
+                    waitSecond();
+                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr + " ( *‿*)y─┛~"));
+                    waitSecond();
+                    }
+                Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr));
+                waitSecond();
             }
         });
         timerThread.start();
