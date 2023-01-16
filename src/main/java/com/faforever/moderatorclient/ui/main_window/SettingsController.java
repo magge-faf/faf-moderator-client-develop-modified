@@ -1,7 +1,6 @@
 package com.faforever.moderatorclient.ui.main_window;
 
 import com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController;
-import javafx.event.ActionEvent;
 import javafx.scene.control.Button;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextArea;
