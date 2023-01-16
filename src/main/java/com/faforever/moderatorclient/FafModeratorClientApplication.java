@@ -68,9 +68,9 @@ public class FafModeratorClientApplication extends Application {
                         TimeUnit.MILLISECONDS.toMinutes(elapsedTime) % TimeUnit.HOURS.toMinutes(1),
                         TimeUnit.MILLISECONDS.toSeconds(elapsedTime) % TimeUnit.MINUTES.toSeconds(1));
                 if (elapsedTime >= 68000 && elapsedTime <= 69000) {
-                    Platform.runLater(() -> primaryStage.setTitle("nice"));
+                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr + " nice"));
                 } else if (elapsedTime >= 419000 && elapsedTime <= 420000) {
-                    Platform.runLater(() -> primaryStage.setTitle("( *∀*)y─┛"));
+                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr + " ( *∀*)y─┛"));
                 } else {
                     Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr));
                 }
