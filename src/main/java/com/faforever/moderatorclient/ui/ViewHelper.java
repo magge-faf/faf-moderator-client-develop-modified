@@ -1,8 +1,6 @@
 package com.faforever.moderatorclient.ui;
 
 import java.io.*;
-import java.sql.Timestamp;
-import java.text.SimpleDateFormat;
 import java.time.Duration;
 import com.faforever.commons.api.dto.BanDurationType;
 import com.faforever.commons.api.dto.BanLevel;
