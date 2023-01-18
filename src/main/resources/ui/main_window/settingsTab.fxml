@@ -6,11 +6,11 @@
 
 <VBox xmlns:fx="http://javafx.com/fxml/1" fx:id="root" xmlns="http://javafx.com/javafx/8.0.111"
       fx:controller="com.faforever.moderatorclient.ui.main_window.SettingsController">
-    <TextField fx:id="AccountNameOrEmailTextField" minWidth="300" promptText="Account name or email"/>
-    <PasswordField fx:id="AccountPasswordTextField" minWidth="300" promptText="Password"/>
-    <Button fx:id="SaveAccountButton" text="Save" mnemonicParsing="false" onAction="#SaveAccountButton"/>
+    <TextField fx:id="accountNameOrEmailTextField" minWidth="300" promptText="Account name or email"/>
+    <PasswordField fx:id="accountPasswordTextField" minWidth="300" promptText="Password"/>
+    <Button fx:id="saveAccountButton" text="Save" mnemonicParsing="false" onAction="#SaveAccountButton"/>
     <Text textAlignment="CENTER"  text="If credentials are wrong and you can not auto login anymore, change them in account_credentials.txt -> File is in project folder."/>
-    <TextField fx:id="PathAccountFile" text="restart Mordor to see path"/>
+    <TextField fx:id="pathAccountFile" text="restart Mordor to see path"/>
     <Text textAlignment="CENTER"  text="For every line one item, without brackets whatsoever. Same path as ↑"/>
     <Button fx:id="BlacklistedHash" text="Open BlacklistedHash" mnemonicParsing="false" onAction="#BlacklistedHash"/>
     <Button fx:id="BlacklistedIP" text="Open BlacklistedIP" mnemonicParsing="false" onAction="#BlacklistedIP"/>
@@ -20,18 +20,18 @@
     <Button fx:id="BlacklistedVolumeSN" text="Open BlacklistedVolumeSN" mnemonicParsing="false" onAction="#BlacklistedVolumeSN"/>
     <Button fx:id="ExcludedItems" text="Open ExcludedItems" mnemonicParsing="false" onAction="#ExcludedItems"/>
     <Text textAlignment="CENTER"  text="Check link for newest list of junk/malformed hardware IDs"/>
-    <TextField fx:id="GenericJunk" minWidth="300" text="https://faforever.zulipchat.com/#narrow/stream/203851-moderators/topic/modified.20mordor"/>
+    <TextField fx:id="genericJunk" minWidth="300" text="https://faforever.zulipchat.com/#narrow/stream/203851-moderators/topic/modified.20mordor"/>
     <Separator prefHeight="10" />
     <Button fx:id="generateReportsAndModeratorStatisticsButton" text="Show Moderator Stats, Repeated Offenders and paste into clipboard:" mnemonicParsing="false" onAction="#generateReportsAndModeratorStatistics"/>
     <Separator prefHeight="10" />
-    <TextField fx:id="AllModeratorStatsTextField" minWidth="300" promptText="Load all reports, then click button to see stats about moderators - total sum of DISCARDED and COMPLETED"/>
+    <TextField fx:id="allModeratorStatsTextField" minWidth="300" promptText="Load all reports, then click button to see stats about moderators - total sum of DISCARDED and COMPLETED"/>
     <Separator prefHeight="10" />
-    <TextArea fx:id="MostReportsOffendersTextArea" minWidth="100" promptText="Load all reports, then click button."/>
+    <TextArea fx:id="mostReportsOffendersTextArea" minWidth="100" promptText="Load all reports, then click button."/>
     <Separator prefHeight="10" />
-    <Button fx:id="TemplateCompletedButton" text="Open template for completed" mnemonicParsing="false" onAction="#TemplateCompletedButton"/>
-    <Button fx:id="TemplateDiscardedButton" text="Open template for discarded" mnemonicParsing="false" onAction="#TemplateDiscardedButton"/>
+    <Button fx:id="templateCompletedButton" text="Open template for completed" mnemonicParsing="false" onAction="#TemplateCompletedButton"/>
+    <Button fx:id="templateDiscardedButton" text="Open template for discarded" mnemonicParsing="false" onAction="#TemplateDiscardedButton"/>
     <Separator minHeight="10" />
-    <Button fx:id="TemplateReportButton" text="Open template for report" mnemonicParsing="false" onAction="#TemplateReportButton"/>
+    <Button fx:id="templateReportButton" text="Open template for report" mnemonicParsing="false" onAction="#TemplateReportButton"/>
     <Text textAlignment="CENTER"  text="Available variables: %report_id% %game_id% %offender% "/>
     <Separator minHeight="10" />
     <MenuBar xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml">
