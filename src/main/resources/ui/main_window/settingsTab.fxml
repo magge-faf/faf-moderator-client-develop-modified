@@ -22,7 +22,7 @@
     <Text textAlignment="CENTER"  text="Check link for newest list of junk/malformed hardware IDs"/>
     <TextField fx:id="GenericJunk" minWidth="300" text="https://faforever.zulipchat.com/#narrow/stream/203851-moderators/topic/modified.20mordor"/>
     <Separator prefHeight="10" />
-    <Button fx:id="LoadAllReportsAndModeratorStatsAndTopOffendersButton" text="Show Moderator Stats, Repeated Offenders and paste into clipboard:" mnemonicParsing="false" onAction="#LoadAllReportsAndModeratorStatsAndTopOffendersButton"/>
+    <Button fx:id="generateReportsAndModeratorStatisticsButton" text="Show Moderator Stats, Repeated Offenders and paste into clipboard:" mnemonicParsing="false" onAction="#generateReportsAndModeratorStatistics"/>
     <Separator prefHeight="10" />
     <TextField fx:id="AllModeratorStatsTextField" minWidth="300" promptText="Load all reports, then click button to see stats about moderators - total sum of DISCARDED and COMPLETED"/>
     <Separator prefHeight="10" />
