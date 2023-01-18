@@ -16,26 +16,26 @@
 <?import javafx.scene.control.TextArea?>
 
 <SplitPane xmlns:fx="http://javafx.com/fxml/1" fx:id="root" dividerPositions="0.3" orientation="VERTICAL"
-           prefHeight="200.0" prefWidth="160.0" xmlns="http://javafx.com/javafx/8.0.171"
+           prefHeight="200.0" prefWidth="220.0" xmlns="http://javafx.com/javafx/8.0.171"
            fx:controller="com.faforever.moderatorclient.ui.main_window.UserManagementController">
-    <HBox>
-        <VBox minWidth="220.0" spacing="1.0">
+    <HBox HBox.hgrow="ALWAYS">
+        <VBox minWidth="220.0">
             <ComboBox fx:id="searchUserProperties" promptText="Search by"/>
             <TextField fx:id="userSearchTextField" onAction="#onUserSearch">
             </TextField>
             <Button mnemonicParsing="false" onAction="#onUserSearch" text="Search" alignment="CENTER">
             </Button>
-            <TextArea fx:id="SearchHistoryTextField"  editable="false" maxHeight="300" maxWidth="220"
+            <TextArea fx:id="SearchHistoryTextField" editable="false"
                       promptText="history (resets with new start)">
             </TextArea>
-            <TextArea fx:id="NotesTextArea" wrapText="true" maxHeight="300" maxWidth="220"
+            <TextArea fx:id="NotesTextArea"
                       promptText="notes (resets with new start)">
             </TextArea>
         </VBox>
         <TableView fx:id="userSearchTableView" maxHeight="1.7976931348623157E308"
                    maxWidth="1.7976931348623157E308" minWidth="550.0" prefHeight="200.0" HBox.hgrow="ALWAYS"/>
     </HBox>
-    <TabPane minHeight="200.0" tabClosingPolicy="UNAVAILABLE">
+    <TabPane minHeight="200.0" tabClosingPolicy="UNAVAILABLE" >
         <Tab fx:id="notesTab" text="Notes">
             <VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308">
                 <TableView fx:id="userNoteTableView" prefHeight="200.0" prefWidth="200.0"
