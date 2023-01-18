@@ -46,7 +46,7 @@ public class SettingsController implements Controller<Region> {
     public Button TemplateDiscardedButton;
     public Button TemplateReportButton;
     public TextArea MostReportsOffendersTextArea;
-    public Button LoadAllReportsAndModeratorStatsAndTopOffendersButton;
+    public Button generateReportsAndModeratorStatisticsButton;
     public TextField GenericJunk;
     public MenuItem optionUserManagementTab;
     public MenuItem optionReportTab;
@@ -208,102 +208,108 @@ public class SettingsController implements Controller<Region> {
         }
     }
 
-    public void LoadAllReportsAndModeratorStatsAndTopOffendersButton() {
-        try {
-            String allReportsString = String.valueOf(ModerationReportController.GlobalConstants.allReports);
-            allReportsString = allReportsString.replaceAll("\\[.*?]",""); // remove []
-            String[] dataList = allReportsString.split(",");
-            List<String> Moderator = new ArrayList<>(Collections.singletonList(""));
+    public void generateReportsAndModeratorStatistics() {
+        if(!ModerationReportController.GlobalConstants.allReports.isEmpty()){
+            try {
+                String allReportsString = String.valueOf(ModerationReportController.GlobalConstants.allReports);
+                allReportsString = allReportsString.replaceAll("\\[.*?]",""); // remove []
+                String[] dataList = allReportsString.split(",");
+                List<String> Moderator = new ArrayList<>(Collections.singletonList(""));
 
-            for (String item : dataList) {
-                item = Arrays.toString(item.split(":"));
-                Moderator.add(Arrays.toString(new String[]{item.split(",")[1]}));
-            }
-
-            Set<String> unique = new HashSet<>(Moderator);
-            List<String> totalProcessedReportsRaw = new ArrayList<>();
-            List<String> totalProcessedReportsProcessed = new ArrayList<>();
-
-            for (String key : unique) {
-                if (!key.equals("")){
-                    totalProcessedReportsRaw.add(key + ": " + Collections.frequency(Moderator, key));
+                for (String item : dataList) {
+                    item = Arrays.toString(item.split(":"));
+                    Moderator.add(Arrays.toString(new String[]{item.split(",")[1]}));
                 }
-            }
 
-            for (String item : totalProcessedReportsRaw) {
-                item = item.replaceAll("\\[", "").replaceAll("]", "").replaceAll(" ", "");
-                totalProcessedReportsProcessed.add(item);
-            }
+                Set<String> unique = new HashSet<>(Moderator);
+                List<String> totalProcessedReportsRaw = new ArrayList<>();
+                List<String> totalProcessedReportsProcessed = new ArrayList<>();
 
-            totalProcessedReportsProcessed.sort((o1, o2) -> {
-                // Extract the number of reports processed from each string
-                int num1 = extractInt(o1);
-                int num2 = extractInt(o2);
-                // Compare the numbers
-                return num1 - num2;
-            });
-
-
-            List<String> finalList = new ArrayList<>();
-
-            for (String item : totalProcessedReportsProcessed){
-                if (!item.contains("DISCARDED")){  // ignore legacy reports which has DISCARDED as moderator name
-                    finalList.add(item);
+                for (String key : unique) {
+                    if (!key.equals("")){
+                        totalProcessedReportsRaw.add(key + ": " + Collections.frequency(Moderator, key));
+                    }
                 }
-            }
 
-            List<?> shallowCopy = finalList.subList(0, finalList.size());
-            Collections.reverse(shallowCopy);
-
-            AllModeratorStatsTextField.setText(String.valueOf(finalList));
-
-            String AwaitingReportsTotalTextAreaString = String.valueOf(ModerationReportController.GlobalConstants.AwaitingReportsTotalTextArea);
-
-            List<String> allOffendersListGlobal = ModerationReportController.GlobalConstants.allOffenders;
-            List<String> allRUOffendersList = ModerationReportController.GlobalConstants.allRUOffenders;
-
-            allOffendersListGlobal.removeAll(allRUOffendersList);
-            Map<String, Integer> offenderCounts = new HashMap<>();
-            for (String offender : allOffendersListGlobal) {
-                offenderCounts.put(offender, offenderCounts.getOrDefault(offender, 0) + 1);
-            }
-
-            for (Map.Entry<String, Integer> entry : offenderCounts.entrySet()) {
-                String offender = entry.getKey();
-                int frequency = entry.getValue();
-                String text = offender + " : " + frequency;
-                if (frequency > 3) {
-                    MostReportsOffendersTextArea.appendText(text + "\n");
-
+                for (String item : totalProcessedReportsRaw) {
+                    item = item.replaceAll("\\[", "").replaceAll("]", "").replaceAll(" ", "");
+                    totalProcessedReportsProcessed.add(item);
                 }
-            }
 
-            // Count the frequency of offenders in allRUOffendersList
-            Map<String, Integer> ruOffenderCounts = new HashMap<>();
-            for (String offender : allRUOffendersList) {
-                ruOffenderCounts.put(offender, ruOffenderCounts.getOrDefault(offender, 0) + 1);
-            }
+                totalProcessedReportsProcessed.sort((o1, o2) -> {
+                    // Extract the number of reports processed from each string
+                    int num1 = extractInt(o1);
+                    int num2 = extractInt(o2);
+                    // Compare the numbers
+                    return num1 - num2;
+                });
 
-            for (Map.Entry<String, Integer> entry : ruOffenderCounts.entrySet()) {
-                String offender = entry.getKey();
-                int frequency = entry.getValue();
-                String text = offender + ": " + frequency + " -> RU";
-                if (frequency > 3) {
-                    MostReportsOffendersTextArea.appendText(text + "\n");
+
+                List<String> finalList = new ArrayList<>();
+
+                for (String item : totalProcessedReportsProcessed){
+                    if (!item.contains("DISCARDED")){  // ignore legacy reports which has DISCARDED as moderator name
+                        finalList.add(item);
+                    }
                 }
-            }
-            // Concatenate the moderator stats, awaiting reports, and repeat offenders and paste into clipboard
-            String myString = AllModeratorStatsTextField.getText() + "\n\n"
-                    + AwaitingReportsTotalTextAreaString + "\n\n"
-                    + "Repeat offenders:\n\n"
-                    + MostReportsOffendersTextArea.getText();
 
-            StringSelection stringSelection = new StringSelection(myString);
-            Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
-            clipboard.setContents(stringSelection, null);
+                List<?> shallowCopy = finalList.subList(0, finalList.size());
+                Collections.reverse(shallowCopy);
 
-        }catch (Exception e) {
-            AllModeratorStatsTextField.setText("Refresh reports first");
+                AllModeratorStatsTextField.setText(String.valueOf(finalList));
+
+                String AwaitingReportsTotalTextAreaString = String.valueOf(ModerationReportController.GlobalConstants.AwaitingReportsTotalTextArea);
+
+                List<String> allOffendersListGlobal = ModerationReportController.GlobalConstants.allOffenders;
+                List<String> allRUOffendersList = ModerationReportController.GlobalConstants.allRUOffenders;
+
+                allOffendersListGlobal.removeAll(allRUOffendersList);
+                Map<String, Integer> offenderCounts = new HashMap<>();
+                for (String offender : allOffendersListGlobal) {
+                    offenderCounts.put(offender, offenderCounts.getOrDefault(offender, 0) + 1);
+                }
+
+                for (Map.Entry<String, Integer> entry : offenderCounts.entrySet()) {
+                    String offender = entry.getKey();
+                    int frequency = entry.getValue();
+                    String text = offender + " : " + frequency;
+                    if (frequency > 3) {
+                        MostReportsOffendersTextArea.appendText(text + "\n");
+
+                    }
+                }
+
+                // Count the frequency of offenders in allRUOffendersList
+                Map<String, Integer> ruOffenderCounts = new HashMap<>();
+                for (String offender : allRUOffendersList) {
+                    ruOffenderCounts.put(offender, ruOffenderCounts.getOrDefault(offender, 0) + 1);
+                }
+
+                for (Map.Entry<String, Integer> entry : ruOffenderCounts.entrySet()) {
+                    String offender = entry.getKey();
+                    int frequency = entry.getValue();
+                    String text = offender + ": " + frequency + " -> RU";
+                    if (frequency > 3) {
+                        MostReportsOffendersTextArea.appendText(text + "\n");
+                    }
+                }
+                // Concatenate the moderator stats, awaiting reports, and repeat offenders and paste into clipboard
+                String myString = AllModeratorStatsTextField.getText() + "\n\n"
+                        + AwaitingReportsTotalTextAreaString + "\n\n"
+                        + "Repeat offenders:\n\n"
+                        + MostReportsOffendersTextArea.getText();
+
+                StringSelection stringSelection = new StringSelection(myString);
+                Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+                clipboard.setContents(stringSelection, null);
+
+                ModerationReportController.GlobalConstants.allReports.clear();
+                ModerationReportController.GlobalConstants.allOffenders.clear();
+                ModerationReportController.GlobalConstants.allRUOffenders.clear();
+
+            }catch (Exception e) {
+                AllModeratorStatsTextField.setText(String.valueOf(e));
             }
+        }
     }
 }
