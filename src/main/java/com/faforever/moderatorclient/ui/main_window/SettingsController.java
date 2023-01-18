@@ -30,10 +30,10 @@ import java.util.regex.Pattern;
 public class SettingsController implements Controller<Region> {
 
     public VBox root;
-    public TextField AccountNameOrEmailTextField;
-    public TextField AccountPasswordTextField;
-    public Button SaveAccountButton;
-    public TextField PathAccountFile;
+    public TextField accountNameOrEmailTextField;
+    public TextField accountPasswordTextField;
+    public Button saveAccountButton;
+    public TextField pathAccountFile;
     public Button BlacklistedHash;
     public Button BlacklistedIP;
     public Button BlacklistedMemorySN;
@@ -41,13 +41,13 @@ public class SettingsController implements Controller<Region> {
     public Button BlacklistedUUID;
     public Button BlacklistedVolumeSN;
     public Button ExcludedItems;
-    public TextField AllModeratorStatsTextField;
-    public Button TemplateCompletedButton;
-    public Button TemplateDiscardedButton;
-    public Button TemplateReportButton;
-    public TextArea MostReportsOffendersTextArea;
+    public TextField allModeratorStatsTextField;
+    public Button templateCompletedButton;
+    public Button templateDiscardedButton;
+    public Button templateReportButton;
+    public TextArea mostReportsOffendersTextArea;
     public Button generateReportsAndModeratorStatisticsButton;
-    public TextField GenericJunk;
+    public TextField genericJunk;
     public MenuItem optionUserManagementTab;
     public MenuItem optionReportTab;
     public MenuItem optionRecentActivityTab;
@@ -121,13 +121,13 @@ public class SettingsController implements Controller<Region> {
         File f = new File("account_credentials.txt");
         if (f.exists() && !f.isDirectory()) {
             Path pathCredentialsFile = Path.of("account_credentials.txt");
-            PathAccountFile.setText(String.valueOf(pathCredentialsFile.toAbsolutePath()));
+            pathAccountFile.setText(String.valueOf(pathCredentialsFile.toAbsolutePath()));
             try {
                 List<String> credentials = Files.readAllLines(pathCredentialsFile);
                 String nameOrEmail = credentials.get(0);
                 String password = credentials.get(1);
-                AccountNameOrEmailTextField.setText(nameOrEmail);
-                AccountPasswordTextField.setText(password);
+                accountNameOrEmailTextField.setText(nameOrEmail);
+                accountPasswordTextField.setText(password);
             } catch (Exception e) {
                 log.debug("Error reading account credentials: " + e.getMessage());
             }
@@ -135,15 +135,15 @@ public class SettingsController implements Controller<Region> {
     }
 
     public void saveAccount() {
-        String accountNameOrEmail = AccountNameOrEmailTextField.getText();
-        String accountPassword = AccountPasswordTextField.getText();
+        String accountNameOrEmail = accountNameOrEmailTextField.getText();
+        String accountPassword = accountPasswordTextField.getText();
         String data = accountNameOrEmail + "\n" + accountPassword;
         try {
             FileWriter fw = new FileWriter("account_credentials.txt", false);
             fw.write(data);
             fw.flush();
             fw.close();
-            SaveAccountButton.setText("Credentials were saved.");
+            saveAccountButton.setText("Credentials were saved.");
         } catch (IOException e) {
             log.error("Error saving account credentials: " + e.getMessage());
         }
@@ -256,7 +256,7 @@ public class SettingsController implements Controller<Region> {
                 List<?> shallowCopy = finalList.subList(0, finalList.size());
                 Collections.reverse(shallowCopy);
 
-                AllModeratorStatsTextField.setText(String.valueOf(finalList));
+                allModeratorStatsTextField.setText(String.valueOf(finalList));
 
                 String AwaitingReportsTotalTextAreaString = String.valueOf(ModerationReportController.GlobalConstants.AwaitingReportsTotalTextArea);
 
@@ -274,7 +274,7 @@ public class SettingsController implements Controller<Region> {
                     int frequency = entry.getValue();
                     String text = offender + " : " + frequency;
                     if (frequency > 3) {
-                        MostReportsOffendersTextArea.appendText(text + "\n");
+                        mostReportsOffendersTextArea.appendText(text + "\n");
 
                     }
                 }
@@ -290,14 +290,14 @@ public class SettingsController implements Controller<Region> {
                     int frequency = entry.getValue();
                     String text = offender + ": " + frequency + " -> RU";
                     if (frequency > 3) {
-                        MostReportsOffendersTextArea.appendText(text + "\n");
+                        mostReportsOffendersTextArea.appendText(text + "\n");
                     }
                 }
                 // Concatenate the moderator stats, awaiting reports, and repeat offenders and paste into clipboard
-                String myString = AllModeratorStatsTextField.getText() + "\n\n"
+                String myString = allModeratorStatsTextField.getText() + "\n\n"
                         + AwaitingReportsTotalTextAreaString + "\n\n"
                         + "Repeat offenders:\n\n"
-                        + MostReportsOffendersTextArea.getText();
+                        + mostReportsOffendersTextArea.getText();
 
                 StringSelection stringSelection = new StringSelection(myString);
                 Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
@@ -308,7 +308,7 @@ public class SettingsController implements Controller<Region> {
                 ModerationReportController.GlobalConstants.allRUOffenders.clear();
 
             }catch (Exception e) {
-                AllModeratorStatsTextField.setText(String.valueOf(e));
+                allModeratorStatsTextField.setText(String.valueOf(e));
             }
         }
     }
