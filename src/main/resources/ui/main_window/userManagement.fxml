@@ -16,6 +16,7 @@
 <?import javafx.scene.control.TextArea?>
 
 <?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.text.Text?>
 <SplitPane xmlns:fx="http://javafx.com/fxml/1" fx:id="root" dividerPositions="0.3" orientation="VERTICAL"
            prefHeight="200.0" xmlns="http://javafx.com/javafx/8.0.171"
            fx:controller="com.faforever.moderatorclient.ui.main_window.UserManagementController">
@@ -33,9 +34,9 @@
                       promptText="notes (resets with new start)">
             </TextArea>
             <Separator orientation="VERTICAL"/>
-            <TextField fx:id="smurfVillageLookupTextField" onAction="#onSmurfVillageLookup" promptText="player ID required here">
+            <TextField fx:id="smurfVillageLookupTextField" onAction="#onLookup" promptText="player ID required here">
             </TextField>
-            <Button mnemonicParsing="false" onAction="#onSmurfVillageLookup" text="Smurf Village Lookup" alignment="CENTER">
+            <Button mnemonicParsing="false" onAction="#onLookup" text="Smurf Village Lookup" alignment="CENTER">
             </Button>
         </VBox>
         <TableView fx:id="userSearchTableView" maxHeight="1.7976931348623157E308"
@@ -166,13 +167,30 @@
                     </TextArea>
             </VBox>
         </Tab>
-        <Tab fx:id="settingsSmurfVillageLookupTab" text="Soon TM">
+        <Tab fx:id="settingsSmurfVillageLookupTab" text="Settings Smurf Village Lookup">
             <content>
                 <VBox>
                     <CheckBox fx:id="excludeItemsCheckBox" text="Exclude junk/malformed items (see Settings)"/>
-                    <CheckBox fx:id="checkboxB" text="B" />
-                    <Button fx:id="saveSettingsButton" text="Save Settings" onAction="#saveSettings"/>
+                    <Separator/>
 
+                    <CheckBox fx:id="includeUUIDCheckBox" text="Include UUID" />
+                    <CheckBox fx:id="includeUIDHashCheckBox" text="Include UID Hash" />
+                    <CheckBox fx:id="includeIPCheckBox" text="Include IP" />
+                    <CheckBox fx:id="includeMemorySerialNumberCheckBox" text="Include Memory Serial Number" />
+                    <CheckBox fx:id="includeVolumeSerialNumberCheckBox" text="Include Volume Serial Number" />
+                    <CheckBox fx:id="includeSerialNumberCheckBox" text="Include Serial Number" />
+                    <CheckBox fx:id="includeProcessorIdCheckBox" text="Include Processor Id" />
+                    <CheckBox fx:id="includeManufacturerCheckBox" text="Include Manufacturer" />
+                    <Separator/>
+                    <Text>maxUniqueUsersThreshold:</Text>
+                    <TextField fx:id="maxUniqueUsersThresholdTextField" layoutX="10" layoutY="10" promptText="Enter an integer value - Default is 42" />
+                    <Text>Explanation blabla</Text>
+                    <Separator/>
+                    <Text>depthScanningInput:</Text>
+                    <TextField fx:id="depthScanningInputTextField" layoutX="10" layoutY="10" promptText="Enter an integer value" />
+                    <Text>The depth scanning value, like 1,2 or 3+, sets how many levels deep it should look for each connected smurf</Text>
+                    <Separator orientation="VERTICAL"/>
+                    <Button fx:id="saveSettingsButton" text="Save Settings" onAction="#saveSettings"/>
                 </VBox>
             </content>
         </Tab>
