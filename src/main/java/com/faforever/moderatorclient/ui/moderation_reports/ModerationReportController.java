@@ -364,8 +364,15 @@ public class ModerationReportController implements Controller<Region> {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(replayUrl))
                     .build();
-            httpClient.send(request, HttpResponse.BodyHandlers.ofFile(tempFilePath));
-            log.debug("Parsing replay");
+
+            HttpResponse<Path> response = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(tempFilePath));
+            if (response.statusCode() == 404) {
+                log.debug("The requested resource was not found on the server");
+                StartReplay.setText("Replay not available");
+                CopyChatLog.setText("Chat log not available");
+                chatLogTextArea.setText(header + format("Loading replay failed. The server is probably processing the replay file at the moment or it simply does not exist at all."));
+            } else {
+                log.debug("The request was successful - parsing replay");
             ReplayDataParser replayDataParser = new ReplayDataParser(tempFilePath, objectMapper);
             String chatLog = header + replayDataParser.getChatMessages().stream()
                     .map(message -> format("[{0}] from {1} to {2}: {3}",
@@ -391,9 +398,8 @@ public class ModerationReportController implements Controller<Region> {
             CopyChatLog.setId(chatLogFiltered.toString());
             CopyChatLog.setText("Copy Chat Log");
             chatLogTextArea.setText(chatLogFiltered.toString());
-
+            }
         } catch (Exception e) {
-            log.error("Loading replay {} failed", game, e);
             StartReplay.setText("Replay not available");
             CopyChatLog.setText("Chat log not available");
             chatLogTextArea.setText(header + format("Loading replay failed due to {0}: \n{1}", e, e.getMessage()));
