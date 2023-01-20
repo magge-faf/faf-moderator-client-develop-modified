@@ -9,6 +9,7 @@
 <?import javafx.scene.control.TextArea?>
 <?import javafx.scene.control.CheckBox?>
 
+<?import javafx.scene.text.Text?>
 <VBox xmlns:fx="http://javafx.com/fxml/1" fx:id="root" alignment="TOP_CENTER" xmlns="http://javafx.com/javafx/8.0.111"
       fx:controller="com.faforever.moderatorclient.ui.main_window.RecentActivityController">
     <Button minWidth="200.0" mnemonicParsing="false" onAction="#refresh" text="refresh">
@@ -18,8 +19,8 @@
     </Button>
     <CheckBox fx:id="includeGlobalBannedUserCheckBox" mnemonicParsing="false" text="Include already banned users">
     </CheckBox>
-    <CheckBox fx:id="excludedItemsCheckBox" selected="true" mnemonicParsing="false" text="Exclude junk/malformed items (see Settings)">
-    </CheckBox>
+    <Text fx:id="excludedItemsText" text="junk/malformed items are filtered from file (see Settings)">
+    </Text>
     <TextArea fx:id="suspiciousUserTextArea" editable="false" prefRowCount="20"/>
     <ScrollPane fitToWidth="true" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308">
         <VBox>

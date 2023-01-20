@@ -20,6 +20,7 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TitledPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,7 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -51,10 +53,10 @@ public class RecentActivityController implements Controller<VBox> {
     public TitledPane mapUploadFeedPane;
 
     public TableView<PlayerFX> userRegistrationFeedTableView;
-    public CheckBox includeGlobalBannedUserCheckBox;
-    public CheckBox excludedItemsCheckBox;
+    public Text excludedItemsText;
     public TableView<TeamkillFX> teamkillFeedTableView;
     public TableView<MapVersionFX> mapUploadFeedTableView;
+    public CheckBox includeGlobalBannedUserCheckBox;
 
     @Override public VBox getRoot() {return root;}
 
@@ -87,12 +89,11 @@ public class RecentActivityController implements Controller<VBox> {
     private void checkBlacklistedItem(String fileName, List<String> blacklistedItems, String item, PlayerFX account) {
         for (String blacklistedItem : blacklistedItems) {
             if (blacklistedItem.equals(item)) {
-                log.debug("[!] " + fileName + " : " + blacklistedItem + " for " + account.getRepresentation());
-                suspiciousUserTextArea.setText(suspiciousUserTextArea.getText() + "[!] " + fileName + " : " + blacklistedItem + " for " + account.getRepresentation() + "\n");
+                log.debug("[!] " + fileName + " [" + blacklistedItem + "] for " + account.getRepresentation());
+                suspiciousUserTextArea.setText(suspiciousUserTextArea.getText() + "[!] " + fileName + " [" + blacklistedItem + "] for " + account.getRepresentation() + "\n");
             }
         }
     }
-
 
     private void addBan(PlayerFX playerFX) {
         BanInfoController banInfoController = uiService.loadFxml("ui/banInfo.fxml");
@@ -112,13 +113,11 @@ public class RecentActivityController implements Controller<VBox> {
         mapService.patchMapVersion(mapVersionFX);
     }
 
-    private void loadList(File file, List<String> list, List<String> excludedItems) {
+    private void loadList(File file, List<String> list) {
         try (Scanner s = new Scanner(file)) {
-            while (s.hasNext()) {
-                String blacklistedItem = s.next();
-                if (!excludedItems.contains(blacklistedItem)) {
-                    list.add(blacklistedItem);
-                }
+            while (s.hasNextLine()) {
+                String blacklistedItem = s.nextLine();
+                list.add(blacklistedItem);
             }
         } catch (FileNotFoundException e) {
             log.debug(String.valueOf(e));
@@ -128,7 +127,6 @@ public class RecentActivityController implements Controller<VBox> {
             String line = reader.readLine();
             int lineCount = 0;
             while (line != null) {
-                excludedItems.add(line);
                 lineCount++;
                 line = reader.readLine();
             }
@@ -137,8 +135,11 @@ public class RecentActivityController implements Controller<VBox> {
             log.debug(String.valueOf(e));
         }
     }
-
-
+    private List<String> filterList(List<String> list, List<String> excludedItems) {
+        return list.stream()
+                .filter(item -> !excludedItems.contains(item))
+                .collect(Collectors.toList());
+    }
     public void refresh() {
         teamkills.setAll(userService.findLatestTeamkills());
         teamkillFeedTableView.getSortOrder().clear();
@@ -163,23 +164,33 @@ public class RecentActivityController implements Controller<VBox> {
         File fileBlacklistedUUID = new File("BlacklistedUUID" + ".txt");
         File fileBlacklistedVolumeSN = new File("BlacklistedVolumeSN" + ".txt");
 
+        //TODO if the format is not correct, it will add an empty item to the list which can cause issues later?
         try {
             Scanner s = new Scanner(fileExcludedItems);
-            while (s.hasNext()) {
+            while (s.hasNextLine()) {
                 excludedItems.add(s.nextLine());
             }
             s.close();
             log.debug("[info] " + fileExcludedItems + " loaded.");
+
+            log.debug("fileExcludedItems:" + excludedItems.toString());
         } catch (Exception e) {
             log.debug(String.valueOf(e));
         }
 
-        loadList(fileBlacklistedHash, blacklistedHash, excludedItems);
-        loadList(fileBlacklistedIP, blacklistedIP, excludedItems);
-        loadList(fileBlacklistedMemorySN, blacklistedMemorySN, excludedItems);
-        loadList(fileBlacklistedSN, blacklistedSN, excludedItems);
-        loadList(fileBlacklistedUUID, blacklistedUUID, excludedItems);
-        loadList(fileBlacklistedVolumeSN, blacklistedVolumeSN, excludedItems);
+        loadList(fileBlacklistedHash, blacklistedHash);
+        loadList(fileBlacklistedIP, blacklistedIP);
+        loadList(fileBlacklistedMemorySN, blacklistedMemorySN);
+        loadList(fileBlacklistedSN, blacklistedSN);
+        loadList(fileBlacklistedUUID, blacklistedUUID);
+        loadList(fileBlacklistedVolumeSN, blacklistedVolumeSN);
+
+        List<String> filteredBlacklistedHash = filterList(blacklistedHash, excludedItems);
+        List<String> filteredBlacklistedIP = filterList(blacklistedIP, excludedItems);
+        List<String> filteredBlacklistedMemorySN = filterList(blacklistedMemorySN, excludedItems);
+        List<String> filteredBlacklistedSN = filterList(blacklistedSN, excludedItems);
+        List<String> filteredBlacklistedUUID = filterList(blacklistedUUID, excludedItems);
+        List<String> filteredBlacklistedVolumeSN = filterList(blacklistedVolumeSN, excludedItems);
 
         users.setAll(userService.findLatestRegistrations());
         userRegistrationFeedTableView.getSortOrder().clear();
@@ -194,13 +205,12 @@ public class RecentActivityController implements Controller<VBox> {
                 ObservableSet<UniqueIdFx> accountUniqueIds = account.getUniqueIds();
 
                 for (UniqueIdFx item : accountUniqueIds) {
-                    // cycle through all unique ids
-                    checkBlacklistedItem("blacklistedHash", blacklistedHash, item.getHash(), account);
-                    checkBlacklistedItem("blacklistedIP", blacklistedIP, account.getRecentIpAddress(), account);
-                    checkBlacklistedItem("blacklistedMemorySN", blacklistedMemorySN, item.getMemorySerialNumber(), account);
-                    checkBlacklistedItem("blacklistedSN", blacklistedSN, item.getSerialNumber(), account);
-                    checkBlacklistedItem("blacklistedUUID", blacklistedUUID, item.getUuid(), account);
-                    checkBlacklistedItem("blacklistedVolumeSN", blacklistedVolumeSN, item.getVolumeSerialNumber(), account);
+                    checkBlacklistedItem("blacklistedHash", filteredBlacklistedHash, item.getHash(), account);
+                    checkBlacklistedItem("blacklistedIP", filteredBlacklistedIP, account.getRecentIpAddress(), account);
+                    checkBlacklistedItem("blacklistedMemorySN", filteredBlacklistedMemorySN, item.getMemorySerialNumber(), account);
+                    checkBlacklistedItem("blacklistedSN", filteredBlacklistedSN, item.getSerialNumber(), account);
+                    checkBlacklistedItem("blacklistedUUID", filteredBlacklistedUUID, item.getUuid(), account);
+                    checkBlacklistedItem("blacklistedVolumeSN", filteredBlacklistedVolumeSN, item.getVolumeSerialNumber(), account);
                 }
             }
         }
