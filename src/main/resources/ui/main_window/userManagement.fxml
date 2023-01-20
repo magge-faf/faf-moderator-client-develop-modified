@@ -15,8 +15,9 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.control.TextArea?>
 
+<?import javafx.scene.control.CheckBox?>
 <SplitPane xmlns:fx="http://javafx.com/fxml/1" fx:id="root" dividerPositions="0.3" orientation="VERTICAL"
-           prefHeight="200.0" prefWidth="220.0" xmlns="http://javafx.com/javafx/8.0.171"
+           prefHeight="200.0" xmlns="http://javafx.com/javafx/8.0.171"
            fx:controller="com.faforever.moderatorclient.ui.main_window.UserManagementController">
     <HBox HBox.hgrow="ALWAYS">
         <VBox minWidth="220.0">
@@ -31,6 +32,11 @@
             <TextArea fx:id="NotesTextArea"
                       promptText="notes (resets with new start)">
             </TextArea>
+            <Separator orientation="VERTICAL"/>
+            <TextField fx:id="smurfVillageLookupTextField" onAction="#onSmurfVillageLookup" promptText="player ID required here">
+            </TextField>
+            <Button mnemonicParsing="false" onAction="#onSmurfVillageLookup" text="Smurf Village Lookup" alignment="CENTER">
+            </Button>
         </VBox>
         <TableView fx:id="userSearchTableView" maxHeight="1.7976931348623157E308"
                    maxWidth="1.7976931348623157E308" minWidth="550.0" prefHeight="200.0" HBox.hgrow="ALWAYS"/>
@@ -149,6 +155,26 @@
                             onAction="#onRemoveGroup"/>
                 </HBox>
             </VBox>
+        </Tab>
+
+        <Tab fx:id="searchSmurfVillageLookupTab" text="Output of Smurf Village Lookup">
+            <VBox >
+                    <TextArea fx:id="searchSmurfVillageTabTextField"
+                              promptText="Program can freeze for a few seconds/minutes while it is requesting data, especially when there are many users with same items. Just be patient."
+                              VBox.vgrow="ALWAYS"
+                    >
+                    </TextArea>
+            </VBox>
+        </Tab>
+        <Tab fx:id="settingsSmurfVillageLookupTab" text="Soon TM">
+            <content>
+                <VBox>
+                    <CheckBox fx:id="excludeItemsCheckBox" text="Exclude junk/malformed items (see Settings)"/>
+                    <CheckBox fx:id="checkboxB" text="B" />
+                    <Button fx:id="saveSettingsButton" text="Save Settings" onAction="#saveSettings"/>
+
+                </VBox>
+            </content>
         </Tab>
     </TabPane>
 </SplitPane>

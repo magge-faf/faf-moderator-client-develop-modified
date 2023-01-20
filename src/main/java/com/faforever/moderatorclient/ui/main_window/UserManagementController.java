@@ -1,7 +1,6 @@
 package com.faforever.moderatorclient.ui.main_window;
 
 import com.faforever.commons.api.dto.GroupPermission;
-import com.faforever.commons.api.dto.Player;
 import com.faforever.commons.api.update.AvatarAssignmentUpdate;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.AvatarService;
@@ -45,16 +44,15 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
 
+import java.io.*;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.prefs.Preferences;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -79,9 +77,19 @@ public class UserManagementController implements Controller<SplitPane> {
     private final ObservableList<GroupPermissionFX> groupPermissions = FXCollections.observableArrayList();
 
     private final Map<String, String> searchUserPropertyMapping = new LinkedHashMap<>();
-    public ComboBox searchUserProperties2;
     public TextArea SearchHistoryTextField;
     public TextArea NotesTextArea;
+    public TextField smurfVillageLookupTextField;
+    public Tab searchSmurfVillageLookupTab;
+    public TextArea searchSmurfVillageTabTextField;
+    public Tab settingsSmurfVillageLookupTab;
+
+    @FXML
+    private Button saveSettingsButton;
+    @FXML
+    private CheckBox excludeItemsCheckBox;
+    @FXML
+    private CheckBox checkboxB;
 
     @Value("${faforever.vault.replay-download-url-format}")
     private String replayDownLoadFormat;
@@ -132,8 +140,20 @@ public class UserManagementController implements Controller<SplitPane> {
         tab.setDisable(!communicationService.hasPermission(permissionTechnicalName));
     }
 
+
+
     @FXML
     public void initialize() {
+        saveSettingsButton.setOnAction(event -> saveSettings());
+        Properties props = new Properties();
+        try (InputStream in = new FileInputStream("config.properties")) {
+            props.load(in);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        excludeItemsCheckBox.setSelected(Boolean.parseBoolean(props.getProperty("excludeItemsCheckBox")));
+        checkboxB.setSelected(Boolean.parseBoolean(props.getProperty("checkboxB")));
+        log.debug("[info] config loaded");
         disableTabOnMissingPermission(notesTab, GroupPermission.ROLE_ADMIN_ACCOUNT_NOTE);
         disableTabOnMissingPermission(bansTab, GroupPermission.ROLE_ADMIN_ACCOUNT_BAN);
         disableTabOnMissingPermission(teamkillsTab, GroupPermission.ROLE_READ_TEAMKILL_REPORT);
@@ -193,6 +213,19 @@ public class UserManagementController implements Controller<SplitPane> {
         initializeSearchProperties();
     }
 
+    @FXML
+    private void saveSettings() {
+        Properties props = new Properties();
+        props.setProperty("excludeItemsCheckBox", Boolean.toString(excludeItemsCheckBox.isSelected()));
+        props.setProperty("checkboxB", Boolean.toString(checkboxB.isSelected()));
+        try (OutputStream out = new FileOutputStream("config.properties")) {
+            props.store(out, null);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        log.debug("[info] config saved");
+        saveSettingsButton.setText("Save Settings: saved");
+    }
     private void initializeSearchProperties() {
         searchUserPropertyMapping.put("Name", "login");
         searchUserPropertyMapping.put("Id", "id");
@@ -210,7 +243,7 @@ public class UserManagementController implements Controller<SplitPane> {
         searchUserPropertyMapping.put("Bios Version", "uniqueIds.SMBIOSBIOSVersion");
         searchUserPropertyMapping.put("Volume Serial Number", "uniqueIds.volumeSerialNumber");
         searchUserPropertyMapping.put("Memory Serial Number", "uniqueIds.memorySerialNumber");
-        searchUserPropertyMapping.put("Manfacturer", "uniqueIds.manufacturer");
+        searchUserPropertyMapping.put("Manufacturer", "uniqueIds.manufacturer");
 
         searchUserProperties.getItems().addAll(searchUserPropertyMapping.keySet());
         searchUserProperties.getSelectionModel().select(0);
@@ -412,4 +445,123 @@ public class UserManagementController implements Controller<SplitPane> {
 
         userGroups.remove(userGroupFX);
     }
+
+    private void processUsers(String attributeName, String attributeValue, String searchPattern, int threshold, StringBuilder logOutput) {
+        List<PlayerFX> users = userService.findUsersByAttribute(attributeName, attributeValue);
+        attributeName = attributeName.replaceAll("uniqueIds.", "");
+        if (users.size() > threshold) {
+            logOutput.append("\n\n<------------------------------------------------------------>\n");
+            logOutput.append(String.format("\nToo many users found with %s %s. It might not be relatable. Threshold is %d and found were %d users", attributeName, attributeValue, threshold, users.size()));
+        } else if (users.size() == 1){ // first user in users contains always the searched user- TODO make a check if 1 is really the searched user, just in case...
+            //logOutput.append(String.format("No other users found with %s %s.", attributeName, attributeValue + "\n"));
+            log.debug("ABC");
+            log.debug(String.valueOf(users.get(0)));
+        } else {
+            logOutput.append("\n\n<------------------------------------------------------------>\n");
+            logOutput.append("\nList of users for " + attributeName + " with same value " + attributeValue + "\n");
+            users.forEach(user -> {
+                if (!user.getId().equals(searchPattern)) {
+                    String statusBanned = "";
+                    if (user.isBannedGlobally()) {
+                        statusBanned = "    <-- Banned";
+                    }
+                    logOutput.append("\n" + user.getRepresentation() + " " + statusBanned);
+                }
+            });
+        }
+    }
+    public void onSmurfVillageLookup() {
+
+        //searchUserPropertyMapping.put("Email", "email");
+        //searchUserPropertyMapping.put("Steam Id", "accountLinks.serviceId");
+        //searchUserPropertyMapping.put("Gog Id", "accountLinks.serviceId");
+        //searchUserPropertyMapping.put("Device Id", "uniqueIds.deviceId");
+        StringBuilder logOutput = new StringBuilder();
+
+        users.clear();
+        userSearchTableView.getSortOrder().clear();
+        //String property = searchUserPropertyMapping.get(searchUserProperties.getValue());
+        String propertyId = searchUserPropertyMapping.get("Id");
+        String propertyUUID = searchUserPropertyMapping.get("UUID");
+        String propertyHash= searchUserPropertyMapping.get("UID Hash");
+        String propertyIP = searchUserPropertyMapping.get("Ip Address");
+        String propertyMemorySerialNumber = searchUserPropertyMapping.get("Memory Serial Number");
+        String propertyVolumeSerialNumber = searchUserPropertyMapping.get("Volume Serial Number");
+        String propertySerialNumber = searchUserPropertyMapping.get("Serial Number");
+        String propertyProcessorId = searchUserPropertyMapping.get("Processor Id");
+        String propertyCPUName = searchUserPropertyMapping.get("CPU Name");
+        String propertyBiosVersion = searchUserPropertyMapping.get("Bios Version");
+        String propertyManufacturer = searchUserPropertyMapping.get("Manufacturer");
+
+        String searchPattern = smurfVillageLookupTextField.getText();
+        List<PlayerFX> userFound = userService.findUsersByAttribute(propertyId, searchPattern);
+
+        List<String> uuids = new ArrayList<>();
+        List<String> hashes = new ArrayList<>();
+        List<String> ips = new ArrayList<>();
+        List<String> memorySerialNumbers = new ArrayList<>();
+        List<String> volumeSerialNumbers = new ArrayList<>();
+        List<String> serialNumbers = new ArrayList<>();
+        List<String> processorIds = new ArrayList<>();
+        List<String> CPUNames = new ArrayList<>();
+        List<String> biosVersions = new ArrayList<>();
+        List<String> manufacturers = new ArrayList<>();
+
+        userFound.forEach(user->{
+            logOutput.append("Smurf village population for: " + user.getRepresentation());
+
+            user.getUniqueIds().forEach(item -> {
+                if (!uuids.contains(item.getUuid())) {
+                    uuids.add(item.getUuid());
+                }
+                if (!hashes.contains(item.getHash())) {
+                    hashes.add(item.getHash());
+                }
+                if (!ips.contains(user.getRecentIpAddress())) {
+                    ips.add(user.getRecentIpAddress());
+                }
+                if (!memorySerialNumbers.contains(item.getMemorySerialNumber())) {
+                    memorySerialNumbers.add(item.getMemorySerialNumber());
+                }
+                if (!volumeSerialNumbers.contains(item.getVolumeSerialNumber())) {
+                    volumeSerialNumbers.add(item.getVolumeSerialNumber());
+                }
+                if (!serialNumbers.contains(item.getSerialNumber())) {
+                    serialNumbers.add(item.getSerialNumber());
+                }
+                if (!processorIds.contains(item.getProcessorId())) {
+                    processorIds.add(item.getProcessorId());
+                }
+                if (!biosVersions.contains(item.getSMBIOSBIOSVersion())) {
+                    biosVersions.add(item.getSMBIOSBIOSVersion());
+                }
+                if (!manufacturers.contains(item.getManufacturer())) {
+                    manufacturers.add(item.getManufacturer());
+                }
+            });
+        });
+
+        int thresholdTooManyUniqueUsers = 42;
+
+        //TODO make threshold config in tab settings
+        //TODO make toggable to ignore values from excluded file, but note user what was ignored and why
+        //TODO steam/GOG checker?
+        //TODO IP VPN checker?
+        //TODO depth factor? search the found smurf ids as well if threshold was not hit
+        //TODO pattern search for similiar emails?
+
+        uuids.stream().forEach(uuid -> processUsers(propertyUUID, uuid, searchPattern, thresholdTooManyUniqueUsers, logOutput));
+        hashes.stream().forEach(hash -> processUsers(propertyHash, hash, searchPattern, thresholdTooManyUniqueUsers, logOutput));
+        ips.stream().forEach(ip -> processUsers(propertyIP, ip, searchPattern, thresholdTooManyUniqueUsers, logOutput));
+        memorySerialNumbers.stream().forEach(memorySerialNumber -> processUsers(propertyMemorySerialNumber, memorySerialNumber, searchPattern, thresholdTooManyUniqueUsers, logOutput));
+        volumeSerialNumbers.stream().forEach(volumeSerialNumber -> processUsers(propertyVolumeSerialNumber, volumeSerialNumber, searchPattern, thresholdTooManyUniqueUsers, logOutput));
+        serialNumbers.stream().forEach(serialNumber -> processUsers(propertySerialNumber, serialNumber, searchPattern, thresholdTooManyUniqueUsers, logOutput));
+        processorIds.stream().forEach(processorId -> processUsers(propertyProcessorId, processorId, searchPattern, thresholdTooManyUniqueUsers, logOutput));
+        //biosVersions.stream().forEach(biosVersion -> processUsers(propertyBiosVersion, biosVersion, searchPattern, thresholdTooManyUniqueUsers, logOutput));
+        manufacturers.stream().forEach(manufacturer -> processUsers(propertyManufacturer, manufacturer, searchPattern, thresholdTooManyUniqueUsers, logOutput));
+
+        searchSmurfVillageTabTextField.setText(logOutput.toString());
+    }
 }
+
+
