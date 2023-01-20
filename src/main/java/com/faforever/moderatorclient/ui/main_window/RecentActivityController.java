@@ -166,7 +166,7 @@ public class RecentActivityController implements Controller<VBox> {
         try {
             Scanner s = new Scanner(fileExcludedItems);
             while (s.hasNext()) {
-                excludedItems.add(s.next());
+                excludedItems.add(s.nextLine());
             }
             s.close();
             log.debug("[info] " + fileExcludedItems + " loaded.");
