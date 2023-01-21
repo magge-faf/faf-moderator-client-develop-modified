@@ -281,10 +281,7 @@ public class FafApiCommunicationService {
                 .build();
         cycleAvoidingMappingContext.clearCache();
         log.debug("Sending API request: {}", route);
-
         try {
-
-
             return (List<T>) restTemplate.getForObject(
                     route,
                     Array.newInstance(clazz, 0).getClass(),
