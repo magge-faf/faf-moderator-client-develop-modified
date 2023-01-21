@@ -16,6 +16,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Duration;
 import java.util.List;
 
 @Service
@@ -41,7 +42,9 @@ public class TokenService {
       log.info("Token expired, requesting new login");
       applicationEventPublisher.publishEvent(new TokenExpiredEvent());
     } else {
-      log.debug("Token still valid for {} seconds", tokenCache.getExpiresIn());
+      long expiresIn = tokenCache.getExpiresIn();
+      Duration duration = Duration.ofSeconds(expiresIn);
+      log.debug("Token still valid for {}", duration.toString().substring(2).replaceAll("(\\d[HMS])(?!$)", "$1 ").toLowerCase());
     }
 
     return tokenCache.getValue();
