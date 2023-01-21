@@ -96,7 +96,6 @@ public class MainController implements Controller<TabPane> {
             FileReader fileReader = new FileReader(file);
             BufferedReader bufferedReader = new BufferedReader(fileReader);
             userChoiceDefaultTab = bufferedReader.readLine();
-            log.debug("userChoice: " + userChoiceDefaultTab);
             bufferedReader.close();
         } catch (IOException e) {
             e.printStackTrace();
@@ -136,13 +135,11 @@ public class MainController implements Controller<TabPane> {
         initUserManagementTab();
         initVotingTab();
     }
-
     private void initSettingsTab() {
         settingsController = uiService.loadFxml("ui/main_window/settingsTab.fxml");
         settingsTab.setContent(settingsController.getRoot());
 
     }
-
     private void initLoading(Tab tab, Runnable loadingFunction) {
         dataLoadingState.put(tab, false);
         tab.setOnSelectionChanged(event -> {
@@ -153,7 +150,6 @@ public class MainController implements Controller<TabPane> {
 
         });
     }
-
     private void initUserManagementTab() {
         if (checkPermissionForTab(userManagementTab, GroupPermission.ROLE_READ_ACCOUNT_PRIVATE_DETAILS,
                 GroupPermission.ROLE_ADMIN_ACCOUNT_NOTE, GroupPermission.ROLE_ADMIN_ACCOUNT_BAN,
