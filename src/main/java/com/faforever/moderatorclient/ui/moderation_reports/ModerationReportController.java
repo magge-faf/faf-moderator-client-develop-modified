@@ -235,17 +235,17 @@ public class ModerationReportController implements Controller<Region> {
         sb.append("\nALL reports:").append("\n");
         for (Map.Entry<PlayerFX,Integer> entry : entriesModeratorReportCountsAll) {
             String moderator = entry.getKey().getRepresentation();
-            sb.append("Moderator: \t\t").append(moderator).append(", Reports: ").append(entry.getValue()).append("\n");
+            sb.append("Moderator: \t").append(moderator).append(", \tReports: ").append(entry.getValue()).append("\n");
         }
         sb.append("\nCOMPLETED reports:").append("\n");
         for (Map.Entry<PlayerFX,Integer> entry : entriesModeratorReportCountsCompleted) {
             String moderator = entry.getKey().getRepresentation();
-            sb.append("Moderator: \t").append(moderator).append(", Reports: \t").append(entry.getValue()).append("\n");
+            sb.append("Moderator: \t").append(moderator).append(", \tReports: ").append(entry.getValue()).append("\n");
         }
         sb.append("\nDISCARDED reports:").append("\n");
         for (Map.Entry<PlayerFX,Integer> entry : entriesModeratorReportCountsDiscarded) {
             String moderator = entry.getKey().getRepresentation();
-            sb.append("Moderator: \t\t").append(moderator).append(", Reports: \t").append(entry.getValue()).append("\n");
+            sb.append("Moderator: \t").append(moderator).append(", \tReports: ").append(entry.getValue()).append("\n");
         }
         moderatorStatisticsTextArea.setText(sb.toString());
     }
@@ -373,6 +373,7 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     public void onRefreshAllReports() {
+        //TODO refactor to take initial list instead requesting as well
         onStatisticsModeratorButton();
         onRepeatedOffendersButton();
         moderationReportService.getAllReports().thenAccept(reportFxes -> Platform.runLater(() -> itemList.setAll(reportFxes))).exceptionally(throwable -> {
