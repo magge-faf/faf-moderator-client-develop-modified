@@ -262,6 +262,18 @@ public class ModerationReportController implements Controller<Region> {
         public String getPlayer() {
             return player.get();
         }
+
+        public StringProperty playerProperty() {
+            return player;
+        }
+
+        public long getOffenseCount() {
+            return offenseCount.get();
+        }
+
+        public LongProperty offenseCountProperty() {
+            return offenseCount;
+        }
     }
 
     @FXML
