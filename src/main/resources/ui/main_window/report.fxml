@@ -12,9 +12,9 @@
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.control.CheckBox?>
-
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.cell.PropertyValueFactory?>
+<?import javafx.scene.text.Text?>
 <SplitPane fx:id="root" dividerPositions="0.5" orientation="VERTICAL" xmlns="http://javafx.com/javafx/11.0.1"
            xmlns:fx="http://javafx.com/fxml/1"
            fx:controller="com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController">
@@ -24,37 +24,33 @@
             <TextField fx:id="playerNameFilterTextField" promptText="Enter player name to search"/>
             <Button fx:id="editReportButton" mnemonicParsing="false" minWidth="93" onAction="#onEdit" text="Edit"/>
             <Button mnemonicParsing="false" onAction="#onRefreshAllReports" minWidth="93" text="Refresh"/>
-            <CheckBox fx:id="hideReportsRU" mnemonicParsing="false"
-                      text="Ignore RU">
-            </CheckBox>
-            <CheckBox fx:id="hideAlreadyTakenReportsCheckbox" mnemonicParsing="false"
-                      text="Hide taken reports">
-            </CheckBox>
-            <CheckBox fx:id="FilterLogCheckBox" selected="true" mnemonicParsing="false"
-                      text="Ignore notify messages">
-            </CheckBox>
-            <CheckBox fx:id="AutomaticallyLoadChatLogCheckBox" selected="true" mnemonicParsing="false"
-                      text="Auto load Chat Log">
-            </CheckBox>
-            <TextArea fx:id="AwaitingReportsTotalTextArea" editable="false" promptText="Statistics loading..."
-                      minHeight="60" maxHeight="90"/>
+            <Separator minHeight="10" />
+            <Text>Copy:</Text>
             <Button fx:id="CopyReportID" mnemonicParsing="false" minWidth="93" onAction="#CopyReportID"
-                    text="CopyReportID"/>
+                    text="Report ID"/>
             <Button fx:id="CopyReportedUserID" mnemonicParsing="false" minWidth="93" onAction="#CopyReportedUserID"
-                    text="CopyReportedUserID"/>
-            <Button fx:id="CopyGameID" mnemonicParsing="false" minWidth="93" onAction="#CopyGameID" text="CopyGameID"/>
+                    text="Offender"/>
+            <Button fx:id="CopyGameID" mnemonicParsing="false" minWidth="93" onAction="#CopyGameID" text="Game ID"/>
             <Separator prefHeight="10" />
-            <Button fx:id="StartReplay" mnemonicParsing="false" minWidth="93" onAction="#StartReplay"
-                    text="StartReplay"/>
             <Button fx:id="CopyChatLog" mnemonicParsing="false" minWidth="93" onAction="#CopyChatLog"
-                    text="CopyChatLog"/>
+                    text="Chat log"/>
             <Separator minHeight="10" />
             <Button fx:id="CreateReportButton" mnemonicParsing="false" minWidth="93" onAction="#CreateReportButton"
                     text="Create report"/>
             <Separator prefHeight="10"/>
             <Button fx:id="CopyReportTemplate" mnemonicParsing="false" minWidth="93" onAction="#CopyReportTemplate"
-                    text="Copy report template"/>
+                    text="Use template"/>
             <Separator prefHeight="10"/>
+            <Text>Replay settings</Text>
+            <CheckBox fx:id="FilterLogCheckBox" selected="true" mnemonicParsing="false"
+                      text="Ignore notify messages">
+            </CheckBox>
+            <CheckBox fx:id="AutomaticallyLoadChatLogCheckBox" selected="true" mnemonicParsing="false"
+                      text="Auto load chat log">
+            </CheckBox>
+            <Separator prefHeight="10"/>
+            <Button fx:id="StartReplay" mnemonicParsing="false" minWidth="93" onAction="#StartReplay"
+                    text="Start Replay"/>
         </VBox>
         <TableView fx:id="reportTableView" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
                    HBox.hgrow="ALWAYS"/>
@@ -69,7 +65,7 @@
         </Tab>
         <Tab text="Most reported accounts">
             <VBox>
-                <TableView fx:id="tableView">
+                <TableView fx:id="tableViewMostReportedAccounts">
                     <columns>
                         <TableColumn text="Player" minWidth="150">
                             <cellValueFactory>
@@ -87,7 +83,7 @@
         </Tab>
         <Tab text="Moderator statistics">
             <VBox>
-                <TextArea fx:id="moderatorStatisticsTextArea" editable="false"/>
+                <TextArea fx:id="moderatorStatisticsTextArea" editable="false" HBox.hgrow="ALWAYS"/>
             </VBox>
         </Tab>
     </TabPane>
