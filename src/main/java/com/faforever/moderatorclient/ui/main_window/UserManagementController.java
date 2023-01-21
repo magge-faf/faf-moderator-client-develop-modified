@@ -45,6 +45,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
 
 import java.io.*;
+import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -487,43 +488,62 @@ public class UserManagementController implements Controller<SplitPane> {
         }
         return excludedItems;
     }
-
+//TODO deduplicate the output
     private void processUsers(String attributeName, String attributeValue, int threshold, StringBuilder logOutput, ArrayList<Object> foundSmurfs) {
+        //logOutput.append("\n\n<START processing users attribute values------------------------->\n");
         List<String> excludedItems = loadExcludedItems();
         if (excludedItems.contains(attributeValue) && excludeItemsCheckBox.isSelected()) {
-            logOutput.append("\n\nThe " + attributeName + " [" + attributeValue + "] is an excluded item, skipping.");
+            logOutput.append("\n[info] The " + attributeName + " [" + attributeValue + "] is an excluded item, skipping.");
         } else {
             List<PlayerFX> users = userService.findUsersByAttribute(attributeName, attributeValue);
             attributeName = attributeName.replaceAll("uniqueIds.", "");
             if (users.size() > threshold) {
-                logOutput.append(String.format("\nToo many users found with %s [%s]. It might not be relatable. Threshold is %d and found were %d users", attributeName, attributeValue, threshold, users.size()));
-            } else {
-                logOutput.append("\n\n<------------------------------------------------------------>\n");
-                logOutput.append("\nList of users for " + attributeName + " with same value [" + attributeValue + "]\n");
+                logOutput.append(String.format("\n[info] Too many users found with %s [%s]. It might not be relatable. Threshold is %d and found were %d users", attributeName, attributeValue, threshold, users.size()));
+            }
+            else {
+                logOutput.append("\n\n[info] Users for " + attributeName + " with same value [" + attributeValue + "]\n");
                 users.forEach(user -> {
-                        String statusBanned = "    <-- NOT banned";
-                        if (user.isBannedGlobally()) {
-                            statusBanned = "    <-- Banned";
-                        }
-                        logOutput.append("\n" + user.getRepresentation() + " " + statusBanned);
-                        if(user.getId() != null && !foundSmurfs.contains(user.getId())) {
-                            foundSmurfs.add(user.getId());
-                            usersNotBanned.append(user.getId());
-                        }
+                    String statusBanned = "<-- NOT banned"; if (user.isBannedGlobally()) {statusBanned = "<-- Banned";}
+                    String name = user.getRepresentation();
+                    String status = statusBanned;
+                    String format = "[info] \t %-20s %-10s" + "\n";
+                    String output = String.format(format, name, status);
+                    logOutput.append(output);
+                    if(user.getId() != null && !foundSmurfs.contains(user.getId())) {
+                        foundSmurfs.add(user.getId());
+                        usersNotBanned.append(user.getId());
+                       }
                 });
+                //logOutput.append("\n\n<FIN processing users attribute values--------------------------->\n");
             }
         }
     }
 
     public static final List<String> alreadyCheckedUsers = new ArrayList<>();
     StringBuilder logOutput = new StringBuilder();
+
+    //File f = new File("account_credentials.txt");
     StringBuilder usersNotBanned = new StringBuilder();
     int depthCounter = 0;
+
+    public void writeSmurfVillageLookup2File(StringBuilder logOutput) {
+        try {
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm");
+            String currentDate = dateFormat.format(new Date());
+            String fileName = "SmurfVillageLookup-" + currentDate + ".txt";
+            BufferedWriter bw = new BufferedWriter(new FileWriter(fileName));
+            bw.append(logOutput.toString());
+            bw.close();
+            log.debug("[info] Output was saved in " + fileName);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
     public void onSmurfVillageLookup(String playerID) {
         log.debug("[info] Checking " + playerID);
         if (alreadyCheckedUsers.contains(playerID)) {
-            log.debug("[info] skipping, we already know that account");
+            log.debug("[info] skipping, we already have seen that account");
             // User ID has already been checked, return without calling the function again
             return;
         }
@@ -580,13 +600,14 @@ public class UserManagementController implements Controller<SplitPane> {
 //
         userFound.forEach(user->{
             String statusBanned = "";
-            if (user.isBannedGlobally()) {
-                statusBanned = "    <-- Banned";
-                logOutput.append("Smurf village population for: " + user.getRepresentation() + statusBanned);
-            }
-            else {
-                logOutput.append("Smurf village population for: " + user.getRepresentation());
-            }
+            //if (user.isBannedGlobally()) {
+            //    statusBanned = "    <-- Banned";
+            //    //logOutput.append("Smurf village population for: " + user.getRepresentation() + statusBanned); //TODO is playerid not represenation
+            //    logOutput.append("Smurf village population for: " + user.getRepresentation() + statusBanned); //TODO is playerid not represenation
+            //}
+            //else {
+            //    logOutput.append("Smurf village population for: " + user.getRepresentation());
+            //}
 //
     //        user.getUniqueIds().forEach(item -> {
     //            uniqueIds.get("uuids").add(item.getUuid());
@@ -647,7 +668,7 @@ public class UserManagementController implements Controller<SplitPane> {
             });
         });
 
-        int maxUniqueUsersThreshold = 30;
+        int maxUniqueUsersThreshold = 42;
 
         //TODO make threshold config in tab settings
         //TODO make toggable to ignore values from excluded file, but note user what was ignored and why
@@ -667,26 +688,29 @@ public class UserManagementController implements Controller<SplitPane> {
         //biosVersions.stream().forEach(biosVersion -> processUsers(propertyBiosVersion, biosVersion, searchPattern, maxUniqueUsersThreshold, logOutput));
         manufacturers.stream().forEach(manufacturer -> processUsers(propertyManufacturer, manufacturer, maxUniqueUsersThreshold, logOutput, foundSmurfs));
 
-        searchSmurfVillageTabTextField.setText(logOutput.toString());
-        log.debug("[info]" + playerID + " is somehow related through unique items to --> " + foundSmurfs.toString());
+        if (foundSmurfs.size() >= 1) {
+            logOutput.append("\n[info] " + playerID + " is related through unique items to --> " + foundSmurfs);
+        }
         depthCounter+=1;
         StringBuilder plusSigns = new StringBuilder();
         for (int i = 0; i < depthCounter; i++) {
             plusSigns.append("+");
         }
-        logOutput.append("\n\n-> Current depth " + depthCounter + " " + plusSigns + "\n\n");
+        logOutput.append("\n" + "=".repeat(50) + "\n");
+        logOutput.append("[info] Current depth " + depthCounter + " " + plusSigns + "\n");
+        logOutput.append("[info] Examining playerID: " + playerID + "\n");
         foundSmurfs.forEach(s -> onSmurfVillageLookup((String) s));
+        logOutput.append("[info] No further information found for " + playerID + "\n");
+
+        searchSmurfVillageTabTextField.setText(logOutput.toString());
+        writeSmurfVillageLookup2File(logOutput);
     }
 
     public void onLookup() {
-        depthCounter=0;
+        depthCounter = 0;
         logOutput = new StringBuilder();
         usersNotBanned = new StringBuilder();
-
         String lookupPlayerID = smurfVillageLookupTextField.getText();
         onSmurfVillageLookup(lookupPlayerID);
-
     }
 }
-
-
