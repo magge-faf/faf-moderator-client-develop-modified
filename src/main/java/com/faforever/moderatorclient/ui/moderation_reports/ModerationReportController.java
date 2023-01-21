@@ -60,19 +60,8 @@ import static java.text.MessageFormat.format;
 @Slf4j
 @RequiredArgsConstructor
 public class ModerationReportController implements Controller<Region> {
-    public TextArea RepeatedOffenders;
-    public TableView tableView;
-    public Button repeatedOffendersButton;
-    public TableView statsModerator;
-    public Button statisticsModeratorButton;
-    public TableColumn moderatorColumn;
-    public TableColumn reportsColumn;
-    public TableView tableViewRepeatedOffender;
-    public TextArea statisticsTextArea;
+    public TableView tableViewMostReportedAccounts;
     public TextArea moderatorStatisticsTextArea;
-    int counterAwaitingTotalReports = 0;
-    int counterAwaitingTotalRuReports = 0;
-    int counterAlreadyTakenFromMod = 0;
     private final ObjectMapper objectMapper;
     private final ModerationReportService moderationReportService;
     private final UiService uiService;
@@ -83,12 +72,10 @@ public class ModerationReportController implements Controller<Region> {
     private final HttpClient httpClient = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.ALWAYS)
             .build();
-    public CheckBox hideReportsRU;
     public CheckBox FilterLogCheckBox;
     public CheckBox AutomaticallyLoadChatLogCheckBox;
     public Button CreateReportButton;
     public Button CopyReportTemplate;
-    public CheckBox hideAlreadyTakenReportsCheckbox;
 
     @Value("${faforever.vault.replay-download-url-format}")
     private String replayDownLoadFormat;
@@ -100,7 +87,6 @@ public class ModerationReportController implements Controller<Region> {
     public Button editReportButton;
     public TableView<PlayerFX> reportedPlayerView;
     public TextArea chatLogTextArea;
-    public TextArea AwaitingReportsTotalTextArea;
     public Button CopyReportedUserID;
     public Button CopyChatLog;
     public Button CopyReportID;
@@ -160,7 +146,7 @@ public class ModerationReportController implements Controller<Region> {
         String[] offender = CopyReportedUserID.getId().split(" ", 2);
 
         String content = new Scanner(new File("TemplateReport.txt")).useDelimiter("\\Z").next();
-
+        //TODO refactor use method to get the values
         content = content.replace("%report_id%", reportId);
         content = content.replace("%game_id%", gameId);
         content = content.replace("%offender%", offender[0]);
@@ -185,14 +171,10 @@ public class ModerationReportController implements Controller<Region> {
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
 
         List<Offender> offenders = sortedOffendersAwaitingReports.entrySet().stream().map(entry -> new Offender(entry.getKey(), entry.getValue())).collect(Collectors.toList());
-        tableView.setItems(FXCollections.observableArrayList(offenders));
-
-        log.debug("Offenders awaiting reports: {}", sortedOffendersAwaitingReports);
-
-        // tableView does not allow copy its content by default
-        tableView.setOnKeyPressed(event -> {
+        tableViewMostReportedAccounts.setItems(FXCollections.observableArrayList(offenders));
+        tableViewMostReportedAccounts.setOnKeyPressed(event -> {
             if (event.isControlDown() && event.getCode() == KeyCode.C) {
-                Offender selectedOffender = (Offender) tableView.getSelectionModel().getSelectedItem();
+                Offender selectedOffender = (Offender) tableViewMostReportedAccounts.getSelectionModel().getSelectedItem();
                 if (selectedOffender != null) {
                     StringSelection stringSelection = new StringSelection(selectedOffender.getPlayer());
                     Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
@@ -200,8 +182,6 @@ public class ModerationReportController implements Controller<Region> {
                 }
             }
         });
-
-
     }
 
     public void onStatisticsModeratorButton() {
@@ -247,60 +227,28 @@ public class ModerationReportController implements Controller<Region> {
         entriesModeratorReportCountsCompleted.sort((o1, o2) -> o2.getValue().compareTo(o1.getValue()));
 
         StringBuilder sb = new StringBuilder();
-        sb.append("Total reports: ").append(reports.size()).append("\n");
-        sb.append("Completed reports: ").append(completedReports).append("\n");
-        sb.append("Awaiting reports: ").append(awaitingReports).append("\n");
-        sb.append("Processing reports: ").append(processingReports).append("\n");
-        sb.append("Discarded reports: ").append(discardedReports).append("\n");
-        sb.append("ALL reports:").append("\n");
+        sb.append("Total reports: \t").append(reports.size()).append("\n");
+        sb.append("Completed reports: \t").append(completedReports).append("\n");
+        sb.append("Awaiting reports: \t").append(awaitingReports).append("\n");
+        sb.append("Processing reports: \t").append(processingReports).append("\n");
+        sb.append("Discarded reports: \t").append(discardedReports).append("\n");
+        sb.append("\nALL reports:").append("\n");
         for (Map.Entry<PlayerFX,Integer> entry : entriesModeratorReportCountsAll) {
-            sb.append("Moderator: ").append(entry.getKey().getRepresentation()).append(", Reports: ").append(entry.getValue()).append("\n");
+            String moderator = entry.getKey().getRepresentation();
+            sb.append("Moderator: \t\t").append(moderator).append(", Reports: ").append(entry.getValue()).append("\n");
         }
-        sb.append("COMPLETED reports:").append("\n");
+        sb.append("\nCOMPLETED reports:").append("\n");
         for (Map.Entry<PlayerFX,Integer> entry : entriesModeratorReportCountsCompleted) {
-            sb.append("Moderator: ").append(entry.getKey().getRepresentation()).append(", Reports: ").append(entry.getValue()).append("\n");
+            String moderator = entry.getKey().getRepresentation();
+            sb.append("Moderator: \t").append(moderator).append(", Reports: \t").append(entry.getValue()).append("\n");
         }
-        sb.append("DISCARDED reports:").append("\n");
+        sb.append("\nDISCARDED reports:").append("\n");
         for (Map.Entry<PlayerFX,Integer> entry : entriesModeratorReportCountsDiscarded) {
-            sb.append("Moderator: ").append(entry.getKey().getRepresentation()).append(", Reports: ").append(entry.getValue()).append("\n");
+            String moderator = entry.getKey().getRepresentation();
+            sb.append("Moderator: \t\t").append(moderator).append(", Reports: \t").append(entry.getValue()).append("\n");
         }
         moderatorStatisticsTextArea.setText(sb.toString());
     }
-
-    static class PlayerReports {
-        private final StringProperty moderator;
-        private final IntegerProperty reports;
-
-        public PlayerReports(String moderator, int reports) {
-            this.moderator = new SimpleStringProperty(moderator);
-            this.reports = new SimpleIntegerProperty(reports);
-        }
-
-        public String getModerator() {
-            return moderator.get();
-        }
-
-        public StringProperty moderatorProperty() {
-            return moderator;
-        }
-
-        public void setModerator(String moderator) {
-            this.moderator.set(moderator);
-        }
-
-        public int getReports() {
-            return reports.get();
-        }
-
-        public IntegerProperty reportsProperty() {
-            return reports;
-        }
-
-        public void setReports(int reports) {
-            this.reports.set(reports);
-        }
-    }
-
 
     public static class Offender {
         private final StringProperty player;
@@ -314,31 +262,11 @@ public class ModerationReportController implements Controller<Region> {
         public String getPlayer() {
             return player.get();
         }
-
-        public StringProperty playerProperty() {
-            return player;
-        }
-
-        public long getOffenseCount() {
-            return offenseCount.get();
-        }
-
-        public LongProperty offenseCountProperty() {
-            return offenseCount;
-        }
-    }
-
-    public static class GlobalConstants
-    {
-        public static String AwaitingReportsTotalTextArea = "";
-        public static ArrayList<String> allReports = new ArrayList<>();
-        public static ArrayList<String> allOffenders = new ArrayList<>();
-        public static ArrayList<String> allRUOffenders = new ArrayList<>();
     }
 
     @FXML
     public void initialize() {
-        // when report is getting hit...
+        // report is selected
         statusChoiceBox.setItems(FXCollections.observableArrayList(ChooseableStatus.values()));
         statusChoiceBox.getSelectionModel().select(ChooseableStatus.AWAITING);
         editReportButton.disableProperty().bind(reportTableView.getSelectionModel().selectedItemProperty().isNull());
@@ -402,18 +330,6 @@ public class ModerationReportController implements Controller<Region> {
         clip.setContents(tText, null);
     }
 
-    private void resetCounters() {
-        counterAwaitingTotalReports = 0;
-        counterAwaitingTotalRuReports = 0;
-        counterAlreadyTakenFromMod = 0;
-    }
-
-    private void initRepeatedOffenders() {
-        RepeatedOffenders.setText("test");
-        ObservableList<ModerationReportFX> allReports = reportTableView.getItems();
-
-    }
-
     private void addBan(PlayerFX accountFX) {
         BanInfoController banInfoController = uiService.loadFxml("ui/banInfo.fxml");
         BanInfoFX ban = new BanInfoFX();
@@ -428,7 +344,6 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private void renewFilter() {
-        resetCounters();
         filteredItemList.setPredicate(moderationReportFx -> {
             String playerFilter = playerNameFilterTextField.getText().toLowerCase();
             if (!Strings.isNullOrEmpty(playerFilter)) {
@@ -441,57 +356,13 @@ public class ModerationReportController implements Controller<Region> {
             ChooseableStatus selectedItemChoiceBox = statusChoiceBox.getSelectionModel().getSelectedItem();
             if (selectedItemChoiceBox.toString().equals("ALL")) return true;
             ModerationReportStatus moderationReportStatus = selectedItemChoiceBox.getModerationReportStatus();
-            try {
-                String current_line = moderationReportFx.getId() + ":" + moderationReportFx.getLastModerator().getRepresentation() + ":" + moderationReportFx.getReportStatus();
-                if(!GlobalConstants.allReports.contains(current_line) && !moderationReportFx.getReportStatus().toString().equals("AWAITING")){
-                    GlobalConstants.allReports.add(current_line);
-                }
-            }
-            catch (Exception ignored){} // com.faforever.moderatorclient.ui.domain.ModerationReportFX.getLastModerator()" is null
-
-            if (moderationReportFx.getReportStatus().toString().equals("AWAITING")) {
-                counterAwaitingTotalReports +=1;
-                for (PlayerFX temp : moderationReportFx.getReportedUsers().stream().toList()) {
-                    GlobalConstants.allOffenders.add(String.valueOf(temp.getRepresentation()));
-                }
-                if ("RU".equals(moderationReportFx.getModeratorPrivateNote())) {
-                        counterAwaitingTotalRuReports +=1;
-                        for (PlayerFX temp : moderationReportFx.getReportedUsers().stream().toList()) {
-                            GlobalConstants.allRUOffenders.add(String.valueOf(temp.getRepresentation()));
-                        }
-                } else {
-                    for(int i = 0; i < moderationReportFx.getReportDescription().length(); i++) {
-                        if(Character.UnicodeBlock.of(moderationReportFx.getReportDescription().charAt(i)).equals(Character.UnicodeBlock.CYRILLIC)) {
-                            counterAwaitingTotalRuReports +=1;
-                            for (PlayerFX temp : moderationReportFx.getReportedUsers().stream().toList()) {
-                                GlobalConstants.allRUOffenders.add(String.valueOf(temp.getRepresentation()));
-                            }
-                            break;
-                        }
-                    }
-                }
-                if (hideAlreadyTakenReportsCheckbox.isSelected() && moderationReportFx.getLastModerator() != null) {
-                    return false;
-                }
-                if (hideReportsRU.isSelected() && moderationReportFx.getReportDescription().chars().anyMatch(c -> Character.UnicodeBlock.of(c) == Character.UnicodeBlock.CYRILLIC)) {
-                    return false;
-                }
-            }
-            AwaitingReportsTotalTextArea.setText(
-                "Total awaiting: " + (counterAwaitingTotalReports) +
-                "\nTotal RU awaiting: " + (counterAwaitingTotalRuReports) +
-                "\nTotal non RU awaiting: " + (counterAwaitingTotalReports - counterAwaitingTotalRuReports));
-            GlobalConstants.AwaitingReportsTotalTextArea = AwaitingReportsTotalTextArea.getText();
-
             return moderationReportFx.getReportStatus() == moderationReportStatus;
         });
     }
 
     public void onRefreshAllReports() {
-        resetCounters();
         onStatisticsModeratorButton();
         onRepeatedOffendersButton();
-        log.debug("reset counters?");
         moderationReportService.getAllReports().thenAccept(reportFxes -> Platform.runLater(() -> itemList.setAll(reportFxes))).exceptionally(throwable -> {
             log.error("error loading reports", throwable);
             return null;
@@ -499,7 +370,6 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     public void onEdit() {
-        resetCounters();
         EditModerationReportController editModerationReportController = uiService.loadFxml("ui/edit_moderation_report.fxml");
         editModerationReportController.setModerationReportFx(reportTableView.getSelectionModel().getSelectedItem());
         editModerationReportController.setOnSaveRunnable(() -> Platform.runLater(this::onRefreshAllReports));
