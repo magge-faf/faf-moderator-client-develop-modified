@@ -82,7 +82,7 @@
             </VBox>
         </Tab>
         <Tab text="Moderator statistics">
-            <VBox>
+            <VBox VBox.vgrow="ALWAYS">
                 <TextArea fx:id="moderatorStatisticsTextArea" editable="false" HBox.hgrow="ALWAYS"/>
             </VBox>
         </Tab>

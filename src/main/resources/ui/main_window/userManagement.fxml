@@ -161,39 +161,44 @@
         <Tab fx:id="searchSmurfVillageLookupTab" text="Output of Smurf Village Lookup">
             <VBox >
                     <TextArea fx:id="searchSmurfVillageTabTextField"
-                              promptText="Program can freeze for a few seconds/minutes while it is requesting data, especially when there are many users with same items. Just be patient."
-                              VBox.vgrow="ALWAYS"
-                    >
+                              promptText="Output will be saved as .txt into project folder as well - Program can freeze for a few seconds/minutes while it is requesting data, especially when there are many users with same items. Just be patient."
+                              VBox.vgrow="ALWAYS">
                     </TextArea>
             </VBox>
         </Tab>
         <Tab fx:id="settingsSmurfVillageLookupTab" text="Settings Smurf Village Lookup">
-            <content>
-                <VBox>
-                    <CheckBox fx:id="excludeItemsCheckBox" text="Exclude junk/malformed items (see Settings)" disable="true"/>
-                    <Separator/>
-                    <CheckBox fx:id="includeUUIDCheckBox" text="Include UUID" />
-                    <CheckBox fx:id="includeUIDHashCheckBox" text="Include UID Hash" />
-                    <CheckBox fx:id="includeIPCheckBox" text="Include IP" />
-                    <CheckBox fx:id="includeMemorySerialNumberCheckBox" text="Include Memory Serial Number" />
-                    <CheckBox fx:id="includeVolumeSerialNumberCheckBox" text="Include Volume Serial Number" />
-                    <CheckBox fx:id="includeSerialNumberCheckBox" text="Include Serial Number" />
-                    <CheckBox fx:id="includeProcessorIdCheckBox" text="Include Processor Id" />
-                    <CheckBox fx:id="includeManufacturerCheckBox" text="Include Manufacturer" />
-                    <Separator/>
-                    <Text>maxUniqueUsersThreshold:</Text>
-                    <TextField fx:id="maxUniqueUsersThresholdTextField" layoutX="10" layoutY="10" promptText="Enter an integer value - Default is 100" />
-                    <Text>If a unique hardware item has shared properties with more than X accounts, it will inform about it, but not give details about each account.</Text>
-                    <Separator/>
-                    <Text>depthScanningInput:</Text>
-                    <TextField fx:id="depthScanningInputTextField" layoutX="10" layoutY="10" promptText="Enter an integer value - Default is 9000" />
-                    <Text>The depth scanning value, like 1,2 or 3+, sets how many levels deep it should look for each connected smurf</Text>
-                    <Separator orientation="VERTICAL"/>
-                    <Separator/>
-                    <Button fx:id="saveSettingsButton" text="Save Settings" onAction="#saveSettings"/>
-                    <Separator orientation="VERTICAL"/>
-                </VBox>
-            </content>
+            <VBox>
+                <CheckBox fx:id="excludeItemsCheckBox" text="Exclude junk/malformed items (see Settings)"
+                          disable="true"/>
+                <Separator/>
+                <CheckBox fx:id="includeUUIDCheckBox" text="Include UUID"/>
+                <CheckBox fx:id="includeUIDHashCheckBox" text="Include UID Hash"/>
+                <CheckBox fx:id="includeIPCheckBox" text="Include IP"/>
+                <CheckBox fx:id="includeMemorySerialNumberCheckBox" text="Include Memory Serial Number"/>
+                <CheckBox fx:id="includeVolumeSerialNumberCheckBox" text="Include Volume Serial Number"/>
+                <CheckBox fx:id="includeSerialNumberCheckBox" text="Include Serial Number"/>
+                <CheckBox fx:id="includeProcessorIdCheckBox" text="Include Processor Id"/>
+                <CheckBox fx:id="includeProcessorNameCheckBox" text="Include Processor Name"/>
+                <CheckBox fx:id="includeManufacturerCheckBox" text="Include Manufacturer"/>
+                <Separator/>
+                <Text>maxUniqueUsersThreshold:</Text>
+                <TextField fx:id="maxUniqueUsersThresholdTextField" layoutX="10" layoutY="10"
+                           promptText="Enter an integer value - Default is 100"/>
+                <Text>If a unique hardware item has shared properties with more than X accounts, it will inform about
+                    it, but not give details about each account.
+                </Text>
+                <Separator/>
+                <Text>depthScanningInput:</Text>
+                <TextField fx:id="depthScanningInputTextField" layoutX="10" layoutY="10"
+                           promptText="Enter an integer value - Default is 9000"/>
+                <Text>The depth scanning value, like 1,2 or 3+, sets how many levels deep it should look for each
+                    connected smurf
+                </Text>
+                <Separator orientation="VERTICAL"/>
+                <Separator/>
+                <Button fx:id="saveSettingsButton" text="Save Settings" onAction="#saveSettings"/>
+                <Separator orientation="VERTICAL"/>
+            </VBox>
         </Tab>
     </TabPane>
 </SplitPane>

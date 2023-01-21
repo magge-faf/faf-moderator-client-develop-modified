@@ -59,6 +59,7 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class UserManagementController implements Controller<SplitPane> {
+    public CheckBox includeProcessorNameCheckBox;
     private int depthCounter = 0;
     private StringBuilder logOutput = new StringBuilder();
     private StringBuilder usersNotBanned = new StringBuilder();
@@ -172,6 +173,7 @@ public class UserManagementController implements Controller<SplitPane> {
         includeProcessorIdCheckBox.setSelected(Boolean.parseBoolean(props.getProperty("includeProcessorIdCheckBox")));
         includeManufacturerCheckBox.setSelected(Boolean.parseBoolean(props.getProperty("includeManufacturerCheckBox")));
         includeIPCheckBox.setSelected(Boolean.parseBoolean(props.getProperty("includeIPCheckBox")));
+        includeProcessorNameCheckBox.setSelected(Boolean.parseBoolean(props.getProperty("includeProcessorNameCheckBox")));
         String depthScanningInput = props.getProperty("depthScanningInputTextField");
         depthScanningInputTextField.setText(depthScanningInput);
         String maxUniqueUsersThreshold = props.getProperty("maxUniqueUsersThresholdTextField");
@@ -241,6 +243,7 @@ public class UserManagementController implements Controller<SplitPane> {
     private void saveSettings() {
         Properties props = new Properties();
         props.setProperty("excludeItemsCheckBox", Boolean.toString(excludeItemsCheckBox.isSelected()));
+        props.setProperty("includeProcessorNameCheckBox", Boolean.toString(includeProcessorNameCheckBox.isSelected()));
         props.setProperty("includeUUIDCheckBox", Boolean.toString(includeUUIDCheckBox.isSelected()));
         props.setProperty("includeUIDHashCheckBox", Boolean.toString(includeUIDHashCheckBox.isSelected()));
         props.setProperty("includeMemorySerialNumberCheckBox", Boolean.toString(includeMemorySerialNumberCheckBox.isSelected()));
@@ -257,7 +260,7 @@ public class UserManagementController implements Controller<SplitPane> {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        saveSettingsButton.setText("saved");
+        saveSettingsButton.setText("config saved");
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
         ScheduledFuture<?> scheduledFuture = scheduler.schedule(new Runnable() {
             @Override
@@ -554,23 +557,13 @@ public class UserManagementController implements Controller<SplitPane> {
         log.debug("[info] Checking " + playerID);
         if (alreadyCheckedUsers.contains(playerID)) {
             log.debug("[info] skipping, we already have seen that account");
-            // User ID has already been checked, return without calling the function again
             return;
         }
         log.debug("[info] " + playerID + " added to alreadyCheckedUsers");
         alreadyCheckedUsers.add(playerID);
-        // Perform additional logic to find other users...
-        //modifiableList.add(playerID);
-        //log.debug(playerID + " was added to modifiableList.");
-
-        //searchUserPropertyMapping.put("Email", "email");
-        //searchUserPropertyMapping.put("Steam Id", "accountLinks.serviceId");
-        //searchUserPropertyMapping.put("Gog Id", "accountLinks.serviceId");
-        //searchUserPropertyMapping.put("Device Id", "uniqueIds.deviceId");
-
         users.clear();
         userSearchTableView.getSortOrder().clear();
-        //String property = searchUserPropertyMapping.get(searchUserProperties.getValue());
+
         String propertyId = searchUserPropertyMapping.get("Id");
         String propertyUUID = searchUserPropertyMapping.get("UUID");
         String propertyHash= searchUserPropertyMapping.get("UID Hash");
@@ -584,57 +577,26 @@ public class UserManagementController implements Controller<SplitPane> {
         String propertyManufacturer = searchUserPropertyMapping.get("Manufacturer");
 
         List<PlayerFX> userFound = userService.findUsersByAttribute(propertyId, playerID);
-
+        //TODO save buttons includeProcessorNameCheckBox
         List<String> uuids = new ArrayList<>();
         List<String> hashes = new ArrayList<>();
         List<String> ips = new ArrayList<>();
         List<String> memorySerialNumbers = new ArrayList<>();
         List<String> volumeSerialNumbers = new ArrayList<>();
         List<String> serialNumbers = new ArrayList<>();
-        List<String> processorIds = new ArrayList<>();
-        List<String> CPUNames = new ArrayList<>();
-        List<String> biosVersions = new ArrayList<>();
-        List<String> manufacturers = new ArrayList<>();
-
-        Map<String, Set<String>> uniqueIds = new HashMap<>();
-
-    //    uniqueIds.put("uuids", new HashSet<>());
-    //    uniqueIds.put("hashes", new HashSet<>());
-    //    uniqueIds.put("ips", new HashSet<>());
-    //    uniqueIds.put("memorySerialNumbers", new HashSet<>());
-    //    uniqueIds.put("volumeSerialNumbers", new HashSet<>());
-    //    uniqueIds.put("serialNumbers", new HashSet<>());
-    //    uniqueIds.put("processorIds", new HashSet<>());
-    //    uniqueIds.put("biosVersions", new HashSet<>());
-    //    uniqueIds.put("manufacturers", new HashSet<>());
-//
+        List<String> processorIds = new ArrayList<>(); // Not relatable, unless spoof is obvious
+        List<String> CPUNames = new ArrayList<>();  // Not relatable, unless spoof is obvious
+        List<String> biosVersions = new ArrayList<>();  // Does not work
+        List<String> manufacturers = new ArrayList<>(); // Not relatable, unless spoof is obvious
+        // TODO refactor to hash
         userFound.forEach(user->{
-            String statusBanned = "";
-            //if (user.isBannedGlobally()) {
-            //    statusBanned = "    <-- Banned";
-            //    //logOutput.append("Smurf village population for: " + user.getRepresentation() + statusBanned); //TODO is playerid not represenation
-            //    logOutput.append("Smurf village population for: " + user.getRepresentation() + statusBanned); //TODO is playerid not represenation
-            //}
-            //else {
-            //    logOutput.append("Smurf village population for: " + user.getRepresentation());
-            //}
-//
-    //        user.getUniqueIds().forEach(item -> {
-    //            uniqueIds.get("uuids").add(item.getUuid());
-    //            uniqueIds.get("hashes").add(item.getHash());
-    //            uniqueIds.get("ips").add(user.getRecentIpAddress());
-    //            uniqueIds.get("memorySerialNumbers").add(item.getMemorySerialNumber());
-    //            uniqueIds.get("volumeSerialNumbers").add(item.getVolumeSerialNumber());
-    //            uniqueIds.get("serialNumbers").add(item.getSerialNumber());
-    //            uniqueIds.get("processorIds").add(item.getProcessorId());
-    //            uniqueIds.get("biosVersions").add(item.getSMBIOSBIOSVersion());
-    //    userFound.forEach(user->{
-    //        logOutput.append("Smurf village population for: " + user.getRepresentation());
-
-            //TODO recap that mess with a HashSet?
             user.getUniqueIds().forEach(item -> {
+                if (includeProcessorNameCheckBox.isSelected())
+                {   // Sometimes an account has same hardware items several times
+                    if (!CPUNames.contains(item.getUuid())) {CPUNames.add(item.getUuid());}
+                }
                 if (includeUUIDCheckBox.isSelected())
-                {
+                {   // Sometimes an account has same hardware items several times
                     if (!uuids.contains(item.getUuid())) {uuids.add(item.getUuid());}
                 }
                 if (includeUIDHashCheckBox.isSelected())
@@ -678,16 +640,14 @@ public class UserManagementController implements Controller<SplitPane> {
             });
         });
 
-        int maxUniqueUsersThreshold = 42;
+        int maxUniqueUsersThreshold = Integer.parseInt(maxUniqueUsersThresholdTextField.getText());
 
-        //TODO make threshold config in tab settings
-        //TODO make toggable to ignore values from excluded file, but note user what was ignored and why
         //TODO steam/GOG checker?
         //TODO IP VPN checker?
-        //TODO depth factor? search the found smurf ids as well if threshold was not hit
         //TODO pattern search for similiar emails?
 
         ArrayList<Object> foundSmurfs = new ArrayList<>();
+
         uuids.stream().forEach(uuid -> processUsers(propertyUUID, uuid, maxUniqueUsersThreshold, logOutput, foundSmurfs));
         hashes.stream().forEach(hash -> processUsers(propertyHash, hash, maxUniqueUsersThreshold, logOutput, foundSmurfs));
         ips.stream().forEach(ip -> processUsers(propertyIP, ip, maxUniqueUsersThreshold, logOutput, foundSmurfs));
@@ -722,7 +682,6 @@ public class UserManagementController implements Controller<SplitPane> {
         searchSmurfVillageTabTextField.setText(logOutput.toString());
         writeSmurfVillageLookup2File(logOutput);
     }
-
     public void onLookup() {
         depthCounter = 0;
         logOutput = new StringBuilder();
