@@ -170,9 +170,8 @@
         <Tab fx:id="settingsSmurfVillageLookupTab" text="Settings Smurf Village Lookup">
             <content>
                 <VBox>
-                    <CheckBox fx:id="excludeItemsCheckBox" text="Exclude junk/malformed items (see Settings)"/>
+                    <CheckBox fx:id="excludeItemsCheckBox" text="Exclude junk/malformed items (see Settings)" disable="true"/>
                     <Separator/>
-
                     <CheckBox fx:id="includeUUIDCheckBox" text="Include UUID" />
                     <CheckBox fx:id="includeUIDHashCheckBox" text="Include UID Hash" />
                     <CheckBox fx:id="includeIPCheckBox" text="Include IP" />
@@ -183,14 +182,16 @@
                     <CheckBox fx:id="includeManufacturerCheckBox" text="Include Manufacturer" />
                     <Separator/>
                     <Text>maxUniqueUsersThreshold:</Text>
-                    <TextField fx:id="maxUniqueUsersThresholdTextField" layoutX="10" layoutY="10" promptText="Enter an integer value - Default is 42" />
-                    <Text>Explanation blabla</Text>
+                    <TextField fx:id="maxUniqueUsersThresholdTextField" layoutX="10" layoutY="10" promptText="Enter an integer value - Default is 100" />
+                    <Text>If a unique hardware item has shared properties with more than X accounts, it will inform about it, but not give details about each account.</Text>
                     <Separator/>
                     <Text>depthScanningInput:</Text>
-                    <TextField fx:id="depthScanningInputTextField" layoutX="10" layoutY="10" promptText="Enter an integer value" />
+                    <TextField fx:id="depthScanningInputTextField" layoutX="10" layoutY="10" promptText="Enter an integer value - Default is 9000" />
                     <Text>The depth scanning value, like 1,2 or 3+, sets how many levels deep it should look for each connected smurf</Text>
                     <Separator orientation="VERTICAL"/>
+                    <Separator/>
                     <Button fx:id="saveSettingsButton" text="Save Settings" onAction="#saveSettings"/>
+                    <Separator orientation="VERTICAL"/>
                 </VBox>
             </content>
         </Tab>

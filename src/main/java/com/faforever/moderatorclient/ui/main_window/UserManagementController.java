@@ -52,13 +52,16 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class UserManagementController implements Controller<SplitPane> {
+    private int depthCounter = 0;
+    private StringBuilder logOutput = new StringBuilder();
+    private StringBuilder usersNotBanned = new StringBuilder();
     private final UiService uiService;
     private final PlatformService platformService;
     private final UserService userService;
@@ -159,6 +162,7 @@ public class UserManagementController implements Controller<SplitPane> {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        // Load config
         excludeItemsCheckBox.setSelected(Boolean.parseBoolean(props.getProperty("excludeItemsCheckBox")));
         includeUUIDCheckBox.setSelected(Boolean.parseBoolean(props.getProperty("includeUUIDCheckBox")));
         includeUIDHashCheckBox.setSelected(Boolean.parseBoolean(props.getProperty("includeUIDHashCheckBox")));
@@ -173,6 +177,7 @@ public class UserManagementController implements Controller<SplitPane> {
         String maxUniqueUsersThreshold = props.getProperty("maxUniqueUsersThresholdTextField");
         maxUniqueUsersThresholdTextField.setText(maxUniqueUsersThreshold);
         log.debug("[info] config loaded");
+
         disableTabOnMissingPermission(notesTab, GroupPermission.ROLE_ADMIN_ACCOUNT_NOTE);
         disableTabOnMissingPermission(bansTab, GroupPermission.ROLE_ADMIN_ACCOUNT_BAN);
         disableTabOnMissingPermission(teamkillsTab, GroupPermission.ROLE_READ_TEAMKILL_REPORT);
@@ -245,14 +250,22 @@ public class UserManagementController implements Controller<SplitPane> {
         props.setProperty("includeManufacturerCheckBox", Boolean.toString(includeManufacturerCheckBox.isSelected()));
         props.setProperty("includeIPCheckBox", Boolean.toString(includeIPCheckBox.isSelected()));
         props.setProperty("depthScanningInputTextField", depthScanningInputTextField.getText());
+        props.setProperty("maxUniqueUsersThresholdTextField", maxUniqueUsersThresholdTextField.getText());
 
         try (OutputStream out = new FileOutputStream("config.properties")) {
             props.store(out, null);
         } catch (IOException e) {
             e.printStackTrace();
         }
+        saveSettingsButton.setText("saved");
+        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+        ScheduledFuture<?> scheduledFuture = scheduler.schedule(new Runnable() {
+            @Override
+            public void run() {
+                Platform.runLater(() -> saveSettingsButton.setText("Save Settings"));
+            }
+        }, 2, TimeUnit.SECONDS);
         log.debug("[info] config saved");
-        saveSettingsButton.setText("Save Settings: saved");
     }
     private void initializeSearchProperties() {
         searchUserPropertyMapping.put("Name", "login");
@@ -520,11 +533,8 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     public static final List<String> alreadyCheckedUsers = new ArrayList<>();
-    StringBuilder logOutput = new StringBuilder();
 
     //File f = new File("account_credentials.txt");
-    StringBuilder usersNotBanned = new StringBuilder();
-    int depthCounter = 0;
 
     public void writeSmurfVillageLookup2File(StringBuilder logOutput) {
         try {
@@ -696,8 +706,15 @@ public class UserManagementController implements Controller<SplitPane> {
         for (int i = 0; i < depthCounter; i++) {
             plusSigns.append("+");
         }
+        int depthThreshold = Integer.parseInt(depthScanningInputTextField.getText());
+        if (depthCounter >= depthThreshold){
+            log.debug("[info] Depth limit reached: " + depthCounter + "/"+ depthThreshold);
+            searchSmurfVillageTabTextField.setText(logOutput.toString());
+            writeSmurfVillageLookup2File(logOutput);
+            return;
+        }
         logOutput.append("\n" + "=".repeat(50) + "\n");
-        logOutput.append("[info] Current depth " + depthCounter + " " + plusSigns + "\n");
+        logOutput.append("[info] Current depth " + depthCounter + "/" + depthThreshold + " " + plusSigns + "\n");
         logOutput.append("[info] Examining playerID: " + playerID + "\n");
         foundSmurfs.forEach(s -> onSmurfVillageLookup((String) s));
         logOutput.append("[info] No further information found for " + playerID + "\n");
