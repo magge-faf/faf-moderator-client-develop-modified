@@ -163,7 +163,6 @@ public class LoginController implements Controller<Pane> {
         });
     }
 
-
     public void reloadLogin() {
         resetPageFuture = new CompletableFuture<>();
         resetPageFuture.thenAccept(aVoid -> Platform.runLater(this::loadLoginPage));
@@ -173,18 +172,15 @@ public class LoginController implements Controller<Pane> {
         }
     }
 
-
     private void loadLoginPage(){
         loginWebView.getEngine().setJavaScriptEnabled(true);
         loginWebView.getEngine().load(getHydraUrl());
     }
 
-
     private void onFailedLogin(String message) {
         Platform.runLater(() ->
                 ViewHelper.errorDialog("Login Failed", MessageFormat.format("Something went wrong while logging in please see the details from the user service. Error: {0}", message)));
     }
-
 
     public String getHydraUrl() {
         EnvironmentProperties environmentProperties = applicationProperties.getEnvironments().get(environmentComboBox.getValue());
@@ -197,7 +193,6 @@ public class LoginController implements Controller<Pane> {
                         "&scope=%s",
                 environmentProperties.getOauthBaseUrl(), environmentProperties.getClientId(), state, environmentProperties.getOauthRedirectUrl(), environmentProperties.getOauthScopes());
     }
-
 
     @EventListener
     public void onApiAuthorized(ApiAuthorizedEvent event) {
