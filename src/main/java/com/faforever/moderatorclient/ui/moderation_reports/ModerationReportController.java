@@ -16,6 +16,7 @@ import java.io.FileNotFoundException;
 import java.net.URI;
 import com.google.common.base.Strings;
 import javafx.application.Platform;
+import javafx.beans.property.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
@@ -26,6 +27,7 @@ import javafx.scene.control.*;
 import javafx.scene.control.Button;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.Region;
 import javafx.stage.Stage;
 import lombok.RequiredArgsConstructor;
@@ -45,8 +47,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Scanner;
+import java.util.*;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -57,6 +60,19 @@ import static java.text.MessageFormat.format;
 @Slf4j
 @RequiredArgsConstructor
 public class ModerationReportController implements Controller<Region> {
+    public TextArea RepeatedOffenders;
+    public TableView tableView;
+    public Button repeatedOffendersButton;
+    public TableView statsModerator;
+    public Button statisticsModeratorButton;
+    public TableColumn moderatorColumn;
+    public TableColumn reportsColumn;
+    public TableView tableViewRepeatedOffender;
+    public TextArea statisticsTextArea;
+    public TextArea moderatorStatisticsTextArea;
+    int counterAwaitingTotalReports = 0;
+    int counterAwaitingTotalRuReports = 0;
+    int counterAlreadyTakenFromMod = 0;
     private final ObjectMapper objectMapper;
     private final ModerationReportService moderationReportService;
     private final UiService uiService;
@@ -152,6 +168,166 @@ public class ModerationReportController implements Controller<Region> {
         setSysClipboardText(content);
     }
 
+    public void onRepeatedOffendersButton() {
+        CompletableFuture<List<ModerationReportFX>> allReports = moderationReportService.getAllReports();
+
+        allReports.thenAccept(this::acceptRepeatedOffenders);
+    }
+
+    private void acceptRepeatedOffenders(List<ModerationReportFX> reports) {
+        Map<String, Long> offendersAwaitingReports = reports.stream()
+                .filter(report -> report.getReportStatus().equals(ModerationReportStatus.AWAITING))
+                .flatMap(report -> report.getReportedUsers().stream())
+                .collect(Collectors.groupingBy(PlayerFX::getRepresentation, Collectors.counting()));
+
+        Map<String, Long> sortedOffendersAwaitingReports = offendersAwaitingReports.entrySet().stream()
+                .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
+
+        List<Offender> offenders = sortedOffendersAwaitingReports.entrySet().stream().map(entry -> new Offender(entry.getKey(), entry.getValue())).collect(Collectors.toList());
+        tableView.setItems(FXCollections.observableArrayList(offenders));
+
+        log.debug("Offenders awaiting reports: {}", sortedOffendersAwaitingReports);
+
+        // tableView does not allow copy its content by default
+        tableView.setOnKeyPressed(event -> {
+            if (event.isControlDown() && event.getCode() == KeyCode.C) {
+                Offender selectedOffender = (Offender) tableView.getSelectionModel().getSelectedItem();
+                if (selectedOffender != null) {
+                    StringSelection stringSelection = new StringSelection(selectedOffender.getPlayer());
+                    Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+                    clipboard.setContents(stringSelection, null);
+                }
+            }
+        });
+
+
+    }
+
+    public void onStatisticsModeratorButton() {
+        CompletableFuture<List<ModerationReportFX>> allReports = moderationReportService.getAllReports();
+        allReports.thenAccept(this::acceptStatisticsModerator);
+    }
+
+    private void acceptStatisticsModerator(List<ModerationReportFX> reports) {
+        int awaitingReports = (int) reports.stream()
+                .map(ModerationReportFX::getReportStatus)
+                .filter(status -> status.equals(ModerationReportStatus.AWAITING))
+                .count();
+        int discardedReports = (int) reports.stream()
+                .map(ModerationReportFX::getReportStatus)
+                .filter(status -> status.equals(ModerationReportStatus.DISCARDED))
+                .count();
+        int processingReports = (int) reports.stream()
+                .map(ModerationReportFX::getReportStatus)
+                .filter(status -> status.equals(ModerationReportStatus.PROCESSING))
+                .count();
+        int completedReports = (int) reports.stream()
+                .map(ModerationReportFX::getReportStatus)
+                .filter(status -> status.equals(ModerationReportStatus.COMPLETED))
+                .count();
+        //TODO refactor - use 1 map
+        Map<PlayerFX, Integer> moderatorReportCountsAll = reports.stream()
+                .filter(r-> r.getLastModerator()!=null)
+                .collect(Collectors.groupingBy(ModerationReportFX::getLastModerator, Collectors.summingInt(r -> 1)));
+        Map<PlayerFX, Integer> moderatorReportCountsDiscarded = reports.stream()
+                .filter(report -> report.getReportStatus().equals(ModerationReportStatus.DISCARDED) && report.getLastModerator()!=null)
+                .collect(Collectors.groupingBy(ModerationReportFX::getLastModerator, Collectors.summingInt(r -> 1)));
+        Map<PlayerFX, Integer> moderatorReportCountsCompleted = reports.stream()
+                .filter(report -> report.getReportStatus().equals(ModerationReportStatus.COMPLETED) && report.getLastModerator()!=null)
+                .collect(Collectors.groupingBy(ModerationReportFX::getLastModerator, Collectors.summingInt(r -> 1)));
+        //TODO refactor - filter the above map
+        List<Map.Entry<PlayerFX,Integer>> entriesModeratorReportCountsAll = new ArrayList<>(moderatorReportCountsAll.entrySet());
+        entriesModeratorReportCountsAll.sort((o1, o2) -> o2.getValue().compareTo(o1.getValue()));
+
+        List<Map.Entry<PlayerFX,Integer>> entriesModeratorReportCountsDiscarded = new ArrayList<>(moderatorReportCountsDiscarded.entrySet());
+        entriesModeratorReportCountsDiscarded.sort((o1, o2) -> o2.getValue().compareTo(o1.getValue()));
+
+        List<Map.Entry<PlayerFX,Integer>> entriesModeratorReportCountsCompleted = new ArrayList<>(moderatorReportCountsCompleted.entrySet());
+        entriesModeratorReportCountsCompleted.sort((o1, o2) -> o2.getValue().compareTo(o1.getValue()));
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("Total reports: ").append(reports.size()).append("\n");
+        sb.append("Completed reports: ").append(completedReports).append("\n");
+        sb.append("Awaiting reports: ").append(awaitingReports).append("\n");
+        sb.append("Processing reports: ").append(processingReports).append("\n");
+        sb.append("Discarded reports: ").append(discardedReports).append("\n");
+        sb.append("ALL reports:").append("\n");
+        for (Map.Entry<PlayerFX,Integer> entry : entriesModeratorReportCountsAll) {
+            sb.append("Moderator: ").append(entry.getKey().getRepresentation()).append(", Reports: ").append(entry.getValue()).append("\n");
+        }
+        sb.append("COMPLETED reports:").append("\n");
+        for (Map.Entry<PlayerFX,Integer> entry : entriesModeratorReportCountsCompleted) {
+            sb.append("Moderator: ").append(entry.getKey().getRepresentation()).append(", Reports: ").append(entry.getValue()).append("\n");
+        }
+        sb.append("DISCARDED reports:").append("\n");
+        for (Map.Entry<PlayerFX,Integer> entry : entriesModeratorReportCountsDiscarded) {
+            sb.append("Moderator: ").append(entry.getKey().getRepresentation()).append(", Reports: ").append(entry.getValue()).append("\n");
+        }
+        moderatorStatisticsTextArea.setText(sb.toString());
+    }
+
+    static class PlayerReports {
+        private final StringProperty moderator;
+        private final IntegerProperty reports;
+
+        public PlayerReports(String moderator, int reports) {
+            this.moderator = new SimpleStringProperty(moderator);
+            this.reports = new SimpleIntegerProperty(reports);
+        }
+
+        public String getModerator() {
+            return moderator.get();
+        }
+
+        public StringProperty moderatorProperty() {
+            return moderator;
+        }
+
+        public void setModerator(String moderator) {
+            this.moderator.set(moderator);
+        }
+
+        public int getReports() {
+            return reports.get();
+        }
+
+        public IntegerProperty reportsProperty() {
+            return reports;
+        }
+
+        public void setReports(int reports) {
+            this.reports.set(reports);
+        }
+    }
+
+
+    public static class Offender {
+        private final StringProperty player;
+        private final LongProperty offenseCount;
+
+        public Offender(String player, long offenseCount) {
+            this.player = new SimpleStringProperty(player);
+            this.offenseCount = new SimpleLongProperty(offenseCount);
+        }
+
+        public String getPlayer() {
+            return player.get();
+        }
+
+        public StringProperty playerProperty() {
+            return player;
+        }
+
+        public long getOffenseCount() {
+            return offenseCount.get();
+        }
+
+        public LongProperty offenseCountProperty() {
+            return offenseCount;
+        }
+    }
+
     public static class GlobalConstants
     {
         public static String AwaitingReportsTotalTextArea = "";
@@ -162,28 +338,24 @@ public class ModerationReportController implements Controller<Region> {
 
     @FXML
     public void initialize() {
+        // when report is getting hit...
         statusChoiceBox.setItems(FXCollections.observableArrayList(ChooseableStatus.values()));
-        statusChoiceBox.getSelectionModel().select(ChooseableStatus.AWAITING); // default selected filter
+        statusChoiceBox.getSelectionModel().select(ChooseableStatus.AWAITING);
         editReportButton.disableProperty().bind(reportTableView.getSelectionModel().selectedItemProperty().isNull());
-
         itemList = FXCollections.observableArrayList();
         filteredItemList = new FilteredList<>(itemList);
         renewFilter();
         SortedList<ModerationReportFX> sortedItemList = new SortedList<>(filteredItemList);
         sortedItemList.comparatorProperty().bind(reportTableView.comparatorProperty());
-
         ViewHelper.buildModerationReportTableView(reportTableView, sortedItemList, this::showChatLog);
-
         statusChoiceBox.getSelectionModel().selectedItemProperty().addListener(observable -> renewFilter());
         playerNameFilterTextField.textProperty().addListener(observable -> renewFilter());
-
         reportTableView.getSelectionModel()
                 .selectedItemProperty()
                 .addListener((observable, oldValue, newValue) -> {
                     try {
                         reportedPlayersOfCurrentlySelectedReport.setAll(newValue.getReportedUsers());
                         currentlySelectedItemNotNull = newValue;
-
                         CopyReportID.setId(newValue.getId());
                         CopyReportID.setText("Report ID: " + newValue.getId());
                         CopyGameID.setId(newValue.getGame().getId());
@@ -195,7 +367,6 @@ public class ModerationReportController implements Controller<Region> {
                             showChatLog(newValue);
                             log.debug("[LoadChatLog] log automatically loaded");
                         }
-
                         for (PlayerFX item : reportedPlayersOfCurrentlySelectedReport) {
                             log.debug("Selected report id - offenders: " + item.getRepresentation());
                             CopyReportedUserID.setId(item.getRepresentation());
@@ -206,7 +377,6 @@ public class ModerationReportController implements Controller<Region> {
                     } catch (Exception ErrorSelectedReport) {
                         log.debug("Exception for selected report: ");
                         log.debug(String.valueOf(ErrorSelectedReport));
-
                         chatLogTextArea.setText("Game ID is invalid or missing.");
                         CopyChatLog.setText("Chat does not exist");
                         CopyChatLog.setId("");
@@ -238,6 +408,12 @@ public class ModerationReportController implements Controller<Region> {
         counterAlreadyTakenFromMod = 0;
     }
 
+    private void initRepeatedOffenders() {
+        RepeatedOffenders.setText("test");
+        ObservableList<ModerationReportFX> allReports = reportTableView.getItems();
+
+    }
+
     private void addBan(PlayerFX accountFX) {
         BanInfoController banInfoController = uiService.loadFxml("ui/banInfo.fxml");
         BanInfoFX ban = new BanInfoFX();
@@ -251,12 +427,7 @@ public class ModerationReportController implements Controller<Region> {
         banInfoDialog.showAndWait();
     }
 
-    int counterAwaitingTotalReports = 0;
-    int counterAwaitingTotalRuReports = 0;
-    int counterAlreadyTakenFromMod = 0;
-
     private void renewFilter() {
-        //TODO GlobalConstants refactor with private static ?
         resetCounters();
         filteredItemList.setPredicate(moderationReportFx -> {
             String playerFilter = playerNameFilterTextField.getText().toLowerCase();
@@ -311,12 +482,16 @@ public class ModerationReportController implements Controller<Region> {
                 "\nTotal RU awaiting: " + (counterAwaitingTotalRuReports) +
                 "\nTotal non RU awaiting: " + (counterAwaitingTotalReports - counterAwaitingTotalRuReports));
             GlobalConstants.AwaitingReportsTotalTextArea = AwaitingReportsTotalTextArea.getText();
+
             return moderationReportFx.getReportStatus() == moderationReportStatus;
         });
     }
 
     public void onRefreshAllReports() {
         resetCounters();
+        onStatisticsModeratorButton();
+        onRepeatedOffendersButton();
+        log.debug("reset counters?");
         moderationReportService.getAllReports().thenAccept(reportFxes -> Platform.runLater(() -> itemList.setAll(reportFxes))).exceptionally(throwable -> {
             log.error("error loading reports", throwable);
             return null;

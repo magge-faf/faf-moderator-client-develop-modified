@@ -13,6 +13,8 @@
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.control.CheckBox?>
 
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.cell.PropertyValueFactory?>
 <SplitPane fx:id="root" dividerPositions="0.5" orientation="VERTICAL" xmlns="http://javafx.com/javafx/11.0.1"
            xmlns:fx="http://javafx.com/fxml/1"
            fx:controller="com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController">
@@ -22,10 +24,10 @@
             <TextField fx:id="playerNameFilterTextField" promptText="Enter player name to search"/>
             <Button fx:id="editReportButton" mnemonicParsing="false" minWidth="93" onAction="#onEdit" text="Edit"/>
             <Button mnemonicParsing="false" onAction="#onRefreshAllReports" minWidth="93" text="Refresh"/>
-            <CheckBox fx:id="hideReportsRU" selected="false" mnemonicParsing="false"
+            <CheckBox fx:id="hideReportsRU" mnemonicParsing="false"
                       text="Ignore RU">
             </CheckBox>
-            <CheckBox fx:id="hideAlreadyTakenReportsCheckbox" selected="false" mnemonicParsing="false"
+            <CheckBox fx:id="hideAlreadyTakenReportsCheckbox" mnemonicParsing="false"
                       text="Hide taken reports">
             </CheckBox>
             <CheckBox fx:id="FilterLogCheckBox" selected="true" mnemonicParsing="false"
@@ -58,12 +60,35 @@
                    HBox.hgrow="ALWAYS"/>
     </HBox>
     <TabPane prefHeight="200.0" prefWidth="200.0" tabClosingPolicy="UNAVAILABLE">
-        <Tab text="Chat Log">
+        <Tab text="Chat log">
             <TextArea fx:id="chatLogTextArea" editable="false" prefHeight="200.0" prefWidth="200.0"/>
         </Tab>
-        <Tab text="Reported Accounts">
+        <Tab text="Reported accounts">
             <TableView fx:id="reportedPlayerView" maxHeight="1.7976931348623157E308"
                        maxWidth="1.7976931348623157E308"/>
+        </Tab>
+        <Tab text="Most reported accounts">
+            <VBox>
+                <TableView fx:id="tableView">
+                    <columns>
+                        <TableColumn text="Player" minWidth="150">
+                            <cellValueFactory>
+                                <PropertyValueFactory property="player"/>
+                            </cellValueFactory>
+                        </TableColumn>
+                        <TableColumn text="Offense count" minWidth="150">
+                            <cellValueFactory>
+                                <PropertyValueFactory property="offenseCount"/>
+                            </cellValueFactory>
+                        </TableColumn>
+                    </columns>
+                </TableView>
+            </VBox>
+        </Tab>
+        <Tab text="Moderator statistics">
+            <VBox>
+                <TextArea fx:id="moderatorStatisticsTextArea" editable="false"/>
+            </VBox>
         </Tab>
     </TabPane>
 </SplitPane>
