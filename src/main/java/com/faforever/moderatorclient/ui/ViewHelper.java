@@ -1944,13 +1944,14 @@ public class ViewHelper {
         idColumn.setCellValueFactory(o -> o.getValue().idProperty());
         idColumn.setComparator(Comparator.comparingInt(Integer::parseInt));
         tableView.getColumns().add(idColumn);
-        //idColumn.setMinWidth(10);
+        idColumn.setSortType(TableColumn.SortType.DESCENDING);
+        idColumn.setMinWidth(10);
         extractors.put(idColumn, ModerationReportFX::getId);
 
         TableColumn<ModerationReportFX, ModerationReportStatus> statusColumn = new TableColumn<>("Status");
         statusColumn.setCellValueFactory(param -> param.getValue().reportStatusProperty());
         tableView.getColumns().add(statusColumn);
-        //statusColumn.setMinWidth(10);
+        statusColumn.setMinWidth(10);
         statusColumn.setCellFactory(new Callback<TableColumn<ModerationReportFX, ModerationReportStatus>, TableCell<ModerationReportFX, ModerationReportStatus>>() {
             @Override
             public TableCell<ModerationReportFX, ModerationReportStatus> call(TableColumn<ModerationReportFX, ModerationReportStatus> param) {
@@ -2004,7 +2005,7 @@ public class ViewHelper {
         tableView.getColumns().add(reportedUsersColumn);
 
         TableColumn<ModerationReportFX, String> reportDescriptionColumn = new TableColumn<>("Description");
-        reportDescriptionColumn.setMinWidth(600);
+        reportDescriptionColumn.setPrefWidth(360);
         reportDescriptionColumn.setCellValueFactory(param -> param.getValue().reportDescriptionProperty());
         reportDescriptionColumn.setCellFactory(column -> {
             TableCell<ModerationReportFX, String> cell = new TableCell<>();
@@ -2058,16 +2059,34 @@ public class ViewHelper {
         }
 
         TableColumn<ModerationReportFX, String> privateNoteColumn = new TableColumn<>("Private Notice");
-        privateNoteColumn.setMinWidth(60);
+        privateNoteColumn.setMinWidth(180);
         privateNoteColumn.setCellValueFactory(param -> param.getValue().moderatorPrivateNoteProperty());
         tableView.getColumns().add(privateNoteColumn);
         extractors.put(privateNoteColumn, ModerationReportFX::getModeratorPrivateNote);
+
+        privateNoteColumn.setCellFactory(column -> {
+            TableCell<ModerationReportFX, String> cell = new TableCell<>();
+            Text text = new Text();
+            cell.setGraphic(text);
+            text.wrappingWidthProperty().bind(privateNoteColumn.widthProperty().subtract(5));
+            text.textProperty().bind(cell.itemProperty());
+            return cell;
+        });
 
         TableColumn<ModerationReportFX, String> moderatorPrivateNoticeColumn = new TableColumn<>("Public Note");
         moderatorPrivateNoticeColumn.setMinWidth(180);
         moderatorPrivateNoticeColumn.setCellValueFactory(param -> param.getValue().moderatorNoticeProperty());
         tableView.getColumns().add(moderatorPrivateNoticeColumn);
         extractors.put(moderatorPrivateNoticeColumn, ModerationReportFX::getModeratorNotice);
+
+        moderatorPrivateNoticeColumn.setCellFactory(column -> {
+            TableCell<ModerationReportFX, String> cell = new TableCell<>();
+            Text text = new Text();
+            cell.setGraphic(text);
+            text.wrappingWidthProperty().bind(moderatorPrivateNoticeColumn.widthProperty().subtract(5));
+            text.textProperty().bind(cell.itemProperty());
+            return cell;
+        });
 
         TableColumn<ModerationReportFX, String> lastModeratorColumn = new TableColumn<>("Last Moderator");
         lastModeratorColumn.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
