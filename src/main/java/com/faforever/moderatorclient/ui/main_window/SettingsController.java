@@ -14,6 +14,7 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Properties;
 
 @Component
 @Slf4j
@@ -41,45 +42,28 @@ public class SettingsController implements Controller<Region> {
     public MenuItem optionRecentActivityTab;
     public javafx.scene.control.Menu defaultStartingTabMenuBar;
 
-    private static final String USER_CHOICE_FILENAME = "userChoiceDefaultTab.txt";
-
-    public void handleOptionUserManagementTabClicked() {
+    private void setDefaultTab(String tabName) {
+        Properties config = new Properties();
         try {
-            File file = new File(USER_CHOICE_FILENAME);
-            FileWriter fileWriter = new FileWriter(file);
-            fileWriter.write("userManagementTab");
-            fileWriter.flush();
-            fileWriter.close();
-            defaultStartingTabMenuBar.setText("current default is userManagementTab");
+            config.load(new FileInputStream("config.properties"));
+            config.setProperty("user.choice.tab", tabName);
+            config.store(new FileOutputStream("config.properties"), null);
+            defaultStartingTabMenuBar.setText("current default is " + tabName);
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public void handleOptionUserManagementTabClicked() {
+        setDefaultTab("userManagementTab");
     }
 
     public void handleOptionReportTabClicked() {
-        try {
-            File file = new File(USER_CHOICE_FILENAME);
-            FileWriter fileWriter = new FileWriter(file);
-            fileWriter.write("reportTab");
-            fileWriter.flush();
-            fileWriter.close();
-            defaultStartingTabMenuBar.setText("current default is reportTab");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        setDefaultTab("reportTab");
     }
 
     public void handleOptionRecentActivityTabClicked() {
-        try {
-            File file = new File(USER_CHOICE_FILENAME);
-            FileWriter fileWriter = new FileWriter(file);
-            fileWriter.write("recentActivityTab");
-            fileWriter.flush();
-            fileWriter.close();
-            defaultStartingTabMenuBar.setText("current default is recentActivityTab");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        setDefaultTab("recentActivityTab");
     }
 
     @Override

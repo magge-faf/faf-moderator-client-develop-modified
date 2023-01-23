@@ -31,10 +31,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.*;
 import java.text.MessageFormat;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 
 @Component
 @Slf4j
@@ -76,35 +73,21 @@ public class MainController implements Controller<TabPane> {
 
     private final FafApiCommunicationService communicationService;
 
+
+
     @Override
     public TabPane getRoot() {
-        String userChoiceDefaultTab = "";
-        try {
-            File file = new File("userChoiceDefaultTab.txt");
-            if (!file.exists()) {
-                boolean isFileCreated = file.createNewFile();
-                if (isFileCreated) {
-                    log.debug("File created successfully");
-                } else {
-                    log.debug("File already exists or an error occurred");
-                }
-                FileWriter fileWriter = new FileWriter(file);
-                fileWriter.write("userManagementTab");
-                fileWriter.flush();
-                fileWriter.close();
+        Properties config = new Properties();
+        try (InputStream input = new FileInputStream("config.properties")) {
+            config.load(input);
+            String userChoiceDefaultTab = config.getProperty("user.choice.tab");
+            switch (userChoiceDefaultTab) {
+                case "userManagementTab" -> root.getSelectionModel().select(userManagementTab);
+                case "reportTab" -> root.getSelectionModel().select(reportTab);
+                case "recentActivityTab" -> root.getSelectionModel().select(recentActivityTab);
             }
-            FileReader fileReader = new FileReader(file);
-            BufferedReader bufferedReader = new BufferedReader(fileReader);
-            userChoiceDefaultTab = bufferedReader.readLine();
-            bufferedReader.close();
         } catch (IOException e) {
             e.printStackTrace();
-        }
-
-        switch (userChoiceDefaultTab) {
-            case "userManagementTab" -> root.getSelectionModel().select(userManagementTab);
-            case "reportTab" -> root.getSelectionModel().select(reportTab);
-            case "recentActivityTab" -> root.getSelectionModel().select(recentActivityTab);
         }
         return root;
     }
