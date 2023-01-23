@@ -271,23 +271,23 @@ public class UserManagementController implements Controller<SplitPane> {
         log.debug("[info] config saved");
     }
     private void initializeSearchProperties() {
+        searchUserPropertyMapping.put("User ID", "id");
         searchUserPropertyMapping.put("Name", "login");
-        searchUserPropertyMapping.put("Id", "id");
-        searchUserPropertyMapping.put("Email", "email");
-        searchUserPropertyMapping.put("Steam Id", "accountLinks.serviceId");
-        searchUserPropertyMapping.put("Gog Id", "accountLinks.serviceId");
-        searchUserPropertyMapping.put("Ip Address", "recentIpAddress");
         searchUserPropertyMapping.put("Previous Name", "names.name");
-        searchUserPropertyMapping.put("UID Hash", "uniqueIds.hash");
-        searchUserPropertyMapping.put("Device Id", "uniqueIds.deviceId");
-        searchUserPropertyMapping.put("CPU Name", "uniqueIds.name");
+        searchUserPropertyMapping.put("Email", "email");
+        searchUserPropertyMapping.put("IP Address", "recentIpAddress");
         searchUserPropertyMapping.put("UUID", "uniqueIds.uuid");
-        searchUserPropertyMapping.put("Serial Number", "uniqueIds.serialNumber");
-        searchUserPropertyMapping.put("Processor Id", "uniqueIds.processorId");
-        searchUserPropertyMapping.put("Bios Version", "uniqueIds.SMBIOSBIOSVersion");
+        searchUserPropertyMapping.put("Hash", "uniqueIds.hash");
         searchUserPropertyMapping.put("Volume Serial Number", "uniqueIds.volumeSerialNumber");
         searchUserPropertyMapping.put("Memory Serial Number", "uniqueIds.memorySerialNumber");
+        searchUserPropertyMapping.put("Serial Number", "uniqueIds.serialNumber");
+        searchUserPropertyMapping.put("Device ID", "uniqueIds.deviceId");
+        searchUserPropertyMapping.put("CPU Name", "uniqueIds.name");
+        searchUserPropertyMapping.put("Processor ID", "uniqueIds.processorId");
+        searchUserPropertyMapping.put("Bios Version", "uniqueIds.SMBIOSBIOSVersion");
         searchUserPropertyMapping.put("Manufacturer", "uniqueIds.manufacturer");
+        searchUserPropertyMapping.put("Steam ID", "accountLinks.serviceId");
+        searchUserPropertyMapping.put("GOG ID", "accountLinks.serviceId");
 
         searchUserProperties.getItems().addAll(searchUserPropertyMapping.keySet());
         searchUserProperties.getSelectionModel().select(0);
@@ -504,7 +504,6 @@ public class UserManagementController implements Controller<SplitPane> {
         }
         return excludedItems;
     }
-//TODO deduplicate the output
     private void processUsers(String attributeName, String attributeValue, int threshold, StringBuilder logOutput, ArrayList<Object> foundSmurfs) {
         //logOutput.append("\n\n<START processing users attribute values------------------------->\n");
         List<String> excludedItems = loadExcludedItems();
@@ -564,20 +563,19 @@ public class UserManagementController implements Controller<SplitPane> {
         users.clear();
         userSearchTableView.getSortOrder().clear();
 
-        String propertyId = searchUserPropertyMapping.get("Id");
+        String propertyId = searchUserPropertyMapping.get("User ID");
         String propertyUUID = searchUserPropertyMapping.get("UUID");
-        String propertyHash= searchUserPropertyMapping.get("UID Hash");
-        String propertyIP = searchUserPropertyMapping.get("Ip Address");
+        String propertyHash= searchUserPropertyMapping.get("Hash");
+        String propertyIP = searchUserPropertyMapping.get("IP Address");
         String propertyMemorySerialNumber = searchUserPropertyMapping.get("Memory Serial Number");
         String propertyVolumeSerialNumber = searchUserPropertyMapping.get("Volume Serial Number");
         String propertySerialNumber = searchUserPropertyMapping.get("Serial Number");
-        String propertyProcessorId = searchUserPropertyMapping.get("Processor Id");
-        String propertyCPUName = searchUserPropertyMapping.get("CPU Name");
+        String propertyProcessorId = searchUserPropertyMapping.get("Processor ID");
+        String propertyCPUName = searchUserPropertyMapping.get("CPU Name"); // TODO
         String propertyBiosVersion = searchUserPropertyMapping.get("Bios Version");
         String propertyManufacturer = searchUserPropertyMapping.get("Manufacturer");
 
         List<PlayerFX> userFound = userService.findUsersByAttribute(propertyId, playerID);
-        //TODO save buttons includeProcessorNameCheckBox
         List<String> uuids = new ArrayList<>();
         List<String> hashes = new ArrayList<>();
         List<String> ips = new ArrayList<>();
@@ -586,17 +584,17 @@ public class UserManagementController implements Controller<SplitPane> {
         List<String> serialNumbers = new ArrayList<>();
         List<String> processorIds = new ArrayList<>(); // Not relatable, unless spoof is obvious
         List<String> CPUNames = new ArrayList<>();  // Not relatable, unless spoof is obvious
-        List<String> biosVersions = new ArrayList<>();  // Does not work
+        List<String> biosVersions = new ArrayList<>();  // Not available
         List<String> manufacturers = new ArrayList<>(); // Not relatable, unless spoof is obvious
         // TODO refactor to hash
         userFound.forEach(user->{
             user.getUniqueIds().forEach(item -> {
                 if (includeProcessorNameCheckBox.isSelected())
-                {   // Sometimes an account has same hardware items several times
+                {
                     if (!CPUNames.contains(item.getUuid())) {CPUNames.add(item.getUuid());}
                 }
                 if (includeUUIDCheckBox.isSelected())
-                {   // Sometimes an account has same hardware items several times
+                {
                     if (!uuids.contains(item.getUuid())) {uuids.add(item.getUuid());}
                 }
                 if (includeUIDHashCheckBox.isSelected())
@@ -628,7 +626,7 @@ public class UserManagementController implements Controller<SplitPane> {
                 {
                     if (!processorIds.contains(item.getProcessorId())) {processorIds.add(item.getProcessorId());}
                 }
-                //if (!biosVersions.contains(item.getSMBIOSBIOSVersion())) { TODO server gives 400 bugged or wrong search term?
+                //if (!biosVersions.contains(item.getSMBIOSBIOSVersion())) {
                 //    biosVersions.add(item.getSMBIOSBIOSVersion());
                 //}
                 if (includeManufacturerCheckBox.isSelected())
