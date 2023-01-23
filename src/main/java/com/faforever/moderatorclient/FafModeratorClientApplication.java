@@ -55,12 +55,17 @@ public class FafModeratorClientApplication extends Application {
         scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/style/main.css")).toExternalForm());
         primaryStage.setScene(scene);
         primaryStage.show();
+        primaryStage.setOnCloseRequest(e -> {
+            e.consume();
+            log.info("Close request received, exiting");
+            Platform.exit();
+            System.exit(0);
+        });
         startTimerThread(primaryStage);
     }
 
     private void waitSecond() {
         try {
-            // Sleep cycle has a slight delay by ~5ms for executing code. Not important to have it that accurate
             Thread.sleep(1000);
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -68,9 +73,11 @@ public class FafModeratorClientApplication extends Application {
     }
 
     private void startTimerThread(Stage primaryStage) {
+
         long startTime = System.currentTimeMillis();
         Thread timerThread = new Thread(() -> {
             while (true) {
+
                 long elapsedTime = (System.currentTimeMillis() - startTime) / 1000;
                 long minutes = TimeUnit.SECONDS.toMinutes(elapsedTime) % 60;
                 long seconds = TimeUnit.SECONDS.toSeconds(elapsedTime) % 60;
