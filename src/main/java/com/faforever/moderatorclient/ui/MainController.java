@@ -73,21 +73,22 @@ public class MainController implements Controller<TabPane> {
 
     private final FafApiCommunicationService communicationService;
 
-
-
     @Override
     public TabPane getRoot() {
         Properties config = new Properties();
+        root.getSelectionModel().select(userManagementTab); // Set a default tab
         try (InputStream input = new FileInputStream("config.properties")) {
             config.load(input);
             String userChoiceDefaultTab = config.getProperty("user.choice.tab");
-            switch (userChoiceDefaultTab) {
-                case "userManagementTab" -> root.getSelectionModel().select(userManagementTab);
-                case "reportTab" -> root.getSelectionModel().select(reportTab);
-                case "recentActivityTab" -> root.getSelectionModel().select(recentActivityTab);
+            if(userChoiceDefaultTab != null){
+                switch (userChoiceDefaultTab) {
+                    case "userManagementTab" -> root.getSelectionModel().select(userManagementTab);
+                    case "reportTab" -> root.getSelectionModel().select(reportTab);
+                    case "recentActivityTab" -> root.getSelectionModel().select(recentActivityTab);
+                }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            log.error(String.valueOf(e));
         }
         return root;
     }
