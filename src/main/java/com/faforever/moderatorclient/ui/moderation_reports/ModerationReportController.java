@@ -49,13 +49,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.text.MessageFormat.format;
-
+//TODO which mod has banned most
 @Component
 @Slf4j
 @RequiredArgsConstructor
@@ -154,13 +153,7 @@ public class ModerationReportController implements Controller<Region> {
         setSysClipboardText(content);
     }
 
-    public void onRepeatedOffendersButton() {
-        CompletableFuture<List<ModerationReportFX>> allReports = moderationReportService.getAllReports();
-
-        allReports.thenAccept(this::acceptRepeatedOffenders);
-    }
-
-    private void acceptRepeatedOffenders(List<ModerationReportFX> reports) {
+    private void showInTableRepeatedOffenders(List<ModerationReportFX> reports) {
         Map<String, Long> offendersAwaitingReports = reports.stream()
                 .filter(report -> report.getReportStatus().equals(ModerationReportStatus.AWAITING))
                 .flatMap(report -> report.getReportedUsers().stream())
@@ -184,12 +177,7 @@ public class ModerationReportController implements Controller<Region> {
         });
     }
 
-    public void onStatisticsModeratorButton() {
-        CompletableFuture<List<ModerationReportFX>> allReports = moderationReportService.getAllReports();
-        allReports.thenAccept(this::acceptStatisticsModerator);
-    }
-
-    private void acceptStatisticsModerator(List<ModerationReportFX> reports) {
+    private void processStatisticsModerator(List<ModerationReportFX> reports) {
         int awaitingReports = (int) reports.stream()
                 .map(ModerationReportFX::getReportStatus)
                 .filter(status -> status.equals(ModerationReportStatus.AWAITING))
@@ -373,10 +361,11 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     public void onRefreshAllReports() {
-        //TODO refactor to take initial list instead requesting as well
-        onStatisticsModeratorButton();
-        onRepeatedOffendersButton();
-        moderationReportService.getAllReports().thenAccept(reportFxes -> Platform.runLater(() -> itemList.setAll(reportFxes))).exceptionally(throwable -> {
+        moderationReportService.getAllReports().thenAccept(reportFxes -> {
+            Platform.runLater(() -> itemList.setAll(reportFxes));
+            processStatisticsModerator(reportFxes);
+            showInTableRepeatedOffenders(reportFxes);
+        }).exceptionally(throwable -> {
             log.error("error loading reports", throwable);
             return null;
         });
