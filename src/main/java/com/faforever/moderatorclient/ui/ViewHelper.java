@@ -533,7 +533,6 @@ public class ViewHelper {
         };
     }
 
-
     public static void loadForceRenameDialog(UiService uiService, PlayerFX playerFX) {
         ForceRenameController forceRenameController = uiService.loadFxml("ui/forceRename.fxml");
         forceRenameController.setPlayer(playerFX);
@@ -705,7 +704,7 @@ public class ViewHelper {
         tableView.getColumns().add(manufacturerColumn);
         extractors.put(manufacturerColumn, playerFX -> playerFX.getUniqueIds().stream().map(UniqueIdFx::getManufacturer).collect(Collectors.toList()));
 
-        TableColumn<PlayerFX, String> cpuNameColumn = new TableColumn<>("Cpu Name");
+        TableColumn<PlayerFX, String> cpuNameColumn = new TableColumn<>("CPU Name");
         cpuNameColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
                         o.getValue().getUniqueIds().stream().map(UniqueIdFx::getName)
                                 .collect(Collectors.joining("\n")),
@@ -1940,13 +1939,14 @@ public class ViewHelper {
         tableView.setEditable(true);
         HashMap<TableColumn<ModerationReportFX, ?>, Function<ModerationReportFX, ?>> extractors = new HashMap<>();
 
-        TableColumn<ModerationReportFX, String> idColumn = new TableColumn<>("ID");
+        TableColumn<ModerationReportFX, String> idColumn = new TableColumn<>("Report ID");
         idColumn.setCellValueFactory(o -> o.getValue().idProperty());
         idColumn.setComparator(Comparator.comparingInt(Integer::parseInt));
+        idColumn.setSortable(true);
         tableView.getColumns().add(idColumn);
+        tableView.getSortOrder().add(idColumn);
         idColumn.setSortType(TableColumn.SortType.DESCENDING);
-        idColumn.setMinWidth(10);
-        extractors.put(idColumn, ModerationReportFX::getId);
+        tableView.sort();
 
         TableColumn<ModerationReportFX, ModerationReportStatus> statusColumn = new TableColumn<>("Status");
         statusColumn.setCellValueFactory(param -> param.getValue().reportStatusProperty());
@@ -1991,7 +1991,7 @@ public class ViewHelper {
         TableColumn<ModerationReportFX, PlayerFX> reporterColumn = new TableColumn<>("Reporter");
         reporterColumn.setCellFactory(tableColumn -> ViewHelper.playerFXCellFactory(tableColumn, PlayerFX::getLogin));
         reporterColumn.setCellValueFactory(param -> new SimpleObjectProperty<>(param.getValue().getReporter()));
-        //reporterColumn.setMinWidth(80);
+        reporterColumn.setMinWidth(10);
         tableView.getColumns().add(reporterColumn);
         extractors.put(reporterColumn, reportFx -> reportFx.getReporter().getRepresentation());
 
@@ -2001,7 +2001,7 @@ public class ViewHelper {
                         .collect(Collectors.joining("\n"))
                 )
         );
-        //reportedUsersColumn.setMinWidth(80);
+        reportedUsersColumn.setMinWidth(10);
         tableView.getColumns().add(reportedUsersColumn);
 
         TableColumn<ModerationReportFX, String> reportDescriptionColumn = new TableColumn<>("Description");
@@ -2108,7 +2108,6 @@ public class ViewHelper {
 
         applyCopyContextMenus(tableView, extractors);
     }
-
 
     public static void buildQuestionTable(TableView<VotingQuestionFX> tableView, VotingService votingService, Logger log, Runnable refresh) {
         tableView.setEditable(true);
