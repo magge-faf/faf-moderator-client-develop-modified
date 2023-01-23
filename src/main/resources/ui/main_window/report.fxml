@@ -19,7 +19,7 @@
            xmlns:fx="http://javafx.com/fxml/1"
            fx:controller="com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController">
     <HBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" VBox.vgrow="ALWAYS">
-        <VBox minWidth="185" maxWidth="186" maxHeight="75" spacing="1.0">
+        <VBox spacing="1.0">
             <ChoiceBox fx:id="statusChoiceBox" minWidth="93"/>
             <TextField fx:id="playerNameFilterTextField" promptText="Enter player name to search"/>
             <Button fx:id="editReportButton" mnemonicParsing="false" minWidth="93" onAction="#onEdit" text="Edit"/>
@@ -55,7 +55,7 @@
         <TableView fx:id="reportTableView" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
                    HBox.hgrow="ALWAYS"/>
     </HBox>
-    <TabPane prefHeight="200.0" prefWidth="200.0" tabClosingPolicy="UNAVAILABLE">
+    <TabPane tabClosingPolicy="UNAVAILABLE">
         <Tab text="Chat log">
             <TextArea fx:id="chatLogTextArea" editable="false" prefHeight="200.0" prefWidth="200.0"/>
         </Tab>
@@ -82,9 +82,7 @@
             </VBox>
         </Tab>
         <Tab text="Moderator statistics">
-            <VBox VBox.vgrow="ALWAYS">
-                <TextArea fx:id="moderatorStatisticsTextArea" editable="false" HBox.hgrow="ALWAYS"/>
-            </VBox>
+            <TextArea fx:id="moderatorStatisticsTextArea" editable="false"/>
         </Tab>
     </TabPane>
 </SplitPane>
