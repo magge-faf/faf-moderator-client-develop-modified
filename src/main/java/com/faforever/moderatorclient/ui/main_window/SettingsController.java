@@ -39,7 +39,7 @@ public class SettingsController implements Controller<Region> {
     public MenuItem optionUserManagementTab;
     public MenuItem optionReportTab;
     public MenuItem optionRecentActivityTab;
-    public javafx.scene.control.Menu menuBarText;
+    public javafx.scene.control.Menu defaultStartingTabMenuBar;
 
     private static final String USER_CHOICE_FILENAME = "userChoiceDefaultTab.txt";
 
@@ -50,7 +50,7 @@ public class SettingsController implements Controller<Region> {
             fileWriter.write("userManagementTab");
             fileWriter.flush();
             fileWriter.close();
-            menuBarText.setText("current default is userManagementTab");
+            defaultStartingTabMenuBar.setText("current default is userManagementTab");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -63,7 +63,7 @@ public class SettingsController implements Controller<Region> {
             fileWriter.write("reportTab");
             fileWriter.flush();
             fileWriter.close();
-            menuBarText.setText("current default is reportTab");
+            defaultStartingTabMenuBar.setText("current default is reportTab");
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -76,7 +76,7 @@ public class SettingsController implements Controller<Region> {
             fileWriter.write("recentActivityTab");
             fileWriter.flush();
             fileWriter.close();
-            menuBarText.setText("current default is recentActivityTab");
+            defaultStartingTabMenuBar.setText("current default is recentActivityTab");
         } catch (IOException e) {
             e.printStackTrace();
         }

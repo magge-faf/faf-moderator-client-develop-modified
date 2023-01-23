@@ -32,7 +32,7 @@
     <Text textAlignment="CENTER"  text="Available variables: %report_id% %game_id% %offender% "/>
     <Separator minHeight="10" />
     <MenuBar xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml">
-        <Menu fx:id="menuBarText" text="Choose default starting tab:">
+        <Menu fx:id="defaultStartingTabMenuBar" text="Choose default starting tab:">
             <MenuItem fx:id="optionUserManagementTab" text="userManagementTab" onAction="#handleOptionUserManagementTabClicked"/>
             <MenuItem fx:id="optionReportTab" text="reportTab" onAction="#handleOptionReportTabClicked"/>
             <MenuItem fx:id="optionRecentActivityTab" text="recentActivityTab" onAction="#handleOptionRecentActivityTabClicked"/>
