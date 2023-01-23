@@ -508,7 +508,7 @@ public class UserManagementController implements Controller<SplitPane> {
         //logOutput.append("\n\n<START processing users attribute values------------------------->\n");
         List<String> excludedItems = loadExcludedItems();
         if (excludedItems.contains(attributeValue) && excludeItemsCheckBox.isSelected()) {
-            logOutput.append("\n[info] The " + attributeName + " [" + attributeValue + "] is an excluded item, skipping.");
+            logOutput.append("\n[info] The ").append(attributeName).append(" [").append(attributeValue).append("] is an excluded item, skipping.");
         } else {
             List<PlayerFX> users = userService.findUsersByAttribute(attributeName, attributeValue);
             attributeName = attributeName.replaceAll("uniqueIds.", "");
@@ -516,7 +516,7 @@ public class UserManagementController implements Controller<SplitPane> {
                 logOutput.append(String.format("\n[info] Too many users found with %s [%s]. It might not be relatable. Threshold is %d and found were %d users", attributeName, attributeValue, threshold, users.size()));
             }
             else {
-                logOutput.append("\n\n[info] Users for " + attributeName + " with same value [" + attributeValue + "]\n");
+                logOutput.append("\n\n[info] Users for ").append(attributeName).append(" with same value [").append(attributeValue).append("]\n");
                 users.forEach(user -> {
                     String statusBanned = "<-- NOT banned"; if (user.isBannedGlobally()) {statusBanned = "<-- Banned";}
                     String name = user.getRepresentation();
@@ -546,7 +546,7 @@ public class UserManagementController implements Controller<SplitPane> {
             BufferedWriter bw = new BufferedWriter(new FileWriter(fileName));
             bw.append(logOutput.toString());
             bw.close();
-            log.debug("[info] Output was saved in " + fileName);
+            log.debug("[info] Output was added in " + fileName);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -571,99 +571,65 @@ public class UserManagementController implements Controller<SplitPane> {
         String propertyVolumeSerialNumber = searchUserPropertyMapping.get("Volume Serial Number");
         String propertySerialNumber = searchUserPropertyMapping.get("Serial Number");
         String propertyProcessorId = searchUserPropertyMapping.get("Processor ID");
-        String propertyCPUName = searchUserPropertyMapping.get("CPU Name"); // TODO
+        String propertyCPUName = searchUserPropertyMapping.get("CPU Name");
         String propertyBiosVersion = searchUserPropertyMapping.get("Bios Version");
         String propertyManufacturer = searchUserPropertyMapping.get("Manufacturer");
 
-        List<PlayerFX> userFound = userService.findUsersByAttribute(propertyId, playerID);
-        List<String> uuids = new ArrayList<>();
-        List<String> hashes = new ArrayList<>();
-        List<String> ips = new ArrayList<>();
-        List<String> memorySerialNumbers = new ArrayList<>();
-        List<String> volumeSerialNumbers = new ArrayList<>();
-        List<String> serialNumbers = new ArrayList<>();
-        List<String> processorIds = new ArrayList<>(); // Not relatable, unless spoof is obvious
-        List<String> CPUNames = new ArrayList<>();  // Not relatable, unless spoof is obvious
-        List<String> biosVersions = new ArrayList<>();  // Not available
-        List<String> manufacturers = new ArrayList<>(); // Not relatable, unless spoof is obvious
-        // TODO refactor to hash
-        userFound.forEach(user->{
-            user.getUniqueIds().forEach(item -> {
-                if (includeProcessorNameCheckBox.isSelected())
-                {
-                    if (!CPUNames.contains(item.getUuid())) {CPUNames.add(item.getUuid());}
-                }
-                if (includeUUIDCheckBox.isSelected())
-                {
-                    if (!uuids.contains(item.getUuid())) {uuids.add(item.getUuid());}
-                }
-                if (includeUIDHashCheckBox.isSelected())
-                {
-                    if (!hashes.contains(item.getHash())) {hashes.add(item.getHash());}
-                }
+        Set<PlayerFX> userFound = new HashSet<>(userService.findUsersByAttribute(propertyId, playerID));
+        Set<String> uuids = new HashSet<>();
+        Set<String> hashes = new HashSet<>();
+        Set<String> ips = new HashSet<>();
+        Set<String> memorySerialNumbers = new HashSet<>();
+        Set<String> volumeSerialNumbers = new HashSet<>();
+        Set<String> serialNumbers = new HashSet<>();
+        Set<String> processorIds = new HashSet<>();
+        Set<String> cpuNames = new HashSet<>();
+        Set<String> biosVersions = new HashSet<>();
+        Set<String> manufacturers = new HashSet<>();
 
-                if (includeIPCheckBox.isSelected())
-                {
-                    if (!ips.contains(user.getRecentIpAddress())) {ips.add(user.getRecentIpAddress());}
-                }
-
-                if (includeMemorySerialNumberCheckBox.isSelected())
-                {
-                    if (!memorySerialNumbers.contains(item.getMemorySerialNumber())) {memorySerialNumbers.add(item.getMemorySerialNumber());}
-                }
-
-                if (includeVolumeSerialNumberCheckBox.isSelected())
-                {
-                    if (!volumeSerialNumbers.contains(item.getVolumeSerialNumber())) {volumeSerialNumbers.add(item.getVolumeSerialNumber());}
-                }
-
-                if (includeSerialNumberCheckBox.isSelected())
-                {
-                    if (!serialNumbers.contains(item.getSerialNumber())) {serialNumbers.add(item.getSerialNumber());}
-
-                }
-                if (includeProcessorIdCheckBox.isSelected())
-                {
-                    if (!processorIds.contains(item.getProcessorId())) {processorIds.add(item.getProcessorId());}
-                }
-                //if (!biosVersions.contains(item.getSMBIOSBIOSVersion())) {
-                //    biosVersions.add(item.getSMBIOSBIOSVersion());
-                //}
-                if (includeManufacturerCheckBox.isSelected())
-                {
-                    if (!manufacturers.contains(item.getManufacturer())) {manufacturers.add(item.getManufacturer());
-                }
-
-                }
-            });
-        });
+        userFound.forEach(user-> user.getUniqueIds().forEach(item -> {
+            if (includeProcessorNameCheckBox.isSelected()){
+                cpuNames.add(item.getUuid());}
+            if (includeUUIDCheckBox.isSelected()){
+                uuids.add(item.getUuid());}
+            if (includeUIDHashCheckBox.isSelected()){
+                hashes.add(item.getHash());}
+            if (includeIPCheckBox.isSelected()){
+                ips.add(user.getRecentIpAddress());}
+            if (includeMemorySerialNumberCheckBox.isSelected()){
+                memorySerialNumbers.add(item.getMemorySerialNumber());}
+            if (includeVolumeSerialNumberCheckBox.isSelected()){
+                volumeSerialNumbers.add(item.getVolumeSerialNumber());}
+            if (includeSerialNumberCheckBox.isSelected()){
+                serialNumbers.add(item.getSerialNumber());}
+            if (includeProcessorIdCheckBox.isSelected()){
+                processorIds.add(item.getProcessorId());}
+            //biosVersions.add(item.getSMBIOSBIOSVersion());
+            //if (includeManufacturerCheckBox.isSelected())
+            if (includeManufacturerCheckBox.isSelected()){
+                manufacturers.add(item.getManufacturer());}
+        }));
 
         int maxUniqueUsersThreshold = Integer.parseInt(maxUniqueUsersThresholdTextField.getText());
 
-        //TODO steam/GOG checker?
-        //TODO IP VPN checker?
-        //TODO pattern search for similiar emails?
-
         ArrayList<Object> foundSmurfs = new ArrayList<>();
 
-        uuids.stream().forEach(uuid -> processUsers(propertyUUID, uuid, maxUniqueUsersThreshold, logOutput, foundSmurfs));
-        hashes.stream().forEach(hash -> processUsers(propertyHash, hash, maxUniqueUsersThreshold, logOutput, foundSmurfs));
-        ips.stream().forEach(ip -> processUsers(propertyIP, ip, maxUniqueUsersThreshold, logOutput, foundSmurfs));
-        memorySerialNumbers.stream().forEach(memorySerialNumber -> processUsers(propertyMemorySerialNumber, memorySerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs));
-        volumeSerialNumbers.stream().forEach(volumeSerialNumber -> processUsers(propertyVolumeSerialNumber, volumeSerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs));
-        serialNumbers.stream().forEach(serialNumber -> processUsers(propertySerialNumber, serialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs));
-        processorIds.stream().forEach(processorId -> processUsers(propertyProcessorId, processorId, maxUniqueUsersThreshold, logOutput, foundSmurfs));
+        uuids.forEach(uuid -> processUsers(propertyUUID, uuid, maxUniqueUsersThreshold, logOutput, foundSmurfs));
+        hashes.forEach(hash -> processUsers(propertyHash, hash, maxUniqueUsersThreshold, logOutput, foundSmurfs));
+        ips.forEach(ip -> processUsers(propertyIP, ip, maxUniqueUsersThreshold, logOutput, foundSmurfs));
+        memorySerialNumbers.forEach(memorySerialNumber -> processUsers(propertyMemorySerialNumber, memorySerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs));
+        volumeSerialNumbers.forEach(volumeSerialNumber -> processUsers(propertyVolumeSerialNumber, volumeSerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs));
+        serialNumbers.forEach(serialNumber -> processUsers(propertySerialNumber, serialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs));
+        processorIds.forEach(processorId -> processUsers(propertyProcessorId, processorId, maxUniqueUsersThreshold, logOutput, foundSmurfs));
         //biosVersions.stream().forEach(biosVersion -> processUsers(propertyBiosVersion, biosVersion, searchPattern, maxUniqueUsersThreshold, logOutput));
-        manufacturers.stream().forEach(manufacturer -> processUsers(propertyManufacturer, manufacturer, maxUniqueUsersThreshold, logOutput, foundSmurfs));
+        manufacturers.forEach(manufacturer -> processUsers(propertyManufacturer, manufacturer, maxUniqueUsersThreshold, logOutput, foundSmurfs));
+        cpuNames.forEach(cpu -> processUsers(propertyCPUName, cpu, maxUniqueUsersThreshold, logOutput, foundSmurfs));
 
         if (foundSmurfs.size() >= 1) {
-            logOutput.append("\n[info] " + playerID + " is related through unique items to --> " + foundSmurfs);
+            logOutput.append("\n[info] ").append(playerID).append(" is related through unique items to --> ").append(foundSmurfs);
         }
         depthCounter+=1;
-        StringBuilder plusSigns = new StringBuilder();
-        for (int i = 0; i < depthCounter; i++) {
-            plusSigns.append("+");
-        }
+        String plusSigns = "+".repeat(Math.max(0, depthCounter));
         int depthThreshold = Integer.parseInt(depthScanningInputTextField.getText());
         if (depthCounter >= depthThreshold){
             log.debug("[info] Depth limit reached: " + depthCounter + "/"+ depthThreshold);
@@ -671,15 +637,16 @@ public class UserManagementController implements Controller<SplitPane> {
             writeSmurfVillageLookup2File(logOutput);
             return;
         }
-        logOutput.append("\n" + "=".repeat(50) + "\n");
-        logOutput.append("[info] Current depth " + depthCounter + "/" + depthThreshold + " " + plusSigns + "\n");
-        logOutput.append("[info] Examining playerID: " + playerID + "\n");
+        logOutput.append("\n").append("=".repeat(50)).append("\n");
+        logOutput.append("[info] Current depth ").append(depthCounter).append("/").append(depthThreshold).append(" ").append(plusSigns).append("\n");
+        logOutput.append("[info] Examining playerID: ").append(playerID).append("\n");
         foundSmurfs.forEach(s -> onSmurfVillageLookup((String) s));
-        logOutput.append("[info] No further information found for " + playerID + "\n");
+        logOutput.append("[info] No further information found for ").append(playerID).append("\n");
 
         searchSmurfVillageTabTextField.setText(logOutput.toString());
         writeSmurfVillageLookup2File(logOutput);
     }
+
     public void onLookup() {
         depthCounter = 0;
         logOutput = new StringBuilder();
