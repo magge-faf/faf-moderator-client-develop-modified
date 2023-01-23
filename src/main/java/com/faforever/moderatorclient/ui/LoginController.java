@@ -17,7 +17,11 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
 import org.springframework.context.event.EventListener;
+import org.springframework.security.oauth2.common.OAuth2AccessToken;
 import org.springframework.stereotype.Component;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -30,6 +34,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
 
 @Component
 @Slf4j
@@ -44,6 +49,8 @@ public class LoginController implements Controller<Pane> {
     private final FafApiCommunicationService fafApiCommunicationService;
     private final FafUserCommunicationService fafUserCommunicationService;
     private final TokenService tokenService;
+    private OAuth2AccessToken tokenCache;
+
 
     public VBox root;
     public ComboBox<String> environmentComboBox;
@@ -57,8 +64,6 @@ public class LoginController implements Controller<Pane> {
         return root;
     }
 
-    boolean successfulLogin = false;
-
     @FXML
     public void initialize() throws IOException {
         applicationProperties.getEnvironments().forEach((key, environmentProperties) ->
@@ -66,27 +71,21 @@ public class LoginController implements Controller<Pane> {
         );
         reloadLogin();
         environmentComboBox.getSelectionModel().select(0);
-
         loginWebView.getEngine().getLoadWorker().runningProperty().addListener((observable, oldValue, newValue) -> {
             if (!newValue) {
-                List<String> accountCredentials;
-                String nameOrEmail = "";
-                String password = "";
-
-                File f = new File("account_credentials.txt");
-                if (f.exists() && !f.isDirectory()) {
-                    try (Stream<String> lines = Files.lines(Paths.get("account_credentials.txt"))) {
-                        accountCredentials = lines.collect(Collectors.toList());
-                        if (!accountCredentials.get(0).equals("")) {
-                            nameOrEmail = accountCredentials.get(0);
-                            password = accountCredentials.get(1);
-                        }
-                    } catch (Exception error) {
-                        log.debug(String.valueOf(error));
+                String nameOrEmail = null;
+                String password = null;
+                try {
+                    List<String> accountCredentials = Files.readAllLines(Paths.get("account_credentials.txt"));
+                    if (!accountCredentials.get(0).isEmpty()) {
+                        nameOrEmail = accountCredentials.get(0);
+                        password = accountCredentials.get(1);
                     }
+                } catch (IOException e) {
+                    log.debug(String.valueOf(e));
                 }
 
-                if (!nameOrEmail.equals("")) {
+                if (nameOrEmail != null) {
                     try {
                         if (loginWebView.getEngine().executeScript("javascript:document.getElementById('form-header');") != null) {
                             loginWebView.getEngine().executeScript(String.format("javascript:document.getElementsByName('usernameOrEmail')[0].value = '%s'", nameOrEmail));
@@ -101,10 +100,13 @@ public class LoginController implements Controller<Pane> {
                 }
 
                 try {
-                    if (loginWebView.getEngine().executeScript("javascript:document.getElementById('denial-form');") != null && !successfulLogin) {
-                        loginWebView.getEngine().executeScript("javascript:document.querySelector('input[type=\"submit\"][value=\"Authorize\"]').click()");
-                        log.debug("[autologin] Authorize button was automatically clicked.");
-                        successfulLogin = true;
+                    if (tokenCache == null || tokenCache.isExpired()) {
+                        Document doc = loginWebView.getEngine().getDocument();
+                        Element element = doc.getElementById("denial-form");
+                        if (element != null) {
+                            loginWebView.getEngine().executeScript("javascript:document.querySelector('input[type=\"submit\"][value=\"Authorize\"]').click()");
+                            log.debug("[autologin] Authorize button was automatically clicked.");
+                        }
                     }
                 } catch (Exception error) {
                     log.debug(String.valueOf(error));
@@ -164,6 +166,7 @@ public class LoginController implements Controller<Pane> {
     }
 
     public void reloadLogin() {
+        log.debug("reloadLogin");
         resetPageFuture = new CompletableFuture<>();
         resetPageFuture.thenAccept(aVoid -> Platform.runLater(this::loadLoginPage));
 
