@@ -22,7 +22,7 @@
            fx:controller="com.faforever.moderatorclient.ui.main_window.UserManagementController">
     <HBox HBox.hgrow="ALWAYS">
         <VBox minWidth="220.0">
-            <ComboBox fx:id="searchUserProperties" promptText="Search by"/>
+            <ComboBox fx:id="searchUserProperties" promptText="Search by" visibleRowCount="42"/>
             <TextField fx:id="userSearchTextField" onAction="#onUserSearch">
             </TextField>
             <Button mnemonicParsing="false" onAction="#onUserSearch" text="Search" alignment="CENTER">
@@ -172,7 +172,7 @@
                           disable="true"/>
                 <Separator/>
                 <CheckBox fx:id="includeUUIDCheckBox" text="Include UUID"/>
-                <CheckBox fx:id="includeUIDHashCheckBox" text="Include UID Hash"/>
+                <CheckBox fx:id="includeUIDHashCheckBox" text="Include Hash"/>
                 <CheckBox fx:id="includeIPCheckBox" text="Include IP"/>
                 <CheckBox fx:id="includeMemorySerialNumberCheckBox" text="Include Memory Serial Number"/>
                 <CheckBox fx:id="includeVolumeSerialNumberCheckBox" text="Include Volume Serial Number"/>
