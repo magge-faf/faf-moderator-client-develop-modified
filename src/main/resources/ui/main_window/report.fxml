@@ -64,25 +64,59 @@
                        maxWidth="1.7976931348623157E308"/>
         </Tab>
         <Tab text="Most reported accounts">
+            <TableView fx:id="tableViewMostReportedAccounts">
+                <columns>
+                    <TableColumn text="Player" minWidth="150">
+                        <cellValueFactory>
+                            <PropertyValueFactory property="player"/>
+                        </cellValueFactory>
+                    </TableColumn>
+                    <TableColumn text="Offense count" minWidth="150">
+                        <cellValueFactory>
+                            <PropertyValueFactory property="offenseCount"/>
+                        </cellValueFactory>
+                    </TableColumn>
+                </columns>
+            </TableView>
+        </Tab>
+        <Tab text="Moderator statistics">
             <VBox>
-                <TableView fx:id="tableViewMostReportedAccounts">
+            <TextArea fx:id="moderatorStatisticsTextArea" editable="false"/>
+                <TableView fx:id="tableViewModeratorStatistics">
                     <columns>
-                        <TableColumn text="Player" minWidth="150">
+                        <TableColumn text="Moderator" minWidth="150">
                             <cellValueFactory>
-                                <PropertyValueFactory property="player"/>
+                                <PropertyValueFactory property="moderator"/>
                             </cellValueFactory>
                         </TableColumn>
-                        <TableColumn text="Offense count" minWidth="150">
+                        <TableColumn text="All reports" minWidth="150">
                             <cellValueFactory>
-                                <PropertyValueFactory property="offenseCount"/>
+                                <PropertyValueFactory property="allReports"/>
+                            </cellValueFactory>
+                        </TableColumn>
+                        <TableColumn text="Completed reports" minWidth="150">
+                            <cellValueFactory>
+                                <PropertyValueFactory property="completedReports"/>
+                            </cellValueFactory>
+                        </TableColumn>
+                        <TableColumn text="Discarded reports" minWidth="150">
+                            <cellValueFactory>
+                                <PropertyValueFactory property="discardedReports"/>
+                            </cellValueFactory>
+                        </TableColumn>
+                        <TableColumn text="Processing reports" minWidth="150">
+                            <cellValueFactory>
+                                <PropertyValueFactory property="processingReports"/>
+                            </cellValueFactory>
+                        </TableColumn>
+                        <TableColumn text="Last activity" minWidth="150">
+                            <cellValueFactory>
+                                <PropertyValueFactory property="lastActivity"/>
                             </cellValueFactory>
                         </TableColumn>
                     </columns>
                 </TableView>
             </VBox>
-        </Tab>
-        <Tab text="Moderator statistics">
-            <TextArea fx:id="moderatorStatisticsTextArea" editable="false"/>
         </Tab>
     </TabPane>
 </SplitPane>
