@@ -76,12 +76,19 @@
                             <PropertyValueFactory property="offenseCount"/>
                         </cellValueFactory>
                     </TableColumn>
+                    <TableColumn text="Contains RU" minWidth="100">
+                        <cellValueFactory>
+                            <PropertyValueFactory property="ContainsRU"/>
+                        </cellValueFactory>
+                    </TableColumn>
                 </columns>
             </TableView>
         </Tab>
         <Tab text="Moderator statistics">
             <VBox>
-                <TextArea fx:id="moderatorStatisticsTextArea" editable="false" prefHeight="100" maxHeight="100" minHeight="100"/>                <TableView fx:id="tableViewModeratorStatistics">
+                <TextArea fx:id="moderatorStatisticsTextArea" editable="false" prefHeight="30" maxHeight="30" minHeight="30"/>
+                <TableView fx:id="tableViewModeratorStatistics" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
+                           HBox.hgrow="ALWAYS">
                     <columns>
                         <TableColumn text="Moderator" minWidth="200">
                             <cellValueFactory>

@@ -56,7 +56,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.text.MessageFormat.format;
-//TODO which mod has banned most
 @Component
 @Slf4j
 @RequiredArgsConstructor
@@ -166,8 +165,19 @@ public class ModerationReportController implements Controller<Region> {
                 .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
 
-        List<Offender> offenders = sortedOffendersAwaitingReports.entrySet().stream().map(entry -> new Offender(entry.getKey(), entry.getValue())).collect(Collectors.toList());
-        tableViewMostReportedAccounts.setItems(FXCollections.observableArrayList(offenders));
+        List<Offender> offenders = sortedOffendersAwaitingReports.entrySet().stream().map(entry -> {
+            String offenderUsername = entry.getKey();
+            Long offenderReportCount = entry.getValue();
+            String containsRU = reports.stream()
+                    .filter(report -> report.getReportedUsers().stream()
+                            .anyMatch(user -> user.getRepresentation().equals(offenderUsername)))
+                    .anyMatch(report -> report.getReportDescription().matches(".*[Ѐ-ӿ]+.*")) ? "yes" : "no";
+            return new Offender(offenderUsername, offenderReportCount, containsRU);
+        }).collect(Collectors.toList());
+
+        Platform.runLater(() -> tableViewMostReportedAccounts.setItems(FXCollections.observableArrayList(offenders)));
+
+        // Make CTRL+C work
         tableViewMostReportedAccounts.setOnKeyPressed(event -> {
             if (event.isControlDown() && event.getCode() == KeyCode.C) {
                 Offender selectedOffender = (Offender) tableViewMostReportedAccounts.getSelectionModel().getSelectedItem();
@@ -257,11 +267,11 @@ public class ModerationReportController implements Controller<Region> {
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.append("All Reports: ").append(totalReports).append("\n");
-        sb.append("Completed: ").append(totalReportCounts.getOrDefault(ModerationReportStatus.COMPLETED, 0)).append("\n");
-        sb.append("Discarded: ").append(totalReportCounts.getOrDefault(ModerationReportStatus.DISCARDED, 0)).append("\n");
-        sb.append("Awaiting: ").append(totalReportCounts.getOrDefault(ModerationReportStatus.AWAITING, 0)).append("\n");
-        sb.append("Processing: ").append(totalReportCounts.getOrDefault(ModerationReportStatus.PROCESSING, 0)).append("\n\n");
+        sb.append("All Reports: ").append(totalReports).append(" | ");
+        sb.append("Completed: ").append(totalReportCounts.getOrDefault(ModerationReportStatus.COMPLETED, 0)).append(" | ");
+        sb.append("Discarded: ").append(totalReportCounts.getOrDefault(ModerationReportStatus.DISCARDED, 0)).append(" | ");
+        sb.append("Awaiting: ").append(totalReportCounts.getOrDefault(ModerationReportStatus.AWAITING, 0)).append(" | ");
+        sb.append("Processing: ").append(totalReportCounts.getOrDefault(ModerationReportStatus.PROCESSING, 0));
 
         Set<String> uniqueModerators = new HashSet<>();
         for (ModerationReportFX report : reports) {
@@ -320,10 +330,15 @@ public class ModerationReportController implements Controller<Region> {
     public static class Offender {
         private final StringProperty player;
         private final LongProperty offenseCount;
+        private final StringProperty containsRU;
 
-        public Offender(String player, long offenseCount) {
+        public Offender(String player, long offenseCount, String containsRU) {
             this.player = new SimpleStringProperty(player);
             this.offenseCount = new SimpleLongProperty(offenseCount);
+            this.containsRU = new SimpleStringProperty(containsRU);
+        }
+        public String isContainsRU() {
+            return containsRU.getValue();
         }
 
         public String getPlayer() {
@@ -340,6 +355,10 @@ public class ModerationReportController implements Controller<Region> {
 
         public LongProperty offenseCountProperty() {
             return offenseCount;
+        }
+
+        public void setContainsRU(String containsRU) {
+            this.containsRU.set(containsRU);
         }
     }
 
