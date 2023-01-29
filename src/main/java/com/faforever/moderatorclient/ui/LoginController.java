@@ -22,7 +22,6 @@ import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -32,8 +31,6 @@ import java.nio.file.Paths;
 import java.text.MessageFormat;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 
 @Component
@@ -108,6 +105,9 @@ public class LoginController implements Controller<Pane> {
                             log.debug("[autologin] Authorize button was automatically clicked.");
                         }
                     }
+                }
+                 catch (NullPointerException nullPointerException) {
+                    log.debug("Catch: " + nullPointerException);
                 } catch (Exception error) {
                     log.debug(String.valueOf(error));
                 }
