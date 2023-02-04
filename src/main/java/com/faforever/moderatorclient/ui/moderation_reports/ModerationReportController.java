@@ -177,7 +177,6 @@ public class ModerationReportController implements Controller<Region> {
 
         Platform.runLater(() -> tableViewMostReportedAccounts.setItems(FXCollections.observableArrayList(offenders)));
 
-        // Make CTRL+C work
         tableViewMostReportedAccounts.setOnKeyPressed(event -> {
             if (event.isControlDown() && event.getCode() == KeyCode.C) {
                 Offender selectedOffender = (Offender) tableViewMostReportedAccounts.getSelectionModel().getSelectedItem();
@@ -536,7 +535,9 @@ public class ModerationReportController implements Controller<Region> {
             while((chatLine = bufReader.readLine()) != null) {
                 Matcher matcher = pattern.matcher(chatLine);
                 boolean matchFound = matcher.find();
-                if(!matchFound && FilterLogCheckBox.isSelected()) {
+                if(matchFound && FilterLogCheckBox.isSelected()) {
+                    chatLogFiltered.append("");
+                } else {
                     chatLogFiltered.append(chatLine).append("\n");
                 }
             }
