@@ -53,6 +53,8 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -271,8 +273,9 @@ public class UserManagementController implements Controller<SplitPane> {
         log.debug("[info] config saved");
     }
     private void initializeSearchProperties() {
-        searchUserPropertyMapping.put("User ID", "id");
+        searchUserPropertyMapping.put("All in one", "allInOne");
         searchUserPropertyMapping.put("Name", "login");
+        searchUserPropertyMapping.put("User ID", "id");
         searchUserPropertyMapping.put("Previous Name", "names.name");
         searchUserPropertyMapping.put("Email", "email");
         searchUserPropertyMapping.put("IP Address", "recentIpAddress");
@@ -341,16 +344,102 @@ public class UserManagementController implements Controller<SplitPane> {
         newBanButton.setDisable(newValue == null);
     }
 
+    //TODO feat *
     public void onUserSearch() {
         users.clear();
         userSearchTableView.getSortOrder().clear();
 
-        String property = searchUserPropertyMapping.get(searchUserProperties.getValue());
+        String searchParameter = searchUserPropertyMapping.get(searchUserProperties.getValue());
         String searchPattern = userSearchTextField.getText();
-        List<PlayerFX> usersFound = userService.findUsersByAttribute(property, searchPattern);
+        log.debug("searchParameter: " + searchParameter);
+        log.debug("searchPattern: " + searchPattern);
+
+        if (Objects.equals(searchParameter, "allInOne")) {
+            searchParameter = determineSearchParameter(searchPattern);
+            if (searchParameter.equals("unknown")){
+                log.debug("Unknown searchParameter");
+            }
+        }
+        if(Objects.equals(searchParameter, "login")) {
+            if (searchPattern.contains("[id ") && searchPattern.contains("]")) {
+                int startIndex = searchPattern.indexOf("[id ") + 4;
+                int endIndex = searchPattern.indexOf("]", startIndex);
+                String number = searchPattern.substring(startIndex, endIndex);
+                int userID = Integer.parseInt(number);
+                searchPattern = String.valueOf(userID);
+            }
+        }
+        log.debug("searchParameter: " + searchParameter);
+        log.debug("searchPattern: " + searchPattern);
+
+        List<PlayerFX> usersFound = userService.findUsersByAttribute(searchParameter, searchPattern);
         users.addAll(usersFound);
 
         SearchHistoryTextField.setText(userSearchTextField.getText() + "\n" + SearchHistoryTextField.getText());
+    }
+
+    private String determineSearchParameter(String searchPattern) {
+
+        if (isUUID(searchPattern)) {
+            return "uniqueIds.uuid";
+        }
+        if (isValidIp(searchPattern)) {
+            return "recentIpAddress";
+        }
+        if (isEmail(searchPattern)) {
+            return "email";
+        }
+        if (isHash(searchPattern)) {
+            return "uniqueIds.hash";
+        }
+        if (Character.isDigit(searchPattern.charAt(0))) {
+            return "id";
+        }
+        if (isLoginName(searchPattern)) {
+            return "login";
+        }
+        if (isLoginAndName(searchPattern)) {
+            return "login";
+        }
+        return "unknown";
+    }
+
+    private boolean isEmail(String searchPattern) {
+        Pattern pattern = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}$");
+        Matcher matcher = pattern.matcher(searchPattern);
+        return matcher.matches();
+    }
+
+    private boolean isHash(String searchPattern) {
+        return searchPattern.matches("^[a-fA-F0-9]+$") && searchPattern.length() == 32;
+    }
+
+    private boolean isLoginName(String searchPattern) {
+        return !Character.isDigit(searchPattern.charAt(0));
+    }
+
+    private boolean isLoginAndName(String searchPattern) {
+        return searchPattern.contains("[id ") && searchPattern.contains("]");
+    }
+
+    private boolean isUUID(String searchPattern) {
+        Pattern pattern = Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
+        Matcher matcher = pattern.matcher(searchPattern);
+        return matcher.matches();
+    }
+
+    private boolean isValidIp(String searchPattern) {
+        String[] octets = searchPattern.split("\\.");
+        if (octets.length != 4) {
+            return false;
+        }
+        for (String octet : octets) {
+            int value = Integer.parseInt(octet);
+            if (value < 0 || value > 255) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public void onNewBan() {
@@ -508,21 +597,20 @@ public class UserManagementController implements Controller<SplitPane> {
         //logOutput.append("\n\n<START processing users attribute values------------------------->\n");
         List<String> excludedItems = loadExcludedItems();
         if (excludedItems.contains(attributeValue) && excludeItemsCheckBox.isSelected()) {
-            logOutput.append("\n[info] The ").append(attributeName).append(" [").append(attributeValue).append("] is an excluded item, skipping.");
+            logOutput.append("\nThe ").append(attributeName).append(" [").append(attributeValue).append("] is an excluded item, skipping.\n");
         } else {
             List<PlayerFX> users = userService.findUsersByAttribute(attributeName, attributeValue);
             attributeName = attributeName.replaceAll("uniqueIds.", "");
             if (users.size() > threshold) {
-                logOutput.append(String.format("\n[info] Too many users found with %s [%s]. It might not be relatable. Threshold is %d and found were %d users", attributeName, attributeValue, threshold, users.size()));
+                logOutput.append(String.format("Too many users found with %s [%s]. It might not be relatable. Threshold is %d and found were %d users\n", attributeName, attributeValue, threshold, users.size()));
             }
             else {
-                logOutput.append("\n\n[info] Users for ").append(attributeName).append(" with same value [").append(attributeValue).append("]\n");
+                logOutput.append("\n\nUsers for ").append(attributeName).append(" with same value [").append(attributeValue).append("]\n");
                 users.forEach(user -> {
-                    String statusBanned = "<-- NOT banned"; if (user.isBannedGlobally()) {statusBanned = "<-- Banned";}
+                    String accountStatus = "active: "; if (user.isBannedGlobally()) {accountStatus = "banned: ";}
                     String name = user.getRepresentation();
-                    String status = statusBanned;
-                    String format = "[info] \t %-20s %-10s" + "\n";
-                    String output = String.format(format, name, status);
+                    String format = "\t %-20s %-10s" + "\n";
+                    String output = String.format(format, accountStatus, name );
                     logOutput.append(output);
                     if(user.getId() != null && !foundSmurfs.contains(user.getId())) {
                         foundSmurfs.add(user.getId());
@@ -534,9 +622,7 @@ public class UserManagementController implements Controller<SplitPane> {
         }
     }
 
-    public static final List<String> alreadyCheckedUsers = new ArrayList<>();
-
-    //File f = new File("account_credentials.txt");
+    public List<String> alreadyCheckedUsers = new ArrayList<>();
 
     public void writeSmurfVillageLookup2File(StringBuilder logOutput) {
         try {
@@ -546,19 +632,19 @@ public class UserManagementController implements Controller<SplitPane> {
             BufferedWriter bw = new BufferedWriter(new FileWriter(fileName));
             bw.append(logOutput.toString());
             bw.close();
-            log.debug("[info] Output was added in " + fileName);
+            log.debug("Output was added in " + fileName);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
     public void onSmurfVillageLookup(String playerID) {
-        log.debug("[info] Checking " + playerID);
+        log.debug("Checking " + playerID);
         if (alreadyCheckedUsers.contains(playerID)) {
-            log.debug("[info] skipping, we already have seen that account");
+            log.debug("Skipping, we already have seen that account");
             return;
         }
-        log.debug("[info] " + playerID + " added to alreadyCheckedUsers");
+        log.debug(playerID + " added to alreadyCheckedUsers");
         alreadyCheckedUsers.add(playerID);
         users.clear();
         userSearchTableView.getSortOrder().clear();
@@ -626,22 +712,22 @@ public class UserManagementController implements Controller<SplitPane> {
         cpuNames.forEach(cpu -> processUsers(propertyCPUName, cpu, maxUniqueUsersThreshold, logOutput, foundSmurfs));
 
         if (foundSmurfs.size() >= 1) {
-            logOutput.append("\n[info] ").append(playerID).append(" is related through unique items to --> ").append(foundSmurfs);
+            logOutput.append("\n").append(playerID).append(" is related through unique items to --> ").append(foundSmurfs);
         }
         depthCounter+=1;
         String plusSigns = "+".repeat(Math.max(0, depthCounter));
         int depthThreshold = Integer.parseInt(depthScanningInputTextField.getText());
         if (depthCounter >= depthThreshold){
-            log.debug("[info] Depth limit reached: " + depthCounter + "/"+ depthThreshold);
+            log.debug("Depth limit reached: " + depthCounter + "/"+ depthThreshold);
             searchSmurfVillageTabTextField.setText(logOutput.toString());
             writeSmurfVillageLookup2File(logOutput);
             return;
         }
         logOutput.append("\n").append("=".repeat(50)).append("\n");
-        logOutput.append("[info] Current depth ").append(depthCounter).append("/").append(depthThreshold).append(" ").append(plusSigns).append("\n");
-        logOutput.append("[info] Examining playerID: ").append(playerID).append("\n");
+        logOutput.append("Current depth ").append(depthCounter).append("/").append(depthThreshold).append(" ").append(plusSigns).append("\n");
+        logOutput.append("Examining playerID: ").append(playerID).append("\n");
         foundSmurfs.forEach(s -> onSmurfVillageLookup((String) s));
-        logOutput.append("[info] No further information found for ").append(playerID).append("\n");
+        logOutput.append("No further information found for ").append(playerID).append("\n");
 
         searchSmurfVillageTabTextField.setText(logOutput.toString());
         writeSmurfVillageLookup2File(logOutput);
@@ -651,6 +737,7 @@ public class UserManagementController implements Controller<SplitPane> {
         depthCounter = 0;
         logOutput = new StringBuilder();
         usersNotBanned = new StringBuilder();
+        alreadyCheckedUsers = new ArrayList<>();
         String lookupPlayerID = smurfVillageLookupTextField.getText();
         onSmurfVillageLookup(lookupPlayerID);
     }
