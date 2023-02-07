@@ -344,15 +344,14 @@ public class UserManagementController implements Controller<SplitPane> {
         newBanButton.setDisable(newValue == null);
     }
 
-    //TODO feat *
     public void onUserSearch() {
         users.clear();
         userSearchTableView.getSortOrder().clear();
 
         String searchParameter = searchUserPropertyMapping.get(searchUserProperties.getValue());
         String searchPattern = userSearchTextField.getText();
-        log.debug("searchParameter: " + searchParameter);
-        log.debug("searchPattern: " + searchPattern);
+        log.debug("beforeSearchParameter: " + searchParameter);
+        log.debug("beforeSearchPattern: " + searchPattern);
 
         if (Objects.equals(searchParameter, "allInOne")) {
             searchParameter = determineSearchParameter(searchPattern);
@@ -367,10 +366,11 @@ public class UserManagementController implements Controller<SplitPane> {
                 String number = searchPattern.substring(startIndex, endIndex);
                 int userID = Integer.parseInt(number);
                 searchPattern = String.valueOf(userID);
+                searchParameter = "id";
             }
         }
-        log.debug("searchParameter: " + searchParameter);
-        log.debug("searchPattern: " + searchPattern);
+        log.debug("afterSearchParameter: " + searchParameter);
+        log.debug("afterSearchPattern: " + searchPattern);
 
         List<PlayerFX> usersFound = userService.findUsersByAttribute(searchParameter, searchPattern);
         users.addAll(usersFound);
@@ -405,7 +405,7 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     private boolean isEmail(String searchPattern) {
-        Pattern pattern = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}$");
+        Pattern pattern = Pattern.compile("^.*@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}$");
         Matcher matcher = pattern.matcher(searchPattern);
         return matcher.matches();
     }
@@ -415,7 +415,7 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     private boolean isLoginName(String searchPattern) {
-        return !Character.isDigit(searchPattern.charAt(0));
+        return searchPattern.indexOf('@') == -1 && (!Character.isDigit(searchPattern.charAt(0)));
     }
 
     private boolean isLoginAndName(String searchPattern) {
@@ -429,17 +429,43 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     private boolean isValidIp(String searchPattern) {
-        String[] octets = searchPattern.split("\\.");
-        if (octets.length != 4) {
-            return false;
-        }
-        for (String octet : octets) {
-            int value = Integer.parseInt(octet);
-            if (value < 0 || value > 255) {
+        if (!searchPattern.contains("*")) {
+            String[] octets = searchPattern.split("\\.");
+            if (octets.length != 4) {
                 return false;
             }
+            for (String octet : octets) {
+                int value = Integer.parseInt(octet);
+                if (value < 0 || value > 255) {
+                    return false;
+                }
+            }
+            return true;
+        } else {
+            String[] parts = searchPattern.split("\\.");
+            if (parts.length < 2) {
+                return false;
+            }
+            boolean hasDot = false;
+            boolean hasNumber = false;
+            for (String part : parts) {
+                if (part.equals("*")) {
+                    hasDot = true;
+                } else {
+                    try {
+                        int number = Integer.parseInt(part);
+                        if (number >= 0 && number <= 255) {
+                            hasNumber = true;
+                        } else {
+                            return false;
+                        }
+                    } catch (NumberFormatException e) {
+                        return false;
+                    }
+                }
+            }
+            return hasDot && hasNumber;
         }
-        return true;
     }
 
     public void onNewBan() {
@@ -604,7 +630,7 @@ public class UserManagementController implements Controller<SplitPane> {
             if (users.size() > threshold) {
                 logOutput.append(String.format("Too many users found with %s [%s]. It might not be relatable. Threshold is %d and found were %d users\n", attributeName, attributeValue, threshold, users.size()));
             }
-            else {
+            if (!(users.size() == 1)) {
                 logOutput.append("\n\nUsers for ").append(attributeName).append(" with same value [").append(attributeValue).append("]\n");
                 users.forEach(user -> {
                     String accountStatus = "active: "; if (user.isBannedGlobally()) {accountStatus = "banned: ";}
