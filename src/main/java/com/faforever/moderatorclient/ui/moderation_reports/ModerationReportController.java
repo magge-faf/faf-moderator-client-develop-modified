@@ -375,7 +375,6 @@ public class ModerationReportController implements Controller<Region> {
                 // Do nothing if no account is selected in table
             }
         });
-        // report is selected
         statusChoiceBox.setItems(FXCollections.observableArrayList(ChooseableStatus.values()));
         statusChoiceBox.getSelectionModel().select(ChooseableStatus.AWAITING);
         editReportButton.disableProperty().bind(reportTableView.getSelectionModel().selectedItemProperty().isNull());
@@ -526,7 +525,7 @@ public class ModerationReportController implements Controller<Region> {
                 log.debug("The requested resource was not found on the server");
                 StartReplay.setText("Replay not available");
                 CopyChatLog.setText("Chat log not available");
-                chatLogTextArea.setText(header + format("Loading replay failed. The server is probably processing the replay file at the moment."));
+                chatLogTextArea.setText(header + format("Replay not available"));
             } else {
                 log.debug("The request was successful - parsing replay");
             ReplayDataParser replayDataParser = new ReplayDataParser(tempFilePath, objectMapper);
