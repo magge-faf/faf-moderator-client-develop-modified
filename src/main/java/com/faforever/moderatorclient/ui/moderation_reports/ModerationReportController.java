@@ -363,6 +363,18 @@ public class ModerationReportController implements Controller<Region> {
 
     @FXML
     public void initialize() {
+        tableViewMostReportedAccounts.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
+            try {
+                ModerationReportController.Offender selectedAccount = (ModerationReportController.Offender) newValue;
+                String selectedAccountString = String.valueOf(selectedAccount.getPlayer());
+                int startIndex = 0;
+                int endIndex = selectedAccountString.indexOf(" [id");
+                String accountName = selectedAccountString.substring(startIndex, endIndex);
+                playerNameFilterTextField.setText(accountName);
+            } catch (ClassCastException e) {
+                // Do nothing if no account is selected in table
+            }
+        });
         // report is selected
         statusChoiceBox.setItems(FXCollections.observableArrayList(ChooseableStatus.values()));
         statusChoiceBox.getSelectionModel().select(ChooseableStatus.AWAITING);
