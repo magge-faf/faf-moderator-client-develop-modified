@@ -81,6 +81,11 @@
                             <PropertyValueFactory property="ContainsRU"/>
                         </cellValueFactory>
                     </TableColumn>
+                    <TableColumn text="Last reported" minWidth="100">
+                        <cellValueFactory>
+                            <PropertyValueFactory property="lastReported"/>
+                        </cellValueFactory>
+                    </TableColumn>
                 </columns>
             </TableView>
         </Tab>

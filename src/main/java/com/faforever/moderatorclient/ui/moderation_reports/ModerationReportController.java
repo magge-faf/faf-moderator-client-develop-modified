@@ -172,7 +172,16 @@ public class ModerationReportController implements Controller<Region> {
                     .filter(report -> report.getReportedUsers().stream()
                             .anyMatch(user -> user.getRepresentation().equals(offenderUsername)))
                     .anyMatch(report -> report.getReportDescription().matches(".*[Ѐ-ӿ]+.*")) ? "yes" : "no";
-            return new Offender(offenderUsername, offenderReportCount, containsRU);
+
+            Optional<OffsetDateTime> maxCreateTime = reports.stream()
+                    .filter(report -> report.getReportedUsers().stream()
+                            .anyMatch(user -> user.getRepresentation().equals(offenderUsername)))
+                    .map(ModerationReportFX::getCreateTime)
+                    .max(Comparator.naturalOrder());
+            assert maxCreateTime.orElse(null) != null;
+            LocalDateTime lastReported = maxCreateTime.orElse(null).toLocalDateTime();
+
+            return new Offender(offenderUsername, offenderReportCount, containsRU, lastReported);
         }).collect(Collectors.toList());
 
         Platform.runLater(() -> tableViewMostReportedAccounts.setItems(FXCollections.observableArrayList(offenders)));
@@ -330,16 +339,25 @@ public class ModerationReportController implements Controller<Region> {
         private final StringProperty player;
         private final LongProperty offenseCount;
         private final StringProperty containsRU;
+        private LocalDateTime lastReported;
 
-        public Offender(String player, long offenseCount, String containsRU) {
+        public Offender(String player, long offenseCount, String containsRU, LocalDateTime lastReported ) {
             this.player = new SimpleStringProperty(player);
             this.offenseCount = new SimpleLongProperty(offenseCount);
             this.containsRU = new SimpleStringProperty(containsRU);
+            this.lastReported = lastReported;
+        }
+
+        public void lastReported(LocalDateTime lastReported) {
+            this.lastReported = lastReported;
         }
         public String isContainsRU() {
             return containsRU.getValue();
         }
 
+        public LocalDateTime getLastReported() {
+            return lastReported;
+        }
         public String getPlayer() {
             return player.get();
         }
@@ -359,6 +377,7 @@ public class ModerationReportController implements Controller<Region> {
         public void setContainsRU(String containsRU) {
             this.containsRU.set(containsRU);
         }
+
     }
 
     @FXML
