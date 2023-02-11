@@ -11,8 +11,8 @@
     <PasswordField fx:id="accountPasswordTextField" minWidth="300" promptText="Password"/>
     <Button fx:id="saveAccountButton" text="Save credentials" mnemonicParsing="false" onAction="#SaveAccountButton"/>
     <Separator prefHeight="10" />
-    <Text textAlignment="CENTER"  text="If credentials are wrong and you can not auto login anymore, change them in account_credentials.txt -> File is in project folder."/>
-    <TextField fx:id="pathAccountFile" text="restart to see path"/>
+    <Text textAlignment="CENTER"  text="Account credentials are saved in user.home"/>
+    <TextField fx:id="pathAccountFile"/>
     <Text>Open:</Text>
     <Button fx:id="BlacklistedHash" text="BlacklistedHash" mnemonicParsing="false" onAction="#BlacklistedHash" prefWidth="200"/>
     <Button fx:id="BlacklistedIP" text="BlacklistedIP" mnemonicParsing="false" onAction="#BlacklistedIP" prefWidth="200"/>
@@ -25,10 +25,13 @@
     <Text textAlignment="CENTER"  text="Check link for newest list of junk/malformed hardware IDs or use own list"/>
     <TextField fx:id="genericJunk" minWidth="300" text="https://faforever.zulipchat.com/#narrow/stream/203851-moderators/topic/modified.20mordor"/>
     <Separator prefHeight="10" />
-    <Button fx:id="templateCompletedButton" text="Open template for completed" mnemonicParsing="false" onAction="#TemplateCompletedButton" prefWidth="200"/>
-    <Button fx:id="templateDiscardedButton" text="Open template for discarded" mnemonicParsing="false" onAction="#TemplateDiscardedButton" prefWidth="200"/>
+    <Button fx:id="templateCompletedButton" text="Open template for completed report" mnemonicParsing="false" onAction="#TemplateCompletedButton" prefWidth="300"/>
+    <Button fx:id="templateDiscardedButton" text="Open template for discarded report" mnemonicParsing="false" onAction="#TemplateDiscardedButton" prefWidth="300"/>
     <Separator minHeight="10" />
-    <Button fx:id="templateReportButton" text="Open template for report" mnemonicParsing="false" onAction="#TemplateReportButton" prefWidth="200"/>
+    <Button fx:id="templateButtonTemporaryBanButton" text="Open template for temporary ban message" mnemonicParsing="false" onAction="#onTemplateButtonTemporaryBanButton" prefWidth="300"/>
+    <Button fx:id="templateButtonPermanentBanButton" text="Open template for permanent ban message" mnemonicParsing="false" onAction="#onTemplateButtonPermanentBanButton" prefWidth="300"/>
+    <Separator minHeight="10" />
+    <Button fx:id="templateReportButton" text="Open template for forum thread" mnemonicParsing="false" onAction="#TemplateReportButton" prefWidth="200"/>
     <Text textAlignment="CENTER"  text="Available variables: %report_id% %game_id% %offender% "/>
     <Separator minHeight="10" />
     <MenuBar xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml">
@@ -38,4 +41,9 @@
             <MenuItem fx:id="optionRecentActivityTab" text="recentActivityTab" onAction="#handleOptionRecentActivityTabClicked"/>
         </Menu>
     </MenuBar>
+    <Separator minHeight="10" />
+    <Text textAlignment="CENTER"  text="Options for ReportsTab"/>
+    <CheckBox fx:id="autoDiscard" text="auto discard report if click on blueprint button"/>
+    <CheckBox fx:id="autoComplete" text="auto complete report if click on blueprint button"/>
+    <Button fx:id="saveButton" text="SaveCheckboxes" onAction="#handleSaveButtonForCheckBox"/>
 </VBox>
