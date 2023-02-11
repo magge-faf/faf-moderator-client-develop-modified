@@ -1,6 +1,7 @@
 package com.faforever.moderatorclient.ui.main_window;
 
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.Region;
@@ -41,6 +42,11 @@ public class SettingsController implements Controller<Region> {
     public MenuItem optionReportTab;
     public MenuItem optionRecentActivityTab;
     public javafx.scene.control.Menu defaultStartingTabMenuBar;
+    public CheckBox autoDiscard;
+    public CheckBox autoComplete;
+    public Button templateButtonTemporaryBanButton;
+    public Button templateButtonPermanentBanButton;
+    public Button saveButton;
 
     private void setDefaultTab(String tabName) {
         Properties config = new Properties();
@@ -90,10 +96,14 @@ public class SettingsController implements Controller<Region> {
             }
         }
 
-        File f = new File("account_credentials.txt");
+        String homeDirectory = System.getProperty("user.home");
+        pathAccountFile.setText(homeDirectory);
+        String filePath = homeDirectory + File.separator + "account_credentials_mordor.txt";
+        File f = new File(filePath);
+
         if (f.exists() && !f.isDirectory()) {
-            Path pathCredentialsFile = Path.of("account_credentials.txt");
-            pathAccountFile.setText(String.valueOf(pathCredentialsFile.toAbsolutePath()));
+            Path pathCredentialsFile = Path.of(filePath);
+
             try {
                 List<String> credentials = Files.readAllLines(pathCredentialsFile);
                 String nameOrEmail = credentials.get(0);
@@ -104,14 +114,27 @@ public class SettingsController implements Controller<Region> {
                 log.debug("Error reading account credentials: " + e.getMessage());
             }
         }
+
+        try {
+            Properties config = new Properties();
+            config.load(new FileInputStream("config.properties"));
+            autoDiscard.setSelected(Boolean.parseBoolean(config.getProperty("autoDiscard", "false")));
+            autoComplete.setSelected(Boolean.parseBoolean(config.getProperty("autoComplete", "false")));
+        } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
     }
 
-    public void saveAccount() {
+        public void saveAccount() {
         String accountNameOrEmail = accountNameOrEmailTextField.getText();
         String accountPassword = accountPasswordTextField.getText();
         String data = accountNameOrEmail + "\n" + accountPassword;
+
+        String homeDirectory = System.getProperty("user.home");
+        String filePath = homeDirectory + File.separator + "account_credentials_mordor.txt";
+
         try {
-            FileWriter fw = new FileWriter("account_credentials.txt", false);
+            FileWriter fw = new FileWriter(filePath, false);
             fw.write(data);
             fw.flush();
             fw.close();
@@ -129,6 +152,9 @@ public class SettingsController implements Controller<Region> {
         ProcessBuilder pb = new ProcessBuilder("Notepad.exe", fileName);
         pb.start();
     }
+
+    public void onTemplateButtonPermanentBanButton() throws IOException {openFile("templateButtonPermanentBan.txt");}
+    public void onTemplateButtonTemporaryBanButton() throws IOException {openFile("templateButtonTemporaryBan.txt");}
 
     public void BlacklistedHash() throws IOException {openFile("BlacklistedHash.txt");}
 
@@ -149,4 +175,16 @@ public class SettingsController implements Controller<Region> {
     public void TemplateDiscardedButton() throws IOException {openFile("TemplateDiscarded.txt");}
 
     public void TemplateReportButton() throws IOException {openFile("TemplateReport.txt");}
+
+    public void handleSaveButtonForCheckBox() {
+        Properties config = new Properties();
+        try {
+            config.load(new FileInputStream("config.properties"));
+            config.setProperty("autoDiscard", Boolean.toString(autoDiscard.isSelected()));
+            config.setProperty("autoComplete", Boolean.toString(autoComplete.isSelected()));
+            config.store(new FileOutputStream("config.properties"), null);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }

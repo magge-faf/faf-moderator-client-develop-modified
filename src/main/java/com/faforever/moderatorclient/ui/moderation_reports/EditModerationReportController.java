@@ -13,7 +13,10 @@ import javafx.stage.Stage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.Properties;
 import java.util.Scanner;
 
 @Component
@@ -69,18 +72,32 @@ public class EditModerationReportController implements Controller<Pane> {
 		stage.close();
 	}
 
-	public void pasteTemplate(String templateName, ModerationReportStatus status) throws FileNotFoundException {
+	public void pasteTemplate(String templateName, ModerationReportStatus status, boolean autoReport) throws FileNotFoundException {
 		String content = new Scanner(new File(templateName)).useDelimiter("\\Z").next();
 		publicNoteTextArea.setText(content);
 		statusChoiceBox.getSelectionModel().select(status);
+		if (autoReport) {
+			onSave();
+		}
 	}
 
-	public void pasteCompletedTemplate() throws FileNotFoundException {
-		pasteTemplate("TemplateCompleted.txt", ModerationReportStatus.COMPLETED);
+	public void onPasteCompletedTemplate() {
+		Properties config = new Properties();
+		try {
+			config.load(new FileInputStream("config.properties"));
+			pasteTemplate("TemplateCompleted.txt", ModerationReportStatus.COMPLETED, Boolean.parseBoolean(config.getProperty("autoComplete", "false")));
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
 	}
 
-	public void pasteDiscardedTemplate() throws FileNotFoundException {
-		pasteTemplate("TemplateDiscarded.txt", ModerationReportStatus.DISCARDED);
+	public void onPasteDiscardedTemplate() {
+		Properties config = new Properties();
+		try {
+			config.load(new FileInputStream("config.properties"));
+			pasteTemplate("TemplateDiscarded.txt", ModerationReportStatus.DISCARDED, Boolean.parseBoolean(config.getProperty("autoDiscard", "false")));
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
 	}
-
 }

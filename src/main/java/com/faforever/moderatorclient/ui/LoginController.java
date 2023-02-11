@@ -22,6 +22,7 @@ import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -73,7 +74,9 @@ public class LoginController implements Controller<Pane> {
                 String nameOrEmail = null;
                 String password = null;
                 try {
-                    List<String> accountCredentials = Files.readAllLines(Paths.get("account_credentials.txt"));
+                    String homeDirectory = System.getProperty("user.home");
+                    String filePath = homeDirectory + File.separator + "account_credentials_mordor.txt";
+                    List<String> accountCredentials = Files.readAllLines(Paths.get(filePath));
                     if (!accountCredentials.get(0).isEmpty()) {
                         nameOrEmail = accountCredentials.get(0);
                         password = accountCredentials.get(1);

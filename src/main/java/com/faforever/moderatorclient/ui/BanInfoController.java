@@ -9,7 +9,6 @@ import com.faforever.moderatorclient.ui.domain.BanInfoFX;
 import com.faforever.moderatorclient.ui.domain.ModerationReportFX;
 import com.faforever.moderatorclient.ui.domain.PlayerFX;
 import com.faforever.moderatorclient.mapstruct.PlayerMapper;
-import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
@@ -25,6 +24,9 @@ import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
 
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -332,13 +334,28 @@ public class BanInfoController implements Controller<Pane> {
         reportIdTextField.setDisable(true);
     }
 
-    public void templateButtonPermanentBan(ActionEvent actionEvent) {
-        banReasonTextField.setText("Your account has been locked for misuse of FAF's services.");
-        permanentBanRadioButton.setSelected(true);
+    private void loadBanReasonTemplate(String fileName, RadioButton radioButton) {
+        String filePath = fileName + ".txt";
+        File f = new File(filePath);
+        if (f.exists() && !f.isDirectory()) {
+            try {
+                String banReason = Files.readString(Paths.get(filePath));
+                banReasonTextField.setText(banReason);
+                radioButton.setSelected(true);
+                log.debug("Successfully loaded " + fileName + " file.");
+            } catch (Exception e) {
+                log.debug("Error reading " + fileName + " file: " + e.getMessage());
+            }
+        } else {
+            log.debug("File not found: " + filePath);
+        }
     }
 
-    public void templateButtonTemporaryBan(ActionEvent actionEvent) {
-        banReasonTextField.setText("Account 2 days suspended for unsportsmanlike conduct. Please respect the guidelines at www.faforever.com/rules");
-        forNoOfDaysBanRadioButton.setSelected(true);
+    public void templateButtonPermanentBan() {
+        loadBanReasonTemplate("templateButtonPermanentBan", permanentBanRadioButton);
+    }
+
+    public void templateButtonTemporaryBan() {
+        loadBanReasonTemplate("templateButtonTemporaryBan", forNoOfDaysBanRadioButton);
     }
 }
