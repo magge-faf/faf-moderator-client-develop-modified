@@ -33,7 +33,6 @@ import java.text.MessageFormat;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
-
 @Component
 @Slf4j
 @RequiredArgsConstructor
@@ -96,6 +95,11 @@ public class LoginController implements Controller<Pane> {
                         }
                     } catch (Exception error) {
                         log.debug(String.valueOf(error));
+                        try {
+                            Thread.sleep(3000);
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
                     }
                 }
 
