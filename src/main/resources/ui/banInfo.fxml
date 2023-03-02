@@ -159,9 +159,6 @@
                     <Button fx:id="revokeButton" mnemonicParsing="false" onAction="#onRevoke" text="revoke now"
                             GridPane.columnIndex="2" GridPane.rowIndex="2">
                     </Button>
-
-
-
                 </children>
             </GridPane>
             <GridPane.margin>
@@ -195,9 +192,5 @@
     </padding>
     <Button fx:id="templateButtonPermanentBan" mnemonicParsing="false" onAction="#templateButtonPermanentBan" text="templateButtonPermanentBan"
             GridPane.columnIndex="1" GridPane.rowIndex="8">
-    </Button>
-
-    <Button fx:id="templateButtonTemporaryBan" mnemonicParsing="false" onAction="#templateButtonTemporaryBan" text="templateButtonTemporaryBan"
-            GridPane.columnIndex="1" GridPane.rowIndex="9">
     </Button>
 </GridPane>
