@@ -45,7 +45,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
 
 import java.io.*;
-import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -56,6 +55,8 @@ import java.util.concurrent.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
 
 @Slf4j
 @Component
@@ -83,11 +84,11 @@ public class UserManagementController implements Controller<SplitPane> {
     private final ObservableList<GroupPermissionFX> groupPermissions = FXCollections.observableArrayList();
 
     private final Map<String, String> searchUserPropertyMapping = new LinkedHashMap<>();
-    public TextArea SearchHistoryTextField;
+    public TextArea SearchHistoryTextArea;
     public TextArea NotesTextArea;
     public TextField smurfVillageLookupTextField;
     public Tab searchSmurfVillageLookupTab;
-    public TextArea searchSmurfVillageTabTextField;
+    public TextArea searchSmurfVillageTabTextArea;
     public Tab settingsSmurfVillageLookupTab;
     public CheckBox includeUUIDCheckBox;
     public CheckBox includeUIDHashCheckBox;
@@ -154,13 +155,17 @@ public class UserManagementController implements Controller<SplitPane> {
         tab.setDisable(!communicationService.hasPermission(permissionTechnicalName));
     }
 
-
-
     @FXML
     public void initialize() {
-        saveSettingsButton.setOnAction(event -> saveSettings());
+        saveSettingsButton.setOnAction(event -> {
+            try {
+                saveSettings();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
         Properties props = new Properties();
-        try (InputStream in = new FileInputStream("config.properties")) {
+        try (InputStream in = new FileInputStream(CONFIGURATION_FOLDER + "/config.properties")) {
             props.load(in);
         } catch (IOException e) {
             e.printStackTrace();
@@ -242,7 +247,7 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     @FXML
-    private void saveSettings() {
+    private void saveSettings() throws IOException {
         Properties props = new Properties();
         props.setProperty("excludeItemsCheckBox", Boolean.toString(excludeItemsCheckBox.isSelected()));
         props.setProperty("includeProcessorNameCheckBox", Boolean.toString(includeProcessorNameCheckBox.isSelected()));
@@ -257,7 +262,7 @@ public class UserManagementController implements Controller<SplitPane> {
         props.setProperty("depthScanningInputTextField", depthScanningInputTextField.getText());
         props.setProperty("maxUniqueUsersThresholdTextField", maxUniqueUsersThresholdTextField.getText());
 
-        try (OutputStream out = new FileOutputStream("config.properties")) {
+        try (OutputStream out = new FileOutputStream(CONFIGURATION_FOLDER + "/config.properties")) {
             props.store(out, null);
         } catch (IOException e) {
             e.printStackTrace();
@@ -375,7 +380,7 @@ public class UserManagementController implements Controller<SplitPane> {
         List<PlayerFX> usersFound = userService.findUsersByAttribute(searchParameter, searchPattern);
         users.addAll(usersFound);
 
-        SearchHistoryTextField.setText(userSearchTextField.getText() + "\n" + SearchHistoryTextField.getText());
+        SearchHistoryTextArea.setText(userSearchTextField.getText() + "\n" + SearchHistoryTextArea.getText());
     }
 
     private String determineSearchParameter(String searchPattern) {
@@ -607,7 +612,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
     private List<String> loadExcludedItems() {
         List<String> excludedItems = new ArrayList<>();
-        File fileExcludedItems = new File("excludedItems" + ".txt");
+        File fileExcludedItems = new File(CONFIGURATION_FOLDER + "/excludedItems" + ".txt");
         try {
             Scanner s = new Scanner(fileExcludedItems);
             while (s.hasNextLine()) {
@@ -628,7 +633,7 @@ public class UserManagementController implements Controller<SplitPane> {
             List<PlayerFX> users = userService.findUsersByAttribute(attributeName, attributeValue);
             attributeName = attributeName.replaceAll("uniqueIds.", "");
             if (users.size() > threshold) {
-                logOutput.append(String.format("Too many users found with %s [%s]. It might not be relatable. Threshold is %d and found were %d users\n", attributeName, attributeValue, threshold, users.size()));
+                logOutput.append(String.format("Too many users found with %s [%s]. It might not be relatable, getting ignored. Threshold is %d and found were %d users\n", attributeName, attributeValue, threshold, users.size()));
             }
             if (!(users.size() == 1)) {
                 logOutput.append("\n\nUsers for ").append(attributeName).append(" with same value [").append(attributeValue).append("]\n");
@@ -652,9 +657,11 @@ public class UserManagementController implements Controller<SplitPane> {
 
     public void writeSmurfVillageLookup2File(StringBuilder logOutput) {
         try {
-            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd-HHmm");
-            String currentDate = dateFormat.format(new Date());
-            String fileName = "SmurfVillageLookup-" + currentDate + ".txt";
+            File folder = new File("SmurfVillageLookup");
+            if (!folder.exists()) {
+                folder.mkdir();
+            }
+            String fileName = "SmurfVillageLookup/UserID_" + smurfVillageLookupTextField.getText() + ".txt";
             BufferedWriter bw = new BufferedWriter(new FileWriter(fileName));
             bw.append(logOutput.toString());
             bw.close();
@@ -745,17 +752,17 @@ public class UserManagementController implements Controller<SplitPane> {
         int depthThreshold = Integer.parseInt(depthScanningInputTextField.getText());
         if (depthCounter >= depthThreshold){
             log.debug("Depth limit reached: " + depthCounter + "/"+ depthThreshold);
-            searchSmurfVillageTabTextField.setText(logOutput.toString());
+            searchSmurfVillageTabTextArea.setText(logOutput.toString());
             writeSmurfVillageLookup2File(logOutput);
             return;
         }
         logOutput.append("\n").append("=".repeat(50)).append("\n");
         logOutput.append("Current depth ").append(depthCounter).append("/").append(depthThreshold).append(" ").append(plusSigns).append("\n");
-        logOutput.append("Examining playerID: ").append(playerID).append("\n");
+        logOutput.append("Examined playerID: ").append(playerID).append("\n");
         foundSmurfs.forEach(s -> onSmurfVillageLookup((String) s));
         logOutput.append("No further information found for ").append(playerID).append("\n");
 
-        searchSmurfVillageTabTextField.setText(logOutput.toString());
+        searchSmurfVillageTabTextArea.setText(logOutput.toString());
         writeSmurfVillageLookup2File(logOutput);
     }
 
