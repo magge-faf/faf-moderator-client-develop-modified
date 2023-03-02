@@ -26,20 +26,25 @@
             <Button mnemonicParsing="false" onAction="#onRefreshAllReports" minWidth="93" text="Refresh"/>
             <Separator minHeight="10" />
             <Text>Copy:</Text>
-            <Button fx:id="CopyReportID" mnemonicParsing="false" minWidth="93" onAction="#CopyReportID"
+            <Button fx:id="CopyReportIDButton" mnemonicParsing="false" minWidth="93" onAction="#onCopyReportID"
                     text="Report ID"/>
-            <Button fx:id="CopyReportedUserID" mnemonicParsing="false" minWidth="93" onAction="#CopyReportedUserID"
+            <Button fx:id="CopyReportedUserIDButton" mnemonicParsing="false" minWidth="93" onAction="#onCopyReportedUserID"
                     text="Offender"/>
-            <Button fx:id="CopyGameID" mnemonicParsing="false" minWidth="93" onAction="#CopyGameID" text="Game ID"/>
+            <Button fx:id="CopyGameIDButton" mnemonicParsing="false" minWidth="93" onAction="#onCopyGameID" text="Game ID"/>
             <Separator prefHeight="10" />
-            <Button fx:id="CopyChatLog" mnemonicParsing="false" minWidth="93" onAction="#CopyChatLog"
+            <Button fx:id="CopyChatLogButton" mnemonicParsing="false" minWidth="93" onAction="#onCopyChatLog"
                     text="Chat log"/>
             <Separator minHeight="10" />
-            <Button fx:id="CreateReportButton" mnemonicParsing="false" minWidth="93" onAction="#CreateReportButton"
+            <Button fx:id="CreateReportButton" mnemonicParsing="false" minWidth="93" onAction="#onCreateReportButton"
                     text="Create report"/>
             <Separator prefHeight="10"/>
-            <Button fx:id="CopyReportTemplate" mnemonicParsing="false" minWidth="93" onAction="#CopyReportTemplate"
+            <Button fx:id="UseTemplateWithoutReasonsButton" mnemonicParsing="false" minWidth="93" onAction="#onUseTemplateWithoutReasonsButton"
                     text="Use template"/>
+            <Button fx:id="UseTemplateWithReasonsButton" mnemonicParsing="false" minWidth="93" onAction="#onUseTemplateWithReasonsButton"
+                    text="with adding reasons"/>
+            <CheckBox fx:id="reasonsCheckBox" selected="true" mnemonicParsing="false"
+                      text="Select reasons">
+            </CheckBox>
             <Separator prefHeight="10"/>
             <Text>Replay settings</Text>
             <CheckBox fx:id="FilterLogCheckBox" selected="true" mnemonicParsing="false"
@@ -49,7 +54,7 @@
                       text="Auto load chat log">
             </CheckBox>
             <Separator prefHeight="10"/>
-            <Button fx:id="StartReplay" mnemonicParsing="false" minWidth="93" onAction="#StartReplay"
+            <Button fx:id="StartReplayButton" mnemonicParsing="false" minWidth="93" onAction="#onStartReplay"
                     text="Start Replay"/>
         </VBox>
         <TableView fx:id="reportTableView" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
@@ -60,11 +65,11 @@
             <TextArea fx:id="chatLogTextArea" editable="false" prefHeight="200.0" prefWidth="200.0"/>
         </Tab>
         <Tab text="Reported accounts">
-            <TableView fx:id="reportedPlayerView" maxHeight="1.7976931348623157E308"
+            <TableView fx:id="reportedPlayerTableView" maxHeight="1.7976931348623157E308"
                        maxWidth="1.7976931348623157E308"/>
         </Tab>
         <Tab text="Most reported accounts">
-            <TableView fx:id="tableViewMostReportedAccounts">
+            <TableView fx:id="mostReportedAccountsTableView">
                 <columns>
                     <TableColumn text="Player" minWidth="150">
                         <cellValueFactory>
@@ -92,7 +97,7 @@
         <Tab text="Moderator statistics">
             <VBox>
                 <TextArea fx:id="moderatorStatisticsTextArea" editable="false" prefHeight="30" maxHeight="30" minHeight="30"/>
-                <TableView fx:id="tableViewModeratorStatistics" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
+                <TableView fx:id="moderatorStatisticsTableView" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
                            HBox.hgrow="ALWAYS">
                     <columns>
                         <TableColumn text="Moderator" minWidth="200">
