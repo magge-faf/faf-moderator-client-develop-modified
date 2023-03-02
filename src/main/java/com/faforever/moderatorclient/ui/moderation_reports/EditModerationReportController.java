@@ -19,6 +19,8 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.Scanner;
 
+import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
+
 @Component
 @RequiredArgsConstructor
 public class EditModerationReportController implements Controller<Pane> {
@@ -84,8 +86,8 @@ public class EditModerationReportController implements Controller<Pane> {
 	public void onPasteCompletedTemplate() {
 		Properties config = new Properties();
 		try {
-			config.load(new FileInputStream("config.properties"));
-			pasteTemplate("TemplateCompleted.txt", ModerationReportStatus.COMPLETED, Boolean.parseBoolean(config.getProperty("autoComplete", "false")));
+			config.load(new FileInputStream(CONFIGURATION_FOLDER + "/config.properties"));
+			pasteTemplate(CONFIGURATION_FOLDER+File.separator+"templateCompleted.txt", ModerationReportStatus.COMPLETED, Boolean.parseBoolean(config.getProperty("autoCompleteCheckBox", "false")));
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
@@ -94,8 +96,8 @@ public class EditModerationReportController implements Controller<Pane> {
 	public void onPasteDiscardedTemplate() {
 		Properties config = new Properties();
 		try {
-			config.load(new FileInputStream("config.properties"));
-			pasteTemplate("TemplateDiscarded.txt", ModerationReportStatus.DISCARDED, Boolean.parseBoolean(config.getProperty("autoDiscard", "false")));
+			config.load(new FileInputStream(CONFIGURATION_FOLDER + "/config.properties"));
+			pasteTemplate(CONFIGURATION_FOLDER+File.separator+"templateDiscarded.txt", ModerationReportStatus.DISCARDED, Boolean.parseBoolean(config.getProperty("autoDiscardCheckBox", "false")));
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
