@@ -11,9 +11,13 @@ import javafx.fxml.FXML;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
+
+import java.awt.*;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Properties;
 
@@ -24,43 +28,43 @@ public class SettingsController implements Controller<Region> {
 
     public VBox root;
     public TextField accountNameOrEmailTextField;
-    public TextField accountPasswordTextField;
+    public TextField accountPasswordField;
     public Button saveAccountButton;
     public TextField pathAccountFile;
-    public Button BlacklistedHash;
-    public Button BlacklistedIP;
-    public Button BlacklistedMemorySN;
-    public Button BlacklistedSN;
-    public Button BlacklistedUUID;
-    public Button BlacklistedVolumeSN;
-    public Button ExcludedItems;
+    public Button blacklistedHashButton;
+    public Button blacklistedIPButton;
+    public Button blacklistedMemorySNButton;
+    public Button blacklistedSNButton;
+    public Button blacklistedUUIDButton;
+    public Button blacklistedVolumeSNButton;
+    public Button excludedItemsButton;
     public Button templateCompletedButton;
     public Button templateDiscardedButton;
-    public Button templateReportButton;
-    public TextField genericJunk;
+    public Button templateReasonsCheckBoxButton;
+    public TextField genericJunkButton;
     public MenuItem optionUserManagementTab;
     public MenuItem optionReportTab;
     public MenuItem optionRecentActivityTab;
     public javafx.scene.control.Menu defaultStartingTabMenuBar;
-    public CheckBox autoDiscard;
-    public CheckBox autoComplete;
-    public Button templateButtonTemporaryBanButton;
+    public CheckBox autoDiscardCheckBox;
+    public CheckBox autoCompleteCheckBox;
     public Button templateButtonPermanentBanButton;
     public Button saveButton;
+    public Button openConfigurationFolderButton;
 
     private void setDefaultTab(String tabName) {
         Properties config = new Properties();
         try {
-            config.load(new FileInputStream("config.properties"));
+            config.load(new FileInputStream(CONFIGURATION_FOLDER + File.separator + "config.properties"));
             config.setProperty("user.choice.tab", tabName);
-            config.store(new FileOutputStream("config.properties"), null);
+            config.store(new FileOutputStream(CONFIGURATION_FOLDER + File.separator + "config.properties"), null);
             defaultStartingTabMenuBar.setText("current default is " + tabName);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public void handleOptionUserManagementTabClicked() {
+    public void onOptionUserManagementTabClicked() {
         setDefaultTab("userManagementTab");
     }
 
@@ -68,7 +72,7 @@ public class SettingsController implements Controller<Region> {
         setDefaultTab("reportTab");
     }
 
-    public void handleOptionRecentActivityTabClicked() {
+    public void onOptionRecentActivityTabClicked() {
         setDefaultTab("recentActivityTab");
     }
 
@@ -77,12 +81,12 @@ public class SettingsController implements Controller<Region> {
 
     @FXML
     public void initialize() throws IOException {
-        String[] blacklistedFiles = { "BlacklistedHash", "BlacklistedIP", "BlacklistedMemorySN",
-                "BlacklistedSN", "BlacklistedUUID", "BlacklistedVolumeSN", "ExcludedItems" };
+        String[] blacklistedFiles = { "blacklistedHash", "blacklistedIP", "blacklistedMemorySN",
+                "blacklistedSN", "blacklistedUUID", "blacklistedVolumeSN", "excludedItems" };
 
         // create default blacklisted files if they do not exist
         for (String file : blacklistedFiles) {
-            File f = new File(file + ".txt");
+            File f = new File(CONFIGURATION_FOLDER + File.separator + file + ".txt");
             try {
                 if (!f.exists()) {
                     if (f.createNewFile()) {
@@ -97,8 +101,8 @@ public class SettingsController implements Controller<Region> {
         }
 
         String homeDirectory = System.getProperty("user.home");
-        pathAccountFile.setText(homeDirectory);
         String filePath = homeDirectory + File.separator + "account_credentials_mordor.txt";
+        pathAccountFile.setText(filePath);
         File f = new File(filePath);
 
         if (f.exists() && !f.isDirectory()) {
@@ -109,17 +113,19 @@ public class SettingsController implements Controller<Region> {
                 String nameOrEmail = credentials.get(0);
                 String password = credentials.get(1);
                 accountNameOrEmailTextField.setText(nameOrEmail);
-                accountPasswordTextField.setText(password);
+                accountPasswordField.setText(password);
             } catch (Exception e) {
                 log.debug("Error reading account credentials: " + e.getMessage());
             }
         }
-
+        // Load configuration properties
         try {
             Properties config = new Properties();
-            config.load(new FileInputStream("config.properties"));
-            autoDiscard.setSelected(Boolean.parseBoolean(config.getProperty("autoDiscard", "false")));
-            autoComplete.setSelected(Boolean.parseBoolean(config.getProperty("autoComplete", "false")));
+            config.load(new FileInputStream(CONFIGURATION_FOLDER + File.separator + "config.properties"));
+            autoDiscardCheckBox.setSelected(Boolean.parseBoolean(config.getProperty("autoDiscardCheckBox", "false")));
+            autoCompleteCheckBox.setSelected(Boolean.parseBoolean(config.getProperty("autoCompleteCheckBox", "false")));
+            String defaultStartingTab = config.getProperty("user.choice.tab", "reportTab");
+            defaultStartingTabMenuBar.setText("current default is " + defaultStartingTab);
         } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -127,11 +133,10 @@ public class SettingsController implements Controller<Region> {
 
         public void saveAccount() {
         String accountNameOrEmail = accountNameOrEmailTextField.getText();
-        String accountPassword = accountPasswordTextField.getText();
+        String accountPassword = accountPasswordField.getText();
         String data = accountNameOrEmail + "\n" + accountPassword;
 
-        String homeDirectory = System.getProperty("user.home");
-        String filePath = homeDirectory + File.separator + "account_credentials_mordor.txt";
+        String filePath = System.getProperty("user.home") + File.separator + "account_credentials_mordor.txt";
 
         try {
             FileWriter fw = new FileWriter(filePath, false);
@@ -144,45 +149,51 @@ public class SettingsController implements Controller<Region> {
         }
     }
 
-    public void SaveAccountButton() {
+    public void onSaveAccountButton() {
         saveAccount();
     }
 
     public void openFile(String fileName) throws IOException {
-        ProcessBuilder pb = new ProcessBuilder("Notepad.exe", fileName);
-        pb.start();
-    }
+            Path notepadPlusPlus = Paths.get("C:\\Program Files\\Notepad++\\notepad++.exe");
+            Path notepad = Paths.get("C:\\Windows\\System32\\notepad.exe");
 
-    public void onTemplateButtonPermanentBanButton() throws IOException {openFile("templateButtonPermanentBan.txt");}
-    public void onTemplateButtonTemporaryBanButton() throws IOException {openFile("templateButtonTemporaryBan.txt");}
+            if (Files.exists(notepadPlusPlus)) {
+                ProcessBuilder pb = new ProcessBuilder(notepadPlusPlus.toString(), fileName);
+                pb.start();
+            } else {
+                ProcessBuilder pb = new ProcessBuilder(notepad.toString(), fileName);
+                pb.start();
+            }
+        }
 
-    public void BlacklistedHash() throws IOException {openFile("BlacklistedHash.txt");}
+    public void onTemplateButtonPermanentBanButton() throws IOException {openFile(CONFIGURATION_FOLDER + "/templateButtonPermanentBan.txt");}
+    public void onBlacklistedHash() throws IOException {openFile(CONFIGURATION_FOLDER + "/blacklistedHash.txt");}
+    public void onBlacklistedIP() throws IOException {openFile(CONFIGURATION_FOLDER + "/blacklistedIP.txt");}
+    public void onBlacklistedSN() throws IOException {openFile(CONFIGURATION_FOLDER + "/blacklistedSN.txt");}
+    public void onBlacklistedUUID() throws IOException {openFile(CONFIGURATION_FOLDER + "/blacklistedUUID.txt");}
+    public void onBlacklistedVolumeSN() throws IOException {openFile(CONFIGURATION_FOLDER + "/blacklistedVolumeSN.txt");}
+    public void onBlacklistedMemorySN() throws IOException {openFile(CONFIGURATION_FOLDER + "/blacklistedMemorySN.txt");}
+    public void onExcludedItems() throws IOException {openFile(CONFIGURATION_FOLDER + "/excludedItems.txt");}
+    public void onTemplateCompletedButton() throws IOException {openFile(CONFIGURATION_FOLDER + "/templateCompleted.txt");}
+    public void onTemplateDiscardedButton() throws IOException {openFile(CONFIGURATION_FOLDER + "/templateDiscarded.txt");}
+    public void onReasonsTemplateCheckBoxButton() throws IOException {openFile(CONFIGURATION_FOLDER + "/templateReasonsCheckBox.txt");}
 
-    public void BlacklistedIP() throws IOException {openFile("BlacklistedIP.txt");}
-
-    public void BlacklistedSN() throws IOException {openFile("BlacklistedSN.txt");}
-
-    public void BlacklistedUUID() throws IOException {openFile("BlacklistedUUID.txt");}
-
-    public void BlacklistedVolumeSN() throws IOException {openFile("BlacklistedVolumeSN.txt");}
-
-    public void BlacklistedMemorySN() throws IOException {openFile("BlacklistedMemorySN.txt");}
-
-    public void ExcludedItems() throws IOException {openFile("excludedItems.txt");}
-
-    public void TemplateCompletedButton() throws IOException {openFile("TemplateCompleted.txt");}
-
-    public void TemplateDiscardedButton() throws IOException {openFile("TemplateDiscarded.txt");}
-
-    public void TemplateReportButton() throws IOException {openFile("TemplateReport.txt");}
-
-    public void handleSaveButtonForCheckBox() {
+    public void onSaveButtonForCheckBox() {
         Properties config = new Properties();
         try {
-            config.load(new FileInputStream("config.properties"));
-            config.setProperty("autoDiscard", Boolean.toString(autoDiscard.isSelected()));
-            config.setProperty("autoComplete", Boolean.toString(autoComplete.isSelected()));
-            config.store(new FileOutputStream("config.properties"), null);
+            config.load(new FileInputStream(CONFIGURATION_FOLDER + File.separator + "config.properties"));
+            config.setProperty("autoDiscardCheckBox", Boolean.toString(autoDiscardCheckBox.isSelected()));
+            config.setProperty("autoCompleteCheckBox", Boolean.toString(autoCompleteCheckBox.isSelected()));
+            config.store(new FileOutputStream(CONFIGURATION_FOLDER + File.separator + "config.properties"), null);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void onOpenConfigurationFolder() {
+        File folder = new File(CONFIGURATION_FOLDER);
+        try {
+            Desktop.getDesktop().open(folder);
         } catch (IOException e) {
             e.printStackTrace();
         }
