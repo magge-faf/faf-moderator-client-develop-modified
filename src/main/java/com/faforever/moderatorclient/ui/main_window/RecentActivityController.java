@@ -32,6 +32,8 @@ import java.util.List;
 import java.util.Scanner;
 import java.util.stream.Collectors;
 
+import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -155,14 +157,20 @@ public class RecentActivityController implements Controller<VBox> {
         List<String> blacklistedSN = new ArrayList<>();
         List<String> blacklistedUUID = new ArrayList<>();
         List<String> blacklistedVolumeSN = new ArrayList<>();
-
-        File fileExcludedItems = new File("excludedItems" + ".txt");
-        File fileBlacklistedHash = new File("BlacklistedHash" + ".txt");
-        File fileBlacklistedIP = new File("BlacklistedIP" + ".txt");
-        File fileBlacklistedMemorySN = new File("BlacklistedMemorySN" + ".txt");
-        File fileBlacklistedSN = new File("BlacklistedSN" + ".txt");
-        File fileBlacklistedUUID = new File("BlacklistedUUID" + ".txt");
-        File fileBlacklistedVolumeSN = new File("BlacklistedVolumeSN" + ".txt");
+        //TODO ref
+        //String[] fileNames = {"excludedItems", "blacklistedHash", "blacklistedIP", "blacklistedMemorySN",
+        //        "blacklistedSN", "blacklistedUUID", "blacklistedVolumeSN"};
+        //List<File> files = new ArrayList<>();
+        //for (String name : fileNames) {
+        //    files.add(new File(CONFIGURATION_FOLDER + "/" + name + ".txt"));
+        //}
+        File fileExcludedItems = new File(CONFIGURATION_FOLDER+"/excludedItems" + ".txt");
+        File fileBlacklistedHash = new File(CONFIGURATION_FOLDER+"/blacklistedHash" + ".txt");
+        File fileBlacklistedIP = new File(CONFIGURATION_FOLDER+"/blacklistedIP" + ".txt");
+        File fileBlacklistedMemorySN = new File(CONFIGURATION_FOLDER+"/blacklistedMemorySN" + ".txt");
+        File fileBlacklistedSN = new File(CONFIGURATION_FOLDER+"/blacklistedSN" + ".txt");
+        File fileBlacklistedUUID = new File(CONFIGURATION_FOLDER+"/blacklistedUUID" + ".txt");
+        File fileBlacklistedVolumeSN = new File(CONFIGURATION_FOLDER+"/blacklistedVolumeSN" + ".txt");
 
         //TODO if the format is not correct, it will add an empty item to the list which can cause issues later?
         try {
@@ -173,7 +181,7 @@ public class RecentActivityController implements Controller<VBox> {
             s.close();
             log.debug("[info] " + fileExcludedItems + " loaded.");
 
-            log.debug("fileExcludedItems:" + excludedItems.toString());
+            log.debug("fileExcludedItems:" + excludedItems);
         } catch (Exception e) {
             log.debug(String.valueOf(e));
         }
