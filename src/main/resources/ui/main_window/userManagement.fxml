@@ -27,7 +27,7 @@
             </TextField>
             <Button mnemonicParsing="false" onAction="#onUserSearch" text="Search" alignment="CENTER">
             </Button>
-            <TextArea fx:id="SearchHistoryTextField" editable="false"
+            <TextArea fx:id="SearchHistoryTextArea" editable="false"
                       promptText="history (resets with new start)">
             </TextArea>
             <TextArea fx:id="NotesTextArea"
@@ -157,10 +157,9 @@
                 </HBox>
             </VBox>
         </Tab>
-
         <Tab fx:id="searchSmurfVillageLookupTab" text="Output of Smurf Village Lookup">
             <VBox >
-                    <TextArea fx:id="searchSmurfVillageTabTextField"
+                    <TextArea fx:id="searchSmurfVillageTabTextArea"
                               promptText="Output will be saved as .txt into project folder as well - Program can freeze for a few seconds/minutes while it is requesting data, especially when there are many users with same items. Just be patient."
                               VBox.vgrow="ALWAYS">
                     </TextArea>
