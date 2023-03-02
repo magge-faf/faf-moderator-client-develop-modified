@@ -1935,6 +1935,7 @@ public class ViewHelper {
             ObservableList<ModerationReportFX> items,
             Consumer<ModerationReportFX> onChatLog
     ) {
+        tableView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         tableView.setItems(items);
         tableView.setEditable(true);
         HashMap<TableColumn<ModerationReportFX, ?>, Function<ModerationReportFX, ?>> extractors = new HashMap<>();
@@ -2391,6 +2392,8 @@ public class ViewHelper {
 
         alert.showAndWait();
     }
+
+
 
     @SuppressWarnings("rawtypes")
     public static void copySelectionToClipboard(final TableView<?> table) {
