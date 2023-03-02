@@ -36,6 +36,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
 
 
 @Component
@@ -69,7 +73,6 @@ public class BanInfoController implements Controller<Pane> {
     public TextField reportIdTextField;
     public ToggleGroup banDuration;
     public Button templateButtonPermanentBan;
-    public Button templateButtonTemporaryBan;
 
     @Getter
     private BanInfoFX banInfo;
@@ -92,6 +95,17 @@ public class BanInfoController implements Controller<Pane> {
     @FXML
     public void initialize() {
         banIsRevokedNotice.managedProperty().bind(banIsRevokedNotice.visibleProperty());
+        banReasonTextField.textProperty().addListener((observable, oldValue, newValue) -> {
+            Pattern pattern = Pattern.compile("(\\d+)\\s+day\\s+ban");
+            Matcher matcher = pattern.matcher(banReasonTextField.getText());
+            if (matcher.find()) {
+                String numDays = matcher.group(1);
+                log.debug("Detected number before 'day ban': " + numDays);
+                banDaysTextField.setText(numDays);
+            } else {
+                log.debug("No number before 'day ban' found");
+            }
+        });
     }
 
     public void onRevokeTimeTextChanged() {
@@ -111,6 +125,7 @@ public class BanInfoController implements Controller<Pane> {
 
             affectedUserTextField.setText(banInfo.getPlayer().representationProperty().get());
             Optional.ofNullable(banInfo.getAuthor()).ifPresent(author -> banAuthorTextField.setText(author.representationProperty().get()));
+
             banReasonTextField.setText(banInfo.getReason());
 
             revocationReasonTextField.setDisable(false);
@@ -137,9 +152,7 @@ public class BanInfoController implements Controller<Pane> {
             if (moderationReportFx != null) {
                 reportIdTextField.setText(moderationReportFx.getId());
             }
-
         } else {
-
             PlayerFX player = banInfo.getPlayer();
             if (player != null) {
                 affectedUserTextField.setText(player.representationProperty().get());
@@ -335,7 +348,7 @@ public class BanInfoController implements Controller<Pane> {
     }
 
     private void loadBanReasonTemplate(String fileName, RadioButton radioButton) {
-        String filePath = fileName + ".txt";
+        String filePath = CONFIGURATION_FOLDER + File.separator+ fileName + ".txt";
         File f = new File(filePath);
         if (f.exists() && !f.isDirectory()) {
             try {
@@ -353,9 +366,5 @@ public class BanInfoController implements Controller<Pane> {
 
     public void templateButtonPermanentBan() {
         loadBanReasonTemplate("templateButtonPermanentBan", permanentBanRadioButton);
-    }
-
-    public void templateButtonTemporaryBan() {
-        loadBanReasonTemplate("templateButtonTemporaryBan", forNoOfDaysBanRadioButton);
     }
 }
