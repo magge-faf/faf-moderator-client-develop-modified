@@ -70,14 +70,14 @@ public class MainController implements Controller<TabPane> {
     private MessagesController messagesController;
     private UserGroupsController userGroupsController;
     private final Map<Tab, Boolean> dataLoadingState = new HashMap<>();
-
     private final FafApiCommunicationService communicationService;
+    public static final String CONFIGURATION_FOLDER = "Configuration";
 
     @Override
     public TabPane getRoot() {
         Properties config = new Properties();
         root.getSelectionModel().select(userManagementTab); // Set a default tab
-        try (InputStream input = new FileInputStream("config.properties")) {
+        try (InputStream input = new FileInputStream(CONFIGURATION_FOLDER + "/config.properties")) {
             config.load(input);
             String userChoiceDefaultTab = config.getProperty("user.choice.tab");
             if(userChoiceDefaultTab != null){
@@ -88,7 +88,7 @@ public class MainController implements Controller<TabPane> {
                 }
             }
         } catch (IOException e) {
-            log.error(String.valueOf(e));
+            log.debug(String.valueOf(e));
         }
         return root;
     }
