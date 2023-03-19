@@ -42,9 +42,6 @@
                     text="Use template"/>
             <Button fx:id="UseTemplateWithReasonsButton" mnemonicParsing="false" minWidth="93" onAction="#onUseTemplateWithReasonsButton"
                     text="with adding reasons"/>
-            <CheckBox fx:id="reasonsCheckBox" selected="true" mnemonicParsing="false"
-                      text="Select reasons">
-            </CheckBox>
             <Separator prefHeight="10"/>
             <Text>Replay settings</Text>
             <CheckBox fx:id="FilterLogCheckBox" selected="true" mnemonicParsing="false"
