@@ -99,7 +99,7 @@ public class SettingsController implements Controller<Region> {
                 e.printStackTrace();
             }
         }
-
+        //TODO make methods
         String homeDirectory = System.getProperty("user.home");
         String filePath = homeDirectory + File.separator + "account_credentials_mordor.txt";
         pathAccountFile.setText(filePath);
@@ -107,7 +107,6 @@ public class SettingsController implements Controller<Region> {
 
         if (f.exists() && !f.isDirectory()) {
             Path pathCredentialsFile = Path.of(filePath);
-
             try {
                 List<String> credentials = Files.readAllLines(pathCredentialsFile);
                 String nameOrEmail = credentials.get(0);
@@ -117,7 +116,68 @@ public class SettingsController implements Controller<Region> {
             } catch (Exception e) {
                 log.debug("Error reading account credentials: " + e.getMessage());
             }
+
+            // Create configuration properties if not exist already
+            File configFile = new File(CONFIGURATION_FOLDER + File.separator + "config.properties");
+            if (!configFile.exists()) {
+                try {
+                    configFile.createNewFile();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            try (PrintWriter writer = new PrintWriter(configFile)) {
+                writer.println("includeUUIDCheckBox=true");
+                writer.println("includeVolumeSerialNumberCheckBox=true");
+                writer.println("includeManufacturerCheckBox=false");
+                writer.println("includeSerialNumberCheckBox=false");
+                writer.println("includeMemorySerialNumberCheckBox=true");
+                writer.println("depthScanningInputTextField=1000");
+                writer.println("excludeItemsCheckBox=true");
+                writer.println("includeProcessorNameCheckBox=false");
+                writer.println("includeUIDHashCheckBox=true");
+                writer.println("maxUniqueUsersThresholdTextField=100");
+                writer.println("includeIPCheckBox=true");
+                writer.println("includeProcessorIdCheckBox=false");
+                log.info("[info] " + configFile + " was successfully created.");
+            } catch (IOException e) {
+                log.error("[error] Failed to create " + configFile, e);
+            }
+            // Create templates
+            // Create templateCompleted.txt file
+            File fileCompleted = new File(CONFIGURATION_FOLDER + File.separator + "templateCompleted.txt");
+            String contentCompleted = "Thank you for bringing this to our attention. Action was taken.";
+            try {
+                FileWriter writer = new FileWriter(fileCompleted);
+                writer.write(contentCompleted);
+                writer.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
+            // Create templateDiscarded.txt file
+            File fileDiscarded = new File(CONFIGURATION_FOLDER + File.separator + "templateDiscarded.txt");
+            String contentDiscarded = "No additional information or proof was provided.";
+            try {
+                FileWriter writer = new FileWriter(fileDiscarded);
+                writer.write(contentDiscarded);
+                writer.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
+            // Create templateReasonsCheckBox.txt file
+            File fileReasonsCheckBox = new File(CONFIGURATION_FOLDER + File.separator + "templateReasonsCheckBox.txt");
+            String contentReasonsCheckBox = "offensive language\nreclaiming friendly units\nattacking friendly units\nCTRL+K all units in full share\nleaving game on own terms\nharassment in private chat\nracism\noffensive game titles\noffensive kick messages";
+            try {
+                FileWriter writer = new FileWriter(fileReasonsCheckBox);
+                writer.write(contentReasonsCheckBox);
+                writer.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
+
         // Load configuration properties
         try {
             Properties config = new Properties();
@@ -131,19 +191,18 @@ public class SettingsController implements Controller<Region> {
             }
     }
 
-        public void saveAccount() {
-        String accountNameOrEmail = accountNameOrEmailTextField.getText();
-        String accountPassword = accountPasswordField.getText();
-        String data = accountNameOrEmail + "\n" + accountPassword;
+    public void saveAccount() {
+    String accountNameOrEmail = accountNameOrEmailTextField.getText();
+    String accountPassword = accountPasswordField.getText();
+    String data = accountNameOrEmail + "\n" + accountPassword;
+    String filePath = System.getProperty("user.home") + File.separator + "account_credentials_mordor.txt";
 
-        String filePath = System.getProperty("user.home") + File.separator + "account_credentials_mordor.txt";
-
-        try {
-            FileWriter fw = new FileWriter(filePath, false);
-            fw.write(data);
-            fw.flush();
-            fw.close();
-            saveAccountButton.setText("Credentials were saved.");
+    try {
+        FileWriter fw = new FileWriter(filePath, false);
+        fw.write(data);
+        fw.flush();
+        fw.close();
+        saveAccountButton.setText("Credentials were saved.");
         } catch (IOException e) {
             log.error("Error saving account credentials: " + e.getMessage());
         }
