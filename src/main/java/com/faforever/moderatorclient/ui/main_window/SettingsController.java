@@ -122,6 +122,7 @@ public class SettingsController implements Controller<Region> {
             if (!configFile.exists()) {
                 try {
                     configFile.createNewFile();
+                    log.debug(configFile + " was created.");
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
@@ -139,6 +140,7 @@ public class SettingsController implements Controller<Region> {
                 writer.println("maxUniqueUsersThresholdTextField=100");
                 writer.println("includeIPCheckBox=true");
                 writer.println("includeProcessorIdCheckBox=false");
+                writer.println("user.choice.tab=reportTab");
                 log.info("[info] " + configFile + " was successfully created.");
             } catch (IOException e) {
                 log.error("[error] Failed to create " + configFile, e);
