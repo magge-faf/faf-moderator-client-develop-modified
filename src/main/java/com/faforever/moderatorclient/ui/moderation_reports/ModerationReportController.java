@@ -157,8 +157,8 @@ public class ModerationReportController implements Controller<Region> {
             StringBuilder selectedGameIds = new StringBuilder();
 
             for (ModerationReportFX selectedItem : selectedItems) {
-                if (selectedItem.getGame().getId() != null) {
                     selectedIds.append(selectedItem.getId()).append(",");
+                if (selectedItem.getGame() != null) {
                     selectedGameIds.append(selectedItem.getGame().getId()).append(",");
                 }
             }
@@ -194,11 +194,8 @@ public class ModerationReportController implements Controller<Region> {
 
             for (ModerationReportFX selectedItem : selectedItems) {
                 selectedIds.append(selectedItem.getId()).append(",");
-                if (selectedItem.getGame().getId() != null) {
-                    String gameId = selectedItem.getGame().getId();
-                    if (!selectedGameIds.toString().contains(gameId)) {
-                        selectedGameIds.append(gameId).append(",");
-                    }
+                if (selectedItem.getGame() != null) {
+                    selectedGameIds.append(selectedItem.getGame().getId()).append(",");
                 }
             }
 
