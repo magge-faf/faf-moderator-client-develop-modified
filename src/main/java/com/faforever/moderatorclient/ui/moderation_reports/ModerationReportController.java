@@ -681,14 +681,12 @@ public class ModerationReportController implements Controller<Region> {
                     " to allies: sent ";
             Pattern pattern = Pattern.compile(compileSentences);
             String chatLine;
-            while((chatLine = bufReader.readLine()) != null) {
-                Matcher matcher = pattern.matcher(chatLine);
-                boolean matchFound = matcher.find();
-                if(matchFound && FilterLogCheckBox.isSelected()) {
-                    chatLogFiltered.append("");
-                } else {
-                    chatLogFiltered.append(chatLine).append("\n");
+            while ((chatLine = bufReader.readLine()) != null) {
+                boolean matchFound = pattern.matcher(chatLine).find();
+                if (FilterLogCheckBox.isSelected() && matchFound) {
+                    continue;
                 }
+                chatLogFiltered.append(chatLine).append("\n");
             }
             CopyChatLogButton.setId(chatLogFiltered.toString());
             CopyChatLogButton.setText("Copy Chat Log");
