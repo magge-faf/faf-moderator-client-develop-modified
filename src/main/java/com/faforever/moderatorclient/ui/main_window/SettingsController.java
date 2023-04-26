@@ -85,6 +85,11 @@ public class SettingsController implements Controller<Region> {
                 "blacklistedSN", "blacklistedUUID", "blacklistedVolumeSN", "excludedItems" };
 
         // create default blacklisted files if they do not exist
+        File directory = new File(CONFIGURATION_FOLDER);
+        if (!directory.exists()) {
+            directory.mkdirs();
+        }
+
         for (String file : blacklistedFiles) {
             File f = new File(CONFIGURATION_FOLDER + File.separator + file + ".txt");
             try {
@@ -99,6 +104,7 @@ public class SettingsController implements Controller<Region> {
                 e.printStackTrace();
             }
         }
+
         //TODO make methods
         String homeDirectory = System.getProperty("user.home");
         String filePath = homeDirectory + File.separator + "account_credentials_mordor.txt";
