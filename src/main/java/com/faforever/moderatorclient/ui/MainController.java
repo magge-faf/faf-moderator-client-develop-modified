@@ -71,7 +71,7 @@ public class MainController implements Controller<TabPane> {
     private UserGroupsController userGroupsController;
     private final Map<Tab, Boolean> dataLoadingState = new HashMap<>();
     private final FafApiCommunicationService communicationService;
-    public static final String CONFIGURATION_FOLDER = "Configuration";
+    public static final String CONFIGURATION_FOLDER = "ConfigurationModerationToolFAF";
 
     @Override
     public TabPane getRoot() {
