@@ -153,18 +153,19 @@ public class ModerationReportController implements Controller<Region> {
         try {
             ObservableList<ModerationReportFX> selectedItems = reportTableView.getSelectionModel().getSelectedItems();
 
-            StringBuilder selectedIds = new StringBuilder();
-            StringBuilder selectedGameIds = new StringBuilder();
+            String selectedIds = selectedItems.stream()
+                    .map(item -> String.valueOf(item.getId()))
+                    .collect(Collectors.joining(","));
 
-            for (ModerationReportFX selectedItem : selectedItems) {
-                    selectedIds.append(selectedItem.getId()).append(",");
-                if (selectedItem.getGame() != null) {
-                    selectedGameIds.append(selectedItem.getGame().getId()).append(",");
-                }
-            }
+            String selectedGameIds = selectedItems.stream()
+                    .map(ModerationReportFX::getGame)
+                    .filter(Objects::nonNull)
+                    .map(game -> String.valueOf(game.getId()))
+                    .distinct()
+                    .collect(Collectors.joining(","));
 
-            removeTrailingComma(selectedIds);
-            removeTrailingComma(selectedGameIds);
+            removeTrailingComma(new StringBuilder(selectedIds));
+            removeTrailingComma(new StringBuilder(selectedGameIds));
 
             String result;
             result = selectedIds + "\n\n" + "DAY_NUMBER day ban - ReplayID " + selectedGameIds + " - SOME_REASON";
@@ -189,19 +190,19 @@ public class ModerationReportController implements Controller<Region> {
         try {
             ObservableList<ModerationReportFX> selectedItems = reportTableView.getSelectionModel().getSelectedItems();
 
-            StringBuilder selectedIds = new StringBuilder();
-            StringBuilder selectedGameIds = new StringBuilder();
+            String selectedIds = selectedItems.stream()
+                    .map(item -> String.valueOf(item.getId()))
+                    .collect(Collectors.joining(","));
 
-            for (ModerationReportFX selectedItem : selectedItems) {
-                selectedIds.append(selectedItem.getId()).append(",");
-                if (selectedItem.getGame() != null) {
-                    selectedGameIds.append(selectedItem.getGame().getId()).append(",");
-                }
-            }
+            String selectedGameIds = selectedItems.stream()
+                    .map(ModerationReportFX::getGame)
+                    .filter(Objects::nonNull)
+                    .map(game -> String.valueOf(game.getId()))
+                    .distinct()
+                    .collect(Collectors.joining(","));
 
-            removeTrailingComma(selectedIds);
-            removeTrailingComma(selectedGameIds);
-            //TODO make sure gameIds are unique
+            removeTrailingComma(new StringBuilder(selectedIds));
+            removeTrailingComma(new StringBuilder(selectedGameIds));
 
             Stage stage = new Stage();
             final String selectedReasons = "";
