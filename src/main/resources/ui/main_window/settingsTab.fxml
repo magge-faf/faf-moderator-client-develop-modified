@@ -31,7 +31,7 @@
     <Separator minHeight="10" />
     <Button fx:id="templateButtonPermanentBanButton" text="Open template for permanent ban message" mnemonicParsing="false" onAction="#onTemplateButtonPermanentBanButton" prefWidth="300"/>
     <Separator minHeight="10" />
-    <Button fx:id="templateReasonsCheckBoxButton" text="Open template for checkBoxes" mnemonicParsing="false" onAction="#onReasonsTemplateCheckBoxButton" prefWidth="200"/>
+    <Button fx:id="templateReasonsCheckBoxButton" text="Open template for checkBoxes" mnemonicParsing="false" onAction="#onReasonsTemplateCheckBoxButton" prefWidth="300"/>
     <Separator minHeight="10" />
     <MenuBar xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml">
         <Menu fx:id="defaultStartingTabMenuBar" text="Choose default starting tab:">
