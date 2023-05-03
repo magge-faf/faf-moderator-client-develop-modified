@@ -105,7 +105,6 @@ public class SettingsController implements Controller<Region> {
             }
         }
 
-        //TODO make methods
         String homeDirectory = System.getProperty("user.home");
         String filePath = homeDirectory + File.separator + "account_credentials_mordor.txt";
         pathAccountFile.setText(filePath);
@@ -129,64 +128,82 @@ public class SettingsController implements Controller<Region> {
                 try {
                     configFile.createNewFile();
                     log.debug(configFile + " was created.");
+
+                    try (PrintWriter writer = new PrintWriter(configFile)) {
+                        writer.println("includeUUIDCheckBox=true");
+                        writer.println("includeVolumeSerialNumberCheckBox=true");
+                        writer.println("includeManufacturerCheckBox=false");
+                        writer.println("includeSerialNumberCheckBox=false");
+                        writer.println("includeMemorySerialNumberCheckBox=true");
+                        writer.println("depthScanningInputTextField=1000");
+                        writer.println("excludeItemsCheckBox=true");
+                        writer.println("includeProcessorNameCheckBox=false");
+                        writer.println("includeUIDHashCheckBox=true");
+                        writer.println("maxUniqueUsersThresholdTextField=100");
+                        writer.println("includeIPCheckBox=true");
+                        writer.println("includeProcessorIdCheckBox=false");
+                        writer.println("user.choice.tab=reportTab");
+                        writer.println("autoDiscardCheckBox=false");
+                        writer.println("autoCompleteCheckBox=false");
+
+                        log.info("[info] " + configFile + " was successfully created.");
+                    } catch (IOException e) {
+                        log.error("[error] Failed to create " + configFile, e);
+                    }
+                    loadConfigurationProperties();
+                    createTemplateReasonsCheckBoxFile();
+                    createTemplateDiscardedFile();
+                    createTemplateCompletedFile();
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
             }
-            try (PrintWriter writer = new PrintWriter(configFile)) {
-                writer.println("includeUUIDCheckBox=true");
-                writer.println("includeVolumeSerialNumberCheckBox=true");
-                writer.println("includeManufacturerCheckBox=false");
-                writer.println("includeSerialNumberCheckBox=false");
-                writer.println("includeMemorySerialNumberCheckBox=true");
-                writer.println("depthScanningInputTextField=1000");
-                writer.println("excludeItemsCheckBox=true");
-                writer.println("includeProcessorNameCheckBox=false");
-                writer.println("includeUIDHashCheckBox=true");
-                writer.println("maxUniqueUsersThresholdTextField=100");
-                writer.println("includeIPCheckBox=true");
-                writer.println("includeProcessorIdCheckBox=false");
-                writer.println("user.choice.tab=reportTab");
-                log.info("[info] " + configFile + " was successfully created.");
-            } catch (IOException e) {
-                log.error("[error] Failed to create " + configFile, e);
-            }
-            // Create templates
+        }
+    }
+
+    public void createTemplateCompletedFile() {
+        try {
             // Create templateCompleted.txt file
             File fileCompleted = new File(CONFIGURATION_FOLDER + File.separator + "templateCompleted.txt");
             String contentCompleted = "Thank you for bringing this to our attention. Action was taken.";
-            try {
-                FileWriter writer = new FileWriter(fileCompleted);
-                writer.write(contentCompleted);
-                writer.close();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+            // Write content to file
+            FileWriter writer = new FileWriter(fileCompleted);
+            writer.write(contentCompleted);
+            writer.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
+    public void createTemplateDiscardedFile() {
+        try {
             // Create templateDiscarded.txt file
             File fileDiscarded = new File(CONFIGURATION_FOLDER + File.separator + "templateDiscarded.txt");
             String contentDiscarded = "No additional information or proof was provided.";
-            try {
-                FileWriter writer = new FileWriter(fileDiscarded);
-                writer.write(contentDiscarded);
-                writer.close();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+            // Write content to file
+            FileWriter writer = new FileWriter(fileDiscarded);
+            writer.write(contentDiscarded);
+            writer.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
+    public void createTemplateReasonsCheckBoxFile() {
+        try {
             // Create templateReasonsCheckBox.txt file
             File fileReasonsCheckBox = new File(CONFIGURATION_FOLDER + File.separator + "templateReasonsCheckBox.txt");
             String contentReasonsCheckBox = "offensive language\nreclaiming friendly units\nattacking friendly units\nCTRL+K all units in full share\nleaving game on own terms\nharassment in private chat\nracism\noffensive game titles\noffensive kick messages";
-            try {
-                FileWriter writer = new FileWriter(fileReasonsCheckBox);
-                writer.write(contentReasonsCheckBox);
-                writer.close();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+            // Write content to file
+            FileWriter writer = new FileWriter(fileReasonsCheckBox);
+            writer.write(contentReasonsCheckBox);
+            writer.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
+    }
 
-        // Load configuration properties
+    public void loadConfigurationProperties() {
         try {
             Properties config = new Properties();
             config.load(new FileInputStream(CONFIGURATION_FOLDER + File.separator + "config.properties"));
@@ -195,8 +212,8 @@ public class SettingsController implements Controller<Region> {
             String defaultStartingTab = config.getProperty("user.choice.tab", "reportTab");
             defaultStartingTabMenuBar.setText("current default is " + defaultStartingTab);
         } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+            throw new RuntimeException(e);
+        }
     }
 
     public void saveAccount() {
