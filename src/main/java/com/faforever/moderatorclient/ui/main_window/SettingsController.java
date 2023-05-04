@@ -150,7 +150,6 @@ public class SettingsController implements Controller<Region> {
                     } catch (IOException e) {
                         log.error("[error] Failed to create " + configFile, e);
                     }
-                    loadConfigurationProperties();
                     createTemplateReasonsCheckBoxFile();
                     createTemplateDiscardedFile();
                     createTemplateCompletedFile();
@@ -159,6 +158,7 @@ public class SettingsController implements Controller<Region> {
                 }
             }
         }
+        loadConfigurationProperties();
     }
 
     public void createTemplateCompletedFile() {
