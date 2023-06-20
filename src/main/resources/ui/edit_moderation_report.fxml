@@ -47,6 +47,9 @@
         <Button fx:id="pasteDiscardedTemplate" prefHeight="30" mnemonicParsing="false"
                 onAction="#onPasteDiscardedTemplate" text="Blueprint-DISCARDED">
         </Button>
+        <Button fx:id="pastePoorReportQualityButton" prefHeight="30" mnemonicParsing="false"
+                onAction="#onPastePoorReportQuality" text="Blueprint-PoorQuality">
+        </Button>
         <Button mnemonicParsing="false" prefHeight="30" onAction="#close" text="Cancel">
             <HBox.margin>
                 <Insets/>
