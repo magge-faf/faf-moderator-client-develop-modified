@@ -39,7 +39,7 @@
                     text="Create report"/>
             <Separator prefHeight="10"/>
             <Button fx:id="UseTemplateWithoutReasonsButton" mnemonicParsing="false" minWidth="93" onAction="#onUseTemplateWithoutReasonsButton"
-                    text="Use template"/>
+                    text="Apply template"/>
             <Button fx:id="UseTemplateWithReasonsButton" mnemonicParsing="false" minWidth="93" onAction="#onUseTemplateWithReasonsButton"
                     text="with adding reasons"/>
             <Separator prefHeight="10"/>
