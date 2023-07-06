@@ -11,6 +11,7 @@ import com.faforever.moderatorclient.ui.domain.AvatarAssignmentFX;
 import com.faforever.moderatorclient.ui.domain.AvatarFX;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -23,6 +24,7 @@ import org.springframework.util.Assert;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
 
 @Slf4j
 @Component
@@ -72,9 +74,17 @@ public class AvatarsController implements Controller<SplitPane> {
 
     public void refresh() {
         avatars.clear();
-        avatars.addAll(avatarMapper.map(avatarService.getAll()));
+        Task<Void> task = new Task<Void>() {
+            @Override
+            protected Void call() throws Exception {
+                avatars.addAll(avatarMapper.map(avatarService.getAll().get()));
 
-        avatarTableView.getSortOrder().clear();
+                avatarTableView.getSortOrder().clear();
+                return null;
+            }
+        };
+
+        new Thread(task).start();
     }
 
 
@@ -89,7 +99,7 @@ public class AvatarsController implements Controller<SplitPane> {
         refresh();
     }
 
-    public void onSearchAvatars() {
+    public void onSearchAvatars() throws ExecutionException, InterruptedException {
         avatars.clear();
         avatarTableView.getSortOrder().clear();
 
@@ -101,9 +111,9 @@ public class AvatarsController implements Controller<SplitPane> {
         } else if (searchAvatarsByTooltipRadioButton.isSelected()) {
             avatarSearchResult = avatarService.findAvatarsByTooltip(pattern);
         } else if (searchAvatarsByAssignedUserRadioButton.isSelected()) {
-            avatarSearchResult = avatarService.findAvatarsByAssignedUser(pattern);
+            avatarSearchResult = avatarService.findAvatarsByAssignedUser(pattern).get();
         } else {
-            avatarSearchResult = avatarService.getAll();
+            avatarSearchResult = avatarService.getAll().get();
         }
         avatars.addAll(avatarMapper.map(avatarSearchResult));
     }
