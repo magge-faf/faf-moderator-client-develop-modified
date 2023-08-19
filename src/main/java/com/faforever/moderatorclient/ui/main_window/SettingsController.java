@@ -1,18 +1,16 @@
 package com.faforever.moderatorclient.ui.main_window;
 
-import javafx.event.ActionEvent;
+import com.faforever.moderatorclient.ui.Controller;
+import javafx.fxml.FXML;
 import javafx.scene.control.Button;
-import javafx.scene.control.CheckBox;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextField;
+import javafx.scene.control.*;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import com.faforever.moderatorclient.ui.*;
-import javafx.fxml.FXML;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
 
 import java.awt.*;
 import java.io.*;
@@ -21,6 +19,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Properties;
+
+import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
 
 @Component
 @Slf4j
@@ -54,7 +54,11 @@ public class SettingsController implements Controller<Region> {
     public Button openConfigurationFolderButton;
     public Button templatePoorReportQualityButton;
 
-    private void setDefaultTab(String tabName) {
+    public List<Tab> tabs;
+
+    private void setDefaultTab(Tab tab) {
+        String tabName = tab.getId();
+
         Properties config = new Properties();
         try {
             config.load(new FileInputStream(CONFIGURATION_FOLDER + File.separator + "config.properties"));
@@ -66,16 +70,12 @@ public class SettingsController implements Controller<Region> {
         }
     }
 
-    public void onOptionUserManagementTabClicked() {
-        setDefaultTab("userManagementTab");
+    public void handleDefaultTabClick(Tab tab) {
+        setDefaultTab(tab);
     }
 
-    public void handleOptionReportTabClicked() {
-        setDefaultTab("reportTab");
-    }
-
-    public void onOptionRecentActivityTabClicked() {
-        setDefaultTab("recentActivityTab");
+    public void setTabs(List<Tab> tabs) {
+        this.tabs = tabs;
     }
 
     @Override
@@ -162,6 +162,23 @@ public class SettingsController implements Controller<Region> {
             }
         }
         loadConfigurationProperties();
+    }
+
+    public void initTabStuff() {
+        for (Tab tab : tabs) {
+            MenuItem menuItem = new MenuItem(tab.getText());
+            menuItem.setId(tab.getId());
+            menuItem.setOnAction((event) -> {
+                MenuItem menItem = (MenuItem) event.getSource();
+                String string = menItem.getId();
+                for (Tab t : tabs) {
+                    if (!t.getId().equals(string)) continue;
+                    setDefaultTab(t);
+                    break;
+                }
+            });
+            defaultStartingTabMenuBar.getItems().add(menuItem);
+        }
     }
 
     public void createTemplatePoorReportQuality() {
