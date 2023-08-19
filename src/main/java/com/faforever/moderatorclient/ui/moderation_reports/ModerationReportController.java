@@ -648,6 +648,7 @@ public class ModerationReportController implements Controller<Region> {
 
     @SneakyThrows
     private void showChatLog(ModerationReportFX report) {
+        //TODO add replay length to the tab
         GameFX game = report.getGame();
         String header = format("CHAT LOG -- Report ID {0} -- Replay ID {1} -- Game \"{2}\"\n\n",
                 report.getId(), game.getId(), game.getName());
@@ -667,31 +668,42 @@ public class ModerationReportController implements Controller<Region> {
                 chatLogTextArea.setText(header + format("Replay not available"));
             } else {
                 log.debug("The request was successful - parsing replay");
-            ReplayDataParser replayDataParser = new ReplayDataParser(tempFilePath, objectMapper);
-            String chatLog = header + replayDataParser.getChatMessages().stream()
-                    .map(message -> format("[{0}] from {1} to {2}: {3}",
-                            DurationFormatUtils.formatDuration(message.getTime().toMillis(), "HH:mm:ss"),
-                            message.getSender(), message.getReceiver(), message.getMessage()))
-                    .collect(Collectors.joining("\n"));
+                ReplayDataParser replayDataParser = new ReplayDataParser(tempFilePath, objectMapper);
+                String chatLog = header + replayDataParser.getChatMessages().stream()
+                        .map(message -> {
+                            long timeMillis = message.getTime().toMillis();
+                            String formattedTime;
 
-            BufferedReader bufReader = new BufferedReader(new StringReader(chatLog));
+                            if (timeMillis >= 0) {
+                                formattedTime = DurationFormatUtils.formatDuration(timeMillis, "HH:mm:ss");
+                            } else {
+                                formattedTime = "N/A"; // replay data contains negative timestamps for whatever reason
+                            }
 
-            StringBuilder chatLogFiltered = new StringBuilder();
-            String compileSentences = "Can you give me some mass, |Can you give me some energy, |" +
-                    "Can you give me one Engineer, | to notify: | to allies: Sent Mass | to allies: Sent Energy |" +
-                    " to allies: sent ";
-            Pattern pattern = Pattern.compile(compileSentences);
-            String chatLine;
-            while ((chatLine = bufReader.readLine()) != null) {
-                boolean matchFound = pattern.matcher(chatLine).find();
-                if (FilterLogCheckBox.isSelected() && matchFound) {
-                    continue;
+                            return format("[{0}] from {1} to {2}: {3}",
+                                    formattedTime,
+                                    message.getSender(), message.getReceiver(), message.getMessage());
+                        })
+                        .collect(Collectors.joining("\n"));
+
+                BufferedReader bufReader = new BufferedReader(new StringReader(chatLog));
+
+                StringBuilder chatLogFiltered = new StringBuilder();
+                String compileSentences = "Can you give me some mass, |Can you give me some energy, |" +
+                        "Can you give me one Engineer, | to notify: | to allies: Sent Mass | to allies: Sent Energy |" +
+                        " to allies: sent ";
+                Pattern pattern = Pattern.compile(compileSentences);
+                String chatLine;
+                while ((chatLine = bufReader.readLine()) != null) {
+                    boolean matchFound = pattern.matcher(chatLine).find();
+                    if (FilterLogCheckBox.isSelected() && matchFound) {
+                        continue;
+                    }
+                    chatLogFiltered.append(chatLine).append("\n");
                 }
-                chatLogFiltered.append(chatLine).append("\n");
-            }
-            CopyChatLogButton.setId(chatLogFiltered.toString());
-            CopyChatLogButton.setText("Copy Chat Log");
-            chatLogTextArea.setText(chatLogFiltered.toString());
+                CopyChatLogButton.setId(chatLogFiltered.toString());
+                CopyChatLogButton.setText("Copy Chat Log");
+                chatLogTextArea.setText(chatLogFiltered.toString());
             }
         } catch (Exception e) {
             StartReplayButton.setText("Replay not available");
