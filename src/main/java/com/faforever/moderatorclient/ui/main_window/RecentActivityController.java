@@ -33,6 +33,7 @@ import java.util.Scanner;
 import java.util.stream.Collectors;
 
 import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
+import javax.sound.sampled.*;
 
 @Slf4j
 @Component
@@ -91,6 +92,7 @@ public class RecentActivityController implements Controller<VBox> {
     private void checkBlacklistedItem(String fileName, List<String> blacklistedItems, String item, PlayerFX account) {
         for (String blacklistedItem : blacklistedItems) {
             if (blacklistedItem.equals(item)) {
+                playBlacklistedNotificationSound();
                 log.debug("[!] " + fileName + " [" + blacklistedItem + "] for " + account.getRepresentation());
                 suspiciousUserTextArea.setText(suspiciousUserTextArea.getText() + "[!] " + fileName + " [" + blacklistedItem + "] for " + account.getRepresentation() + "\n");
             }
@@ -211,7 +213,7 @@ public class RecentActivityController implements Controller<VBox> {
 
             if (includeBannedUserGlobally.equals(account.isBannedGlobally())) {
                 ObservableSet<UniqueIdFx> accountUniqueIds = account.getUniqueIds();
-
+                // TODO implement to load list to ignore certain IDs here to declutter ui
                 for (UniqueIdFx item : accountUniqueIds) {
                     checkBlacklistedItem("blacklistedHash", filteredBlacklistedHash, item.getHash(), account);
                     checkBlacklistedItem("blacklistedIP", filteredBlacklistedIP, account.getRecentIpAddress(), account);
@@ -222,6 +224,15 @@ public class RecentActivityController implements Controller<VBox> {
                 }
             }
         }
-        log.debug("[info] Last 10k users checked.");
+        log.debug("[info] Recent users checked.");
     }
-}
+    private void playBlacklistedNotificationSound() {
+            try {
+                Clip clip = AudioSystem.getClip();
+                clip.open(AudioSystem.getAudioInputStream(new File(CONFIGURATION_FOLDER + File.separator + "blacklisted_notification_sound.wav")));
+                clip.start();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
