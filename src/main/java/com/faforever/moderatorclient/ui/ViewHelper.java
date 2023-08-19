@@ -773,34 +773,34 @@ public class ViewHelper {
             PlayerFX playerFX = tableView.getSelectionModel().getSelectedItem();
             log.debug("[Add to blacklist] Adding: " + playerFX.getRepresentation());
 
-            writeToFile("BlacklistedIP.txt", playerFX.getRecentIpAddress());
+            writeToFile(CONFIGURATION_FOLDER + File.separator + "BlacklistedIP.txt", playerFX.getRecentIpAddress());
 
             List<String> ListHash = playerFX.getUniqueIds().stream().map(UniqueIdFx::getHash).toList();
 
             for (String element : ListHash) {
                 log.debug("checking for hash " + element);
-                writeToFile("BlacklistedHash.txt", element);
+                writeToFile(CONFIGURATION_FOLDER + File.separator + "BlacklistedHash.txt", element);
             }
 
             List<String> ListUUID = playerFX.getUniqueIds().stream().map(UniqueIdFx::getUuid).toList();
 
             for (String element : ListUUID) {
                 log.debug("checking for UUID " + element);
-                writeToFile("BlacklistedUUID.txt", element);
+                writeToFile(CONFIGURATION_FOLDER + File.separator + "BlacklistedUUID.txt", element);
             }
 
             List<String> ListMemorySN = playerFX.getUniqueIds().stream().map(UniqueIdFx::getMemorySerialNumber).toList();
 
             for (String element : ListMemorySN) {
                 log.debug("checking for Memory S/N " + element);
-                writeToFile("BlacklistedMemorySN.txt", element);
+                writeToFile(CONFIGURATION_FOLDER + File.separator +  "BlacklistedMemorySN.txt", element);
             }
 
             List<String> VolumeSerialNumber = playerFX.getUniqueIds().stream().map(UniqueIdFx::getVolumeSerialNumber).toList();
 
             for (String element : VolumeSerialNumber) {
                 log.debug("checking for Volume S/N " + element);
-                writeToFile("BlacklistedVolumeSN.txt", element);
+                writeToFile(CONFIGURATION_FOLDER + File.separator +  "BlacklistedVolumeSN.txt", element);
             }
         });
 
@@ -2441,4 +2441,5 @@ public class ViewHelper {
         table.setContextMenu(menu);
     }
 
+    public static final String CONFIGURATION_FOLDER = "ConfigurationModerationToolFAF";
 }
