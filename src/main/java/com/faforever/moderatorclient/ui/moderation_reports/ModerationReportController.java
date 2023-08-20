@@ -57,6 +57,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -349,8 +350,9 @@ public class ModerationReportController implements Controller<Region> {
             this.allReports = new SimpleLongProperty(0L);
         }
 
-        public LocalDateTime getLastActivity() {
-            return lastActivity;
+        public String getLastActivity() {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            return lastActivity.format(formatter);
         }
         public String getModerator() {
             return moderator.get();

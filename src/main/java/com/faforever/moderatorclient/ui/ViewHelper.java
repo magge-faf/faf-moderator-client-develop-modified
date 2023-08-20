@@ -359,11 +359,34 @@ public class ViewHelper {
         extractors.put(revocationAtColumn, BanInfoFX::getRevokeTime);
 
         TableColumn<BanInfoFX, OffsetDateTime> changeTimeColumn = new TableColumn<>("Created Time");
+        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        changeTimeColumn.setCellFactory(column -> new TableCell<BanInfoFX, OffsetDateTime>() {
+            @Override
+            protected void updateItem(OffsetDateTime item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(item.format(dateFormatter));
+                }
+            }
+        });
         changeTimeColumn.setCellValueFactory(new PropertyValueFactory<>("createTime"));
         changeTimeColumn.setMinWidth(180);
         tableView.getColumns().add(changeTimeColumn);
 
         TableColumn<BanInfoFX, OffsetDateTime> updateTimeColumn = new TableColumn<>("Update Time");
+        updateTimeColumn.setCellFactory(column -> new TableCell<BanInfoFX, OffsetDateTime>() {
+            @Override
+            protected void updateItem(OffsetDateTime item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(item.format(dateFormatter));
+                }
+            }
+        });
         updateTimeColumn.setCellValueFactory(new PropertyValueFactory<>("updateTime"));
         updateTimeColumn.setMinWidth(180);
         tableView.getColumns().add(updateTimeColumn);
@@ -383,6 +406,19 @@ public class ViewHelper {
         extractors.put(idColumn, NameRecordFX::getId);
 
         TableColumn<NameRecordFX, OffsetDateTime> changeTimeColumn = new TableColumn<>("Change Time");
+        changeTimeColumn.setCellFactory(column -> new TableCell<NameRecordFX, OffsetDateTime>() {
+            DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+            @Override
+            protected void updateItem(OffsetDateTime item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(item.format(dateFormatter));
+                }
+            }
+        });
         changeTimeColumn.setCellValueFactory(o -> o.getValue().changeTimeProperty());
         changeTimeColumn.setMinWidth(180);
         tableView.getColumns().add(changeTimeColumn);
@@ -617,11 +653,39 @@ public class ViewHelper {
         extractors.put(ipColumn, PlayerFX::getRecentIpAddress);
 
         TableColumn<PlayerFX, OffsetDateTime> createTimeColumn = new TableColumn<>("Registration Date");
+        createTimeColumn.setCellFactory(col -> new TableCell<PlayerFX, OffsetDateTime>() {
+            private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+            @Override
+            protected void updateItem(OffsetDateTime item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(formatter.format(item));
+                }
+            }
+        });
         createTimeColumn.setCellValueFactory(o -> o.getValue().createTimeProperty());
         createTimeColumn.setMinWidth(160);
         tableView.getColumns().add(createTimeColumn);
 
         TableColumn<PlayerFX, OffsetDateTime> lastLoginColumn = new TableColumn<>("Last login");
+        lastLoginColumn.setCellFactory(col -> {
+            return new TableCell<PlayerFX, OffsetDateTime>() {
+                private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+                @Override
+                protected void updateItem(OffsetDateTime item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null) {
+                        setText(null);
+                    } else {
+                        setText(formatter.format(item));
+                    }
+                }
+            };
+        });
         lastLoginColumn.setCellValueFactory(o -> o.getValue().lastLoginProperty());
         lastLoginColumn.setMinWidth(160);
         tableView.getColumns().add(lastLoginColumn);
@@ -633,7 +697,37 @@ public class ViewHelper {
         extractors.put(userAgentColumn, PlayerFX::getUserAgent);
 
         TableColumn<PlayerFX, OffsetDateTime> updateTimeColumn = new TableColumn<>("Last update of record");
+        updateTimeColumn.setCellFactory(col -> {
+            return new TableCell<PlayerFX, OffsetDateTime>() {
+                private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+                @Override
+                protected void updateItem(OffsetDateTime item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null) {
+                        setText(null);
+                    } else {
+                        setText(formatter.format(item));
+                    }
+                }
+            };
+        });
         updateTimeColumn.setCellValueFactory(o -> o.getValue().updateTimeProperty());
+        updateTimeColumn.setCellFactory(col -> {
+            return new TableCell<PlayerFX, OffsetDateTime>() {
+                private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+                @Override
+                protected void updateItem(OffsetDateTime item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (empty || item == null) {
+                        setText(null);
+                    } else {
+                        setText(formatter.format(item));
+                    }
+                }
+            };
+        });
         updateTimeColumn.setMinWidth(160);
         tableView.getColumns().add(updateTimeColumn);
 
