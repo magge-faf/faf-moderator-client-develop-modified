@@ -159,6 +159,7 @@ public class RecentActivityController implements Controller<VBox> {
         List<String> blacklistedSN = new ArrayList<>();
         List<String> blacklistedUUID = new ArrayList<>();
         List<String> blacklistedVolumeSN = new ArrayList<>();
+        List<String> whitelistUserID = new ArrayList<>();
         //TODO ref
         //String[] fileNames = {"excludedItems", "blacklistedHash", "blacklistedIP", "blacklistedMemorySN",
         //        "blacklistedSN", "blacklistedUUID", "blacklistedVolumeSN"};
@@ -173,6 +174,7 @@ public class RecentActivityController implements Controller<VBox> {
         File fileBlacklistedSN = new File(CONFIGURATION_FOLDER+"/blacklistedSN" + ".txt");
         File fileBlacklistedUUID = new File(CONFIGURATION_FOLDER+"/blacklistedUUID" + ".txt");
         File fileBlacklistedVolumeSN = new File(CONFIGURATION_FOLDER+"/blacklistedVolumeSN" + ".txt");
+        File fileWhitelistedUserID = new File(CONFIGURATION_FOLDER+"/whitelistedUserID" + ".txt");
 
         //TODO if the format is not correct, it will add an empty item to the list which can cause issues later?
         try {
@@ -194,6 +196,7 @@ public class RecentActivityController implements Controller<VBox> {
         loadList(fileBlacklistedSN, blacklistedSN);
         loadList(fileBlacklistedUUID, blacklistedUUID);
         loadList(fileBlacklistedVolumeSN, blacklistedVolumeSN);
+        loadList(fileWhitelistedUserID, whitelistUserID);
 
         List<String> filteredBlacklistedHash = filterList(blacklistedHash, excludedItems);
         List<String> filteredBlacklistedIP = filterList(blacklistedIP, excludedItems);
@@ -213,7 +216,12 @@ public class RecentActivityController implements Controller<VBox> {
 
             if (includeBannedUserGlobally.equals(account.isBannedGlobally())) {
                 ObservableSet<UniqueIdFx> accountUniqueIds = account.getUniqueIds();
-                // TODO implement to load list to ignore certain IDs here to declutter ui
+                for (String userID : whitelistUserID) {
+                    if (account.getId().equals(userID)) {
+                        log.debug("[whitelisted userID] " + userID);
+                        return;
+                    }
+                }
                 for (UniqueIdFx item : accountUniqueIds) {
                     checkBlacklistedItem("blacklistedHash", filteredBlacklistedHash, item.getHash(), account);
                     checkBlacklistedItem("blacklistedIP", filteredBlacklistedIP, account.getRecentIpAddress(), account);
