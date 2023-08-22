@@ -23,8 +23,14 @@ import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 import java.io.File;
 import java.io.IOException;
+import java.io.StringWriter;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
@@ -40,7 +46,6 @@ import java.util.concurrent.CompletableFuture;
 @RequiredArgsConstructor
 public class LoginController implements Controller<Pane> {
     static {
-
         System.setProperty("java.awt.headless", "false");
     }
 
@@ -100,19 +105,38 @@ public class LoginController implements Controller<Pane> {
     }
 
 
-
-        @FXML
+    @FXML
     public void initialize() throws IOException {
         applicationProperties.getEnvironments().forEach((key, environmentProperties) ->
                 environmentComboBox.getItems().add(key)
         );
         reloadLogin();
+        loginWebView.getEngine().setJavaScriptEnabled(true);
         environmentComboBox.getSelectionModel().select(0);
         EmbeddedLdapProperties.Credential credential = loadAccountCredentials();
+        String clickAuthorizeButtonScript =
+                "function dispatchEvents(element) {" +
+                        "    var event = new Event('input', { 'bubbles': true });" +
+                        "    element.dispatchEvent(event);" +
+                        "    event = new Event('change', { 'bubbles': true });" +
+                        "    element.dispatchEvent(event);" +
+                        "}" +
+                        "function clickAuthorizeButton() {" +
+                        "    var buttons = document.querySelectorAll('vaadin-button[theme=\"primary\"][tabindex=\"0\"][role=\"button\"]');" +
+                        "    for (var i = 0; i < buttons.length; i++) {" +
+                        "        if (buttons[i].textContent.trim() === \"Authorize\") {" +
+                        "            buttons[i].click();" +
+                        "            return;" +
+                        "        }" +
+                        "    }" +
+                        "    console.log('Authorize Button not found!');" +
+                        "}" +
+                        "clickAuthorizeButton();";
+
         loginWebView.getEngine().getLoadWorker().runningProperty().addListener((observable, oldValue, newValue) -> {
             if (credential != null) {
                 try {
-                    String combinedScript = String.format(
+                    String fillLoginNameAndPasswordScript = String.format(
                             "function setValueToNameOrEmail() {" +
                                     "    var element = document.getElementById('input-vaadin-text-field-6');" +
                                     "    if (element) {" +
@@ -154,19 +178,14 @@ public class LoginController implements Controller<Pane> {
                                     "setValueToNameOrEmail();",
                             credential.getUsername(), credential.getPassword()
                     );
-
-                    loginWebView.getEngine().executeScript(combinedScript);
-                    log.debug("[autologin] executeScript combinedScript");
-
+                    log.debug("[autologin] fire fillLoginNameAndPasswordScript");
+                    loginWebView.getEngine().executeScript(fillLoginNameAndPasswordScript);
+                    log.debug("[autologin] fire clickAuthorizeButtonScript");
+                    loginWebView.getEngine().executeScript(clickAuthorizeButtonScript);
                 } catch (Exception e) {
                     log.error("An error occurred during auto-login: " + e.getMessage(), e);
                 }
 
-                try {
-                    log.debug("[autoclick] executeScript clickButtonScript");
-                } catch (Exception e) {
-                    log.error("An error occurred during button click: " + e.getMessage(), e);
-                }
             }
             resetPageFuture.complete(null);
         });
@@ -232,6 +251,7 @@ public class LoginController implements Controller<Pane> {
     }
 
     private void loadLoginPage(){
+        log.debug("test1");
         loginWebView.getEngine().setJavaScriptEnabled(true);
         loginWebView.getEngine().load(getHydraUrl());
     }
