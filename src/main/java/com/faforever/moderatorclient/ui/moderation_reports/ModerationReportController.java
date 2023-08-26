@@ -1,7 +1,9 @@
 package com.faforever.moderatorclient.ui.moderation_reports;
 
 import com.faforever.commons.api.dto.ModerationReportStatus;
+import com.faforever.commons.replay.ChatMessage;
 import com.faforever.commons.replay.ReplayDataParser;
+import com.faforever.commons.replay.ReplayMetadata;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.ModerationReportService;
 import com.faforever.moderatorclient.ui.*;
@@ -727,91 +729,151 @@ public class ModerationReportController implements Controller<Region> {
 
     @SneakyThrows
     private void showChatLog(ModerationReportFX report) {
-        //TODO add replay length to the tab
         Task<Void> task = new Task<>() {
             @Override
-            protected Void call() throws Exception {
+            protected Void call() {
                 GameFX game = report.getGame();
-                String header = format("CHAT LOG -- Report ID {0} -- Replay ID {1} -- Game \"{2}\"\n\n",
-                        report.getId(), game.getId(), game.getName());
-                Path tempFilePath = null;
-                try {
-                    tempFilePath = Files.createTempFile(format("faf_replay_", game.getId()), "");
-                } catch (IOException e) {
-                    e.printStackTrace();
+                String header = formatChatHeader(report, game);
+                Path tempFilePath = createTempFile(game);
+
+                if (tempFilePath == null) {
+                    updateUIUnavailable(header, "An error occurred while creating a temporary file.");
+                    return null;
                 }
-                try {
-                    String replayUrl = game.getReplayUrl(replayDownLoadFormat);
-                    log.info("Downloading replay from {} to {}", replayUrl, tempFilePath);
-                    HttpRequest request = HttpRequest.newBuilder()
-                            .uri(URI.create(replayUrl))
-                            .build();
 
-                    HttpResponse<Path> response = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(tempFilePath));
-                    if (response.statusCode() == 404) {
-                        log.debug("The requested resource was not found on the server");
-                        StartReplayButton.setText("Replay not available");
-                        CopyChatLogButton.setText("Chat log not available");
-                        chatLogTextArea.setText(header + format("Replay not available"));
-                    } else {
-                        log.debug("The request was successful - parsing replay");
-                        ReplayDataParser replayDataParser = new ReplayDataParser(tempFilePath, objectMapper);
-                        String chatLog = header + replayDataParser.getChatMessages().stream()
-                                .map(message -> {
-                                    long timeMillis = message.getTime().toMillis();
-                                    String formattedTime;
+                HttpResponse<Path> response = downloadReplay(game, tempFilePath);
 
-                                    if (timeMillis >= 0) {
-                                        formattedTime = DurationFormatUtils.formatDuration(timeMillis, "HH:mm:ss");
-                                    } else {
-                                        formattedTime = "N/A"; // replay data contains negative timestamps for whatever reason
-                                    }
-
-                                    return format("[{0}] from {1} to {2}: {3}",
-                                            formattedTime,
-                                            message.getSender(), message.getReceiver(), message.getMessage());
-                                })
-                                .collect(Collectors.joining("\n"));
-
-                        BufferedReader bufReader = new BufferedReader(new StringReader(chatLog));
-
-                        StringBuilder chatLogFiltered = new StringBuilder();
-                        String compileSentences = "Can you give me some mass, |Can you give me some energy, |" +
-                                "Can you give me one Engineer, | to notify: | to allies: Sent Mass | to allies: Sent Energy |" +
-                                " to allies: sent ";
-                        Pattern pattern = Pattern.compile(compileSentences);
-                        String chatLine;
-                        while ((chatLine = bufReader.readLine()) != null) {
-                            boolean matchFound = pattern.matcher(chatLine).find();
-                            if (FilterLogCheckBox.isSelected() && matchFound) {
-                                continue;
-                            }
-
-                            chatLogFiltered.append(chatLine).append("\n");
-                        }
-                        Platform.runLater(() -> {
-                            CopyChatLogButton.setId(chatLogFiltered.toString());
-                            CopyChatLogButton.setText("Copy Chat Log");
-                            chatLogTextArea.setText(chatLogFiltered.toString());
-                        });
-
-                    }
-                } catch (Exception e) {
-                    Platform.runLater(() -> {
-                        StartReplayButton.setText("Replay not available");
-                        CopyChatLogButton.setText("Chat log not available");
-                        chatLogTextArea.setText(header + "Chat log not available");
-                    });
+                if (response == null || response.statusCode() == 404) {
+                    updateUIUnavailable(header, "Replay not available");
+                } else {
+                    processAndDisplayReplay(header, tempFilePath);
                 }
-                try {
-                    assert tempFilePath != null;
-                    Files.delete(tempFilePath);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+
+                deleteTempFile(tempFilePath);
                 return null;
             }
         };
         new Thread(task).start();
+    }
+
+    private String formatChatHeader(ModerationReportFX report, GameFX game) {
+        return format("CHAT LOG -- Report ID {0} -- Replay ID {1} -- Game \"{2}\"\n\n",
+                report.getId(), game.getId(), game.getName());
+    }
+
+    private Path createTempFile(GameFX game) {
+        try {
+            return Files.createTempFile(format("faf_replay_", game.getId()), "");
+        } catch (IOException e) {
+            log.error("An error occurred while creating a temporary file.", e);
+            return null;
+        }
+    }
+
+    private HttpResponse<Path> downloadReplay(GameFX game, Path tempFilePath) {
+        try {
+            String replayUrl = game.getReplayUrl(replayDownLoadFormat);
+            log.info("Downloading replay from {} to {}", replayUrl, tempFilePath);
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(replayUrl))
+                    .build();
+
+            return httpClient.send(request, HttpResponse.BodyHandlers.ofFile(tempFilePath));
+        } catch (Exception e) {
+            log.error("An error occurred while downloading the replay.", e);
+            return null;
+        }
+    }
+
+    private void updateUIUnavailable(String header, String message) {
+        Platform.runLater(() -> {
+            StartReplayButton.setText(message);
+            CopyChatLogButton.setText(message);
+            chatLogTextArea.setText(header + message);
+        });
+    }
+
+    private void processAndDisplayReplay(String header, Path tempFilePath) {
+        try {
+            ReplayDataParser replayDataParser = new ReplayDataParser(tempFilePath, objectMapper);
+            String chatLog = generateChatLog(replayDataParser);
+
+            StringBuilder chatLogFiltered = new StringBuilder();
+            chatLogFiltered.append(header);
+
+            String metadataInfo = generateMetadataInfo(replayDataParser);
+            chatLogFiltered.append("--- Replay Metadata ---\n").append(metadataInfo);
+
+            String filteredChatLog = filterAndAppendChatLog(chatLog);
+            chatLogFiltered.append(filteredChatLog);
+
+            Platform.runLater(() -> {
+                CopyChatLogButton.setId(chatLogFiltered.toString());
+                CopyChatLogButton.setText("Copy Chat Log");
+                chatLogTextArea.setText(chatLogFiltered.toString());
+            });
+        } catch (Exception e) {
+            updateUIUnavailable(header, "Chat log not available");
+            log.error("An error occurred while processing and displaying the replay", e);
+        }
+    }
+
+    private void deleteTempFile(Path tempFilePath) {
+        if (tempFilePath != null) {
+            try {
+                Files.delete(tempFilePath);
+            } catch (IOException e) {
+                log.error("An error occurred while deleting the temporary file.", e);
+            }
+        }
+    }
+
+    private String generateChatLog(ReplayDataParser replayDataParser) {
+        return replayDataParser.getChatMessages().stream()
+                .map(this::formatChatMessage)
+                .collect(Collectors.joining("\n"));
+    }
+
+    private String formatChatMessage(ChatMessage message) {
+        long timeMillis = message.getTime().toMillis();
+        String formattedTime = timeMillis >= 0
+                ? DurationFormatUtils.formatDuration(timeMillis, "HH:mm:ss")
+                : "N/A";
+
+        return format("[{0}] from {1} to {2}: {3}",
+                formattedTime, message.getSender(), message.getReceiver(), message.getMessage());
+    }
+
+    private String generateMetadataInfo(ReplayDataParser replayDataParser) {
+        ReplayMetadata metadata = replayDataParser.getMetadata();
+        return "Victory Condition: " + metadata.getVictoryCondition() + "\n" +
+                "Game Time: " + metadata.getGameTime() + "\n" +
+                "Host: " + metadata.getHost() + "\n" +
+                "Featured Mod: " + metadata.getFeaturedMod() + "\n" +
+                "Map Name: " + metadata.getMapname() + "\n" +
+                "Number of Players: " + metadata.getNumPlayers() + "\n" +
+                "Teams: " + metadata.getTeams() + "\n\n";
+    }
+
+    private String filterAndAppendChatLog(String chatLog) throws IOException {
+        StringBuilder filteredChatLog = new StringBuilder();
+        BufferedReader bufReader = new BufferedReader(new StringReader(chatLog));
+
+        String compileSentences = "Can you give me some mass, |Can you give me some energy, |" +
+                "Can you give me one Engineer, | to notify: | to allies: Sent Mass | to allies: Sent Energy |" +
+                " to allies: sent ";
+
+        Pattern pattern = Pattern.compile(compileSentences);
+        String chatLine;
+
+        while ((chatLine = bufReader.readLine()) != null) {
+            boolean matchFound = pattern.matcher(chatLine).find();
+            if (FilterLogCheckBox.isSelected() && matchFound) {
+                continue;
+            }
+            filteredChatLog.append(chatLine).append("\n");
+        }
+
+        return filteredChatLog.toString();
     }
 }
