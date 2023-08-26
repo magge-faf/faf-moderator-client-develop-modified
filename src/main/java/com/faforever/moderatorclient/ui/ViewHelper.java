@@ -671,20 +671,18 @@ public class ViewHelper {
         tableView.getColumns().add(createTimeColumn);
 
         TableColumn<PlayerFX, OffsetDateTime> lastLoginColumn = new TableColumn<>("Last login");
-        lastLoginColumn.setCellFactory(col -> {
-            return new TableCell<PlayerFX, OffsetDateTime>() {
-                private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        lastLoginColumn.setCellFactory(col -> new TableCell<>() {
+            private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-                @Override
-                protected void updateItem(OffsetDateTime item, boolean empty) {
-                    super.updateItem(item, empty);
-                    if (empty || item == null) {
-                        setText(null);
-                    } else {
-                        setText(formatter.format(item));
-                    }
+            @Override
+            protected void updateItem(OffsetDateTime item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(formatter.format(item));
                 }
-            };
+            }
         });
         lastLoginColumn.setCellValueFactory(o -> o.getValue().lastLoginProperty());
         lastLoginColumn.setMinWidth(160);
@@ -2196,6 +2194,21 @@ public class ViewHelper {
         extractors.put(lastModeratorColumn, reportFx -> reportFx.getLastModerator() == null ? null : reportFx.getLastModerator().getLogin());
 
         TableColumn<ModerationReportFX, OffsetDateTime> createTimeColumn = new TableColumn<>("Create time");
+
+        createTimeColumn.setCellFactory(col -> new TableCell<>() {
+            private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+            @Override
+            protected void updateItem(OffsetDateTime item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(formatter.format(item));
+                }
+            }
+        });
+
         createTimeColumn.setMinWidth(150);
         createTimeColumn.setCellValueFactory(param -> param.getValue().createTimeProperty());
         tableView.getColumns().add(createTimeColumn);
