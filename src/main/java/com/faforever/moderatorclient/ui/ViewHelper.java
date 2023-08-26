@@ -1344,8 +1344,34 @@ public class ViewHelper {
         TableColumn<GamePlayerStatsFX, Number> afterGameRatingColumn = new TableColumn<>("Rating Change");
         afterGameRatingColumn.setCellValueFactory(o -> o.getValue().ratingChangeProperty());
         afterGameRatingColumn.setMinWidth(100);
+
+// Set a cell factory to customize the appearance of cells
+        afterGameRatingColumn.setCellFactory(column -> new TableCell<>() {
+            @Override
+            protected void updateItem(Number ratingChange, boolean empty) {
+                super.updateItem(ratingChange, empty);
+
+                if (empty || ratingChange == null) {
+                    setText(null);
+                    setStyle(""); // Reset cell style if the cell is empty
+                } else {
+                    setText(ratingChange.toString());
+
+                    // Customize cell style based on the value of ratingChange
+                    if (ratingChange.doubleValue() > 0) {
+                        setStyle("-fx-text-fill: #C7E1C7;"); // Lighter green color
+                    } else if (ratingChange.doubleValue() < 0) {
+                        setStyle("-fx-text-fill: red;");
+                    } else {
+                        setStyle(""); // Reset cell style for zero rating change
+                    }
+                }
+            }
+        });
+
         tableView.getColumns().add(afterGameRatingColumn);
         extractors.put(afterGameRatingColumn, GamePlayerStatsFX::getRatingChange);
+
 
         TableColumn<GamePlayerStatsFX, OffsetDateTime> scoreTimeDateColumn = new TableColumn<>("Score Time");
         DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)
