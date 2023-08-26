@@ -6,15 +6,13 @@ import com.faforever.moderatorclient.api.domain.MapService;
 import com.faforever.moderatorclient.api.domain.UserService;
 import com.faforever.moderatorclient.ui.*;
 import com.faforever.moderatorclient.ui.domain.*;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.ObservableSet;
 import javafx.fxml.FXML;
 import javafx.scene.Scene;
-import javafx.scene.control.CheckBox;
-import javafx.scene.control.TableView;
-import javafx.scene.control.TextArea;
-import javafx.scene.control.TitledPane;
+import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
@@ -26,6 +24,10 @@ import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Clip;
 import java.io.File;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
@@ -55,6 +57,8 @@ public class RecentActivityController implements Controller<VBox> {
     public TableView<TeamkillFX> teamkillFeedTableView;
     public TableView<MapVersionFX> mapUploadFeedTableView;
     public CheckBox includeGlobalBannedUserCheckBox;
+    @FXML
+    public Button refreshButton;
 
     @Override public VBox getRoot() {return root;}
 
@@ -109,51 +113,71 @@ public class RecentActivityController implements Controller<VBox> {
                 .filter(item -> !excludedItems.contains(item))
                 .collect(Collectors.toList());
     }
+
+    ExecutorService executorService = Executors.newFixedThreadPool(4);
+    ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
+
     public void refresh() {
-        teamkills.setAll(userService.findLatestTeamkills());
-        teamkillFeedTableView.getSortOrder().clear();
-        mapVersions.setAll(mapService.findLatestMapVersions());
-        mapUploadFeedTableView.getSortOrder().clear();
+        refreshButton.setText("Automatic refresh event has started...");
+        executorService.submit(() -> {
+            scheduler.scheduleWithFixedDelay(() -> {
 
-        // Resetting UI element
-        suspiciousUserTextArea.setText("");
+                Platform.runLater(() -> {
+                    teamkills.setAll(userService.findLatestTeamkills());
+                    teamkillFeedTableView.getSortOrder().clear();
+                    mapVersions.setAll(mapService.findLatestMapVersions());
+                    mapUploadFeedTableView.getSortOrder().clear();
 
-        // Initialize data structures
-        Map<String, List<String>> blacklistedData = new HashMap<>();
-        List<String> whitelistUserID = new ArrayList<>();
+                    // Resetting UI element
+                    suspiciousUserTextArea.setText("");
 
-        // Define FILE_NAMES constants
-        final String[] FILE_NAMES = {"excludedItems", "blacklistedHash", "blacklistedIP", "blacklistedMemorySN",
-                "blacklistedSN", "blacklistedUUID", "blacklistedVolumeSN", "whitelistedUserID"};
+                    // Initialize data structures
+                    Map<String, List<String>> blacklistedData = new HashMap<>();
+                    List<String> whitelistUserID = new ArrayList<>();
 
-        // Load data from files
-        for (String fileName : FILE_NAMES) {
-            File file = new File(CONFIGURATION_FOLDER + File.separator + fileName + ".txt");
-            List<String> list = new ArrayList<>();
-            if ("whitelistedUserID".equals(fileName)) {
-                loadList(file, whitelistUserID);
-            } else {
-                loadList(file, list);
-                blacklistedData.put(fileName, list);
-            }
-        }
+                    // Define FILE_NAMES constants
+                    final String[] FILE_NAMES = {"excludedItems", "blacklistedHash", "blacklistedIP", "blacklistedMemorySN",
+                            "blacklistedSN", "blacklistedUUID", "blacklistedVolumeSN", "whitelistedUserID"};
 
-        // Filter blacklisted items
-        Map<String, List<String>> filteredBlacklistedData = new HashMap<>();
-        for (Map.Entry<String, List<String>> entry : blacklistedData.entrySet()) {
-            filteredBlacklistedData.put(entry.getKey(), filterList(entry.getValue(), blacklistedData.get("excludedItems")));
-        }
+                    // Load data from files
+                    for (String fileName : FILE_NAMES) {
+                        File file = new File(CONFIGURATION_FOLDER + File.separator + fileName + ".txt");
+                        List<String> list = new ArrayList<>();
+                        if ("whitelistedUserID".equals(fileName)) {
+                            loadList(file, whitelistUserID);
+                        } else {
+                            loadList(file, list);
+                            blacklistedData.put(fileName, list);
+                        }
+                    }
 
-        // Load recent registrations and loop through accounts
-        users.setAll(userService.findLatestRegistrations());
-        List<PlayerFX> accounts = userService.findLatestRegistrations();
-        userRegistrationFeedTableView.getSortOrder().clear();
+                    // Filter blacklisted items
+                    Map<String, List<String>> filteredBlacklistedData = new HashMap<>();
+                    for (Map.Entry<String, List<String>> entry : blacklistedData.entrySet()) {
+                        filteredBlacklistedData.put(entry.getKey(), filterList(entry.getValue(), blacklistedData.get("excludedItems")));
+                    }
 
-        for (PlayerFX account : accounts) {
-            checkAccountAgainstBlacklists(account, whitelistUserID, filteredBlacklistedData);
-        }
-        log.debug("[info] Recent users checked.");
-    }
+                    // Load recent registrations and loop through accounts
+                    users.setAll(userService.findLatestRegistrations());
+                    List<PlayerFX> accounts = userService.findLatestRegistrations();
+                    userRegistrationFeedTableView.getSortOrder().clear();
+
+                    for (PlayerFX account : accounts) {
+                        checkAccountAgainstBlacklists(account, whitelistUserID, filteredBlacklistedData);
+                    }
+                    //TODO delayInSeconds in settingsTab configurable
+                    long delayInSeconds = 60;
+                    long delayInNanoseconds = delayInSeconds * 1_000_000_000L;
+                    long lastExecutionTime = System.nanoTime();
+                    long remainingTime = delayInNanoseconds - (System.nanoTime() - lastExecutionTime) % delayInNanoseconds;
+                    log.debug("[info] {} seconds until refresh", remainingTime / 1_000_000_000L);
+                    log.debug("[info] Recent users checked.");
+                });
+            }, 0, 60, TimeUnit.SECONDS);
+        });
+    };
+
     private void loadList(File file, List<String> list) {
         int itemCount = 0;
         try (Scanner scanner = new Scanner(file)) {
@@ -166,7 +190,6 @@ public class RecentActivityController implements Controller<VBox> {
             log.debug(String.valueOf(e));
         }
     }
-
 
     private void checkAccountAgainstBlacklists(PlayerFX account, List<String> whitelistUserID, Map<String, List<String>> filteredBlacklistedData) {
         Boolean includeBannedUserGlobally = includeGlobalBannedUserCheckBox.isSelected();
