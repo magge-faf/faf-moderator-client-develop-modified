@@ -16,14 +16,21 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
+import org.springframework.boot.autoconfigure.ldap.embedded.EmbeddedLdapProperties;
 import org.springframework.context.event.EventListener;
 import org.springframework.security.oauth2.common.OAuth2AccessToken;
 import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 import java.io.File;
 import java.io.IOException;
+import java.io.StringWriter;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
@@ -33,12 +40,12 @@ import java.text.MessageFormat;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+
 @Component
 @Slf4j
 @RequiredArgsConstructor
 public class LoginController implements Controller<Pane> {
     static {
-
         System.setProperty("java.awt.headless", "false");
     }
 
@@ -56,10 +63,47 @@ public class LoginController implements Controller<Pane> {
 
     private CompletableFuture<Void> resetPageFuture;
 
+    private EmbeddedLdapProperties.Credential loadAccountCredentials() {
+        String nameOrEmail = null;
+        String password = null;
+
+        try {
+            String homeDirectory = System.getProperty("user.home");
+            String filePath = homeDirectory + File.separator + "account_credentials_mordor.txt";
+            File file = new File(filePath);
+
+            if (!file.exists()) {
+                if (file.createNewFile()) {
+                    log.debug("Created account_credentials_mordor.txt file.");
+                }
+            }
+
+            List<String> accountCredentials = Files.readAllLines(Paths.get(filePath));
+            if (!accountCredentials.isEmpty()) {
+                nameOrEmail = accountCredentials.get(0);
+                password = accountCredentials.size() > 1 ? accountCredentials.get(1) : null;
+                log.debug("[autologin] Credentials loaded for user:" + nameOrEmail);
+            }
+        } catch (IOException e) {
+            log.debug("Error reading account credentials: " + e.getMessage());
+        }
+
+        if (nameOrEmail != null && password != null) {
+            EmbeddedLdapProperties.Credential credential = new EmbeddedLdapProperties.Credential();
+            credential.setUsername(nameOrEmail);
+            credential.setPassword(password);
+            return credential;
+        } else {
+            return null;
+        }
+    }
+
+
     @Override
     public Pane getRoot() {
         return root;
     }
+
 
     @FXML
     public void initialize() throws IOException {
@@ -67,72 +111,83 @@ public class LoginController implements Controller<Pane> {
                 environmentComboBox.getItems().add(key)
         );
         reloadLogin();
+        loginWebView.getEngine().setJavaScriptEnabled(true);
         environmentComboBox.getSelectionModel().select(0);
+        EmbeddedLdapProperties.Credential credential = loadAccountCredentials();
+        String clickAuthorizeButtonScript =
+                "function dispatchEvents(element) {" +
+                        "    var event = new Event('input', { 'bubbles': true });" +
+                        "    element.dispatchEvent(event);" +
+                        "    event = new Event('change', { 'bubbles': true });" +
+                        "    element.dispatchEvent(event);" +
+                        "}" +
+                        "function clickAuthorizeButton() {" +
+                        "    var buttons = document.querySelectorAll('vaadin-button[theme=\"primary\"][tabindex=\"0\"][role=\"button\"]');" +
+                        "    for (var i = 0; i < buttons.length; i++) {" +
+                        "        if (buttons[i].textContent.trim() === \"Authorize\") {" +
+                        "            buttons[i].click();" +
+                        "            return;" +
+                        "        }" +
+                        "    }" +
+                        "    console.log('Authorize Button not found!');" +
+                        "}" +
+                        "clickAuthorizeButton();";
+
         loginWebView.getEngine().getLoadWorker().runningProperty().addListener((observable, oldValue, newValue) -> {
-            if (!newValue) {
-                String nameOrEmail = null;
-                String password = null;
+            if (credential != null) {
                 try {
-                    String homeDirectory = System.getProperty("user.home");
-                    String filePath = homeDirectory + File.separator + "account_credentials_mordor.txt";
-                    File file = new File(filePath);
-                    if (!file.exists()) {
-                        try {
-                            boolean created = file.createNewFile();
-                            if (created) {
-                                log.debug("Created account_credentials_mordor.txt file.");
-                            }
-                        } catch (IOException e) {
-                            log.debug("Error creating account_credentials_mordor.txt file: " + e.getMessage());
-                        }
-                    }
-
-                    List<String> accountCredentials = Files.readAllLines(Paths.get(filePath));
-                    if (!accountCredentials.get(0).isEmpty()) {
-                        nameOrEmail = accountCredentials.get(0);
-                        password = accountCredentials.get(1);
-                    }
-                } catch (IOException e) {
-                    log.debug(String.valueOf(e));
+                    String fillLoginNameAndPasswordScript = String.format(
+                            "function setValueToNameOrEmail() {" +
+                                    "    var element = document.getElementById('input-vaadin-text-field-6');" +
+                                    "    if (element) {" +
+                                    "        element.value = '%s';" +
+                                    "        dispatchEvents(element);" +
+                                    "        setValueToPassword();" +
+                                    "    } else {" +
+                                    "        setTimeout(setValueToNameOrEmail, 100);" +
+                                    "    }" +
+                                    "}" +
+                                    "function setValueToPassword() {" +
+                                    "    var element = document.getElementById('input-vaadin-password-field-7');" +
+                                    "    if (element) {" +
+                                    "        element.value = '%s';" +
+                                    "        dispatchEvents(element);" +
+                                    "        clickLoginButton();" +
+                                    "    } else {" +
+                                    "        setTimeout(setValueToPassword, 100);" +
+                                    "    }" +
+                                    "}" +
+                                    "function dispatchEvents(element) {" +
+                                    "    var event = new Event('input', { 'bubbles': true });" +
+                                    "    element.dispatchEvent(event);" +
+                                    "    event = new Event('change', { 'bubbles': true });" +
+                                    "    element.dispatchEvent(event);" +
+                                    "}" +
+                                    "function clickLoginButton() {" +
+                                    "    var button = document.querySelector('vaadin-button[theme=\"primary\"][tabindex=\"0\"][role=\"button\"]');" +
+                                    "    if (button) {" +
+                                    "        button.dispatchEvent(new MouseEvent('click', {" +
+                                    "            'view': window," +
+                                    "            'bubbles': true," +
+                                    "            'cancelable': true" +
+                                    "        }));" +
+                                    "    } else {" +
+                                    "        console.log('Button not found!');" +
+                                    "    }" +
+                                    "}" +
+                                    "setValueToNameOrEmail();",
+                            credential.getUsername(), credential.getPassword()
+                    );
+                    log.debug("[autologin] fire fillLoginNameAndPasswordScript");
+                    loginWebView.getEngine().executeScript(fillLoginNameAndPasswordScript);
+                    log.debug("[autologin] fire clickAuthorizeButtonScript");
+                    loginWebView.getEngine().executeScript(clickAuthorizeButtonScript);
+                } catch (Exception e) {
+                    log.error("An error occurred during auto-login: " + e.getMessage(), e);
                 }
 
-                if (nameOrEmail != null) {
-                    try {
-                        if (loginWebView.getEngine().executeScript("javascript:document.getElementById('form-header');") != null) {
-                            loginWebView.getEngine().executeScript(String.format("javascript:document.getElementsByName('usernameOrEmail')[0].value = '%s'", nameOrEmail));
-                            loginWebView.getEngine().executeScript(String.format("javascript:document.getElementsByName('password')[0].value = '%s'", password));
-                            log.debug("[autologin] Account credentials were entered.");
-                            loginWebView.getEngine().executeScript("javascript:document.querySelector('input[type=\"submit\"][value=\"Log in\"]').click()");
-                            log.debug("[autologin] Log in button was automatically clicked.");
-                        }
-                    } catch (Exception error) {
-                        log.debug(String.valueOf(error));
-                        try {
-                            Thread.sleep(3000);
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
-                        }
-                    }
-                }
-
-                try {
-                    if (tokenCache == null || tokenCache.isExpired()) {
-                        Document doc = loginWebView.getEngine().getDocument();
-                        Element element = doc.getElementById("denial-form");
-                        if (element != null) {
-                            loginWebView.getEngine().executeScript("javascript:document.querySelector('input[type=\"submit\"][value=\"Authorize\"]').click()");
-                            log.debug("[autologin] Authorize button was automatically clicked.");
-                        }
-                    }
-                }
-                 catch (NullPointerException nullPointerException) {
-                    log.debug("Catch: " + nullPointerException);
-                } catch (Exception error) {
-                    log.debug(String.valueOf(error));
-                }
-
-                resetPageFuture.complete(null);
             }
+            resetPageFuture.complete(null);
         });
 
         loginWebView.getEngine().locationProperty().addListener((observable, oldValue, newValue) -> {
@@ -184,6 +239,7 @@ public class LoginController implements Controller<Pane> {
         });
     }
 
+
     public void reloadLogin() {
         log.debug("reloadLogin");
         resetPageFuture = new CompletableFuture<>();
@@ -195,6 +251,7 @@ public class LoginController implements Controller<Pane> {
     }
 
     private void loadLoginPage(){
+        log.debug("test1");
         loginWebView.getEngine().setJavaScriptEnabled(true);
         loginWebView.getEngine().load(getHydraUrl());
     }
