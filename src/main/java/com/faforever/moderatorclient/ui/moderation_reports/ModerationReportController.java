@@ -846,13 +846,29 @@ public class ModerationReportController implements Controller<Region> {
 
     private String generateMetadataInfo(ReplayDataParser replayDataParser) {
         ReplayMetadata metadata = replayDataParser.getMetadata();
-        return "Victory Condition: " + metadata.getVictoryCondition() + "\n" +
-                "Game Time: " + metadata.getGameTime() + "\n" +
-                "Host: " + metadata.getHost() + "\n" +
-                "Featured Mod: " + metadata.getFeaturedMod() + "\n" +
-                "Map Name: " + metadata.getMapname() + "\n" +
-                "Number of Players: " + metadata.getNumPlayers() + "\n" +
-                "Teams: " + metadata.getTeams() + "\n\n";
+        double launchedAt = metadata.getLaunchedAt();
+        double gameEnd = metadata.getGameEnd();
+        double totalTime = gameEnd - launchedAt;
+        String formattedTotalTime = formatGameTotalTime(totalTime);
+
+        return //"Victory Condition: " + metadata.getVictoryCondition() + "\n" + // Is always Unknown for whatever reason
+               // "Game Time: " + metadata.getLaunchedAt() + "\n" + // Is always 0.0 for whatever reason
+               "Host: " + metadata.getHost() + "\n" +
+               "Number of Players: " + metadata.getNumPlayers() + "\n" +
+               "Teams: " + metadata.getTeams() + "\n"+
+               "Map Name: " + metadata.getMapname() + "\n" +
+               "Game Total Time: " + formattedTotalTime + "\n\n";
+               //"Featured Mod: " + Arrays.toString(metadata.getOptions()) + "\n\n"; // Is always null for whatever reason
+    }
+
+    private String formatGameTotalTime(double totalTime) {
+        int totalSeconds = (int) totalTime;
+        int hours = totalSeconds / 3600;
+        int remainder = totalSeconds % 3600;
+        int minutes = remainder / 60;
+        int seconds = remainder % 60;
+
+        return String.format("%02d:%02d:%02d", hours, minutes, seconds);
     }
 
     private String filterAndAppendChatLog(String chatLog) throws IOException {
