@@ -2156,7 +2156,7 @@ public class ViewHelper {
         tableView.getColumns().add(gameColumn);
         extractors.put(gameColumn, reportFx -> reportFx.getGame() == null ? null : reportFx.getGame().getId());
 
-        if (onChatLog != null) {
+        /*if (onChatLog != null) {
             TableColumn<ModerationReportFX, ModerationReportFX> chatLogColumn = new TableColumn<>("Replay");
             chatLogColumn.setCellValueFactory(param -> new SimpleObjectProperty<>(param.getValue()));
             chatLogColumn.setCellFactory(param -> new TableCell<>() {
@@ -2175,7 +2175,7 @@ public class ViewHelper {
             });
             chatLogColumn.setMinWidth(120);
             tableView.getColumns().add(chatLogColumn);
-        }
+        }*/
 
         TableColumn<ModerationReportFX, String> privateNoteColumn = new TableColumn<>("Private Notice");
         privateNoteColumn.setMinWidth(180);
