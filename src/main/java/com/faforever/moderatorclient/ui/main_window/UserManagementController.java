@@ -340,10 +340,16 @@ public class UserManagementController implements Controller<SplitPane> {
                 });
             }
 
-            userGamesPage = 1;
-            loadMoreGamesRunnable = () -> CompletableFuture.supplyAsync(() -> gamePlayerStatsMapper.map(userService.getLastHundredPlayedGamesByFeaturedMod(newValue.getId(), userGamesPage, featuredModFilterChoiceBox.getSelectionModel().getSelectedItem())))
-                    .thenAccept(gamePlayerStats -> Platform.runLater(() -> userLastGamesTable.getItems().addAll(gamePlayerStats)));
-            loadMoreGamesRunnable.run();
+            userGamesPage = 1; // Reset userGamesPage to start from the first page
+            int numberOfPagesToLoad = 10; // Load 10 more pages TODO Customize value in settingsTab
+
+            for (int i = 0; i < numberOfPagesToLoad; i++) {
+                final int currentPage = userGamesPage + i;
+                loadMoreGamesRunnable = () -> CompletableFuture.supplyAsync(() -> gamePlayerStatsMapper.map(userService.getLastHundredPlayedGamesByFeaturedMod(newValue.getId(), currentPage, featuredModFilterChoiceBox.getSelectionModel().getSelectedItem())))
+                        .thenAccept(gamePlayerStats -> Platform.runLater(() -> userLastGamesTable.getItems().addAll(gamePlayerStats)));
+                loadMoreGamesRunnable.run();
+            }
+
         }
 
         newBanButton.setDisable(newValue == null);
