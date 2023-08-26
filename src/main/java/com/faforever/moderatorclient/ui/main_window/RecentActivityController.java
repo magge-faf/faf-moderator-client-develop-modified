@@ -5,11 +5,7 @@ import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.MapService;
 import com.faforever.moderatorclient.api.domain.UserService;
 import com.faforever.moderatorclient.ui.*;
-import com.faforever.moderatorclient.ui.domain.BanInfoFX;
-import com.faforever.moderatorclient.ui.domain.MapVersionFX;
-import com.faforever.moderatorclient.ui.domain.PlayerFX;
-import com.faforever.moderatorclient.ui.domain.TeamkillFX;
-import com.faforever.moderatorclient.ui.domain.UniqueIdFx;
+import com.faforever.moderatorclient.ui.domain.*;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.ObservableSet;
@@ -26,14 +22,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Scanner;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.Clip;
+import java.io.File;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
-import javax.sound.sampled.*;
 
 @Slf4j
 @Component
@@ -89,15 +84,7 @@ public class RecentActivityController implements Controller<VBox> {
         }
 
     }
-    private void checkBlacklistedItem(String fileName, List<String> blacklistedItems, String item, PlayerFX account) {
-        for (String blacklistedItem : blacklistedItems) {
-            if (blacklistedItem.equals(item)) {
-                playBlacklistedNotificationSound();
-                log.debug("[!] " + fileName + " [" + blacklistedItem + "] for " + account.getRepresentation());
-                suspiciousUserTextArea.setText(suspiciousUserTextArea.getText() + "[!] " + fileName + " [" + blacklistedItem + "] for " + account.getRepresentation() + "\n");
-            }
-        }
-    }
+
 
     private void addBan(PlayerFX playerFX) {
         BanInfoController banInfoController = uiService.loadFxml("ui/banInfo.fxml");
@@ -117,28 +104,6 @@ public class RecentActivityController implements Controller<VBox> {
         mapService.patchMapVersion(mapVersionFX);
     }
 
-    private void loadList(File file, List<String> list) {
-        try (Scanner s = new Scanner(file)) {
-            while (s.hasNextLine()) {
-                String blacklistedItem = s.nextLine();
-                list.add(blacklistedItem);
-            }
-        } catch (FileNotFoundException e) {
-            log.debug(String.valueOf(e));
-        }
-
-        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-            String line = reader.readLine();
-            int lineCount = 0;
-            while (line != null) {
-                lineCount++;
-                line = reader.readLine();
-            }
-            log.debug("[info] " + file + " loaded. Total items: " + lineCount);
-        } catch (IOException e) {
-            log.debug(String.valueOf(e));
-        }
-    }
     private List<String> filterList(List<String> list, List<String> excludedItems) {
         return list.stream()
                 .filter(item -> !excludedItems.contains(item))
@@ -150,97 +115,102 @@ public class RecentActivityController implements Controller<VBox> {
         mapVersions.setAll(mapService.findLatestMapVersions());
         mapUploadFeedTableView.getSortOrder().clear();
 
+        // Resetting UI element
         suspiciousUserTextArea.setText("");
 
-        List<String> excludedItems = new ArrayList<>();
-        List<String> blacklistedHash = new ArrayList<>();
-        List<String> blacklistedIP = new ArrayList<>();
-        List<String> blacklistedMemorySN = new ArrayList<>();
-        List<String> blacklistedSN = new ArrayList<>();
-        List<String> blacklistedUUID = new ArrayList<>();
-        List<String> blacklistedVolumeSN = new ArrayList<>();
+        // Initialize data structures
+        Map<String, List<String>> blacklistedData = new HashMap<>();
         List<String> whitelistUserID = new ArrayList<>();
-        //TODO ref
-        //String[] fileNames = {"excludedItems", "blacklistedHash", "blacklistedIP", "blacklistedMemorySN",
-        //        "blacklistedSN", "blacklistedUUID", "blacklistedVolumeSN"};
-        //List<File> files = new ArrayList<>();
-        //for (String name : fileNames) {
-        //    files.add(new File(CONFIGURATION_FOLDER + "/" + name + ".txt"));
-        //}
-        File fileExcludedItems = new File(CONFIGURATION_FOLDER+"/excludedItems" + ".txt");
-        File fileBlacklistedHash = new File(CONFIGURATION_FOLDER+"/blacklistedHash" + ".txt");
-        File fileBlacklistedIP = new File(CONFIGURATION_FOLDER+"/blacklistedIP" + ".txt");
-        File fileBlacklistedMemorySN = new File(CONFIGURATION_FOLDER+"/blacklistedMemorySN" + ".txt");
-        File fileBlacklistedSN = new File(CONFIGURATION_FOLDER+"/blacklistedSN" + ".txt");
-        File fileBlacklistedUUID = new File(CONFIGURATION_FOLDER+"/blacklistedUUID" + ".txt");
-        File fileBlacklistedVolumeSN = new File(CONFIGURATION_FOLDER+"/blacklistedVolumeSN" + ".txt");
-        File fileWhitelistedUserID = new File(CONFIGURATION_FOLDER+"/whitelistedUserID" + ".txt");
 
-        //TODO if the format is not correct, it will add an empty item to the list which can cause issues later?
-        try {
-            Scanner s = new Scanner(fileExcludedItems);
-            while (s.hasNextLine()) {
-                excludedItems.add(s.nextLine());
+        // Define FILE_NAMES constants
+        final String[] FILE_NAMES = {"excludedItems", "blacklistedHash", "blacklistedIP", "blacklistedMemorySN",
+                "blacklistedSN", "blacklistedUUID", "blacklistedVolumeSN", "whitelistedUserID"};
+
+        // Load data from files
+        for (String fileName : FILE_NAMES) {
+            File file = new File(CONFIGURATION_FOLDER + File.separator + fileName + ".txt");
+            List<String> list = new ArrayList<>();
+            if ("whitelistedUserID".equals(fileName)) {
+                loadList(file, whitelistUserID);
+            } else {
+                loadList(file, list);
+                blacklistedData.put(fileName, list);
             }
-            s.close();
-            log.debug("[info] " + fileExcludedItems + " loaded.");
-
-            log.debug("fileExcludedItems:" + excludedItems);
-        } catch (Exception e) {
-            log.debug(String.valueOf(e));
         }
 
-        loadList(fileBlacklistedHash, blacklistedHash);
-        loadList(fileBlacklistedIP, blacklistedIP);
-        loadList(fileBlacklistedMemorySN, blacklistedMemorySN);
-        loadList(fileBlacklistedSN, blacklistedSN);
-        loadList(fileBlacklistedUUID, blacklistedUUID);
-        loadList(fileBlacklistedVolumeSN, blacklistedVolumeSN);
-        loadList(fileWhitelistedUserID, whitelistUserID);
+        // Filter blacklisted items
+        Map<String, List<String>> filteredBlacklistedData = new HashMap<>();
+        for (Map.Entry<String, List<String>> entry : blacklistedData.entrySet()) {
+            filteredBlacklistedData.put(entry.getKey(), filterList(entry.getValue(), blacklistedData.get("excludedItems")));
+        }
 
-        List<String> filteredBlacklistedHash = filterList(blacklistedHash, excludedItems);
-        List<String> filteredBlacklistedIP = filterList(blacklistedIP, excludedItems);
-        List<String> filteredBlacklistedMemorySN = filterList(blacklistedMemorySN, excludedItems);
-        List<String> filteredBlacklistedSN = filterList(blacklistedSN, excludedItems);
-        List<String> filteredBlacklistedUUID = filterList(blacklistedUUID, excludedItems);
-        List<String> filteredBlacklistedVolumeSN = filterList(blacklistedVolumeSN, excludedItems);
-
+        // Load recent registrations and loop through accounts
         users.setAll(userService.findLatestRegistrations());
+        List<PlayerFX> accounts = userService.findLatestRegistrations();
         userRegistrationFeedTableView.getSortOrder().clear();
 
-        List<PlayerFX> accounts = userService.findLatestRegistrations();
-
         for (PlayerFX account : accounts) {
-            // cycle through players
-            Boolean includeBannedUserGlobally = includeGlobalBannedUserCheckBox.isSelected();
-
-            if (includeBannedUserGlobally.equals(account.isBannedGlobally())) {
-                ObservableSet<UniqueIdFx> accountUniqueIds = account.getUniqueIds();
-                for (String userID : whitelistUserID) {
-                    if (account.getId().equals(userID)) {
-                        log.debug("[whitelisted userID] " + userID);
-                        return;
-                    }
-                }
-                for (UniqueIdFx item : accountUniqueIds) {
-                    checkBlacklistedItem("blacklistedHash", filteredBlacklistedHash, item.getHash(), account);
-                    checkBlacklistedItem("blacklistedIP", filteredBlacklistedIP, account.getRecentIpAddress(), account);
-                    checkBlacklistedItem("blacklistedMemorySN", filteredBlacklistedMemorySN, item.getMemorySerialNumber(), account);
-                    checkBlacklistedItem("blacklistedSN", filteredBlacklistedSN, item.getSerialNumber(), account);
-                    checkBlacklistedItem("blacklistedUUID", filteredBlacklistedUUID, item.getUuid(), account);
-                    checkBlacklistedItem("blacklistedVolumeSN", filteredBlacklistedVolumeSN, item.getVolumeSerialNumber(), account);
-                }
-            }
+            checkAccountAgainstBlacklists(account, whitelistUserID, filteredBlacklistedData);
         }
         log.debug("[info] Recent users checked.");
     }
+    private void loadList(File file, List<String> list) {
+        int itemCount = 0;
+        try (Scanner scanner = new Scanner(file)) {
+            while (scanner.hasNextLine()) {
+                list.add(scanner.nextLine());
+                itemCount++;
+            }
+            log.debug("[info] " + file + " loaded with " + itemCount + " items.");
+        } catch (Exception e) {
+            log.debug(String.valueOf(e));
+        }
+    }
+
+
+    private void checkAccountAgainstBlacklists(PlayerFX account, List<String> whitelistUserID, Map<String, List<String>> filteredBlacklistedData) {
+        Boolean includeBannedUserGlobally = includeGlobalBannedUserCheckBox.isSelected();
+
+        if (includeBannedUserGlobally.equals(account.isBannedGlobally())) {
+            ObservableSet<UniqueIdFx> accountUniqueIds = account.getUniqueIds();
+
+            // Check against whitelist and ignore userID
+            for (String userID : whitelistUserID) {
+                if (account.getId().equals(userID)) {
+                    log.debug("[whitelisted userID] " + userID);
+                    return;
+                }
+            }
+
+            // Check against blacklists
+            for (UniqueIdFx item : accountUniqueIds) {
+                checkBlacklistedItem("blacklistedHash", filteredBlacklistedData.get("blacklistedHash"), item.getHash(), account);
+                checkBlacklistedItem("blacklistedIP", filteredBlacklistedData.get("blacklistedIP"), account.getRecentIpAddress(), account);
+                checkBlacklistedItem("blacklistedMemorySN", filteredBlacklistedData.get("blacklistedMemorySN"), item.getMemorySerialNumber(), account);
+                checkBlacklistedItem("blacklistedSN", filteredBlacklistedData.get("blacklistedSN"), item.getSerialNumber(), account);
+                checkBlacklistedItem("blacklistedUUID", filteredBlacklistedData.get("blacklistedUUID"), item.getUuid(), account);
+                checkBlacklistedItem("blacklistedVolumeSN", filteredBlacklistedData.get("blacklistedVolumeSN"), item.getVolumeSerialNumber(), account);
+            }
+        }
+    }
+
+    private void checkBlacklistedItem(String fileName, List<String> blacklistedItems, String item, PlayerFX account) {
+        for (String blacklistedItem : blacklistedItems) {
+            if (blacklistedItem.equals(item)) {
+                playBlacklistedNotificationSound();
+                log.debug("[!] " + fileName + " [" + blacklistedItem + "] for " + account.getRepresentation());
+                suspiciousUserTextArea.setText(suspiciousUserTextArea.getText() + "[!] " + fileName + " [" + blacklistedItem + "] for " + account.getRepresentation() + "\n");
+            }
+        }
+    }
+
     private void playBlacklistedNotificationSound() {
             try {
                 Clip clip = AudioSystem.getClip();
                 clip.open(AudioSystem.getAudioInputStream(new File(CONFIGURATION_FOLDER + File.separator + "blacklisted_notification_sound.wav")));
                 clip.start();
             } catch (Exception e) {
-                e.printStackTrace();
+                log.warn("Error in playBlacklistedNotificationSound:", e);
             }
         }
     }
