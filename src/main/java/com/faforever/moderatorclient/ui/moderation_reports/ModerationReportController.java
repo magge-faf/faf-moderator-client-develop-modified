@@ -746,7 +746,16 @@ public class ModerationReportController implements Controller<Region> {
                 if (response == null || response.statusCode() == 404) {
                     updateUIUnavailable(header, "Replay not available");
                 } else {
-                    processAndDisplayReplay(header, tempFilePath);
+                    String offenderNames = report.getReportedUsers().stream()
+                            .map(PlayerFX::getRepresentation)
+                            .collect(Collectors.joining(", "));
+                    String reporter = String.valueOf(report.getReporter().getRepresentation());
+                    String promptAI = "AI-Prompt: Gaming Moderator Task\n"
+                            + "Reported Chat Log Assessing report from " + reporter + " against " + offenderNames + ":\n"
+                            + "Rate offender's toxicity (0-100%)\n"
+                            + "Give examples for the violations and keep your answers short";
+
+                    processAndDisplayReplay(header, tempFilePath, promptAI);
                 }
 
                 deleteTempFile(tempFilePath);
@@ -793,7 +802,7 @@ public class ModerationReportController implements Controller<Region> {
         });
     }
 
-    private void processAndDisplayReplay(String header, Path tempFilePath) {
+    private void processAndDisplayReplay(String header, Path tempFilePath, String promptAI) {
         try {
             ReplayDataParser replayDataParser = new ReplayDataParser(tempFilePath, objectMapper);
             String chatLog = generateChatLog(replayDataParser);
@@ -806,6 +815,7 @@ public class ModerationReportController implements Controller<Region> {
 
             String filteredChatLog = filterAndAppendChatLog(chatLog);
             chatLogFiltered.append(filteredChatLog);
+            chatLogFiltered.append("\n").append(promptAI);
 
             Platform.runLater(() -> {
                 CopyChatLogButton.setId(chatLogFiltered.toString());
@@ -852,13 +862,13 @@ public class ModerationReportController implements Controller<Region> {
         String formattedTotalTime = formatGameTotalTime(totalTime);
 
         return //"Victory Condition: " + metadata.getVictoryCondition() + "\n" + // Is always Unknown for whatever reason
-               // "Game Time: " + metadata.getLaunchedAt() + "\n" + // Is always 0.0 for whatever reason
-               "Host: " + metadata.getHost() + "\n" +
-               "Number of Players: " + metadata.getNumPlayers() + "\n" +
-               "Teams: " + metadata.getTeams() + "\n"+
-               "Map Name: " + metadata.getMapname() + "\n" +
-               "Game Total Time: " + formattedTotalTime + "\n\n";
-               //"Featured Mod: " + Arrays.toString(metadata.getOptions()) + "\n\n"; // Is always null for whatever reason
+                // "Game Time: " + metadata.getLaunchedAt() + "\n" + // Is always 0.0 for whatever reason
+                "Host: " + metadata.getHost() + "\n" +
+                "Number of Players: " + metadata.getNumPlayers() + "\n" +
+                "Teams: " + metadata.getTeams() + "\n"+
+                "Map Name: " + metadata.getMapname() + "\n" +
+                "Game Total Time: " + formattedTotalTime + "\n\n";
+                //"Featured Mod: " + Arrays.toString(metadata.getOptions()) + "\n\n"; // Is always null for whatever reason
     }
 
     private String formatGameTotalTime(double totalTime) {
@@ -877,7 +887,7 @@ public class ModerationReportController implements Controller<Region> {
 
         String compileSentences = "Can you give me some mass, |Can you give me some energy, |" +
                 "Can you give me one Engineer, | to notify: | to allies: Sent Mass | to allies: Sent Energy |" +
-                " to allies: sent ";
+                " to allies: sent |give me Mass";
 
         Pattern pattern = Pattern.compile(compileSentences);
         String chatLine;
