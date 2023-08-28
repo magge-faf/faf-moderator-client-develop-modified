@@ -7,24 +7,8 @@ import com.faforever.moderatorclient.api.domain.AvatarService;
 import com.faforever.moderatorclient.api.domain.PermissionService;
 import com.faforever.moderatorclient.api.domain.UserService;
 import com.faforever.moderatorclient.mapstruct.GamePlayerStatsMapper;
-import com.faforever.moderatorclient.ui.BanInfoController;
-import com.faforever.moderatorclient.ui.Controller;
-import com.faforever.moderatorclient.ui.GroupAddUserController;
-import com.faforever.moderatorclient.ui.PlatformService;
-import com.faforever.moderatorclient.ui.UiService;
-import com.faforever.moderatorclient.ui.UserNoteController;
-import com.faforever.moderatorclient.ui.ViewHelper;
-import com.faforever.moderatorclient.ui.domain.AvatarAssignmentFX;
-import com.faforever.moderatorclient.ui.domain.AvatarFX;
-import com.faforever.moderatorclient.ui.domain.BanInfoFX;
-import com.faforever.moderatorclient.ui.domain.FeaturedModFX;
-import com.faforever.moderatorclient.ui.domain.GamePlayerStatsFX;
-import com.faforever.moderatorclient.ui.domain.GroupPermissionFX;
-import com.faforever.moderatorclient.ui.domain.NameRecordFX;
-import com.faforever.moderatorclient.ui.domain.PlayerFX;
-import com.faforever.moderatorclient.ui.domain.TeamkillFX;
-import com.faforever.moderatorclient.ui.domain.UserGroupFX;
-import com.faforever.moderatorclient.ui.domain.UserNoteFX;
+import com.faforever.moderatorclient.ui.*;
+import com.faforever.moderatorclient.ui.domain.*;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.ObjectProperty;
@@ -32,6 +16,7 @@ import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -168,7 +153,7 @@ public class UserManagementController implements Controller<SplitPane> {
         try (InputStream in = new FileInputStream(CONFIGURATION_FOLDER + "/config.properties")) {
             props.load(in);
         } catch (IOException e) {
-            e.printStackTrace();
+            log.warn("Error initializing config.properties " + e);
         }
         // Load config
         excludeItemsCheckBox.setSelected(Boolean.parseBoolean(props.getProperty("excludeItemsCheckBox")));
@@ -630,29 +615,40 @@ public class UserManagementController implements Controller<SplitPane> {
         }
         return excludedItems;
     }
-    private void processUsers(String attributeName, String attributeValue, int threshold, StringBuilder logOutput, ArrayList<Object> foundSmurfs) {
+    private void processUsers(String attributeName, String attributeValue, int threshold, StringBuilder logOutput, ArrayList<Object> foundSmurfs, int depth, String playerID) {
         List<String> excludedItems = loadExcludedItems();
         boolean excludeItemsSelected = excludeItemsCheckBox.isSelected();
 
-        if (excludedItems.contains(attributeValue) && excludeItemsSelected) {
-            logOutput.append("\nThe ").append(attributeName).append(" [").append(attributeValue).append("] is an excluded item, skipping.\n");
+        if (excludeItemsSelected && excludedItems.contains(attributeValue)) {
+            logOutput.append("\nEXCLUSION CHECK\n  - Attribute: ").append(attributeName).append("\n  - Value: [").append(attributeValue).append("]\n  This attribute-value pair is excluded, skipping.\n--------------------------------------------------------\n");
             return;
         }
 
         List<PlayerFX> users = userService.findUsersByAttribute(attributeName, attributeValue);
 
         if (users.size() > threshold) {
-            logOutput.append(String.format("Too many users found with %s [%s]. It might not be relatable, getting ignored. Threshold is %d and found were %d users\n", attributeName, attributeValue, threshold, users.size()));
+            logOutput.append("THRESHOLD CHECK\n");
+            logOutput.append(String.format("Ignoring %s [%s] (found %d, limit %d, added to excludedItems.txt)", attributeName, attributeValue, users.size(), threshold));
+
+            File fileExcludedItems = new File(CONFIGURATION_FOLDER + "/excludedItems" + ".txt");
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileExcludedItems, true))) {
+                writer.newLine();
+                writer.write(attributeValue);  // Append the attributeValue to the last line
+            } catch (IOException e) {
+                log.warn("Failed to write to excludedItems.txt: " + e.getMessage());
+            }
+            log.debug(attributeValue + " was added to the excludedItems.txt");
             return;
         }
 
         if (users.size() != 1) {
-            logOutput.append("\n\nUsers for ").append(attributeName).append(" with same value [").append(attributeValue).append("]\n");
+            logOutput.append("\nMULTIPLE USERS\n");
+            logOutput.append(String.format("  - Attribute: %s with value: [%s]\n", attributeName, attributeValue));
 
             for (PlayerFX user : users) {
                 String accountStatus = user.isBannedGlobally() ? "banned: " : "active: ";
                 String name = user.getRepresentation();
-                String output = String.format("\t %-20s %-10s\n", accountStatus, name);
+                String output = String.format("      %-20s %-10s\n", accountStatus, name);
                 logOutput.append(output);
 
                 if (user.getId() != null && !foundSmurfs.contains(user.getId())) {
@@ -678,7 +674,7 @@ public class UserManagementController implements Controller<SplitPane> {
             bw.close();
             log.debug("Output was added in " + fileName);
         } catch (IOException e) {
-            e.printStackTrace();
+            log.warn("error in writeSmurfVillageLookup2File:" + e);;
         }
     }
 
@@ -744,19 +740,20 @@ public class UserManagementController implements Controller<SplitPane> {
 
         ArrayList<Object> foundSmurfs = new ArrayList<>();
 
-        uuids.forEach(uuid -> processUsers(propertyUUID, uuid, maxUniqueUsersThreshold, logOutput, foundSmurfs));
-        hashes.forEach(hash -> processUsers(propertyHash, hash, maxUniqueUsersThreshold, logOutput, foundSmurfs));
-        ips.forEach(ip -> processUsers(propertyIP, ip, maxUniqueUsersThreshold, logOutput, foundSmurfs));
-        memorySerialNumbers.forEach(memorySerialNumber -> processUsers(propertyMemorySerialNumber, memorySerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs));
-        volumeSerialNumbers.forEach(volumeSerialNumber -> processUsers(propertyVolumeSerialNumber, volumeSerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs));
-        serialNumbers.forEach(serialNumber -> processUsers(propertySerialNumber, serialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs));
-        processorIds.forEach(processorId -> processUsers(propertyProcessorId, processorId, maxUniqueUsersThreshold, logOutput, foundSmurfs));
-        //biosVersions.stream().forEach(biosVersion -> processUsers(propertyBiosVersion, biosVersion, searchPattern, maxUniqueUsersThreshold, logOutput));
-        manufacturers.forEach(manufacturer -> processUsers(propertyManufacturer, manufacturer, maxUniqueUsersThreshold, logOutput, foundSmurfs));
-        cpuNames.forEach(cpu -> processUsers(propertyCPUName, cpu, maxUniqueUsersThreshold, logOutput, foundSmurfs));
+        uuids.forEach(uuid -> processUsers(propertyUUID, uuid, maxUniqueUsersThreshold, logOutput, foundSmurfs, depthCounter, playerID));
+        hashes.forEach(hash -> processUsers(propertyHash, hash, maxUniqueUsersThreshold, logOutput, foundSmurfs, depthCounter, playerID));
+        ips.forEach(ip -> processUsers(propertyIP, ip, maxUniqueUsersThreshold, logOutput, foundSmurfs, depthCounter, playerID));
+        memorySerialNumbers.forEach(memorySerialNumber -> processUsers(propertyMemorySerialNumber, memorySerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, depthCounter, playerID));
+        volumeSerialNumbers.forEach(volumeSerialNumber -> processUsers(propertyVolumeSerialNumber, volumeSerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, depthCounter, playerID));
+        serialNumbers.forEach(serialNumber -> processUsers(propertySerialNumber, serialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, depthCounter, playerID));
+        processorIds.forEach(processorId -> processUsers(propertyProcessorId, processorId, maxUniqueUsersThreshold, logOutput, foundSmurfs, depthCounter, playerID));
+        manufacturers.forEach(manufacturer -> processUsers(propertyManufacturer, manufacturer, maxUniqueUsersThreshold, logOutput, foundSmurfs, depthCounter, playerID));
+        cpuNames.forEach(cpu -> processUsers(propertyCPUName, cpu, maxUniqueUsersThreshold, logOutput, foundSmurfs, depthCounter, playerID));
 
-        if (foundSmurfs.size() >= 1) {
-            logOutput.append("\n").append(playerID).append(" is related through unique items to --> ").append(foundSmurfs);
+        //biosVersions.stream().forEach(biosVersion -> processUsers(propertyBiosVersion, biosVersion, searchPattern, maxUniqueUsersThreshold, logOutput));
+
+        if (!foundSmurfs.isEmpty()) {
+            logOutput.append("\n").append(playerID).append(" is related through unique items to --> ").append(foundSmurfs).append("\n");
         }
         depthCounter+=1;
         String plusSigns = "+".repeat(Math.max(0, depthCounter));
@@ -767,22 +764,39 @@ public class UserManagementController implements Controller<SplitPane> {
             writeSmurfVillageLookup2File(logOutput);
             return;
         }
-        logOutput.append("\n").append("=".repeat(50)).append("\n");
-        logOutput.append("Current depth ").append(depthCounter).append("/").append(depthThreshold).append(" ").append(plusSigns).append("\n");
-        logOutput.append("Examined playerID: ").append(playerID).append("\n");
+        logOutput.append("\n==================== [Depth ").append(depthCounter).append("/1000] ====================\n");
+        logOutput.append("Processing [PlayerID: ").append(playerID).append("]\n");
+        logOutput.append("--------------------------------------------------------\n");
+
         foundSmurfs.forEach(s -> onSmurfVillageLookup((String) s));
-        logOutput.append("No further information found for ").append(playerID).append("\n");
 
         searchSmurfVillageTabTextArea.setText(logOutput.toString());
         writeSmurfVillageLookup2File(logOutput);
     }
 
     public void onLookup() {
-        depthCounter = 0;
-        logOutput = new StringBuilder();
-        usersNotBanned = new StringBuilder();
-        alreadyCheckedUsers = new ArrayList<>();
-        String lookupPlayerID = smurfVillageLookupTextField.getText();
-        onSmurfVillageLookup(lookupPlayerID);
+        //TODO refactor the feature
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() {
+                depthCounter = 0;
+                logOutput = new StringBuilder();
+                usersNotBanned = new StringBuilder();
+                alreadyCheckedUsers = new ArrayList<>();
+                String lookupPlayerID = smurfVillageLookupTextField.getText();
+                onSmurfVillageLookup(lookupPlayerID);
+                return null;
+            }
+        };
+
+        task.setOnSucceeded(e -> {
+            log.debug("done");
+        });
+
+        task.setOnFailed(e -> {
+            log.debug("fail");
+        });
+
+        new Thread(task).start();
     }
 }
