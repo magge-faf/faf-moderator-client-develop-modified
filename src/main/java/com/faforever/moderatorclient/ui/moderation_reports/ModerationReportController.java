@@ -753,7 +753,8 @@ public class ModerationReportController implements Controller<Region> {
                     String promptAI = "AI-Prompt: Gaming Moderator Task\n"
                             + "Reported Chat Log Assessing report from " + reporter + " against " + offenderNames + ":\n"
                             + "Rate offender's toxicity (0-100%)\n"
-                            + "Give examples for the violations and keep your answers short";
+                            + "Give examples for the violations and keep your answers short.\n"
+                            + "Translate the examples to English.";
 
                     processAndDisplayReplay(header, tempFilePath, promptAI);
                 }
