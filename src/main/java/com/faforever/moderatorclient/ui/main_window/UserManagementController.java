@@ -615,22 +615,23 @@ public class UserManagementController implements Controller<SplitPane> {
         }
         return excludedItems;
     }
-    private void processUsers(String attributeName, String attributeValue, int threshold, StringBuilder logOutput, ArrayList<Object> foundSmurfs, int depth, String playerID) {
+    private void processUsers(String attributeName, String attributeValue, int threshold, StringBuilder logOutput, ArrayList<Object> foundSmurfs, String playerID) {
         List<String> excludedItems = loadExcludedItems();
         boolean excludeItemsSelected = excludeItemsCheckBox.isSelected();
 
         if (excludeItemsSelected && excludedItems.contains(attributeValue)) {
-            logOutput.append("\nEXCLUSION CHECK\n  - Attribute: ").append(attributeName).append("\n  - Value: [").append(attributeValue).append("]\n  This attribute-value pair is excluded, skipping.\n--------------------------------------------------------\n");
+            logOutput.append(String.format("\n EXCLUSION CHECK: attribute [%s] with value [%s] found in excludedItems.txt, skipping.\n", attributeName, attributeValue));
+            log.debug(String.format("\n EXCLUSION CHECK: attribute [%s] with value [%s] found in excludedItems.txt, skipping.\n", attributeName, attributeValue));
             return;
         }
 
         List<PlayerFX> users = userService.findUsersByAttribute(attributeName, attributeValue);
 
         if (users.size() > threshold) {
-            logOutput.append("THRESHOLD CHECK\n");
-            logOutput.append(String.format("Ignoring %s [%s] (found %d, limit %d, added to excludedItems.txt)", attributeName, attributeValue, users.size(), threshold));
+            logOutput.append(String.format("\nTHRESHOLD CHECK: Ignoring %s [%s] (found %d, limit %d, added to excludedItems.txt)\n", attributeName, attributeValue, users.size(), threshold));
+            log.debug(String.format("\nTHRESHOLD CHECK: Ignoring %s [%s] (found %d, limit %d, added to excludedItems.txt)\n", attributeName, attributeValue, users.size(), threshold));
 
-            File fileExcludedItems = new File(CONFIGURATION_FOLDER + "/excludedItems" + ".txt");
+            File fileExcludedItems = new File(CONFIGURATION_FOLDER + File.separator + "excludedItems" + ".txt");
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileExcludedItems, true))) {
                 writer.newLine();
                 writer.write(attributeValue);  // Append the attributeValue to the last line
@@ -674,7 +675,7 @@ public class UserManagementController implements Controller<SplitPane> {
             bw.close();
             log.debug("Output was added in " + fileName);
         } catch (IOException e) {
-            log.warn("error in writeSmurfVillageLookup2File:" + e);;
+            log.warn("Error in writeSmurfVillageLookup2File:" + e);
         }
     }
 
@@ -686,6 +687,9 @@ public class UserManagementController implements Controller<SplitPane> {
         }
         log.debug(playerID + " added to alreadyCheckedUsers");
         alreadyCheckedUsers.add(playerID);
+
+        logOutput.append("\n==================== [PlayerID: ").append(playerID).append(" ====================\n");
+
         users.clear();
         userSearchTableView.getSortOrder().clear();
 
@@ -740,15 +744,15 @@ public class UserManagementController implements Controller<SplitPane> {
 
         ArrayList<Object> foundSmurfs = new ArrayList<>();
 
-        uuids.forEach(uuid -> processUsers(propertyUUID, uuid, maxUniqueUsersThreshold, logOutput, foundSmurfs, depthCounter, playerID));
-        hashes.forEach(hash -> processUsers(propertyHash, hash, maxUniqueUsersThreshold, logOutput, foundSmurfs, depthCounter, playerID));
-        ips.forEach(ip -> processUsers(propertyIP, ip, maxUniqueUsersThreshold, logOutput, foundSmurfs, depthCounter, playerID));
-        memorySerialNumbers.forEach(memorySerialNumber -> processUsers(propertyMemorySerialNumber, memorySerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, depthCounter, playerID));
-        volumeSerialNumbers.forEach(volumeSerialNumber -> processUsers(propertyVolumeSerialNumber, volumeSerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, depthCounter, playerID));
-        serialNumbers.forEach(serialNumber -> processUsers(propertySerialNumber, serialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, depthCounter, playerID));
-        processorIds.forEach(processorId -> processUsers(propertyProcessorId, processorId, maxUniqueUsersThreshold, logOutput, foundSmurfs, depthCounter, playerID));
-        manufacturers.forEach(manufacturer -> processUsers(propertyManufacturer, manufacturer, maxUniqueUsersThreshold, logOutput, foundSmurfs, depthCounter, playerID));
-        cpuNames.forEach(cpu -> processUsers(propertyCPUName, cpu, maxUniqueUsersThreshold, logOutput, foundSmurfs, depthCounter, playerID));
+        uuids.forEach(uuid -> processUsers(propertyUUID, uuid, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID));
+        hashes.forEach(hash -> processUsers(propertyHash, hash, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID));
+        ips.forEach(ip -> processUsers(propertyIP, ip, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID));
+        memorySerialNumbers.forEach(memorySerialNumber -> processUsers(propertyMemorySerialNumber, memorySerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID));
+        volumeSerialNumbers.forEach(volumeSerialNumber -> processUsers(propertyVolumeSerialNumber, volumeSerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID));
+        serialNumbers.forEach(serialNumber -> processUsers(propertySerialNumber, serialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID));
+        processorIds.forEach(processorId -> processUsers(propertyProcessorId, processorId, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID));
+        manufacturers.forEach(manufacturer -> processUsers(propertyManufacturer, manufacturer, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID));
+        cpuNames.forEach(cpu -> processUsers(propertyCPUName, cpu, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID));
 
         //biosVersions.stream().forEach(biosVersion -> processUsers(propertyBiosVersion, biosVersion, searchPattern, maxUniqueUsersThreshold, logOutput));
 
@@ -756,7 +760,6 @@ public class UserManagementController implements Controller<SplitPane> {
             logOutput.append("\n").append(playerID).append(" is related through unique items to --> ").append(foundSmurfs).append("\n");
         }
         depthCounter+=1;
-        String plusSigns = "+".repeat(Math.max(0, depthCounter));
         int depthThreshold = Integer.parseInt(depthScanningInputTextField.getText());
         if (depthCounter >= depthThreshold){
             log.debug("Depth limit reached: " + depthCounter + "/"+ depthThreshold);
@@ -764,9 +767,6 @@ public class UserManagementController implements Controller<SplitPane> {
             writeSmurfVillageLookup2File(logOutput);
             return;
         }
-        logOutput.append("\n==================== [Depth ").append(depthCounter).append("/1000] ====================\n");
-        logOutput.append("Processing [PlayerID: ").append(playerID).append("]\n");
-        logOutput.append("--------------------------------------------------------\n");
 
         foundSmurfs.forEach(s -> onSmurfVillageLookup((String) s));
 
@@ -788,14 +788,10 @@ public class UserManagementController implements Controller<SplitPane> {
                 return null;
             }
         };
+        //TODO spinning loading image to let user know something is happening in background
+        task.setOnSucceeded(e -> log.debug("done"));
 
-        task.setOnSucceeded(e -> {
-            log.debug("done");
-        });
-
-        task.setOnFailed(e -> {
-            log.debug("fail");
-        });
+        task.setOnFailed(e -> log.debug("fail"));
 
         new Thread(task).start();
     }
