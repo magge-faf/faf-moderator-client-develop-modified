@@ -1,7 +1,5 @@
 package com.faforever.moderatorclient.api;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.faforever.commons.api.dto.MeResult;
 import com.faforever.commons.api.elide.ElideEntity;
 import com.faforever.commons.api.elide.ElideNavigator;
@@ -19,15 +17,13 @@ import com.github.jasminb.jsonapi.ResourceConverter;
 import lombok.Getter;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.security.oauth2.client.resource.OAuth2AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
@@ -38,12 +34,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.Serializable;
 import java.lang.reflect.Array;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CountDownLatch;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Service
@@ -242,13 +235,27 @@ public class FafApiCommunicationService {
         }
     }
 
-    public <T extends ElideEntity> List<T> getAll(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder) {
-        return getAll(clazz, routeBuilder, Collections.emptyMap());
+    private <T> List<T> throttle(Supplier<List<T>> taskSupplier) {
+        try {
+            //log.debug("Throttling...");
+            //TODO variable via options, default was 0
+            Thread.sleep(200);
+            return taskSupplier.get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.debug("InterruptedException in throttle:" + e);
+            return Collections.emptyList();
+        }
     }
 
-    public <T extends ElideEntity> List<T> getAll(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder, java.util.Map<String, Serializable> params) {
+    public <T extends ElideEntity> List<T> getAll(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder) {
+        logger.debug("getAll method called with parameters: clazz={}, routeBuilder={}", clazz, routeBuilder);
+        return throttle(() -> getAll(clazz, routeBuilder, Collections.emptyMap()));
+    }
+
+    public <T extends ElideEntity> List<T> getAll(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder, Map<String, Serializable> params) {
         logger.debug("getAll method called with parameters: clazz={}, routeBuilder={}, params={}", clazz, routeBuilder, params);
-        return getMany(clazz, routeBuilder, environmentProperties.getMaxResultSize(), params);
+        return throttle(() -> getMany(clazz, routeBuilder, environmentProperties.getMaxResultSize(), params));
     }
 
     @SneakyThrows
@@ -257,17 +264,20 @@ public class FafApiCommunicationService {
         List<T> current = null;
         int page = 1;
         while ((current == null || current.size() >= environmentProperties.getMaxPageSize()) && result.size() < count) {
-            current = getPage(clazz, routeBuilder, environmentProperties.getMaxPageSize(), page++, params);
+            int finalPage = page;
+            Supplier<List<T>> getPageTask = () -> getPage(clazz, routeBuilder, environmentProperties.getMaxPageSize(), finalPage, params);
+            current = throttle(getPageTask);
             result.addAll(current);
+            page++;
         }
         return result;
     }
 
-    public <T extends ElideEntity> List<T> getPage(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder, int pageSize, int page, java.util.Map<String, Serializable> params) {
-        java.util.Map<String, List<String>> multiValues = params.entrySet().stream()
+    public <T extends ElideEntity> List<T> getPage(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder, int pageSize, int page, Map<String, Serializable> params) {
+        Map<String, List<String>> multiValues = params.entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> Collections.singletonList(String.valueOf(entry.getValue()))));
 
-        return getPage(clazz, routeBuilder, pageSize, page, CollectionUtils.toMultiValueMap(multiValues));
+        return throttle(() -> getPage(clazz, routeBuilder, pageSize, page, CollectionUtils.toMultiValueMap(multiValues)));
     }
 
     @SuppressWarnings("unchecked")
