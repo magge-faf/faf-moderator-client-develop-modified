@@ -1,16 +1,7 @@
 package com.faforever.moderatorclient.ui;
 
-import java.io.*;
-import java.time.Duration;
-import com.faforever.commons.api.dto.BanDurationType;
-import com.faforever.commons.api.dto.BanLevel;
-import com.faforever.commons.api.dto.BanStatus;
-import com.faforever.commons.api.dto.LinkedServiceType;
 import com.faforever.commons.api.dto.Map;
-import com.faforever.commons.api.dto.ModerationReportStatus;
-import com.faforever.commons.api.dto.VotingChoice;
-import com.faforever.commons.api.dto.VotingQuestion;
-import com.faforever.commons.api.dto.VotingSubject;
+import com.faforever.commons.api.dto.*;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.MessagesService;
 import com.faforever.moderatorclient.api.domain.TutorialService;
@@ -18,62 +9,19 @@ import com.faforever.moderatorclient.api.domain.VotingService;
 import com.faforever.moderatorclient.ui.caches.LargeThumbnailCache;
 import com.faforever.moderatorclient.ui.data_cells.TextAreaTableCell;
 import com.faforever.moderatorclient.ui.data_cells.UrlImageViewTableCell;
-import com.faforever.moderatorclient.ui.domain.AccountLinkFx;
-import com.faforever.moderatorclient.ui.domain.AvatarAssignmentFX;
-import com.faforever.moderatorclient.ui.domain.AvatarFX;
-import com.faforever.moderatorclient.ui.domain.BanInfoFX;
-import com.faforever.moderatorclient.ui.domain.GameFX;
-import com.faforever.moderatorclient.ui.domain.GamePlayerStatsFX;
-import com.faforever.moderatorclient.ui.domain.GroupPermissionFX;
-import com.faforever.moderatorclient.ui.domain.MapFX;
-import com.faforever.moderatorclient.ui.domain.MapVersionFX;
-import com.faforever.moderatorclient.ui.domain.MessageFx;
-import com.faforever.moderatorclient.ui.domain.ModFX;
-import com.faforever.moderatorclient.ui.domain.ModVersionFX;
-import com.faforever.moderatorclient.ui.domain.ModerationReportFX;
-import com.faforever.moderatorclient.ui.domain.NameRecordFX;
-import com.faforever.moderatorclient.ui.domain.PlayerFX;
-import com.faforever.moderatorclient.ui.domain.TeamkillFX;
-import com.faforever.moderatorclient.ui.domain.TutorialCategoryFX;
-import com.faforever.moderatorclient.ui.domain.TutorialFx;
-import com.faforever.moderatorclient.ui.domain.UniqueIdFx;
-import com.faforever.moderatorclient.ui.domain.UserGroupFX;
-import com.faforever.moderatorclient.ui.domain.UserNoteFX;
-import com.faforever.moderatorclient.ui.domain.VotingChoiceFX;
-import com.faforever.moderatorclient.ui.domain.VotingQuestionFX;
-import com.faforever.moderatorclient.ui.domain.VotingSubjectFX;
+import com.faforever.moderatorclient.ui.domain.*;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.ObservableList;
 import javafx.scene.Scene;
-import javafx.scene.control.Alert;
-import javafx.scene.control.Button;
-import javafx.scene.control.ButtonType;
-import javafx.scene.control.ContextMenu;
-import javafx.scene.control.Control;
-import javafx.scene.control.Label;
-import javafx.scene.control.MenuItem;
-import javafx.scene.control.SelectionMode;
-import javafx.scene.control.TableCell;
-import javafx.scene.control.TableColumn;
-import javafx.scene.control.TablePosition;
-import javafx.scene.control.TableView;
-import javafx.scene.control.TextArea;
-import javafx.scene.control.Tooltip;
-import javafx.scene.control.TreeItem;
-import javafx.scene.control.TreeTableColumn;
-import javafx.scene.control.TreeTableView;
+import javafx.scene.control.*;
 import javafx.scene.control.cell.CheckBoxTableCell;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.control.cell.TreeItemPropertyValueFactory;
 import javafx.scene.image.ImageView;
-import javafx.scene.input.Clipboard;
-import javafx.scene.input.ClipboardContent;
-import javafx.scene.input.KeyCode;
-import javafx.scene.input.KeyCodeCombination;
-import javafx.scene.input.KeyCombination;
+import javafx.scene.input.*;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.paint.Color;
@@ -91,8 +39,10 @@ import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.io.*;
 import java.net.URL;
 import java.text.MessageFormat;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
@@ -221,7 +171,7 @@ public class ViewHelper {
         });
     }
 
-    public static void buildAvatarAssignmentTableView(TableView<AvatarAssignmentFX> tableView, ObservableList<AvatarAssignmentFX> data) {
+    public static void buildAvatarAssignmentTableView(TableView<AvatarAssignmentFX> tableView, ObservableList<AvatarAssignmentFX> data, @Nullable Consumer<AvatarAssignmentFX> onRemove) {
         tableView.setItems(data);
         HashMap<TableColumn<AvatarAssignmentFX, ?>, Function<AvatarAssignmentFX, ?>> extractors = new HashMap<>();
 
@@ -264,6 +214,27 @@ public class ViewHelper {
         assignedAtColumn.setCellValueFactory(o -> o.getValue().createTimeProperty());
         assignedAtColumn.setMinWidth(180);
         tableView.getColumns().add(assignedAtColumn);
+
+        TableColumn<AvatarAssignmentFX, AvatarAssignmentFX> removeColumn = new TableColumn<>("Remove");
+        removeColumn.setMinWidth(90);
+        removeColumn.setCellValueFactory(param -> new SimpleObjectProperty<>(param.getValue()));
+        removeColumn.setCellFactory(param -> new TableCell<AvatarAssignmentFX, AvatarAssignmentFX>() {
+
+            @Override
+            protected void updateItem(AvatarAssignmentFX item, boolean empty) {
+                super.updateItem(item, empty);
+                if (!empty) {
+                    Button button = new Button("Remove");
+                    button.setOnMouseClicked(event -> onRemove.accept(item));
+                    button.setTextFill(Color.rgb(200, 10, 10));
+
+                    setGraphic(button);
+                    return;
+                }
+                setGraphic(null);
+            }
+        });
+        tableView.getColumns().add(removeColumn);
 
         applyCopyContextMenus(tableView, extractors);
     }
