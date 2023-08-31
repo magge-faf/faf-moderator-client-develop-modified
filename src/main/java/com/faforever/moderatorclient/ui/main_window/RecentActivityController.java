@@ -24,10 +24,6 @@ import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Clip;
 import java.io.File;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
@@ -114,69 +110,54 @@ public class RecentActivityController implements Controller<VBox> {
                 .collect(Collectors.toList());
     }
 
-    ExecutorService executorService = Executors.newFixedThreadPool(4);
-    ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-
-
     public void refresh() {
-        refreshButton.setText("Automatic refresh event has started...");
-        executorService.submit(() -> {
-            scheduler.scheduleWithFixedDelay(() -> {
+        refreshButton.setText("refresh");
+        Platform.runLater(() -> {
+            teamkills.setAll(userService.findLatestTeamkills());
+            teamkillFeedTableView.getSortOrder().clear();
+            mapVersions.setAll(mapService.findLatestMapVersions());
+            mapUploadFeedTableView.getSortOrder().clear();
 
-                Platform.runLater(() -> {
-                    teamkills.setAll(userService.findLatestTeamkills());
-                    teamkillFeedTableView.getSortOrder().clear();
-                    mapVersions.setAll(mapService.findLatestMapVersions());
-                    mapUploadFeedTableView.getSortOrder().clear();
+            // Resetting UI element
+            suspiciousUserTextArea.setText("");
 
-                    // Resetting UI element
-                    suspiciousUserTextArea.setText("");
+            // Initialize data structures
+            Map<String, List<String>> blacklistedData = new HashMap<>();
+            List<String> whitelistUserID = new ArrayList<>();
 
-                    // Initialize data structures
-                    Map<String, List<String>> blacklistedData = new HashMap<>();
-                    List<String> whitelistUserID = new ArrayList<>();
+            // Define FILE_NAMES constants
+            final String[] FILE_NAMES = {"excludedItems", "blacklistedHash", "blacklistedIP", "blacklistedMemorySN",
+                    "blacklistedSN", "blacklistedUUID", "blacklistedVolumeSN", "whitelistedUserID"};
 
-                    // Define FILE_NAMES constants
-                    final String[] FILE_NAMES = {"excludedItems", "blacklistedHash", "blacklistedIP", "blacklistedMemorySN",
-                            "blacklistedSN", "blacklistedUUID", "blacklistedVolumeSN", "whitelistedUserID"};
+            // Load data from files
+            for (String fileName : FILE_NAMES) {
+                File file = new File(CONFIGURATION_FOLDER + File.separator + fileName + ".txt");
+                List<String> list = new ArrayList<>();
+                if ("whitelistedUserID".equals(fileName)) {
+                    loadList(file, whitelistUserID);
+                } else {
+                    loadList(file, list);
+                    blacklistedData.put(fileName, list);
+                }
+            }
 
-                    // Load data from files
-                    for (String fileName : FILE_NAMES) {
-                        File file = new File(CONFIGURATION_FOLDER + File.separator + fileName + ".txt");
-                        List<String> list = new ArrayList<>();
-                        if ("whitelistedUserID".equals(fileName)) {
-                            loadList(file, whitelistUserID);
-                        } else {
-                            loadList(file, list);
-                            blacklistedData.put(fileName, list);
-                        }
-                    }
+            // Filter blacklisted items
+            Map<String, List<String>> filteredBlacklistedData = new HashMap<>();
+            for (Map.Entry<String, List<String>> entry : blacklistedData.entrySet()) {
+                filteredBlacklistedData.put(entry.getKey(), filterList(entry.getValue(), blacklistedData.get("excludedItems")));
+            }
 
-                    // Filter blacklisted items
-                    Map<String, List<String>> filteredBlacklistedData = new HashMap<>();
-                    for (Map.Entry<String, List<String>> entry : blacklistedData.entrySet()) {
-                        filteredBlacklistedData.put(entry.getKey(), filterList(entry.getValue(), blacklistedData.get("excludedItems")));
-                    }
+            // Load recent registrations and loop through accounts
+            users.setAll(userService.findLatestRegistrations());
+            List<PlayerFX> accounts = userService.findLatestRegistrations();
+            userRegistrationFeedTableView.getSortOrder().clear();
 
-                    // Load recent registrations and loop through accounts
-                    users.setAll(userService.findLatestRegistrations());
-                    List<PlayerFX> accounts = userService.findLatestRegistrations();
-                    userRegistrationFeedTableView.getSortOrder().clear();
-
-                    for (PlayerFX account : accounts) {
-                        checkAccountAgainstBlacklists(account, whitelistUserID, filteredBlacklistedData);
-                    }
-                    //TODO delayInSeconds in settingsTab configurable
-                    long delayInSeconds = 60;
-                    long delayInNanoseconds = delayInSeconds * 1_000_000_000L;
-                    long lastExecutionTime = System.nanoTime();
-                    long remainingTime = delayInNanoseconds - (System.nanoTime() - lastExecutionTime) % delayInNanoseconds;
-                    log.debug("[info] {} seconds until refresh", remainingTime / 1_000_000_000L);
-                    log.debug("[info] Recent users checked.");
-                });
-            }, 0, 60, TimeUnit.SECONDS);
+            for (PlayerFX account : accounts) {
+                checkAccountAgainstBlacklists(account, whitelistUserID, filteredBlacklistedData);
+            }
+            log.debug("[info] Recent users checked.");
         });
-    };
+    }
 
     private void loadList(File file, List<String> list) {
         int itemCount = 0;
