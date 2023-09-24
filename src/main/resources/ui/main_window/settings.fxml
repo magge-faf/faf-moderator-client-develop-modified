@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.collections.*?>
+
+<?import java.lang.String?>
+<VBox fx:id="root" spacing="5" style="-fx-padding: 10px;" xmlns="http://javafx.com/javafx/11.0.1"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.faforever.moderatorclient.ui.main_window.SettingsController">
+    <Separator minHeight="5"/>
+
+    <ChoiceBox fx:id="themeChoiceBox">
+        <items>
+            <FXCollections fx:factory="observableArrayList">
+                <String fx:value="Default Theme" />
+                <String fx:value="Dark Theme" />
+            </FXCollections>
+        </items>
+    </ChoiceBox>
+</VBox>

@@ -16,6 +16,7 @@ import com.faforever.moderatorclient.ui.main_window.TutorialController;
 import com.faforever.moderatorclient.ui.main_window.UserGroupsController;
 import com.faforever.moderatorclient.ui.main_window.UserManagementController;
 import com.faforever.moderatorclient.ui.main_window.VotingController;
+import com.faforever.moderatorclient.ui.main_window.SettingsController;
 import com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -53,6 +54,7 @@ public class MainController implements Controller<TabPane> {
     public Tab messagesTab;
     public Tab reportTab;
     public Tab permissionTab;
+    public Tab settingsTab;
 
     private ModerationReportController moderationReportController;
     private UserManagementController userManagementController;
@@ -67,6 +69,8 @@ public class MainController implements Controller<TabPane> {
     private TutorialController tutorialController;
     private MessagesController messagesController;
     private UserGroupsController userGroupsController;
+    private SettingsController settingsController;
+
     private final Map<Tab, Boolean> dataLoadingState = new HashMap<>();
 
     private final FafApiCommunicationService communicationService;
@@ -100,6 +104,7 @@ public class MainController implements Controller<TabPane> {
         initTutorialTab();
         initReportTab();
         initPermissionTab();
+        initSettingsTab();
     }
 
     private void initLoading(Tab tab, Runnable loadingFunction) {
@@ -211,6 +216,11 @@ public class MainController implements Controller<TabPane> {
             permissionTab.setContent(userGroupsController.getRoot());
             initLoading(permissionTab, userGroupsController::onRefreshGroups);
         }
+    }
+
+    private void initSettingsTab() {
+        settingsController = uiService.loadFxml("ui/main_window/settings.fxml");
+        settingsTab.setContent(settingsController.getRoot());
     }
 
     public void display() {
