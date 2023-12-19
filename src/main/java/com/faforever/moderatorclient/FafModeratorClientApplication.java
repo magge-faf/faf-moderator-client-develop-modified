@@ -1,6 +1,7 @@
 package com.faforever.moderatorclient;
 
 import com.faforever.moderatorclient.config.ApplicationProperties;
+import com.faforever.moderatorclient.settings.SettingsManager;
 import com.faforever.moderatorclient.ui.MainController;
 import com.faforever.moderatorclient.ui.PlatformService;
 import com.faforever.moderatorclient.ui.PlatformServiceImpl;
@@ -47,9 +48,14 @@ public class FafModeratorClientApplication extends Application {
         UiService uiService = applicationContext.getBean(UiService.class);
         MainController mainController = uiService.loadFxml("ui/mainWindow.fxml");
         mainController.display();
+
+        SettingsManager settingsManager = new SettingsManager();
+        String selectedTheme = settingsManager.getTheme();
+        log.info("Loaded Theme for FafModeratorClientApplication: {}", selectedTheme);
+
         primaryStage.getIcons().add(new Image(this.getClass().getResourceAsStream("/media/favicon.png")));
         Scene scene = new Scene(mainController.getRoot());
-        scene.getStylesheets().add(getClass().getResource("/style/main.css").toExternalForm());
+        scene.getStylesheets().add(getClass().getResource(selectedTheme).toExternalForm());
         primaryStage.setScene(scene);
         primaryStage.show();
     }

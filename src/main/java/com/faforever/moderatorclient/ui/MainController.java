@@ -6,17 +6,18 @@ import com.faforever.moderatorclient.api.event.FafApiFailGetEvent;
 import com.faforever.moderatorclient.api.event.FafApiFailModifyEvent;
 import com.faforever.moderatorclient.api.event.FafUserFailModifyEvent;
 import com.faforever.moderatorclient.api.event.TokenExpiredEvent;
+import com.faforever.moderatorclient.settings.SettingsManager;
 import com.faforever.moderatorclient.ui.main_window.AvatarsController;
 import com.faforever.moderatorclient.ui.main_window.DomainBlacklistController;
 import com.faforever.moderatorclient.ui.main_window.LadderMapPoolController;
 import com.faforever.moderatorclient.ui.main_window.MapVaultController;
 import com.faforever.moderatorclient.ui.main_window.ModVaultController;
 import com.faforever.moderatorclient.ui.main_window.RecentActivityController;
+import com.faforever.moderatorclient.ui.main_window.SettingsController;
 import com.faforever.moderatorclient.ui.main_window.TutorialController;
 import com.faforever.moderatorclient.ui.main_window.UserGroupsController;
 import com.faforever.moderatorclient.ui.main_window.UserManagementController;
 import com.faforever.moderatorclient.ui.main_window.VotingController;
-import com.faforever.moderatorclient.ui.main_window.SettingsController;
 import com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -229,9 +230,16 @@ public class MainController implements Controller<TabPane> {
         Stage loginDialog = new Stage();
         loginDialog.setOnCloseRequest(event -> System.exit(0));
         loginDialog.setTitle("FAF Moderator Client");
+
+        SettingsManager settingsManager = new SettingsManager();
+        String selectedTheme = settingsManager.getTheme();
+        log.info("Loaded theme for login mask: {}", selectedTheme);
+
         loginDialog.getIcons().add(new Image(this.getClass().getResourceAsStream("/media/favicon.png")));
+
         Scene scene = new Scene(loginController.getRoot());
-        scene.getStylesheets().add(getClass().getResource("/style/main.css").toExternalForm());
+        scene.getStylesheets().add(getClass().getResource(selectedTheme).toExternalForm());
+
         loginDialog.setScene(scene);
         loginDialog.showAndWait();
 
