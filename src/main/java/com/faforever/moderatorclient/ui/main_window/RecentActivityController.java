@@ -20,8 +20,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import javax.sound.sampled.AudioSystem;
-import javax.sound.sampled.Clip;
 import java.io.File;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -201,20 +199,9 @@ public class RecentActivityController implements Controller<VBox> {
     private void checkBlacklistedItem(String fileName, List<String> blacklistedItems, String item, PlayerFX account) {
         for (String blacklistedItem : blacklistedItems) {
             if (blacklistedItem.equals(item)) {
-                playBlacklistedNotificationSound();
                 log.debug("[!] " + fileName + " [" + blacklistedItem + "] for " + account.getRepresentation());
                 suspiciousUserTextArea.setText(suspiciousUserTextArea.getText() + "[!] " + fileName + " [" + blacklistedItem + "] for " + account.getRepresentation() + "\n");
             }
         }
     }
-
-    private void playBlacklistedNotificationSound() {
-            try {
-                Clip clip = AudioSystem.getClip();
-                clip.open(AudioSystem.getAudioInputStream(new File(CONFIGURATION_FOLDER + File.separator + "blacklisted_notification_sound.wav")));
-                clip.start();
-            } catch (Exception e) {
-                log.warn("Error in playBlacklistedNotificationSound:", e);
-            }
-        }
-    }
+}
