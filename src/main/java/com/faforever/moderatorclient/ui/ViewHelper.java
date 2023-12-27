@@ -2222,7 +2222,7 @@ public class ViewHelper {
         lastModeratorColumn.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
             PlayerFX lastModerator = o.getValue().getLastModerator();
             if (lastModerator == null) {
-                return "null";
+                return "";
             }
             return lastModerator.getRepresentation();
         }, o.getValue().lastModeratorProperty()));
