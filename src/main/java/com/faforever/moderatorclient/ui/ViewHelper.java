@@ -2139,6 +2139,7 @@ public class ViewHelper {
         reportDescriptionColumn.setCellFactory(column -> {
             TableCell<ModerationReportFX, String> cell = new TableCell<>();
             Text text = new Text();
+            text.setFill(Color.WHITE);
             cell.setGraphic(text);
             cell.setPrefHeight(Control.USE_COMPUTED_SIZE);
             cell.setWrapText(true);
