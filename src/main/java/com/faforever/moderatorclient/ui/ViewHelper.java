@@ -493,7 +493,7 @@ public class ViewHelper {
             @Override
             protected void updateItem(PlayerFX item, boolean empty) {
                 super.updateItem(item, empty);
-                setTextFill(Color.BLACK);
+                setTextFill(Color.WHITE);
 
                 if (item == null) {
                     setText("");
@@ -506,14 +506,13 @@ public class ViewHelper {
                         setStyle("");
                         tooltip.setText("No bans");
                     } else {
-                        setStyle("-fx-font-weight: bold");
 
                         if (item.getBans().stream()
                                 .anyMatch(banInfo -> banInfo.getLevel() == BanLevel.GLOBAL
                                         && banInfo.getBanStatus() == BanStatus.BANNED
                                         && banInfo.getDuration() == BanDurationType.PERMANENT)) {
                             tooltip.setText("Permanent global ban");
-                            setTextFill(Color.valueOf("#ca0000"));
+                            setTextFill(Color.RED);
                         } else if (item.getBans().stream()
                                 .anyMatch(banInfo -> banInfo.getLevel() == BanLevel.CHAT
                                         && banInfo.getBanStatus() == BanStatus.BANNED
@@ -529,10 +528,10 @@ public class ViewHelper {
                         } else if (item.getBans().stream()
                                 .allMatch(banInfo -> banInfo.getBanStatus() == BanStatus.EXPIRED || banInfo.getBanStatus() == BanStatus.DISABLED)) {
                             tooltip.setText("Expired ban");
-                            setTextFill(Color.valueOf("#098700"));
+                            setTextFill(Color.LIGHTGREEN);
                         } else {
                             tooltip.setText("Temporary ban");
-                            setTextFill(Color.valueOf("#ff8800"));
+                            setTextFill(Color.ORANGE);
                         }
                     }
                 }
@@ -2091,6 +2090,46 @@ public class ViewHelper {
                         .collect(Collectors.joining("\n"))
                 )
         );
+
+        reportedUsersColumn.setCellFactory(column -> new TableCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+
+                if (!empty && getTableRow() != null && getTableRow().getItem() != null) {
+                    ModerationReportFX report = getTableRow().getItem();
+
+                    boolean isTemporarilyBanned = report.getReportedUsers().stream()
+                            .flatMap(user -> user.getBans().stream().reduce((first, second) -> second).stream())
+                            .anyMatch(banInfo -> banInfo.getBanStatus() == BanStatus.BANNED
+                                    && banInfo.getDuration() != BanDurationType.PERMANENT);
+
+                    boolean expiredBans = report.getReportedUsers().stream()
+                            .flatMap(user -> user.getBans().stream().reduce((first, second) -> second).stream())
+                            .anyMatch(banInfo -> banInfo.getBanStatus() == BanStatus.EXPIRED
+                                    || banInfo.getBanStatus() == BanStatus.DISABLED);
+
+                    boolean permanentBan = report.getReportedUsers().stream()
+                            .flatMap(user -> user.getBans().stream())
+                            .anyMatch(banInfo -> banInfo.getLevel() == BanLevel.GLOBAL
+                                    && banInfo.getBanStatus() == BanStatus.BANNED
+                                    && banInfo.getDuration() == BanDurationType.PERMANENT);
+
+                    setTextFill(Color.WHITE);
+
+                    if (permanentBan) {
+                        setTextFill(Color.RED);
+                    } else if (expiredBans) {
+                        setTextFill(Color.LIGHTGREEN);
+                    } else if (isTemporarilyBanned) {
+                        setTextFill(Color.ORANGE);
+                    }
+
+                }
+                setText(item);
+            }
+        });
+
         reportedUsersColumn.setMinWidth(10);
         tableView.getColumns().add(reportedUsersColumn);
 
