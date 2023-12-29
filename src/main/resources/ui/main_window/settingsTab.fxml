@@ -30,9 +30,9 @@
     <Text style="-fx-font-size: 14pt;">Items to Exclude:</Text>
     <Button fx:id="excludedItemsButton" mnemonicParsing="false" onAction="#onExcludedItems" prefWidth="70"
             text="Excluded"/>
-    <Text text="Check link for newest list of IDs or use own list" textAlignment="CENTER"/>
+    <Text text="IMPORTANT: Check link for latest ExcludedItems.txt" textAlignment="CENTER"/>
     <TextField fx:id="genericJunkButton" minWidth="200"
-               text="https://faforever.zulipchat.com/#narrow/stream/203851-moderators/topic/modified.20mordor"/>
+               text="https://faforever.zulipchat.com/#narrow/stream/203851-moderators/topic/AntiSmurfForce.20-.20ExcludedItems"/>
     <Button fx:id="templateCompletedButton" mnemonicParsing="false" onAction="#onTemplateCompletedButton"
             prefWidth="300" text="Open Template for Completed Report"/>
     <Button fx:id="templateDiscardedButton" mnemonicParsing="false" onAction="#onTemplateDiscardedButton"
