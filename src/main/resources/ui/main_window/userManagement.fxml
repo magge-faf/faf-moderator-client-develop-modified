@@ -36,13 +36,15 @@
             <Separator orientation="VERTICAL"/>
             <TextField fx:id="smurfVillageLookupTextField" onAction="#onLookup" promptText="player ID required here">
             </TextField>
-            <Button mnemonicParsing="false" onAction="#onLookup" text="Smurf Village Lookup" alignment="CENTER">
-            </Button>
+            <HBox spacing="10" alignment="CENTER">
+                <Button mnemonicParsing="false" onAction="#onLookup" text="Smurf Village Lookup" alignment="CENTER"/>
+                <Label fx:id="statusLabelSmurfVillageLookup" text="Idle      " style="-fx-background-color: blue;"/>
+            </HBox>
         </VBox>
         <TableView fx:id="userSearchTableView" maxHeight="1.7976931348623157E308"
                    maxWidth="1.7976931348623157E308" minWidth="550.0" prefHeight="200.0" HBox.hgrow="ALWAYS"/>
     </HBox>
-    <TabPane minHeight="200.0" tabClosingPolicy="UNAVAILABLE" >
+    <TabPane minHeight="200.0" tabClosingPolicy="UNAVAILABLE">
         <Tab fx:id="notesTab" text="Notes">
             <VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308">
                 <TableView fx:id="userNoteTableView" prefHeight="200.0" prefWidth="200.0"
@@ -158,11 +160,11 @@
             </VBox>
         </Tab>
         <Tab fx:id="searchSmurfVillageLookupTab" text="Output of Smurf Village Lookup">
-            <VBox >
-                    <TextArea fx:id="searchSmurfVillageTabTextArea"
-                              promptText="Output will be saved as .txt into project folder as well - Program can freeze for a few seconds/minutes while it is requesting data, especially when there are many users with same items. Just be patient."
-                              VBox.vgrow="ALWAYS">
-                    </TextArea>
+            <VBox>
+                <TextArea fx:id="searchSmurfVillageTabTextArea"
+                          promptText="Debug status is displayed in the console window. The output will be saved as a .txt file in the project folder."
+                          VBox.vgrow="ALWAYS">
+                </TextArea>
             </VBox>
         </Tab>
         <Tab fx:id="settingsSmurfVillageLookupTab" text="Settings Smurf Village Lookup">
@@ -185,7 +187,8 @@
                 <TextField fx:id="maxUniqueUsersThresholdTextField" layoutX="10" layoutY="10"
                            promptText="Enter an integer value - Default 100"/>
                 <Text>If a unique hardware item has shared properties with more than X accounts, it will inform about
-                    it, but not give details about each account. Default 100</Text>
+                    it, but not give details about each account. Default 100
+                </Text>
                 <Separator/>
                 <Text>depthScanningInput:</Text>
                 <TextField fx:id="depthScanningInputTextField" layoutX="10" layoutY="10"

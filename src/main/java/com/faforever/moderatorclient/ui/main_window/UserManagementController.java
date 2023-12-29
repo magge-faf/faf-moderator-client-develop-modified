@@ -125,6 +125,9 @@ public class UserManagementController implements Controller<SplitPane> {
     public Button setExpiresAtButton;
     public Button removeGroupButton;
 
+    @FXML
+    private Label statusLabelSmurfVillageLookup;
+
     public TableView<GamePlayerStatsFX> userLastGamesTable;
     public ChoiceBox<FeaturedModFX> featuredModFilterChoiceBox;
     public Button loadMoreGamesButton;
@@ -250,7 +253,7 @@ public class UserManagementController implements Controller<SplitPane> {
         try (OutputStream out = new FileOutputStream(CONFIGURATION_FOLDER + "/config.properties")) {
             props.store(out, null);
         } catch (IOException e) {
-            e.printStackTrace();
+            log.debug(String.valueOf(e));
         }
         saveSettingsButton.setText("config saved");
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
@@ -262,6 +265,7 @@ public class UserManagementController implements Controller<SplitPane> {
         }, 2, TimeUnit.SECONDS);
         log.debug("[info] config saved");
     }
+
     private void initializeSearchProperties() {
         searchUserPropertyMapping.put("All in one", "allInOne");
         searchUserPropertyMapping.put("Name", "login");
@@ -351,11 +355,11 @@ public class UserManagementController implements Controller<SplitPane> {
 
         if (Objects.equals(searchParameter, "allInOne")) {
             searchParameter = determineSearchParameter(searchPattern);
-            if (searchParameter.equals("unknown")){
+            if (searchParameter.equals("unknown")) {
                 log.debug("Unknown searchParameter");
             }
         }
-        if(Objects.equals(searchParameter, "login")) {
+        if (Objects.equals(searchParameter, "login")) {
             if (searchPattern.contains("[id ") && searchPattern.contains("]")) {
                 int startIndex = searchPattern.indexOf("[id ") + 4;
                 int endIndex = searchPattern.indexOf("]", startIndex);
@@ -615,6 +619,7 @@ public class UserManagementController implements Controller<SplitPane> {
         }
         return excludedItems;
     }
+
     private void processUsers(String attributeName, String attributeValue, int threshold, StringBuilder logOutput, ArrayList<Object> foundSmurfs, String playerID) {
         List<String> excludedItems = loadExcludedItems();
         boolean excludeItemsSelected = excludeItemsCheckBox.isSelected();
@@ -660,8 +665,8 @@ public class UserManagementController implements Controller<SplitPane> {
         }
     }
 
-
     public List<String> alreadyCheckedUsers = new ArrayList<>();
+    //public List<String> alreadyCheckedUniqueIdentifiers = new ArrayList<>();
 
     public void writeSmurfVillageLookup2File(StringBuilder logOutput) {
         try {
@@ -679,8 +684,19 @@ public class UserManagementController implements Controller<SplitPane> {
         }
     }
 
+    void setStatusWorking() {
+        statusLabelSmurfVillageLookup.setStyle("-fx-background-color: orange; -fx-background-radius: 5;");
+        statusLabelSmurfVillageLookup.setText("Processing");
+    }
+
+    private void setStatusDone() {
+        statusLabelSmurfVillageLookup.setStyle("-fx-background-color: green; -fx-background-radius: 5;");
+        statusLabelSmurfVillageLookup.setText("Complete  ");
+    }
+
     public void onSmurfVillageLookup(String playerID) {
         log.debug("Checking " + playerID);
+
         if (alreadyCheckedUsers.contains(playerID)) {
             log.debug("Skipping, we already have seen that account");
             return;
@@ -695,7 +711,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
         String propertyId = searchUserPropertyMapping.get("User ID");
         String propertyUUID = searchUserPropertyMapping.get("UUID");
-        String propertyHash= searchUserPropertyMapping.get("Hash");
+        String propertyHash = searchUserPropertyMapping.get("Hash");
         String propertyIP = searchUserPropertyMapping.get("IP Address");
         String propertyMemorySerialNumber = searchUserPropertyMapping.get("Memory Serial Number");
         String propertyVolumeSerialNumber = searchUserPropertyMapping.get("Volume Serial Number");
@@ -717,27 +733,36 @@ public class UserManagementController implements Controller<SplitPane> {
         Set<String> biosVersions = new HashSet<>();
         Set<String> manufacturers = new HashSet<>();
 
-        userFound.forEach(user-> user.getUniqueIds().forEach(item -> {
-            if (includeProcessorNameCheckBox.isSelected()){
-                cpuNames.add(item.getUuid());}
-            if (includeUUIDCheckBox.isSelected()){
-                uuids.add(item.getUuid());}
-            if (includeUIDHashCheckBox.isSelected()){
-                hashes.add(item.getHash());}
-            if (includeIPCheckBox.isSelected()){
-                ips.add(user.getRecentIpAddress());}
-            if (includeMemorySerialNumberCheckBox.isSelected()){
-                memorySerialNumbers.add(item.getMemorySerialNumber());}
-            if (includeVolumeSerialNumberCheckBox.isSelected()){
-                volumeSerialNumbers.add(item.getVolumeSerialNumber());}
-            if (includeSerialNumberCheckBox.isSelected()){
-                serialNumbers.add(item.getSerialNumber());}
-            if (includeProcessorIdCheckBox.isSelected()){
-                processorIds.add(item.getProcessorId());}
+        userFound.forEach(user -> user.getUniqueIds().forEach(item -> {
+            if (includeProcessorNameCheckBox.isSelected()) {
+                cpuNames.add(item.getUuid());
+            }
+            if (includeUUIDCheckBox.isSelected()) {
+                uuids.add(item.getUuid());
+            }
+            if (includeUIDHashCheckBox.isSelected()) {
+                hashes.add(item.getHash());
+            }
+            if (includeIPCheckBox.isSelected()) {
+                ips.add(user.getRecentIpAddress());
+            }
+            if (includeMemorySerialNumberCheckBox.isSelected()) {
+                memorySerialNumbers.add(item.getMemorySerialNumber());
+            }
+            if (includeVolumeSerialNumberCheckBox.isSelected()) {
+                volumeSerialNumbers.add(item.getVolumeSerialNumber());
+            }
+            if (includeSerialNumberCheckBox.isSelected()) {
+                serialNumbers.add(item.getSerialNumber());
+            }
+            if (includeProcessorIdCheckBox.isSelected()) {
+                processorIds.add(item.getProcessorId());
+            }
             //biosVersions.add(item.getSMBIOSBIOSVersion());
             //if (includeManufacturerCheckBox.isSelected())
-            if (includeManufacturerCheckBox.isSelected()){
-                manufacturers.add(item.getManufacturer());}
+            if (includeManufacturerCheckBox.isSelected()) {
+                manufacturers.add(item.getManufacturer());
+            }
         }));
 
         int maxUniqueUsersThreshold = Integer.parseInt(maxUniqueUsersThresholdTextField.getText());
@@ -759,10 +784,10 @@ public class UserManagementController implements Controller<SplitPane> {
         if (!foundSmurfs.isEmpty()) {
             logOutput.append("\n").append(playerID).append(" is related through unique items to --> ").append(foundSmurfs).append("\n");
         }
-        depthCounter+=1;
+        depthCounter += 1;
         int depthThreshold = Integer.parseInt(depthScanningInputTextField.getText());
-        if (depthCounter >= depthThreshold){
-            log.debug("Depth limit reached: " + depthCounter + "/"+ depthThreshold);
+        if (depthCounter >= depthThreshold) {
+            log.debug("Depth limit reached: " + depthCounter + "/" + depthThreshold);
             searchSmurfVillageTabTextArea.setText(logOutput.toString());
             writeSmurfVillageLookup2File(logOutput);
             return;
@@ -772,10 +797,12 @@ public class UserManagementController implements Controller<SplitPane> {
 
         searchSmurfVillageTabTextArea.setText(logOutput.toString());
         writeSmurfVillageLookup2File(logOutput);
+
     }
 
     public void onLookup() {
-        //TODO refactor the feature
+        setStatusWorking();
+        // TODO: Refactor the feature
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() {
@@ -788,11 +815,11 @@ public class UserManagementController implements Controller<SplitPane> {
                 return null;
             }
         };
-        //TODO spinning loading image to let user know something is happening in background
-        task.setOnSucceeded(e -> log.debug("done"));
 
+        task.setOnSucceeded(event -> setStatusDone());
         task.setOnFailed(e -> log.debug("fail"));
 
         new Thread(task).start();
     }
+
 }
