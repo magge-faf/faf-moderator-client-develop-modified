@@ -666,7 +666,16 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     public List<String> alreadyCheckedUsers = new ArrayList<>();
-    //public List<String> alreadyCheckedUniqueIdentifiers = new ArrayList<>();
+    public List<String> alreadyCheckedUuids = new ArrayList<>();
+    public List<String> alreadyCheckedHashes = new ArrayList<>();
+    public List<String> alreadyCheckedIps = new ArrayList<>();
+    public List<String> alreadyCheckedMemorySerialNumbers = new ArrayList<>();
+    public List<String> alreadyCheckedVolumeSerialNumbers = new ArrayList<>();
+    public List<String> alreadyCheckedSerialNumbers = new ArrayList<>();
+    public List<String> alreadyCheckedProcessorIds = new ArrayList<>();
+    public List<String> alreadyCheckedCpuNames = new ArrayList<>();
+    public List<String> alreadyCheckedBiosVersions = new ArrayList<>();
+    public List<String> alreadyCheckedManufacturers = new ArrayList<>();
 
     public void writeSmurfVillageLookup2File(StringBuilder logOutput) {
         try {
@@ -718,7 +727,7 @@ public class UserManagementController implements Controller<SplitPane> {
         String propertySerialNumber = searchUserPropertyMapping.get("Serial Number");
         String propertyProcessorId = searchUserPropertyMapping.get("Processor ID");
         String propertyCPUName = searchUserPropertyMapping.get("CPU Name");
-        String propertyBiosVersion = searchUserPropertyMapping.get("Bios Version");
+        String propertyBiosVersion = searchUserPropertyMapping.get("Bios Version"); // Bios values are not implemented
         String propertyManufacturer = searchUserPropertyMapping.get("Manufacturer");
 
         Set<PlayerFX> userFound = new HashSet<>(userService.findUsersByAttribute(propertyId, playerID));
@@ -769,15 +778,88 @@ public class UserManagementController implements Controller<SplitPane> {
 
         ArrayList<Object> foundSmurfs = new ArrayList<>();
 
-        uuids.forEach(uuid -> processUsers(propertyUUID, uuid, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID));
-        hashes.forEach(hash -> processUsers(propertyHash, hash, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID));
-        ips.forEach(ip -> processUsers(propertyIP, ip, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID));
-        memorySerialNumbers.forEach(memorySerialNumber -> processUsers(propertyMemorySerialNumber, memorySerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID));
-        volumeSerialNumbers.forEach(volumeSerialNumber -> processUsers(propertyVolumeSerialNumber, volumeSerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID));
-        serialNumbers.forEach(serialNumber -> processUsers(propertySerialNumber, serialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID));
-        processorIds.forEach(processorId -> processUsers(propertyProcessorId, processorId, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID));
-        manufacturers.forEach(manufacturer -> processUsers(propertyManufacturer, manufacturer, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID));
-        cpuNames.forEach(cpu -> processUsers(propertyCPUName, cpu, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID));
+        // TODO create methode to handle logic and avoid repetition
+
+        uuids.forEach(uuid -> {
+            if (!alreadyCheckedUuids.contains(uuid)) {
+                processUsers(propertyUUID, uuid, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
+                alreadyCheckedUuids.add(uuid);
+            } else {
+                log.debug(String.format("Ignoring duplicate: UUID [%s] already processed.", uuid));
+            }
+        });
+
+        hashes.forEach(hash -> {
+            if (!alreadyCheckedHashes.contains(hash)) {
+                processUsers(propertyHash, hash, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
+                alreadyCheckedHashes.add(hash);
+            } else {
+                log.debug(String.format("Ignoring duplicate: Hash [%s] already processed.", hash));
+            }
+        });
+
+        ips.forEach(ip -> {
+            if (!alreadyCheckedIps.contains(ip)) {
+                processUsers(propertyIP, ip, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
+                alreadyCheckedIps.add(ip);
+            } else {
+                log.debug(String.format("Ignoring duplicate: IP [%s] already processed.", ip));
+            }
+        });
+
+        memorySerialNumbers.forEach(memorySerialNumber -> {
+            if (!alreadyCheckedMemorySerialNumbers.contains(memorySerialNumber)) {
+                processUsers(propertyMemorySerialNumber, memorySerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
+                alreadyCheckedMemorySerialNumbers.add(memorySerialNumber);
+            } else {
+                log.debug(String.format("Ignoring duplicate: Memory Serial Number [%s] already processed.", memorySerialNumber));
+            }
+        });
+
+        volumeSerialNumbers.forEach(volumeSerialNumber -> {
+            if (!alreadyCheckedVolumeSerialNumbers.contains(volumeSerialNumber)) {
+                processUsers(propertyVolumeSerialNumber, volumeSerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
+                alreadyCheckedVolumeSerialNumbers.add(volumeSerialNumber);
+            } else {
+                log.debug(String.format("Ignoring duplicate: Volume Serial Number [%s] already processed.", volumeSerialNumber));
+            }
+        });
+
+        serialNumbers.forEach(serialNumber -> {
+            if (!alreadyCheckedSerialNumbers.contains(serialNumber)) {
+                processUsers(propertySerialNumber, serialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
+                alreadyCheckedSerialNumbers.add(serialNumber);
+            } else {
+                log.debug(String.format("Ignoring duplicate: Serial Number [%s] already processed.", serialNumber));
+            }
+        });
+
+        processorIds.forEach(processorId -> {
+            if (!alreadyCheckedProcessorIds.contains(processorId)) {
+                processUsers(propertyProcessorId, processorId, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
+                alreadyCheckedProcessorIds.add(processorId);
+            } else {
+                log.debug(String.format("Ignoring duplicate: Processor ID [%s] already processed.", processorId));
+            }
+        });
+
+        cpuNames.forEach(cpu -> {
+            if (!alreadyCheckedCpuNames.contains(cpu)) {
+                processUsers(propertyCPUName, cpu, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
+                alreadyCheckedCpuNames.add(cpu);
+            } else {
+                log.debug(String.format("Ignoring duplicate: CPU Name [%s] already processed.", cpu));
+            }
+        });
+
+        manufacturers.forEach(manufacturer -> {
+            if (!alreadyCheckedManufacturers.contains(manufacturer)) {
+                processUsers(propertyManufacturer, manufacturer, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
+                alreadyCheckedManufacturers.add(manufacturer);
+            } else {
+                log.debug(String.format("Ignoring duplicate: Manufacturer [%s] already processed.", manufacturer));
+            }
+        });
 
         //biosVersions.stream().forEach(biosVersion -> processUsers(propertyBiosVersion, biosVersion, searchPattern, maxUniqueUsersThreshold, logOutput));
 
@@ -806,17 +888,31 @@ public class UserManagementController implements Controller<SplitPane> {
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() {
+                searchSmurfVillageTabTextArea.setText("");
                 depthCounter = 0;
-                logOutput = new StringBuilder();
-                usersNotBanned = new StringBuilder();
-                alreadyCheckedUsers = new ArrayList<>();
+                logOutput.setLength(0);
+                usersNotBanned.setLength(0);
                 String lookupPlayerID = smurfVillageLookupTextField.getText();
                 onSmurfVillageLookup(lookupPlayerID);
                 return null;
             }
         };
 
-        task.setOnSucceeded(event -> setStatusDone());
+        task.setOnSucceeded(event -> {
+            setStatusDone();
+            alreadyCheckedUsers.clear();
+            alreadyCheckedUuids.clear();
+            alreadyCheckedHashes.clear();
+            alreadyCheckedIps.clear();
+            alreadyCheckedMemorySerialNumbers.clear();
+            alreadyCheckedVolumeSerialNumbers.clear();
+            alreadyCheckedSerialNumbers.clear();
+            alreadyCheckedProcessorIds.clear();
+            alreadyCheckedCpuNames.clear();
+            alreadyCheckedBiosVersions.clear();
+            alreadyCheckedManufacturers.clear();
+        });
+
         task.setOnFailed(e -> log.debug("fail"));
 
         new Thread(task).start();
