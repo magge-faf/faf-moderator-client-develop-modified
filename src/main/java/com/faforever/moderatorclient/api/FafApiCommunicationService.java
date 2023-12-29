@@ -104,20 +104,20 @@ public class FafApiCommunicationService {
                 .errorHandler(jsonApiErrorHandler)
                 .rootUri(environmentProperties.getBaseUrl())
                 .interceptors(List.of(oAuthTokenInterceptor,
-                (request, body, execution) -> {
-                    HttpHeaders headers = request.getHeaders();
+                        (request, body, execution) -> {
+                            HttpHeaders headers = request.getHeaders();
 
-                    List<String> contentTypes = headers.get(HttpHeaders.CONTENT_TYPE);
-                    if (contentTypes != null && contentTypes.stream()
-                            .anyMatch(MediaType.APPLICATION_JSON_VALUE::equalsIgnoreCase)) {
-                        headers.setAccept(Collections.singletonList(MediaType.valueOf("application/vnd.api+json")));
-                        if (request.getMethod() == HttpMethod.POST || request.getMethod() == HttpMethod.PATCH || request.getMethod() == HttpMethod.PUT) {
-                            headers.setContentType(MediaType.APPLICATION_JSON);
+                            List<String> contentTypes = headers.get(HttpHeaders.CONTENT_TYPE);
+                            if (contentTypes != null && contentTypes.stream()
+                                    .anyMatch(MediaType.APPLICATION_JSON_VALUE::equalsIgnoreCase)) {
+                                headers.setAccept(Collections.singletonList(MediaType.valueOf("application/vnd.api+json")));
+                                if (request.getMethod() == HttpMethod.POST || request.getMethod() == HttpMethod.PATCH || request.getMethod() == HttpMethod.PUT) {
+                                    headers.setContentType(MediaType.APPLICATION_JSON);
+                                }
+                            }
+                            return execution.execute(request, body);
                         }
-                    }
-                    return execution.execute(request, body);
-                }
-        )).build();
+                )).build();
 
         try {
             meResult = getOne("/me", MeResult.class);
@@ -245,7 +245,7 @@ public class FafApiCommunicationService {
         try {
             //log.debug("Throttling...");
             //TODO variable via options, default was 0
-            Thread.sleep(200);
+            Thread.sleep(0);
             return taskSupplier.get();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
