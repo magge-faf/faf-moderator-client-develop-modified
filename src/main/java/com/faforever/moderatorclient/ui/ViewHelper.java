@@ -106,11 +106,11 @@ public class ViewHelper {
             Object o = supplier.get();
 
             if (o != null) {
-                if(o.toString().charAt(0) == '[' && o.toString().charAt(o.toString().length()-1) == ']') {
-                    String modifiedString = o.toString().substring(1, o.toString().length()-1);
+                if (o.toString().charAt(0) == '[' && o.toString().charAt(o.toString().length() - 1) == ']') {
+                    String modifiedString = o.toString().substring(1, o.toString().length() - 1);
                     modifiedString = modifiedString.replace(", ", "\n");
                     content.putString(modifiedString);
-                }else{
+                } else {
                     content.putString(o.toString());
                 }
                 clipboard.setContent(content);
@@ -640,7 +640,7 @@ public class ViewHelper {
         createTimeColumn.setMinWidth(160);
         tableView.getColumns().add(createTimeColumn);
 
-        TableColumn<PlayerFX, OffsetDateTime> lastLoginColumn = new TableColumn<>("Last login");
+        TableColumn<PlayerFX, OffsetDateTime> lastLoginColumn = new TableColumn<>("Last Login");
         lastLoginColumn.setCellFactory(col -> new TableCell<>() {
             private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -664,7 +664,7 @@ public class ViewHelper {
         tableView.getColumns().add(userAgentColumn);
         extractors.put(userAgentColumn, PlayerFX::getUserAgent);
 
-        TableColumn<PlayerFX, OffsetDateTime> updateTimeColumn = new TableColumn<>("Last update of record");
+       /* TableColumn<PlayerFX, OffsetDateTime> updateTimeColumn = new TableColumn<>("Last update of record");
         updateTimeColumn.setCellFactory(col -> {
             return new TableCell<PlayerFX, OffsetDateTime>() {
                 private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -698,6 +698,7 @@ public class ViewHelper {
         });
         updateTimeColumn.setMinWidth(160);
         tableView.getColumns().add(updateTimeColumn);
+        */
 
         if (onAddBan != null) {
             TableColumn<PlayerFX, PlayerFX> banOptionColumn = new TableColumn<>("Ban");
@@ -855,14 +856,14 @@ public class ViewHelper {
 
             for (String element : ListMemorySN) {
                 log.debug("checking for Memory S/N " + element);
-                writeToFile(CONFIGURATION_FOLDER + File.separator +  "BlacklistedMemorySN.txt", element);
+                writeToFile(CONFIGURATION_FOLDER + File.separator + "BlacklistedMemorySN.txt", element);
             }
 
             List<String> VolumeSerialNumber = playerFX.getUniqueIds().stream().map(UniqueIdFx::getVolumeSerialNumber).toList();
 
             for (String element : VolumeSerialNumber) {
                 log.debug("checking for Volume S/N " + element);
-                writeToFile(CONFIGURATION_FOLDER + File.separator +  "BlacklistedVolumeSN.txt", element);
+                writeToFile(CONFIGURATION_FOLDER + File.separator + "BlacklistedVolumeSN.txt", element);
             }
         });
 
@@ -2536,8 +2537,6 @@ public class ViewHelper {
 
         alert.showAndWait();
     }
-
-
 
     @SuppressWarnings("rawtypes")
     public static void copySelectionToClipboard(final TableView<?> table) {
