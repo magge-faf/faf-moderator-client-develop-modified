@@ -67,6 +67,7 @@ import java.util.stream.Collectors;
 
 import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
 import static java.text.MessageFormat.format;
+
 @Component
 @Slf4j
 @RequiredArgsConstructor
@@ -162,6 +163,7 @@ public class ModerationReportController implements Controller<Region> {
             sb.deleteCharAt(sb.length() - 1);
         }
     }
+
     public void onUseTemplateWithoutReasonsButton() {
         try {
             ObservableList<ModerationReportFX> selectedItems = reportTableView.getSelectionModel().getSelectedItems();
@@ -197,7 +199,7 @@ public class ModerationReportController implements Controller<Region> {
         } catch (NullPointerException e) {
             log.debug(String.valueOf(e));
         }
-    };
+    }
 
     public void onUseTemplateWithReasonsButton() {
         try {
@@ -285,9 +287,9 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private void showInTableRepeatedOffenders(List<ModerationReportFX> reps) {
-        Task<Void> task = new Task<Void>() {
+        Task<Void> task = new Task<>() {
             @Override
-            protected Void call() throws Exception {
+            protected Void call() {
                 List<ModerationReportFX> reports = Lists.newArrayList(reps.listIterator());
 
                 Map<String, Long> offendersAwaitingReports = reports.stream()
@@ -300,24 +302,24 @@ public class ModerationReportController implements Controller<Region> {
                         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
 
                 List<Offender> offenders = sortedOffendersAwaitingReports.entrySet().stream().map(entry -> {
-                    String offenderUsername = entry.getKey();
-                    Long offenderReportCount = entry.getValue();
-                    String containsRU = reports.stream()
-                            .filter(report -> report.getReportedUsers().stream()
-                                    .anyMatch(user -> user.getRepresentation().equals(offenderUsername)))
-                            .anyMatch(report -> report.getReportDescription().matches(".*[А-Яа-я]+.*")) ? "yes" : "no";
+                            String offenderUsername = entry.getKey();
+                            Long offenderReportCount = entry.getValue();
 
-                    Optional<OffsetDateTime> maxCreateTime = reports.stream()
-                            .filter(report -> report.getReportedUsers().stream()
-                                    .anyMatch(user -> user.getRepresentation().equals(offenderUsername)))
-                            .map(ModerationReportFX::getCreateTime)
-                            .max(Comparator.naturalOrder());
-                    assert maxCreateTime.orElse(null) != null;
-                    LocalDateTime lastReported = maxCreateTime.orElse(null).toLocalDateTime();
+                            Optional<OffsetDateTime> maxCreateTime = reports.stream()
+                                    .filter(report -> report.getReportedUsers().stream()
+                                            .anyMatch(user -> user.getRepresentation().equals(offenderUsername)))
+                                    .map(ModerationReportFX::getCreateTime)
+                                    .max(Comparator.naturalOrder());
 
-                    return new Offender(offenderUsername, offenderReportCount, containsRU, lastReported);
-                }).collect(Collectors.toList());
-
+                            if (maxCreateTime.isPresent()) {
+                                LocalDateTime lastReported = maxCreateTime.get().toLocalDateTime();
+                                return new Offender(offenderUsername, offenderReportCount, lastReported);
+                            } else {
+                                log.debug("MaxCreateTime is not present.");
+                                return null;
+                            }
+                        }).filter(Objects::nonNull)
+                        .collect(Collectors.toList());
                 Platform.runLater(() -> mostReportedAccountsTableView.setItems(FXCollections.observableArrayList(offenders)));
 
                 mostReportedAccountsTableView.setOnKeyPressed(event -> {
@@ -336,7 +338,7 @@ public class ModerationReportController implements Controller<Region> {
         new Thread(task).start();
     }
 
-    public class ModeratorStatistics {
+    public static class ModeratorStatistics {
         private final StringProperty moderator;
         private final LongProperty completedReports;
         private final LongProperty discardedReports;
@@ -356,33 +358,43 @@ public class ModerationReportController implements Controller<Region> {
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
             return lastActivity.format(formatter);
         }
+
         public String getModerator() {
             return moderator.get();
         }
+
         public void setModerator(String moderator) {
             this.moderator.set(moderator);
         }
+
         public Long getCompletedReports() {
             return completedReports.get();
         }
+
         public void setCompletedReports(Long completedReports) {
             this.completedReports.set(completedReports);
         }
+
         public Long getDiscardedReports() {
             return discardedReports.get();
         }
+
         public void setDiscardedReports(Long discardedReports) {
             this.discardedReports.set(discardedReports);
         }
+
         public Long getProcessingReports() {
             return processingReports.get();
         }
+
         public void setProcessingReports(Long processingReports) {
             this.processingReports.set(processingReports);
         }
+
         public Long getAllReports() {
             return allReports.get();
         }
+
         public void setAllReports(Long allReports) {
             this.allReports.set(allReports);
         }
@@ -485,26 +497,22 @@ public class ModerationReportController implements Controller<Region> {
     public static class Offender {
         private final StringProperty player;
         private final LongProperty offenseCount;
-        private final StringProperty containsRU;
         private LocalDateTime lastReported;
 
-        public Offender(String player, long offenseCount, String containsRU, LocalDateTime lastReported ) {
+        public Offender(String player, long offenseCount, LocalDateTime lastReported) {
             this.player = new SimpleStringProperty(player);
             this.offenseCount = new SimpleLongProperty(offenseCount);
-            this.containsRU = new SimpleStringProperty(containsRU);
             this.lastReported = lastReported;
         }
 
         public void lastReported(LocalDateTime lastReported) {
             this.lastReported = lastReported;
         }
-        public String isContainsRU() {
-            return containsRU.getValue();
-        }
 
         public LocalDateTime getLastReported() {
             return lastReported;
         }
+
         public String getPlayer() {
             return player.get();
         }
@@ -519,10 +527,6 @@ public class ModerationReportController implements Controller<Region> {
 
         public LongProperty offenseCountProperty() {
             return offenseCount;
-        }
-
-        public void setContainsRU(String containsRU) {
-            this.containsRU.set(containsRU);
         }
 
     }
@@ -673,9 +677,9 @@ public class ModerationReportController implements Controller<Region> {
                     });
                     if (reportFxes.size() == pageSize || x < 2) {
                         if (recursive) {
-                            createNewApiRequestThread(x+5, true);
+                            createNewApiRequestThread(x + 5, true);
                             for (int i = 1; i < 5; i++) {
-                                createNewApiRequestThread(x+i, false);
+                                createNewApiRequestThread(x + i, false);
                             }
                         }
 
@@ -698,7 +702,7 @@ public class ModerationReportController implements Controller<Region> {
     public void onEdit() {
         EditModerationReportController editModerationReportController = uiService.loadFxml("ui/edit_moderation_report.fxml");
         editModerationReportController.setModerationReportFx(reportTableView.getSelectionModel().getSelectedItem());
-        editModerationReportController.setOnSaveRunnable(() -> Platform.runLater( () -> {
+        editModerationReportController.setOnSaveRunnable(() -> Platform.runLater(() -> {
             renewFilter();
             this.onRefreshAllReports();
         }));
@@ -865,11 +869,11 @@ public class ModerationReportController implements Controller<Region> {
         return //"Victory Condition: " + metadata.getVictoryCondition() + "\n" + // Is always Unknown for whatever reason
                 // "Game Time: " + metadata.getLaunchedAt() + "\n" + // Is always 0.0 for whatever reason
                 "Host: " + metadata.getHost() + "\n" +
-                "Number of Players: " + metadata.getNumPlayers() + "\n" +
-                "Teams: " + metadata.getTeams() + "\n"+
-                "Map Name: " + metadata.getMapname() + "\n" +
-                "Game Total Time: " + formattedTotalTime + "\n\n";
-                //"Featured Mod: " + Arrays.toString(metadata.getOptions()) + "\n\n"; // Is always null for whatever reason
+                        "Number of Players: " + metadata.getNumPlayers() + "\n" +
+                        "Teams: " + metadata.getTeams() + "\n" +
+                        "Map Name: " + metadata.getMapname() + "\n" +
+                        "Game Total Time: " + formattedTotalTime + "\n\n";
+        //"Featured Mod: " + Arrays.toString(metadata.getOptions()) + "\n\n"; // Is always null for whatever reason
     }
 
     private String formatGameTotalTime(double totalTime) {

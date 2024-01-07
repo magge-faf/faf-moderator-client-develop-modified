@@ -78,11 +78,6 @@
                             <PropertyValueFactory property="offenseCount"/>
                         </cellValueFactory>
                     </TableColumn>
-                    <TableColumn text="Contains RU" minWidth="100">
-                        <cellValueFactory>
-                            <PropertyValueFactory property="ContainsRU"/>
-                        </cellValueFactory>
-                    </TableColumn>
                     <TableColumn text="Last reported" minWidth="200">
                         <cellValueFactory>
                             <PropertyValueFactory property="lastReported"/>
