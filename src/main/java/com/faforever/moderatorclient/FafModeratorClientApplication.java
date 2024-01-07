@@ -54,6 +54,7 @@ public class FafModeratorClientApplication extends Application {
         Scene scene = new Scene(mainController.getRoot());
         scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/style/main.css")).toExternalForm());
         primaryStage.setScene(scene);
+        primaryStage.setMaximized(true);
         primaryStage.show();
         primaryStage.setOnCloseRequest(e -> {
             e.consume();
