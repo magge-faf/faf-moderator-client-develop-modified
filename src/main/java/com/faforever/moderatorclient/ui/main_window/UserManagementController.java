@@ -48,6 +48,8 @@ import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLD
 @RequiredArgsConstructor
 public class UserManagementController implements Controller<SplitPane> {
     public CheckBox includeProcessorNameCheckBox;
+    public TextField statusTextFieldProcessingPlayerID;
+    public TextField statusTextFieldProcessingItem;
     private int depthCounter = 0;
     private StringBuilder logOutput = new StringBuilder();
     private StringBuilder usersNotBanned = new StringBuilder();
@@ -694,17 +696,19 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     void setStatusWorking() {
-        statusLabelSmurfVillageLookup.setStyle("-fx-background-color: orange; -fx-background-radius: 5;");
+        statusLabelSmurfVillageLookup.setStyle("-fx-background-color: orange; -fx-text-fill: black; -fx-background-radius: 1;");
         statusLabelSmurfVillageLookup.setText("Processing");
     }
 
     private void setStatusDone() {
         statusLabelSmurfVillageLookup.setStyle("-fx-background-color: green; -fx-background-radius: 5;");
         statusLabelSmurfVillageLookup.setText("Complete  ");
+        statusTextFieldProcessingPlayerID.setText("Status");
     }
 
     public void onSmurfVillageLookup(String playerID) {
         log.debug("Checking " + playerID);
+        statusTextFieldProcessingPlayerID.setText(playerID);
 
         if (alreadyCheckedUsers.contains(playerID)) {
             log.debug("Skipping, we already have seen that account");
@@ -781,6 +785,7 @@ public class UserManagementController implements Controller<SplitPane> {
         // TODO create methode to handle logic and avoid repetition
 
         uuids.forEach(uuid -> {
+            statusTextFieldProcessingItem.setText("uuid: " + uuid);
             if (!alreadyCheckedUuids.contains(uuid)) {
                 processUsers(propertyUUID, uuid, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
                 alreadyCheckedUuids.add(uuid);
@@ -790,6 +795,7 @@ public class UserManagementController implements Controller<SplitPane> {
         });
 
         hashes.forEach(hash -> {
+            statusTextFieldProcessingItem.setText("hash: " + hash);
             if (!alreadyCheckedHashes.contains(hash)) {
                 processUsers(propertyHash, hash, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
                 alreadyCheckedHashes.add(hash);
@@ -799,6 +805,7 @@ public class UserManagementController implements Controller<SplitPane> {
         });
 
         ips.forEach(ip -> {
+            statusTextFieldProcessingItem.setText(ip);
             if (!alreadyCheckedIps.contains(ip)) {
                 processUsers(propertyIP, ip, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
                 alreadyCheckedIps.add(ip);
@@ -808,6 +815,7 @@ public class UserManagementController implements Controller<SplitPane> {
         });
 
         memorySerialNumbers.forEach(memorySerialNumber -> {
+            statusTextFieldProcessingItem.setText("memorySerialNumber:" + memorySerialNumber);
             if (!alreadyCheckedMemorySerialNumbers.contains(memorySerialNumber)) {
                 processUsers(propertyMemorySerialNumber, memorySerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
                 alreadyCheckedMemorySerialNumbers.add(memorySerialNumber);
@@ -817,6 +825,7 @@ public class UserManagementController implements Controller<SplitPane> {
         });
 
         volumeSerialNumbers.forEach(volumeSerialNumber -> {
+            statusTextFieldProcessingItem.setText("volumeSerialNumber: " + volumeSerialNumber);
             if (!alreadyCheckedVolumeSerialNumbers.contains(volumeSerialNumber)) {
                 processUsers(propertyVolumeSerialNumber, volumeSerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
                 alreadyCheckedVolumeSerialNumbers.add(volumeSerialNumber);
@@ -826,6 +835,7 @@ public class UserManagementController implements Controller<SplitPane> {
         });
 
         serialNumbers.forEach(serialNumber -> {
+            statusTextFieldProcessingItem.setText("serialNumber:" + serialNumber);
             if (!alreadyCheckedSerialNumbers.contains(serialNumber)) {
                 processUsers(propertySerialNumber, serialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
                 alreadyCheckedSerialNumbers.add(serialNumber);
@@ -835,6 +845,7 @@ public class UserManagementController implements Controller<SplitPane> {
         });
 
         processorIds.forEach(processorId -> {
+            statusTextFieldProcessingItem.setText("processorId:" + processorId);
             if (!alreadyCheckedProcessorIds.contains(processorId)) {
                 processUsers(propertyProcessorId, processorId, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
                 alreadyCheckedProcessorIds.add(processorId);
@@ -844,6 +855,7 @@ public class UserManagementController implements Controller<SplitPane> {
         });
 
         cpuNames.forEach(cpu -> {
+            statusTextFieldProcessingItem.setText("cpu:" + cpu);
             if (!alreadyCheckedCpuNames.contains(cpu)) {
                 processUsers(propertyCPUName, cpu, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
                 alreadyCheckedCpuNames.add(cpu);
@@ -853,6 +865,7 @@ public class UserManagementController implements Controller<SplitPane> {
         });
 
         manufacturers.forEach(manufacturer -> {
+            statusTextFieldProcessingItem.setText("manufacturer: "+ manufacturer);
             if (!alreadyCheckedManufacturers.contains(manufacturer)) {
                 processUsers(propertyManufacturer, manufacturer, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
                 alreadyCheckedManufacturers.add(manufacturer);
@@ -911,6 +924,8 @@ public class UserManagementController implements Controller<SplitPane> {
             alreadyCheckedCpuNames.clear();
             alreadyCheckedBiosVersions.clear();
             alreadyCheckedManufacturers.clear();
+            statusTextFieldProcessingPlayerID.setText("Status");
+            statusTextFieldProcessingItem.setText("");
         });
 
         task.setOnFailed(e -> log.debug("fail"));

@@ -36,10 +36,12 @@
             <Separator orientation="VERTICAL"/>
             <TextField fx:id="smurfVillageLookupTextField" onAction="#onLookup" promptText="player ID required here">
             </TextField>
-            <HBox spacing="10" alignment="CENTER">
-                <Button mnemonicParsing="false" onAction="#onLookup" text="Smurf Village Lookup" alignment="CENTER"/>
+            <Button mnemonicParsing="false" onAction="#onLookup" text="Smurf Village Lookup" alignment="CENTER_LEFT"/>
+            <HBox alignment="CENTER_LEFT">
                 <Label fx:id="statusLabelSmurfVillageLookup" text="Idle      " style="-fx-background-color: blue;"/>
+                <TextField fx:id="statusTextFieldProcessingPlayerID" text="Status" editable="false"/>
             </HBox>
+            <TextField fx:id="statusTextFieldProcessingItem" text="" editable="false"/>
         </VBox>
         <TableView fx:id="userSearchTableView" maxHeight="1.7976931348623157E308"
                    maxWidth="1.7976931348623157E308" minWidth="550.0" prefHeight="200.0" HBox.hgrow="ALWAYS"/>
