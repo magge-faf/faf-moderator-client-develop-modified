@@ -754,13 +754,25 @@ public class ModerationReportController implements Controller<Region> {
                             .map(PlayerFX::getRepresentation)
                             .collect(Collectors.joining(", "));
                     String reporter = String.valueOf(report.getReporter().getRepresentation());
-                    String promptAI = "AI-Prompt: Gaming Moderator Task\n"
-                            + "Reported Chat Log Assessing report from " + reporter + " against " + offenderNames + ":\n"
-                            + "Rate offender's toxicity (0-100%)\n"
-                            + "Give examples for the violations and keep your answers short.\n"
-                            + "Translate the examples to English.";
+                    String filePathGamingModeratorTask = CONFIGURATION_FOLDER + File.separator + "templateGamingModeratorTask.txt";
+                    StringBuilder contentGamingModeratorTask = new StringBuilder();
+                    try (BufferedReader br = new BufferedReader(new FileReader(filePathGamingModeratorTask))) {
+                        String line;
+                        while ((line = br.readLine()) != null) {
+                            line = line.replace("%offenderNames%", offenderNames);
+                            line = line.replace("%reporter%", reporter);
 
-                    processAndDisplayReplay(header, tempFilePath, promptAI);
+                            contentGamingModeratorTask.append(line).append("\n");
+                        }
+                    } catch (IOException e) {
+                        log.warn(String.valueOf(e));
+                    }
+
+                    try {
+                        processAndDisplayReplay(header, tempFilePath, String.valueOf(contentGamingModeratorTask));
+                    } catch (Exception e) {
+                        log.error("An error occurred while processing and displaying the replay", e);
+                    }
                 }
 
                 deleteTempFile(tempFilePath);
@@ -828,8 +840,7 @@ public class ModerationReportController implements Controller<Region> {
                 chatLogTextArea.setText(chatLogFiltered.toString());
             });
         } catch (Exception e) {
-            updateUIUnavailable(header, "Chat log not available");
-            log.error("An error occurred while processing and displaying the replay", e);
+            log.error("An error occurred while parsing replay data.", e);
         }
     }
 

@@ -161,6 +161,7 @@ public class SettingsController implements Controller<Region> {
                 }
             }
         }
+        createTemplateGamingModeratorTask();
         loadConfigurationProperties();
     }
 
@@ -230,6 +231,25 @@ public class SettingsController implements Controller<Region> {
             FileWriter writer = new FileWriter(fileReasonsCheckBox);
             writer.write(contentReasonsCheckBox);
             writer.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void createTemplateGamingModeratorTask() {
+        try {
+            File fileCompleted = new File(CONFIGURATION_FOLDER + File.separator + "templateGamingModeratorTask.txt");
+
+            if (!fileCompleted.exists()) {
+                String contentCompleted = "AI-Prompt: Gaming Moderator Task\n"
+                        + "Reported Chat Log Assessing report from " + "%reporter%" + " against offender " + "%offenderNames%" + ":\n"
+                        + "Rate offender's toxicity (" + "%offenderNames%" + ") " + "(0-100%)\n"
+                        + "Give examples for the violations from " + "%offenderNames%" + " and keep your answers short.\n"
+                        + "If the offender writes Russian, then translate the text into English.";
+                FileWriter writer = new FileWriter(fileCompleted);
+                writer.write(contentCompleted);
+                writer.close();
+            }
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
