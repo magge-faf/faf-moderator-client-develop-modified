@@ -286,6 +286,20 @@ public class ViewHelper {
         if (showAffectedPlayerInfo) {
             TableColumn<BanInfoFX, String> affectedPlayerColumn = new TableColumn<>("Affected Player");
             affectedPlayerColumn.setCellValueFactory(o -> o.getValue().getPlayer().representationProperty());
+
+            affectedPlayerColumn.setCellFactory(column -> new TableCell<>() {
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+
+                    if (!empty && getTableRow() != null && getTableRow().getItem() != null) {
+                        PlayerFX player = getTableRow().getItem().getPlayer();
+                        setStyle(getBanColor(player));
+                    }
+                    setText(item);
+                }
+            });
+
             affectedPlayerColumn.setMinWidth(100);
             tableView.getColumns().add(affectedPlayerColumn);
             extractors.put(affectedPlayerColumn, banInfoFX -> banInfoFX.getPlayer().getLogin());
@@ -494,7 +508,6 @@ public class ViewHelper {
             @Override
             protected void updateItem(PlayerFX item, boolean empty) {
                 super.updateItem(item, empty);
-                setTextFill(Color.WHITE);
 
                 if (item == null) {
                     setText("");
@@ -504,7 +517,6 @@ public class ViewHelper {
                     setText(textExtractor.apply(item));
 
                     if (item.getBans().isEmpty()) {
-                        setStyle("");
                         tooltip.setText("No bans");
                     } else {
 
@@ -513,26 +525,21 @@ public class ViewHelper {
                                         && banInfo.getBanStatus() == BanStatus.BANNED
                                         && banInfo.getDuration() == BanDurationType.PERMANENT)) {
                             tooltip.setText("Permanent global ban");
-                            setTextFill(Color.RED);
                         } else if (item.getBans().stream()
                                 .anyMatch(banInfo -> banInfo.getLevel() == BanLevel.CHAT
                                         && banInfo.getBanStatus() == BanStatus.BANNED
                                         && banInfo.getDuration() == BanDurationType.PERMANENT)) {
                             tooltip.setText("Permanent chat ban");
-                            setTextFill(Color.valueOf("#ff8800"));
                         } else if (item.getBans().stream()
                                 .anyMatch(banInfo -> banInfo.getLevel() == BanLevel.VAULT
                                         && banInfo.getBanStatus() == BanStatus.BANNED
                                         && banInfo.getDuration() == BanDurationType.PERMANENT)) {
                             tooltip.setText("Permanent vault ban");
-                            setTextFill(Color.valueOf("#ff8800"));
                         } else if (item.getBans().stream()
                                 .allMatch(banInfo -> banInfo.getBanStatus() == BanStatus.EXPIRED || banInfo.getBanStatus() == BanStatus.DISABLED)) {
                             tooltip.setText("Expired ban");
-                            setTextFill(Color.LIGHTGREEN);
                         } else {
                             tooltip.setText("Temporary ban");
-                            setTextFill(Color.ORANGE);
                         }
                     }
                 }
@@ -629,6 +636,21 @@ public class ViewHelper {
 
         TableColumn<PlayerFX, String> nameColumn = new TableColumn<>("Name");
         nameColumn.setCellValueFactory(o -> o.getValue().loginProperty());
+
+        nameColumn.setCellFactory(column -> new TableCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+
+                if (!empty && getTableRow() != null && getTableRow().getItem() != null) {
+                    PlayerFX player = getTableRow().getItem();
+                    String color = getBanColor(player);
+                    setStyle(color);
+                }
+                setText(item);
+            }
+        });
+
         nameColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
                 calculateMaxTextWidthPlayerFX(tableView.getItems(), PlayerFX::getLogin), tableView.getItems()));
         tableView.getColumns().add(nameColumn);
@@ -2232,11 +2254,11 @@ public class ViewHelper {
 
                         if (isEmpty()) {
                             setText("");
-                            setStyle("  -fx-background-color: transparent;");
+                            setStyle("-fx-background-color: transparent;");
                         } else {
                             switch (item) {
                                 case AWAITING:
-                                    setStyle("  -fx-background-color: #dcc414;");
+                                    setStyle("-fx-background-color: #dcc414;");
                                     break;
                                 case DISCARDED:
                                     setStyle("-fx-background-color: #9cabab;");
@@ -2262,8 +2284,18 @@ public class ViewHelper {
         reporterColumn.setCellFactory(tableColumn -> ViewHelper.playerFXCellFactory(tableColumn, PlayerFX::getLogin));
         reporterColumn.setCellValueFactory(param -> new SimpleObjectProperty<>(param.getValue().getReporter()));
 
-        //reporterColumn.setMinWidth(30);
-        //reporterColumn.setMaxWidth(5000);
+        reporterColumn.setCellFactory(column -> new TableCell<>() {
+            @Override
+            protected void updateItem(PlayerFX item, boolean empty) {
+                super.updateItem(item, empty);
+
+                if (!empty && item != null) {
+                    setStyle(getBanColor(item));
+                }
+                setText(item == null ? "" : item.getLogin());
+            }
+        });
+
         reporterColumn.setPrefWidth(90);
 
         tableView.getColumns().add(reporterColumn);
@@ -2295,7 +2327,7 @@ public class ViewHelper {
                                     || banInfo.getBanStatus() == BanStatus.DISABLED);
 
                     boolean permanentBan = report.getReportedUsers().stream()
-                            .flatMap(user -> user.getBans().stream())
+                            .flatMap(user -> user.getBans().isEmpty() ? Stream.empty() : Stream.of(user.getBans().getLast()))
                             .anyMatch(banInfo -> banInfo.getLevel() == BanLevel.GLOBAL
                                     && banInfo.getBanStatus() == BanStatus.BANNED
                                     && banInfo.getDuration() == BanDurationType.PERMANENT);
@@ -2303,11 +2335,11 @@ public class ViewHelper {
                     setTextFill(Color.WHITE);
 
                     if (permanentBan) {
-                        setTextFill(Color.RED);
+                        setStyle("-fx-text-fill: red;");
                     } else if (expiredBans) {
-                        setTextFill(Color.LIGHTGREEN);
+                        setStyle("-fx-text-fill: lightgreen;");
                     } else if (isTemporarilyBanned) {
-                        setTextFill(Color.ORANGE);
+                        setStyle("-fx-text-fill: orange;");
                     }
 
                 }
@@ -2766,6 +2798,29 @@ public class ViewHelper {
         ContextMenu menu = table.getContextMenu() == null ? new ContextMenu() : table.getContextMenu();
         menu.getItems().add(item);
         table.setContextMenu(menu);
+    }
+
+    private static String getBanColor(PlayerFX player) {
+        String color = "-fx-text-fill: white;";
+
+        Optional<BanInfoFX> mostRecentBan = player.getBans().stream()
+                .reduce((first, second) -> second);
+
+        if (mostRecentBan.isPresent()) {
+            BanInfoFX banInfo = mostRecentBan.get();
+
+            if (banInfo.getBanStatus() == BanStatus.BANNED) {
+                if (banInfo.getDuration() != BanDurationType.PERMANENT) {
+                    color = "-fx-text-fill: orange;";
+                } else if (banInfo.getLevel() == BanLevel.GLOBAL) {
+                    color = "-fx-text-fill: red;";
+                }
+            } else if (banInfo.getBanStatus() == BanStatus.EXPIRED || banInfo.getBanStatus() == BanStatus.DISABLED) {
+                color = "-fx-text-fill: lightgreen;";
+            }
+        }
+
+        return color;
     }
 
     public static final String CONFIGURATION_FOLDER = "ConfigurationModerationToolFAF";
