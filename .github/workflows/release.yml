@@ -47,8 +47,12 @@ jobs:
       - name: Get Artifact Paths
         id: artifact_paths
         run: |
+          LINUX_ZIP=$(ls build/distributions/faf-moderator-client-*-linux.zip | head -n 1)
+          LINUX_ZIP_NAME=$(basename $LINUX_ZIP)
           WINDOWS_ZIP=$(ls build/distributions/faf-moderator-client-*-win.zip | head -n 1)
           WINDOWS_ZIP_NAME=$(basename $WINDOWS_ZIP)
+          echo ::set-output name=LINUX_ZIP::${LINUX_ZIP}
+          echo ::set-output name=LINUX_ZIP_NAME::${LINUX_ZIP_NAME}
           echo ::set-output name=WINDOWS_ZIP::${WINDOWS_ZIP}
           echo ::set-output name=WINDOWS_ZIP_NAME::${WINDOWS_ZIP_NAME}
 
