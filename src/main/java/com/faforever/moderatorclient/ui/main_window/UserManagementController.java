@@ -30,6 +30,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
 
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -37,6 +40,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -50,6 +54,8 @@ public class UserManagementController implements Controller<SplitPane> {
     public CheckBox includeProcessorNameCheckBox;
     public TextField statusTextFieldProcessingPlayerID;
     public TextField statusTextFieldProcessingItem;
+    public Tab logSmurfVillageTab;
+    public TextArea logSmurfVillageTabTextArea;
     private int depthCounter = 0;
     private StringBuilder logOutput = new StringBuilder();
     private StringBuilder usersNotBanned = new StringBuilder();
@@ -623,47 +629,61 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     private void processUsers(String attributeName, String attributeValue, int threshold, StringBuilder logOutput, ArrayList<Object> foundSmurfs, String playerID) {
-        List<String> excludedItems = loadExcludedItems();
-        boolean excludeItemsSelected = excludeItemsCheckBox.isSelected();
+        try {
+            String text = String.format("\nProcessing ... [%s] [%s]", attributeName, attributeValue);
+            updateSmurfVillageLogTextArea(text);
 
-        if (excludeItemsSelected && excludedItems.contains(attributeValue)) {
-            logOutput.append(String.format("\n EXCLUSION CHECK: attribute [%s] with value [%s] found in excludedItems.txt, skipping.\n", attributeName, attributeValue));
-            log.debug(String.format("\n EXCLUSION CHECK: attribute [%s] with value [%s] found in excludedItems.txt, skipping.\n", attributeName, attributeValue));
-            return;
-        }
+            List<String> excludedItems = loadExcludedItems();
+            boolean excludeItemsSelected = excludeItemsCheckBox.isSelected();
 
-        List<PlayerFX> users = userService.findUsersByAttribute(attributeName, attributeValue);
+            if (excludeItemsSelected && excludedItems.contains(attributeValue)) {
 
-        if (users.size() > threshold) {
-            logOutput.append(String.format("\nTHRESHOLD CHECK: Ignoring %s [%s] (found %d, limit %d, added to excludedItems.txt)\n", attributeName, attributeValue, users.size(), threshold));
-            log.debug(String.format("\nTHRESHOLD CHECK: Ignoring %s [%s] (found %d, limit %d, added to excludedItems.txt)\n", attributeName, attributeValue, users.size(), threshold));
-
-            File fileExcludedItems = new File(CONFIGURATION_FOLDER + File.separator + "excludedItems" + ".txt");
-            try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileExcludedItems, true))) {
-                writer.newLine();
-                writer.write(attributeValue);  // Append the attributeValue to the last line
-            } catch (IOException e) {
-                log.warn("Failed to write to excludedItems.txt: " + e.getMessage());
+                text = String.format("\t\t EXCLUSION CHECK: attribute [%s] with value [%s] found in excludedItems.txt, skipping.\n", attributeName, attributeValue);
+                updateSmurfVillageLogTextArea(text);
+                return;
             }
-            log.debug(attributeValue + " was added to the excludedItems.txt");
-            return;
-        }
 
-        if (users.size() != 1) {
-            logOutput.append("\nMULTIPLE USERS\n");
-            logOutput.append(String.format("  - Attribute: %s with value: [%s]\n", attributeName, attributeValue));
+            List<PlayerFX> users = userService.findUsersByAttribute(attributeName, attributeValue);
 
-            for (PlayerFX user : users) {
-                String accountStatus = user.isBannedGlobally() ? "banned: " : "active: ";
-                String name = user.getRepresentation();
-                String output = String.format("      %-20s %-10s\n", accountStatus, name);
-                logOutput.append(output);
+            if (users.size() > threshold) {
+                text = String.format("\t\t THRESHOLD CHECK: Ignoring %s [%s] (found %d, limit %d, added to excludedItems.txt)\n", attributeName, attributeValue, users.size(), threshold);
+                updateSmurfVillageLogTextArea(text);
 
-                if (user.getId() != null && !foundSmurfs.contains(user.getId())) {
-                    foundSmurfs.add(user.getId());
-                    usersNotBanned.append(user.getId());
+                File fileExcludedItems = new File(CONFIGURATION_FOLDER + File.separator + "excludedItems" + ".txt");
+                try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileExcludedItems, true))) {
+                    writer.newLine();
+                    writer.write(attributeValue);  // Append the attributeValue to the last line
+                } catch (IOException e) {
+                    log.warn("Failed to write to excludedItems.txt: " + e.getMessage());
+                }
+                log.debug(attributeValue + " was added to the excludedItems.txt");
+                return;
+            }
+
+            if (users.size() != 1) {
+                logOutput.append("\nMULTIPLE USERS\n");
+                logOutput.append(String.format("  - Attribute: %s with value: [%s]", attributeName, attributeValue));
+
+                for (PlayerFX user : users) {
+                    String accountStatus = user.isBannedGlobally() ? "banned: " : "active: ";
+                    String name = user.getRepresentation();
+                    String output = String.format("\n      %-20s %-10s", accountStatus, name);
+                    logOutput.append(output);
+                    text = String.format(output);
+                    updateSmurfVillageLogTextArea(text);
+
+                    if (user.getId() != null && !foundSmurfs.contains(user.getId())) {
+                        foundSmurfs.add(user.getId());
+                        //logSmurfVillageTabTextArea.appendText("\nPossibly smurf account found: " + user.getId() + " " + user.getRepresentation());
+                        usersNotBanned.append(user.getId());
+                    }
                 }
             }
+            else {
+                updateSmurfVillageLogTextArea("\t\t - unique");
+            }
+        } catch (IndexOutOfBoundsException e) {
+            log.error("An IndexOutOfBoundsException occurred: {}", e.getMessage());
         }
     }
 
@@ -708,16 +728,21 @@ public class UserManagementController implements Controller<SplitPane> {
 
     public void onSmurfVillageLookup(String playerID) {
         log.debug("Checking " + playerID);
+        AtomicReference<String> text = new AtomicReference<>(String.format("\n\n--- Checking: " + playerID));
+        updateSmurfVillageLogTextArea(text.get());
+        text.set(String.format("\nPlayer IDs seen so far: " + alreadyCheckedUsers));
+        updateSmurfVillageLogTextArea(text.get());
+
         statusTextFieldProcessingPlayerID.setText(playerID);
 
         if (alreadyCheckedUsers.contains(playerID)) {
-            log.debug("Skipping, we already have seen that account");
+            text.set(String.format("\nSkipping, we already have seen that account: " + playerID));
+            updateSmurfVillageLogTextArea(text.get());
             return;
         }
-        log.debug(playerID + " added to alreadyCheckedUsers");
         alreadyCheckedUsers.add(playerID);
 
-        logOutput.append("\n==================== [PlayerID: ").append(playerID).append(" ====================\n");
+        updateSmurfVillageLogTextArea("\n=== [PlayerID: " + playerID + " ===\n");
 
         users.clear();
         userSearchTableView.getSortOrder().clear();
@@ -790,7 +815,8 @@ public class UserManagementController implements Controller<SplitPane> {
                 processUsers(propertyUUID, uuid, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
                 alreadyCheckedUuids.add(uuid);
             } else {
-                log.debug(String.format("Ignoring duplicate: UUID [%s] already processed.", uuid));
+                text.set(String.format("\nIgnoring duplicate: UUID [%s] already processed.\n", uuid));
+                updateSmurfVillageLogTextArea(text.get());
             }
         });
 
@@ -800,7 +826,8 @@ public class UserManagementController implements Controller<SplitPane> {
                 processUsers(propertyHash, hash, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
                 alreadyCheckedHashes.add(hash);
             } else {
-                log.debug(String.format("Ignoring duplicate: Hash [%s] already processed.", hash));
+                log.debug(String.format("\nIgnoring duplicate: Hash [%s] already processed.", hash));
+                updateSmurfVillageLogTextArea("\nIgnoring duplicate: Hash [%s] already processed.", hash);
             }
         });
 
@@ -811,6 +838,7 @@ public class UserManagementController implements Controller<SplitPane> {
                 alreadyCheckedIps.add(ip);
             } else {
                 log.debug(String.format("Ignoring duplicate: IP [%s] already processed.", ip));
+                updateSmurfVillageLogTextArea("\nIgnoring duplicate: IP [%s] already processed.", ip);
             }
         });
 
@@ -821,6 +849,7 @@ public class UserManagementController implements Controller<SplitPane> {
                 alreadyCheckedMemorySerialNumbers.add(memorySerialNumber);
             } else {
                 log.debug(String.format("Ignoring duplicate: Memory Serial Number [%s] already processed.", memorySerialNumber));
+                updateSmurfVillageLogTextArea("\nIgnoring duplicate: Memory Serial Number [%s] already processed.", memorySerialNumber);
             }
         });
 
@@ -831,6 +860,7 @@ public class UserManagementController implements Controller<SplitPane> {
                 alreadyCheckedVolumeSerialNumbers.add(volumeSerialNumber);
             } else {
                 log.debug(String.format("Ignoring duplicate: Volume Serial Number [%s] already processed.", volumeSerialNumber));
+                updateSmurfVillageLogTextArea("\nIgnoring duplicate: Volume Serial Number [%s] already processed.", volumeSerialNumber);
             }
         });
 
@@ -841,6 +871,7 @@ public class UserManagementController implements Controller<SplitPane> {
                 alreadyCheckedSerialNumbers.add(serialNumber);
             } else {
                 log.debug(String.format("Ignoring duplicate: Serial Number [%s] already processed.", serialNumber));
+                updateSmurfVillageLogTextArea("\nIgnoring duplicate: Serial Number [%s] already processed.", serialNumber);
             }
         });
 
@@ -851,6 +882,7 @@ public class UserManagementController implements Controller<SplitPane> {
                 alreadyCheckedProcessorIds.add(processorId);
             } else {
                 log.debug(String.format("Ignoring duplicate: Processor ID [%s] already processed.", processorId));
+                updateSmurfVillageLogTextArea("\nIgnoring duplicate: Processor ID [%s] already processed.", processorId);
             }
         });
 
@@ -859,8 +891,10 @@ public class UserManagementController implements Controller<SplitPane> {
             if (!alreadyCheckedCpuNames.contains(cpu)) {
                 processUsers(propertyCPUName, cpu, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
                 alreadyCheckedCpuNames.add(cpu);
+
             } else {
                 log.debug(String.format("Ignoring duplicate: CPU Name [%s] already processed.", cpu));
+                updateSmurfVillageLogTextArea("\nIgnoring duplicate: CPU Name [%s] already processed.", cpu);
             }
         });
 
@@ -869,15 +903,19 @@ public class UserManagementController implements Controller<SplitPane> {
             if (!alreadyCheckedManufacturers.contains(manufacturer)) {
                 processUsers(propertyManufacturer, manufacturer, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
                 alreadyCheckedManufacturers.add(manufacturer);
+
             } else {
                 log.debug(String.format("Ignoring duplicate: Manufacturer [%s] already processed.", manufacturer));
+                updateSmurfVillageLogTextArea("\nIgnoring duplicate: Manufacturer [%s] already processed.", manufacturer);
             }
         });
 
         //biosVersions.stream().forEach(biosVersion -> processUsers(propertyBiosVersion, biosVersion, searchPattern, maxUniqueUsersThreshold, logOutput));
 
         if (!foundSmurfs.isEmpty()) {
-            logOutput.append("\n").append(playerID).append(" is related through unique items to --> ").append(foundSmurfs).append("\n");
+            logOutput.append("\n\n").append(playerID).append(" is related through unique items to --> ").append(foundSmurfs).append("\n");
+            updateSmurfVillageLogTextArea("\n" +  playerID + " is related through unique items to --> " + foundSmurfs);
+
         }
         depthCounter += 1;
         int depthThreshold = Integer.parseInt(depthScanningInputTextField.getText());
@@ -895,13 +933,43 @@ public class UserManagementController implements Controller<SplitPane> {
 
     }
 
-    public void onLookup() {
+    public boolean checkStartUpExcludedItems() {
+        String filePath = CONFIGURATION_FOLDER + "/excludedItems.txt";
+        Path path = Paths.get(filePath);
+
+        if (Files.exists(path)) {
+            try {
+                String content = Files.readString(path);
+                return !content.isEmpty();
+            } catch (IOException e) {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    public void onLookupSmurfVillage() {
+
+        if (!checkStartUpExcludedItems()) {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("Information Dialog");
+            alert.setHeaderText(null);
+            alert.setContentText("Your excludedItems.txt is empty or missing " +
+                    "See Settings-Tab (Top Right) how to get the latest version from zulip channel"
+            );
+
+            alert.showAndWait();
+            return;
+        }
+
+
         setStatusWorking();
         // TODO: Refactor the feature
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() {
                 searchSmurfVillageTabTextArea.setText("");
+                logSmurfVillageTabTextArea.setText("");
                 depthCounter = 0;
                 logOutput.setLength(0);
                 usersNotBanned.setLength(0);
@@ -926,6 +994,7 @@ public class UserManagementController implements Controller<SplitPane> {
             alreadyCheckedManufacturers.clear();
             statusTextFieldProcessingPlayerID.setText("Status");
             statusTextFieldProcessingItem.setText("");
+            logSmurfVillageTabTextArea.appendText("\n\nTask Done");
         });
 
         task.setOnFailed(e -> log.debug("fail"));
@@ -933,4 +1002,17 @@ public class UserManagementController implements Controller<SplitPane> {
         new Thread(task).start();
     }
 
+    public void updateSmurfVillageLogTextArea(String... texts) {
+        Platform.runLater(() -> {
+            try {
+                for (String text : texts) {
+                    if (text != null) {
+                        logSmurfVillageTabTextArea.appendText(text);
+                    }
+                }
+            } catch (RuntimeException e) {
+                log.debug(e.getMessage());
+            }
+        });
+    }
 }

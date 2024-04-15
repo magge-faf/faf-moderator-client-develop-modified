@@ -34,9 +34,9 @@
                       promptText="notes (resets with new start)">
             </TextArea>
             <Separator orientation="VERTICAL"/>
-            <TextField fx:id="smurfVillageLookupTextField" onAction="#onLookup" promptText="player ID required here">
+            <TextField fx:id="smurfVillageLookupTextField" onAction="#onLookupSmurfVillage" promptText="player ID required here">
             </TextField>
-            <Button mnemonicParsing="false" onAction="#onLookup" text="Smurf Village Lookup" alignment="CENTER_LEFT"/>
+            <Button mnemonicParsing="false" onAction="#onLookupSmurfVillage" text="Smurf Village Lookup" alignment="CENTER_LEFT"/>
             <HBox alignment="CENTER_LEFT">
                 <Label fx:id="statusLabelSmurfVillageLookup" text="Idle      " style="-fx-background-color: blue;"/>
                 <TextField fx:id="statusTextFieldProcessingPlayerID" text="Status" editable="false"/>
@@ -165,6 +165,13 @@
             <VBox>
                 <TextArea fx:id="searchSmurfVillageTabTextArea"
                           promptText="Debug status is displayed in the console window. The output will be saved as a .txt file in the project folder."
+                          VBox.vgrow="ALWAYS">
+                </TextArea>
+            </VBox>
+        </Tab>
+        <Tab fx:id="logSmurfVillageTab" text="Log of SVL">
+            <VBox>
+                <TextArea fx:id="logSmurfVillageTabTextArea"
                           VBox.vgrow="ALWAYS">
                 </TextArea>
             </VBox>
