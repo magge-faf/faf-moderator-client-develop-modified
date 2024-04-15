@@ -426,9 +426,6 @@ public class ModerationReportController implements Controller<Region> {
             this.allReports.set(allReports);
         }
 
-        public void setLastActivity(LocalDateTime lastActivity) {
-            this.lastActivity = lastActivity;
-        }
     }
 
     private void processStatisticsModerator(List<ModerationReportFX> reps) {
@@ -570,10 +567,6 @@ public class ModerationReportController implements Controller<Region> {
 
         public void lastReported(LocalDateTime lastReported) {
             this.lastReported = lastReported;
-        }
-
-        public LocalDateTime getLastReported() {
-            return lastReported;
         }
 
         public String getPlayer() {
@@ -790,9 +783,6 @@ public class ModerationReportController implements Controller<Region> {
             this.moderationReportStatus = moderationReportStatus;
         }
 
-        public ModerationReportStatus getModerationReportStatus() {
-            return moderationReportStatus;
-        }
     }
 
     @SneakyThrows
