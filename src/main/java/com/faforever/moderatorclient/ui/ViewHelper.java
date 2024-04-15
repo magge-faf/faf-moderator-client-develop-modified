@@ -2332,7 +2332,7 @@ public class ViewHelper {
                                     && banInfo.getBanStatus() == BanStatus.BANNED
                                     && banInfo.getDuration() == BanDurationType.PERMANENT);
 
-                    setTextFill(Color.WHITE);
+                    setStyle("-fx-text-fill: white;");
 
                     if (permanentBan) {
                         setStyle("-fx-text-fill: red;");
