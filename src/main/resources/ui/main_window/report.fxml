@@ -88,16 +88,17 @@
                             <PropertyValueFactory property="totalOffenseCountCompleted"/>
                         </cellValueFactory>
                     </TableColumn>
-                    <TableColumn text="Offense Count Processing" minWidth="150">
-                        <cellValueFactory>
-                            <PropertyValueFactory property="totalOffenseCountProcessing"/>
-                        </cellValueFactory>
-                    </TableColumn>
                     <TableColumn text="Offense Count Discarded" minWidth="150">
                         <cellValueFactory>
                             <PropertyValueFactory property="totalOffenseCountDiscarded"/>
                         </cellValueFactory>
                     </TableColumn>
+                    <TableColumn text="Offense Count Processing" minWidth="150">
+                        <cellValueFactory>
+                            <PropertyValueFactory property="totalOffenseCountProcessing"/>
+                        </cellValueFactory>
+                    </TableColumn>
+
                 </columns>
             </TableView>
         </Tab>
