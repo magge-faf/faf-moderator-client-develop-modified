@@ -33,7 +33,7 @@
             <Button fx:id="CopyGameIDButton" mnemonicParsing="false" minWidth="93" onAction="#onCopyGameID" text="Game ID"/>
             <Separator prefHeight="10" />
             <Button fx:id="CopyChatLogButton" mnemonicParsing="false" minWidth="93" onAction="#onCopyChatLog"
-                    text="Chat log"/>
+                    text="Chat Log"/>
             <Separator minHeight="10" />
             <Button fx:id="CreateReportButton" mnemonicParsing="false" minWidth="93" onAction="#onCreateReportButton"
                     text="Create report"/>
@@ -61,32 +61,47 @@
         <Tab text="Chat log">
             <TextArea fx:id="chatLogTextArea" editable="false" prefHeight="200.0" prefWidth="200.0"/>
         </Tab>
-        <Tab text="Reported accounts">
+        <Tab text="Reported Accounts">
             <TableView fx:id="reportedPlayerTableView" maxHeight="1.7976931348623157E308"
                        maxWidth="1.7976931348623157E308"/>
         </Tab>
-        <Tab text="Most reported accounts">
+        <Tab text="Most Reported Accounts">
             <TableView fx:id="mostReportedAccountsTableView">
                 <columns>
-                    <TableColumn text="Player" minWidth="150">
-                        <cellValueFactory>
-                            <PropertyValueFactory property="player"/>
-                        </cellValueFactory>
-                    </TableColumn>
-                    <TableColumn text="Offense count" minWidth="100">
-                        <cellValueFactory>
-                            <PropertyValueFactory property="offenseCount"/>
-                        </cellValueFactory>
-                    </TableColumn>
                     <TableColumn text="Last reported" minWidth="200">
                         <cellValueFactory>
                             <PropertyValueFactory property="lastReported"/>
                         </cellValueFactory>
                     </TableColumn>
+                    <TableColumn text="Player" minWidth="150">
+                        <cellValueFactory>
+                            <PropertyValueFactory property="player"/>
+                        </cellValueFactory>
+                    </TableColumn>
+                    <TableColumn text="Current Offense Count" minWidth="150">
+                        <cellValueFactory>
+                            <PropertyValueFactory property="currentOffenseCount"/>
+                        </cellValueFactory>
+                    </TableColumn>
+                    <TableColumn text="Offense Count Completed" minWidth="150">
+                        <cellValueFactory>
+                            <PropertyValueFactory property="totalOffenseCountCompleted"/>
+                        </cellValueFactory>
+                    </TableColumn>
+                    <TableColumn text="Offense Count Processing" minWidth="150">
+                        <cellValueFactory>
+                            <PropertyValueFactory property="totalOffenseCountProcessing"/>
+                        </cellValueFactory>
+                    </TableColumn>
+                    <TableColumn text="Offense Count Discarded" minWidth="150">
+                        <cellValueFactory>
+                            <PropertyValueFactory property="totalOffenseCountDiscarded"/>
+                        </cellValueFactory>
+                    </TableColumn>
                 </columns>
             </TableView>
         </Tab>
-        <Tab text="Moderator statistics">
+        <Tab text="Moderator Statistics">
             <VBox>
                 <TextArea fx:id="moderatorStatisticsTextArea" editable="false" prefHeight="30" maxHeight="30" minHeight="30"/>
                 <TableView fx:id="moderatorStatisticsTableView" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"

@@ -2,6 +2,7 @@ package com.faforever.moderatorclient.ui.moderation_reports;
 
 import com.faforever.commons.api.dto.ModerationReportStatus;
 import com.faforever.commons.replay.ChatMessage;
+import com.faforever.commons.replay.ModeratorEvent;
 import com.faforever.commons.replay.ReplayDataParser;
 import com.faforever.commons.replay.ReplayMetadata;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
@@ -37,7 +38,9 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Region;
 import javafx.stage.Stage;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.compress.utils.Lists;
@@ -62,6 +65,7 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -297,6 +301,21 @@ public class ModerationReportController implements Controller<Region> {
                         .flatMap(report -> report.getReportedUsers().stream())
                         .collect(Collectors.groupingBy(PlayerFX::getRepresentation, Collectors.counting()));
 
+                Map<String, Long> offendersCompletedReports = reports.stream()
+                        .filter(report -> report.getReportStatus().equals(ModerationReportStatus.COMPLETED))
+                        .flatMap(report -> report.getReportedUsers().stream())
+                        .collect(Collectors.groupingBy(PlayerFX::getRepresentation, Collectors.counting()));
+
+                Map<String, Long> offendersDiscardedReports = reports.stream()
+                        .filter(report -> report.getReportStatus().equals(ModerationReportStatus.DISCARDED))
+                        .flatMap(report -> report.getReportedUsers().stream())
+                        .collect(Collectors.groupingBy(PlayerFX::getRepresentation, Collectors.counting()));
+
+                Map<String, Long> offendersProcessingReports = reports.stream()
+                        .filter(report -> report.getReportStatus().equals(ModerationReportStatus.PROCESSING))
+                        .flatMap(report -> report.getReportedUsers().stream())
+                        .collect(Collectors.groupingBy(PlayerFX::getRepresentation, Collectors.counting()));
+
                 Map<String, Long> sortedOffendersAwaitingReports = offendersAwaitingReports.entrySet().stream()
                         .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
                         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
@@ -304,6 +323,9 @@ public class ModerationReportController implements Controller<Region> {
                 List<Offender> offenders = sortedOffendersAwaitingReports.entrySet().stream().map(entry -> {
                             String offenderUsername = entry.getKey();
                             Long offenderReportCount = entry.getValue();
+                            Long offenderTotalReportCountCompleted = offendersCompletedReports.getOrDefault(offenderUsername, 0L); // Get total report count for this offender
+                            Long offenderTotalReportCountDiscarded = offendersDiscardedReports.getOrDefault(offenderUsername, 0L); // Get total report count for this offender
+                            Long offenderTotalReportCountProcessing = offendersProcessingReports.getOrDefault(offenderUsername, 0L); // Get total report count for this offender
 
                             Optional<OffsetDateTime> maxCreateTime = reports.stream()
                                     .filter(report -> report.getReportedUsers().stream()
@@ -313,7 +335,11 @@ public class ModerationReportController implements Controller<Region> {
 
                             if (maxCreateTime.isPresent()) {
                                 LocalDateTime lastReported = maxCreateTime.get().toLocalDateTime();
-                                return new Offender(offenderUsername, offenderReportCount, lastReported);
+                                return new Offender(offenderUsername, offenderReportCount,
+                                        offenderTotalReportCountCompleted,
+                                        offenderTotalReportCountDiscarded,
+                                        offenderTotalReportCountProcessing,
+                                        lastReported); // Pass total report count for this offender
                             } else {
                                 log.debug("MaxCreateTime is not present.");
                                 return null;
@@ -344,6 +370,7 @@ public class ModerationReportController implements Controller<Region> {
         private final LongProperty discardedReports;
         private final LongProperty processingReports;
         private final LongProperty allReports;
+        @Setter
         private LocalDateTime lastActivity;
 
         public ModeratorStatistics(String moderator) {
@@ -496,13 +523,49 @@ public class ModerationReportController implements Controller<Region> {
 
     public static class Offender {
         private final StringProperty player;
-        private final LongProperty offenseCount;
+        private final LongProperty currentOffenseCount;
+        private final LongProperty totalOffenseCountCompleted;
+        private final LongProperty totalOffenseCountDiscarded;
+        private final LongProperty totalOffenseCountProcessing;
+        @Getter
         private LocalDateTime lastReported;
 
-        public Offender(String player, long offenseCount, LocalDateTime lastReported) {
+        public Offender(String player,
+                        long offenseCount,
+                        long totalOffenseCountCompleted,
+                        long totalOffenseCountDiscarded,
+                        long totalOffenseCountProcessing,
+                        LocalDateTime lastReported) {
+
             this.player = new SimpleStringProperty(player);
-            this.offenseCount = new SimpleLongProperty(offenseCount);
+            this.currentOffenseCount = new SimpleLongProperty(offenseCount);
+            this.totalOffenseCountCompleted = new SimpleLongProperty(totalOffenseCountCompleted);
+            this.totalOffenseCountProcessing = new SimpleLongProperty(totalOffenseCountProcessing);
+            this.totalOffenseCountDiscarded = new SimpleLongProperty(totalOffenseCountDiscarded);
             this.lastReported = lastReported;
+        }
+        public long getTotalOffenseCountCompleted() {
+            return totalOffenseCountCompleted.get();
+        }
+
+        public LongProperty totalOffenseCountCompletedProperty() {
+            return totalOffenseCountCompleted;
+        }
+
+        public long getTotalOffenseCountProcessing() {
+            return totalOffenseCountProcessing.get();
+        }
+
+        public LongProperty totalOffenseCountProcessingroperty() {
+            return totalOffenseCountProcessing;
+        }
+
+        public long getTotalOffenseCountDiscarded() {
+            return totalOffenseCountDiscarded.get();
+        }
+
+        public LongProperty totalOffenseCountDiscardedgroperty() {
+            return totalOffenseCountDiscarded;
         }
 
         public void lastReported(LocalDateTime lastReported) {
@@ -521,12 +584,12 @@ public class ModerationReportController implements Controller<Region> {
             return player;
         }
 
-        public long getOffenseCount() {
-            return offenseCount.get();
+        public long getCurrentOffenseCount() {
+            return currentOffenseCount.get();
         }
 
-        public LongProperty offenseCountProperty() {
-            return offenseCount;
+        public LongProperty currentOffenseCountProperty() {
+            return currentOffenseCount;
         }
 
     }
@@ -560,7 +623,7 @@ public class ModerationReportController implements Controller<Region> {
         };
         itemMap.addListener(listener);
 
-        filteredItemList = new FilteredList<ModerationReportFX>(itemList);
+        filteredItemList = new FilteredList<>(itemList);
 
         renewFilter();
         SortedList<ModerationReportFX> sortedItemList = new SortedList<>(filteredItemList);
@@ -713,6 +776,7 @@ public class ModerationReportController implements Controller<Region> {
         newCategoryDialog.showAndWait();
     }
 
+    @Getter
     private enum ChooseableStatus {
         ALL(null),
         AWAITING(ModerationReportStatus.AWAITING),
@@ -819,9 +883,29 @@ public class ModerationReportController implements Controller<Region> {
         });
     }
 
+    public static String getPlayerAPMs(Map<Integer, Map<Integer, AtomicInteger>> commandsPerMinuteByPlayer, double totalTimeInMinutes) {
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<Integer, Map<Integer, AtomicInteger>> entry : commandsPerMinuteByPlayer.entrySet()) {
+            int player = entry.getKey();
+            Map<Integer, AtomicInteger> commandsPerMinute = entry.getValue();
+
+            int totalCommands = 0;
+            for (AtomicInteger commands : commandsPerMinute.values()) {
+                totalCommands += commands.get();
+            }
+
+            double apm = (double) totalCommands / totalTimeInMinutes;
+            log.debug("totalCommands: " + totalCommands);
+            log.debug("totalTimeInMinutes: " + totalTimeInMinutes);
+            sb.append("\nPlayer ").append(player).append(" has an APM of ").append(apm);
+        }
+        return sb.toString();
+    }
+
     private void processAndDisplayReplay(String header, Path tempFilePath, String promptAI) {
         try {
             ReplayDataParser replayDataParser = new ReplayDataParser(tempFilePath, objectMapper);
+            Map<Integer, Map<Integer, AtomicInteger>> commandsPerMinuteByPlayer = replayDataParser.getCommandsPerMinuteByPlayer();
             String chatLog = generateChatLog(replayDataParser);
 
             StringBuilder chatLogFiltered = new StringBuilder();
@@ -832,7 +916,29 @@ public class ModerationReportController implements Controller<Region> {
 
             String filteredChatLog = filterAndAppendChatLog(chatLog);
             chatLogFiltered.append(filteredChatLog);
+
+
+
+            List<ModeratorEvent> moderatorEvents = replayDataParser.getModeratorEvents();
+
+            for (ModeratorEvent event : moderatorEvents) {
+                chatLogFiltered.append("\n")
+                        .append(event.time())
+                        .append(", sender ")
+                        .append(event.sender())
+                        .append(" ")
+                        .append(event.message());
+            }
+
             chatLogFiltered.append("\n").append(promptAI);
+
+            ReplayMetadata metadata = replayDataParser.getMetadata();
+            double totalTimeInSeconds = metadata.getGameEnd() - metadata.getLaunchedAt();
+            double totalTimeInMinutes = totalTimeInSeconds / 60.0;
+
+            String apms = getPlayerAPMs(commandsPerMinuteByPlayer, totalTimeInMinutes);
+
+            chatLogFiltered.append("\n\n\n getCommandsPerMinuteByPlayer:").append(apms);
 
             Platform.runLater(() -> {
                 CopyChatLogButton.setId(chatLogFiltered.toString());
