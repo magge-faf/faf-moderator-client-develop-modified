@@ -95,6 +95,7 @@ public class ModerationReportController implements Controller<Region> {
     public TableView moderatorStatisticsTableView;
     public CheckBox reasonsCheckBox;
     public Button UseTemplateWithReasonsButton;
+    public TextArea moderatorEventTextArea;
 
     @Value("${faforever.vault.replay-download-url-format}")
     private String replayDownLoadFormat;
@@ -836,6 +837,59 @@ public class ModerationReportController implements Controller<Region> {
         new Thread(task).start();
     }
 
+    private void showModeratorEvent(List<ModeratorEvent> moderatorEvents){
+        StringBuilder warningMessageBuilder = new StringBuilder();
+
+        moderatorEvents.stream()
+                .filter(event ->
+                        !event.playerNameFromArmy().equals(event.playerNameFromCommandSource()) ||
+                                event.activeCommandSource() != event.fromArmy()
+                )
+                .forEach(event -> {
+                    String playerName = event.playerNameFromArmy();
+                    long timeMillis = event.time().toMillis();
+                    String formattedChatMessageTime = formatChatMessageTime(timeMillis);
+                    String warning = String.format("Player '%s' at time [%s] has funky data.\n", playerName, formattedChatMessageTime);
+                    warningMessageBuilder.append(warning);
+                });
+
+        String moderatorEventsLog = moderatorEvents.stream()
+                .map(event -> {
+                    long timeMillis = event.time().toMillis();
+                    String formattedChatMessageTime = formatChatMessageTime(timeMillis);
+
+                    return String.format("""
+                            Time: [%s]
+                            Message: %s
+                            Player Name (Army): %s
+                            Player Name (Command Source): %s
+                            Active Command Source/Sender: %d/%s
+                            """,
+                            formattedChatMessageTime,
+                            event.message(),
+                            event.playerNameFromArmy(),
+                            event.playerNameFromCommandSource(),
+                            event.activeCommandSource(),
+                            event.fromArmy()
+                    );
+                })
+                .collect(Collectors.joining("\n"));
+
+        warningMessageBuilder.append("\n");
+        String finalModeratorEventsLog = warningMessageBuilder + moderatorEventsLog;
+
+        finalModeratorEventsLog += "\n";
+        moderatorEventTextArea.setText(finalModeratorEventsLog);
+    }
+
+    private String formatChatMessageTime(long timeMillis) {
+        if (timeMillis >= 0) {
+            return DurationFormatUtils.formatDuration(timeMillis, "HH:mm:ss");
+        } else {
+            return "N/A"; // replay data contains negative timestamps for whatever reason
+        }
+    }
+
     private String formatChatHeader(ModerationReportFX report, GameFX game) {
         return format("CHAT LOG -- Report ID {0} -- Replay ID {1} -- Game \"{2}\"\n\n",
                 report.getId(), game.getId(), game.getName());
@@ -907,18 +961,9 @@ public class ModerationReportController implements Controller<Region> {
             String filteredChatLog = filterAndAppendChatLog(chatLog);
             chatLogFiltered.append(filteredChatLog);
 
-
-
+            log.debug("Parsing moderatorEvents");
             List<ModeratorEvent> moderatorEvents = replayDataParser.getModeratorEvents();
-
-            for (ModeratorEvent event : moderatorEvents) {
-                chatLogFiltered.append("\n")
-                        .append(event.time())
-                        .append(", sender ")
-                        .append(event.sender())
-                        .append(" ")
-                        .append(event.message());
-            }
+            showModeratorEvent(moderatorEvents);
 
             chatLogFiltered.append("\n").append(promptAI);
 

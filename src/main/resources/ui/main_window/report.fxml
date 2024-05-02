@@ -61,6 +61,9 @@
         <Tab text="Chat log">
             <TextArea fx:id="chatLogTextArea" editable="false" prefHeight="200.0" prefWidth="200.0"/>
         </Tab>
+        <Tab text="Moderator Events">
+            <TextArea fx:id="moderatorEventTextArea" editable="false" prefHeight="200.0" prefWidth="200.0"/>
+        </Tab>
         <Tab text="Reported Accounts">
             <TableView fx:id="reportedPlayerTableView" maxHeight="1.7976931348623157E308"
                        maxWidth="1.7976931348623157E308"/>
