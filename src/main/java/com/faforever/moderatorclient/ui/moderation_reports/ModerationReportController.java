@@ -848,21 +848,6 @@ public class ModerationReportController implements Controller<Region> {
         Unpaused
          */
 
-        StringBuilder warningMessageBuilder = new StringBuilder();
-
-        moderatorEvents.stream()
-                .filter(event ->
-                        !event.playerNameFromArmy().equals(event.playerNameFromCommandSource()) ||
-                                event.activeCommandSource() != event.fromArmy()
-                )
-                .forEach(event -> {
-                    String playerName = event.playerNameFromArmy();
-                    long timeMillis = event.time().toMillis();
-                    String formattedChatMessageTime = formatChatMessageTime(timeMillis);
-                    String warning = String.format("Player '%s' at time [%s] has funky data.\n", playerName, formattedChatMessageTime);
-                    warningMessageBuilder.append(warning);
-                });
-
         String moderatorEventsLog = moderatorEvents.stream()
                 .filter(event -> !event.message().contains("focus army from"))
                 .map(event -> {
@@ -877,11 +862,9 @@ public class ModerationReportController implements Controller<Region> {
                 })
                 .collect(Collectors.joining("\n"));
 
-        warningMessageBuilder.append("\n");
-        String finalModeratorEventsLog = warningMessageBuilder + moderatorEventsLog;
 
-        finalModeratorEventsLog += "\n";
-        moderatorEventTextArea.setText(finalModeratorEventsLog);
+        moderatorEventsLog += "\n";
+        moderatorEventTextArea.setText(moderatorEventsLog);
     }
 
     private String formatChatMessageTime(long timeMillis) {
