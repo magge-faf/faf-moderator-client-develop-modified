@@ -838,6 +838,16 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private void showModeratorEvent(List<ModeratorEvent> moderatorEvents){
+        /* Current Events:
+        Created a marker with the text
+        Created a ping of type
+        Self-destructed X units
+        Switched focus army from
+        Is changing focus army from
+        Paused
+        Unpaused
+         */
+
         StringBuilder warningMessageBuilder = new StringBuilder();
 
         moderatorEvents.stream()
@@ -854,23 +864,15 @@ public class ModerationReportController implements Controller<Region> {
                 });
 
         String moderatorEventsLog = moderatorEvents.stream()
+                .filter(event -> !event.message().contains("focus army from"))
                 .map(event -> {
                     long timeMillis = event.time().toMillis();
                     String formattedChatMessageTime = formatChatMessageTime(timeMillis);
 
-                    return String.format("""
-                            Time: [%s]
-                            Message: %s
-                            Player Name (Army): %s
-                            Player Name (Command Source): %s
-                            Active Command Source/Sender: %d/%s
-                            """,
+                    return String.format("[%s] from %s: %s",
                             formattedChatMessageTime,
-                            event.message(),
-                            event.playerNameFromArmy(),
                             event.playerNameFromCommandSource(),
-                            event.activeCommandSource(),
-                            event.fromArmy()
+                            event.message()
                     );
                 })
                 .collect(Collectors.joining("\n"));
