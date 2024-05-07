@@ -967,14 +967,6 @@ public class ModerationReportController implements Controller<Region> {
 
             chatLogFiltered.append("\n").append(promptAI);
 
-            ReplayMetadata metadata = replayDataParser.getMetadata();
-            double totalTimeInSeconds = metadata.getGameEnd() - metadata.getLaunchedAt();
-            double totalTimeInMinutes = totalTimeInSeconds / 60.0;
-
-            String apms = getPlayerAPMs(commandsPerMinuteByPlayer, totalTimeInMinutes);
-
-            chatLogFiltered.append("\n\n\n getCommandsPerMinuteByPlayer:").append(apms);
-
             Platform.runLater(() -> {
                 CopyChatLogButton.setId(chatLogFiltered.toString());
                 CopyChatLogButton.setText("Copy Chat Log");
