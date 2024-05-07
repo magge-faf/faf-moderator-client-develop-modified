@@ -899,7 +899,7 @@ public class ModerationReportController implements Controller<Region> {
 
     private Path createTempFile(GameFX game) {
         try {
-            return Files.createTempFile(format("faf_replay_", game.getId()), "");
+            return Files.createTempFile(format("faf_replay_" + game.getId()), "");
         } catch (IOException e) {
             log.error("An error occurred while creating a temporary file.", e);
             return null;
