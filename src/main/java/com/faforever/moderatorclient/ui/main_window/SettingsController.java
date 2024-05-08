@@ -86,9 +86,6 @@ public class SettingsController implements Controller<Region> {
 
     @FXML
     public void initialize() throws IOException {
-        log.debug("Initializing CreateTableColumnsWidthSettingsJSON");
-        CreateTableColumnsWidthSettingsJSON();
-
         log.debug("Initializing blacklistedFiles");
         String[] blacklistedFiles = { "blacklistedHash", "blacklistedIP", "blacklistedMemorySN",
                 "blacklistedSN", "blacklistedUUID", "blacklistedVolumeSN", "excludedItems" };

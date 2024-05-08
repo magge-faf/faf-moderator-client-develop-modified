@@ -6,6 +6,7 @@ import com.faforever.moderatorclient.ui.PlatformService;
 import com.faforever.moderatorclient.ui.PlatformServiceImpl;
 import com.faforever.moderatorclient.ui.StageHolder;
 import com.faforever.moderatorclient.ui.UiService;
+import com.faforever.moderatorclient.ui.main_window.SettingsController;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -44,6 +45,9 @@ public class FafModeratorClientApplication extends Application {
 
     @Override
     public void start(Stage primaryStage) {
+        log.debug("Initializing CreateTableColumnsWidthSettingsJSON");
+        SettingsController.CreateTableColumnsWidthSettingsJSON();
+
         Font.loadFont(getClass().getResource("/style/NotoEmoji-Regular.ttf").toExternalForm(), 12);
         StageHolder.setStage(primaryStage);
         primaryStage.setTitle("magge's modified Mordor");
