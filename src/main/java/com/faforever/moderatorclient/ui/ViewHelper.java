@@ -2367,6 +2367,7 @@ public class ViewHelper {
                 setText(item);
             }
         });
+        tableView.getColumns().add(reportedUsersColumn);
 
         int reportedUsersColumnWidth = columnWidths.getOrDefault("reportedUsersColumn", 120);
         reportedUsersColumn.setPrefWidth(reportedUsersColumnWidth);
