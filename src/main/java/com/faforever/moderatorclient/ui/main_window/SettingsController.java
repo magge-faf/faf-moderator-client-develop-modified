@@ -69,7 +69,7 @@ public class SettingsController implements Controller<Region> {
             config.store(new FileOutputStream(CONFIGURATION_FOLDER + File.separator + "config.properties"), null);
             defaultStartingTabMenuBar.setText("current default is " + tabName);
         } catch (IOException e) {
-            e.printStackTrace();
+            log.error(e.getMessage());
         }
     }
 
@@ -332,7 +332,7 @@ public class SettingsController implements Controller<Region> {
             config.setProperty("autoCompleteCheckBox", Boolean.toString(autoCompleteCheckBox.isSelected()));
             config.store(new FileOutputStream(CONFIGURATION_FOLDER + File.separator + "config.properties"), null);
         } catch (IOException e) {
-            e.printStackTrace();
+            log.error(e.getMessage());
         }
     }
 
@@ -341,7 +341,7 @@ public class SettingsController implements Controller<Region> {
         try {
             Desktop.getDesktop().open(folder);
         } catch (IOException e) {
-            e.printStackTrace();
+            log.error(e.getMessage());
         }
     }
 
