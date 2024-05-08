@@ -1,0 +1,36 @@
+{
+  "columns": [
+    {
+      "name": "reporterColumn",
+      "prefWidth": 90
+    },
+    {
+      "name": "reportedUsersColumn",
+      "prefWidth": 120
+    },
+    {
+      "name": "reportDescriptionColumn",
+      "prefWidth": 1400
+    },
+    {
+      "name": "incidentTimeCodeColumn",
+      "prefWidth": 90
+    },
+    {
+      "name": "privateNoteColumn",
+      "prefWidth": 120
+    },
+    {
+      "name": "moderatorPrivateNoticeColumn",
+      "prefWidth": 120
+    },
+    {
+      "name": "lastModeratorColumn",
+      "prefWidth": 120
+    },
+    {
+      "name": "createTimeColumn",
+      "prefWidth": 120
+    }
+  ]
+}

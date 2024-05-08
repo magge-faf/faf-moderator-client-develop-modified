@@ -11,6 +11,9 @@ import javafx.scene.layout.VBox;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.awt.*;
 import java.io.*;
@@ -83,13 +86,23 @@ public class SettingsController implements Controller<Region> {
 
     @FXML
     public void initialize() throws IOException {
+        log.debug("Initializing CreateTableColumnsWidthSettingsJSON");
+        CreateTableColumnsWidthSettingsJSON();
+
+        log.debug("Initializing blacklistedFiles");
         String[] blacklistedFiles = { "blacklistedHash", "blacklistedIP", "blacklistedMemorySN",
                 "blacklistedSN", "blacklistedUUID", "blacklistedVolumeSN", "excludedItems" };
 
         // create default blacklisted files if they do not exist
         File directory = new File(CONFIGURATION_FOLDER);
         if (!directory.exists()) {
-            directory.mkdirs();
+            if (directory.mkdirs()) {
+                log.debug("Configuration directory created: {}", directory.getAbsolutePath());
+            } else {
+                log.error("Failed to create configuration directory: {}", directory.getAbsolutePath());
+            }
+        } else {
+            log.debug("Configuration directory already exists: {}", directory.getAbsolutePath());
         }
 
         for (String file : blacklistedFiles) {
@@ -103,7 +116,7 @@ public class SettingsController implements Controller<Region> {
                     }
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                log.debug(e.getMessage());
             }
         }
 
@@ -148,7 +161,6 @@ public class SettingsController implements Controller<Region> {
                         writer.println("autoDiscardCheckBox=false");
                         writer.println("autoCompleteCheckBox=false");
 
-                        log.info("[info] " + configFile + " was successfully created.");
                     } catch (IOException e) {
                         log.error("[error] Failed to create " + configFile, e);
                     }
@@ -333,6 +345,66 @@ public class SettingsController implements Controller<Region> {
             Desktop.getDesktop().open(folder);
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    public static void CreateTableColumnsWidthSettingsJSON() {
+        String filePath = "ConfigurationModerationToolFAF/TableColumnsWidthSettings.json";
+
+        try {
+            File file = new File(filePath);
+            file.getParentFile().mkdirs();
+
+            ObjectMapper mapper = new ObjectMapper();
+            ObjectNode data = mapper.createObjectNode();
+
+            if (!file.exists()) {
+                ArrayNode columns = mapper.createArrayNode();
+
+                columns.add(mapper.createObjectNode()
+                        .put("name", "reporterColumn")
+                        .put("prefWidth", 90));
+
+                columns.add(mapper.createObjectNode()
+                        .put("name", "reportedUsersColumn")
+                        .put("prefWidth", 120));
+
+                columns.add(mapper.createObjectNode()
+                        .put("name", "reportDescriptionColumn")
+                        .put("prefWidth", 1400));
+
+                columns.add(mapper.createObjectNode()
+                        .put("name", "incidentTimeCodeColumn")
+                        .put("prefWidth", 90));
+
+                columns.add(mapper.createObjectNode()
+                        .put("name", "privateNoteColumn")
+                        .put("prefWidth", 120));
+
+                columns.add(mapper.createObjectNode()
+                        .put("name", "moderatorPrivateNoticeColumn")
+                        .put("prefWidth", 120));
+
+                columns.add(mapper.createObjectNode()
+                        .put("name", "lastModeratorColumn")
+                        .put("prefWidth", 120));
+
+                columns.add(mapper.createObjectNode()
+                        .put("name", "createTimeColumn")
+                        .put("prefWidth", 120));
+
+                data.set("columns", columns);
+
+                FileWriter writer = new FileWriter(file);
+                writer.write(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(data));
+                writer.close();
+                log.debug("TableColumnsWidthSettingsJSON was created.");
+            } else {
+                log.debug("TableColumnsWidthSettingsJSON already exists.");
+            }
+
+        } catch (IOException e) {
+            log.error("Error creating file: {}", e.getMessage());
         }
     }
 }
