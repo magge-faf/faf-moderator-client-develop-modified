@@ -1009,10 +1009,12 @@ public class ModerationReportController implements Controller<Region> {
         final String CHEATS_ENABLED_KEY = "CheatsEnabled";
         final String VICTORY_KEY = "Victory";
         final String SHARE_KEY = "Share";
+        final String COMMON_ARMY_KEY = "CommonArmy";
         final String DEMORALIZATION = "demoralization";
         final String ASSASSINATION = "Assassination (default)";
-        final String TRUE = "true";
+        final String OFF_STRING = "Off";
 
+        String commonArmy = getValueForKey(gameOptions, COMMON_ARMY_KEY);
         String cheatsEnabled = getValueForKey(gameOptions, CHEATS_ENABLED_KEY);
         String victoryCondition = getValueForKey(gameOptions, VICTORY_KEY);
         String shareCondition = getValueForKey(gameOptions, SHARE_KEY);
@@ -1024,8 +1026,12 @@ public class ModerationReportController implements Controller<Region> {
 
         StringBuilder report = new StringBuilder();
 
-        if (TRUE.equalsIgnoreCase(cheatsEnabled)) {
+        if (Boolean.parseBoolean(cheatsEnabled)) {
             report.append("[!] Cheats Enabled: ").append(cheatsEnabled).append("\n");
+        }
+
+        if (!commonArmy.equalsIgnoreCase(OFF_STRING)) {
+            report.append("[!] Non-Default Common Army: ").append(commonArmy).append("\n");
         }
 
         report.append("Host: ").append(metadata.getHost()).append("\n")
