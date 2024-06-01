@@ -877,7 +877,7 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private String formatChatHeader(ModerationReportFX report, GameFX game) {
-        return format("CHAT LOG -- Report ID {0} -- Replay ID {1} -- Game \"{2}\"\n\n",
+        return format("CHAT LOG -- Report ID {0} -- Replay ID {1} -- Title \"{2}\"\n\n",
                 report.getId(), game.getId(), game.getName());
     }
 
@@ -1000,15 +1000,22 @@ public class ModerationReportController implements Controller<Region> {
     private String generateMetadataInfo(ReplayDataParser replayDataParser) {
         ReplayMetadata metadata = replayDataParser.getMetadata();
         List<GameOption> gameOptions = replayDataParser.getGameOptions();
-        Map<String, Map<String, ?>> getMods = replayDataParser.getMods();
+        Map<String, Map<String, ?>> mods = replayDataParser.getMods();
 
-        log.debug("getMods: " + getMods);
-        log.debug("Metadata: " + metadata);
-        log.debug("gameOptions: " + gameOptions);
+        log.debug("Mods: {}", mods);
+        log.debug("Metadata: {}", metadata);
+        log.debug("Game Options: {}", gameOptions);
 
-        String cheatsEnabled = getValueForKey(gameOptions, "CheatsEnabled");
-        String victoryCondition = getValueForKey(gameOptions, "Victory");
-        String share = getValueForKey(gameOptions, "Share");
+        final String CHEATS_ENABLED_KEY = "CheatsEnabled";
+        final String VICTORY_KEY = "Victory";
+        final String SHARE_KEY = "Share";
+        final String DEMORALIZATION = "demoralization";
+        final String ASSASSINATION = "Assassination (default)";
+        final String TRUE = "true";
+
+        String cheatsEnabled = getValueForKey(gameOptions, CHEATS_ENABLED_KEY);
+        String victoryCondition = getValueForKey(gameOptions, VICTORY_KEY);
+        String shareCondition = getValueForKey(gameOptions, SHARE_KEY);
 
         double launchedAt = metadata.getLaunchedAt();
         double gameEnd = metadata.getGameEnd();
@@ -1017,27 +1024,27 @@ public class ModerationReportController implements Controller<Region> {
 
         StringBuilder report = new StringBuilder();
 
-        if ("true".equalsIgnoreCase(cheatsEnabled)) {
-            report.append("[!] gameOptionCheatsEnabled: ").append(cheatsEnabled).append("\n");
+        if (TRUE.equalsIgnoreCase(cheatsEnabled)) {
+            report.append("[!] Cheats Enabled: ").append(cheatsEnabled).append("\n");
         }
 
-        report.append("Host: ").append(metadata.getHost()).append("\n");
-
-        if ("demoralization".equalsIgnoreCase(victoryCondition)) {
-            report.append("Victory Condition: ").append("Assassination (default)").append("\n");
-        }
-        else {
-            report.append("Victory Condition: ").append(victoryCondition).append("\n");
-        }
-
-        report.append("Share Condition: ").append(share).append("\n");
-
-        report.append("Number of Players: ").append(metadata.getNumPlayers()).append("\n")
-                .append("Teams: ").append(metadata.getTeams()).append("\n")
+        report.append("Host: ").append(metadata.getHost()).append("\n")
+                .append("Victory Condition: ").append(DEMORALIZATION.equalsIgnoreCase(victoryCondition) ? ASSASSINATION : victoryCondition).append("\n")
+                .append("Share Condition: ").append(shareCondition).append("\n")
+                .append("Number of Players: ").append(metadata.getNumPlayers()).append("\n")
+                .append("Teams:\n").append(formatTeams(metadata.getTeams())).append("\n")
                 .append("Map Name: ").append(metadata.getMapname()).append("\n")
                 .append("Game Total Time: ").append(formattedTotalTime).append("\n\n");
 
         return report.toString();
+    }
+
+    private String formatTeams(Map<String, List<String>> teams) {
+        StringBuilder formattedTeams = new StringBuilder();
+        teams.forEach((teamNumber, players) -> {
+            formattedTeams.append("Team ").append(teamNumber).append(": ").append(String.join(", ", players)).append("\n");
+        });
+        return formattedTeams.toString();
     }
 
     private String formatGameTotalTime(double totalTime) {
