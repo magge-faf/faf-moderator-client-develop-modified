@@ -5,6 +5,7 @@ import com.faforever.commons.replay.ChatMessage;
 import com.faforever.commons.replay.ModeratorEvent;
 import com.faforever.commons.replay.ReplayDataParser;
 import com.faforever.commons.replay.ReplayMetadata;
+import com.faforever.commons.replay.GameOption;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.ModerationReportService;
 import com.faforever.moderatorclient.ui.*;
@@ -941,12 +942,11 @@ public class ModerationReportController implements Controller<Region> {
             chatLogFiltered.append(header);
 
             String metadataInfo = generateMetadataInfo(replayDataParser);
-            chatLogFiltered.append("--- Replay Metadata ---\n").append(metadataInfo);
+            chatLogFiltered.append(metadataInfo);
 
             String filteredChatLog = filterAndAppendChatLog(chatLog);
             chatLogFiltered.append(filteredChatLog);
 
-            log.debug("Parsing moderatorEvents");
             List<ModeratorEvent> moderatorEvents = replayDataParser.getModeratorEvents();
             showModeratorEvent(moderatorEvents);
 
@@ -988,21 +988,56 @@ public class ModerationReportController implements Controller<Region> {
                 formattedTime, message.getSender(), message.getReceiver(), message.getMessage());
     }
 
+    private static String getValueForKey(List<GameOption> gameOptions, String key) {
+        for (GameOption option : gameOptions) {
+            if (option.getKey().equals(key)) {
+                return (String) option.getValue();
+            }
+        }
+        return "Not Found";
+    }
+
     private String generateMetadataInfo(ReplayDataParser replayDataParser) {
         ReplayMetadata metadata = replayDataParser.getMetadata();
+        List<GameOption> gameOptions = replayDataParser.getGameOptions();
+        Map<String, Map<String, ?>> getMods = replayDataParser.getMods();
+
+        log.debug("getMods: " + getMods);
+        log.debug("Metadata: " + metadata);
+        log.debug("gameOptions: " + gameOptions);
+
+        String cheatsEnabled = getValueForKey(gameOptions, "CheatsEnabled");
+        String victoryCondition = getValueForKey(gameOptions, "Victory");
+        String share = getValueForKey(gameOptions, "Share");
+
         double launchedAt = metadata.getLaunchedAt();
         double gameEnd = metadata.getGameEnd();
         double totalTime = gameEnd - launchedAt;
         String formattedTotalTime = formatGameTotalTime(totalTime);
 
-        return //"Victory Condition: " + metadata.getVictoryCondition() + "\n" + // Is always Unknown for whatever reason
-                // "Game Time: " + metadata.getLaunchedAt() + "\n" + // Is always 0.0 for whatever reason
-                "Host: " + metadata.getHost() + "\n" +
-                        "Number of Players: " + metadata.getNumPlayers() + "\n" +
-                        "Teams: " + metadata.getTeams() + "\n" +
-                        "Map Name: " + metadata.getMapname() + "\n" +
-                        "Game Total Time: " + formattedTotalTime + "\n\n";
-        //"Featured Mod: " + Arrays.toString(metadata.getOptions()) + "\n\n"; // Is always null for whatever reason
+        StringBuilder report = new StringBuilder();
+
+        if ("true".equalsIgnoreCase(cheatsEnabled)) {
+            report.append("[!] gameOptionCheatsEnabled: ").append(cheatsEnabled).append("\n");
+        }
+
+        report.append("Host: ").append(metadata.getHost()).append("\n");
+
+        if ("demoralization".equalsIgnoreCase(victoryCondition)) {
+            report.append("Victory Condition: ").append("Assassination (default)").append("\n");
+        }
+        else {
+            report.append("Victory Condition: ").append(victoryCondition).append("\n");
+        }
+
+        report.append("Share Condition: ").append(share).append("\n");
+
+        report.append("Number of Players: ").append(metadata.getNumPlayers()).append("\n")
+                .append("Teams: ").append(metadata.getTeams()).append("\n")
+                .append("Map Name: ").append(metadata.getMapname()).append("\n")
+                .append("Game Total Time: ").append(formattedTotalTime).append("\n\n");
+
+        return report.toString();
     }
 
     private String formatGameTotalTime(double totalTime) {
