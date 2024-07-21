@@ -252,9 +252,7 @@ public class SettingsController implements Controller<Region> {
             if (!fileCompleted.exists()) {
                 String contentCompleted = "AI-Prompt: Gaming Moderator Task\n"
                         + "Reported Chat Log Assessing report from " + "%reporter%" + " against offender " + "%offenderNames%" + ":\n"
-                        + "Rate offender's toxicity (" + "%offenderNames%" + ") " + "(0-100%)\n"
-                        + "Give examples for the violations from " + "%offenderNames%" + " and keep your answers short.\n"
-                        + "If the offender writes Russian, then translate the text into English.";
+                        + "Itemize all instances of speech by "+"%offenderNames%"+". Translate to English where necessary."
                 FileWriter writer = new FileWriter(fileCompleted);
                 writer.write(contentCompleted);
                 writer.close();
