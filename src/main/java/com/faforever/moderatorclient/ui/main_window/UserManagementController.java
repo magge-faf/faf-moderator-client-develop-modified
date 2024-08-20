@@ -20,6 +20,7 @@ import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import javafx.util.StringConverter;
 import lombok.RequiredArgsConstructor;
@@ -56,6 +57,10 @@ public class UserManagementController implements Controller<SplitPane> {
     public TextField statusTextFieldProcessingItem;
     public Tab logSmurfVillageTab;
     public TextArea logSmurfVillageTabTextArea;
+    public Button checkRecentAccountsForSmurfsButton;
+    public Text statusTextRecentAccountsForSmurfs;
+    public TextField amountTextFieldRecentAccountsForSmurfsAmount;
+    public Text amountAccountsText;
     private int depthCounter = 0;
     private StringBuilder logOutput = new StringBuilder();
     private StringBuilder usersNotBanned = new StringBuilder();
@@ -275,7 +280,7 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     private void initializeSearchProperties() {
-        searchUserPropertyMapping.put("All in one", "allInOne");
+        searchUserPropertyMapping.put("All In One", "allInOne");
         searchUserPropertyMapping.put("Name", "login");
         searchUserPropertyMapping.put("User ID", "id");
         searchUserPropertyMapping.put("Previous Name", "names.name");
@@ -628,7 +633,7 @@ public class UserManagementController implements Controller<SplitPane> {
         return excludedItems;
     }
 
-    private void processUsers(String attributeName, String attributeValue, int threshold, StringBuilder logOutput, ArrayList<Object> foundSmurfs, String playerID) {
+    private void processUsers(String attributeName, String attributeValue, int threshold, StringBuilder logOutput, ArrayList<Object> foundSmurfs) {
         try {
             String text = String.format("\nProcessing ... [%s] [%s]", attributeName, attributeValue);
             updateSmurfVillageLogTextArea(text);
@@ -812,7 +817,7 @@ public class UserManagementController implements Controller<SplitPane> {
         uuids.forEach(uuid -> {
             statusTextFieldProcessingItem.setText("uuid: " + uuid);
             if (!alreadyCheckedUuids.contains(uuid)) {
-                processUsers(propertyUUID, uuid, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
+                processUsers(propertyUUID, uuid, maxUniqueUsersThreshold, logOutput, foundSmurfs);
                 alreadyCheckedUuids.add(uuid);
             } else {
                 text.set(String.format("\nIgnoring duplicate: UUID [%s] already processed.\n", uuid));
@@ -823,7 +828,7 @@ public class UserManagementController implements Controller<SplitPane> {
         hashes.forEach(hash -> {
             statusTextFieldProcessingItem.setText("hash: " + hash);
             if (!alreadyCheckedHashes.contains(hash)) {
-                processUsers(propertyHash, hash, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
+                processUsers(propertyHash, hash, maxUniqueUsersThreshold, logOutput, foundSmurfs);
                 alreadyCheckedHashes.add(hash);
             } else {
                 log.debug(String.format("\nIgnoring duplicate: Hash [%s] already processed.", hash));
@@ -834,7 +839,7 @@ public class UserManagementController implements Controller<SplitPane> {
         ips.forEach(ip -> {
             statusTextFieldProcessingItem.setText(ip);
             if (!alreadyCheckedIps.contains(ip)) {
-                processUsers(propertyIP, ip, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
+                processUsers(propertyIP, ip, maxUniqueUsersThreshold, logOutput, foundSmurfs);
                 alreadyCheckedIps.add(ip);
             } else {
                 log.debug(String.format("Ignoring duplicate: IP [%s] already processed.", ip));
@@ -845,7 +850,7 @@ public class UserManagementController implements Controller<SplitPane> {
         memorySerialNumbers.forEach(memorySerialNumber -> {
             statusTextFieldProcessingItem.setText("memorySerialNumber:" + memorySerialNumber);
             if (!alreadyCheckedMemorySerialNumbers.contains(memorySerialNumber)) {
-                processUsers(propertyMemorySerialNumber, memorySerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
+                processUsers(propertyMemorySerialNumber, memorySerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs);
                 alreadyCheckedMemorySerialNumbers.add(memorySerialNumber);
             } else {
                 log.debug(String.format("Ignoring duplicate: Memory Serial Number [%s] already processed.", memorySerialNumber));
@@ -856,7 +861,7 @@ public class UserManagementController implements Controller<SplitPane> {
         volumeSerialNumbers.forEach(volumeSerialNumber -> {
             statusTextFieldProcessingItem.setText("volumeSerialNumber: " + volumeSerialNumber);
             if (!alreadyCheckedVolumeSerialNumbers.contains(volumeSerialNumber)) {
-                processUsers(propertyVolumeSerialNumber, volumeSerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
+                processUsers(propertyVolumeSerialNumber, volumeSerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs);
                 alreadyCheckedVolumeSerialNumbers.add(volumeSerialNumber);
             } else {
                 log.debug(String.format("Ignoring duplicate: Volume Serial Number [%s] already processed.", volumeSerialNumber));
@@ -867,7 +872,7 @@ public class UserManagementController implements Controller<SplitPane> {
         serialNumbers.forEach(serialNumber -> {
             statusTextFieldProcessingItem.setText("serialNumber:" + serialNumber);
             if (!alreadyCheckedSerialNumbers.contains(serialNumber)) {
-                processUsers(propertySerialNumber, serialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
+                processUsers(propertySerialNumber, serialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs);
                 alreadyCheckedSerialNumbers.add(serialNumber);
             } else {
                 log.debug(String.format("Ignoring duplicate: Serial Number [%s] already processed.", serialNumber));
@@ -878,7 +883,7 @@ public class UserManagementController implements Controller<SplitPane> {
         processorIds.forEach(processorId -> {
             statusTextFieldProcessingItem.setText("processorId:" + processorId);
             if (!alreadyCheckedProcessorIds.contains(processorId)) {
-                processUsers(propertyProcessorId, processorId, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
+                processUsers(propertyProcessorId, processorId, maxUniqueUsersThreshold, logOutput, foundSmurfs);
                 alreadyCheckedProcessorIds.add(processorId);
             } else {
                 log.debug(String.format("Ignoring duplicate: Processor ID [%s] already processed.", processorId));
@@ -889,7 +894,7 @@ public class UserManagementController implements Controller<SplitPane> {
         cpuNames.forEach(cpu -> {
             statusTextFieldProcessingItem.setText("cpu:" + cpu);
             if (!alreadyCheckedCpuNames.contains(cpu)) {
-                processUsers(propertyCPUName, cpu, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
+                processUsers(propertyCPUName, cpu, maxUniqueUsersThreshold, logOutput, foundSmurfs);
                 alreadyCheckedCpuNames.add(cpu);
 
             } else {
@@ -901,7 +906,7 @@ public class UserManagementController implements Controller<SplitPane> {
         manufacturers.forEach(manufacturer -> {
             statusTextFieldProcessingItem.setText("manufacturer: "+ manufacturer);
             if (!alreadyCheckedManufacturers.contains(manufacturer)) {
-                processUsers(propertyManufacturer, manufacturer, maxUniqueUsersThreshold, logOutput, foundSmurfs, playerID);
+                processUsers(propertyManufacturer, manufacturer, maxUniqueUsersThreshold, logOutput, foundSmurfs);
                 alreadyCheckedManufacturers.add(manufacturer);
 
             } else {
@@ -948,23 +953,34 @@ public class UserManagementController implements Controller<SplitPane> {
         return false;
     }
 
-    public void onLookupSmurfVillage() {
+    private void resetPreviousStateSmurfVillageLookup() {
+        alreadyCheckedUsers.clear();
+        alreadyCheckedUuids.clear();
+        alreadyCheckedHashes.clear();
+        alreadyCheckedIps.clear();
+        alreadyCheckedMemorySerialNumbers.clear();
+        alreadyCheckedVolumeSerialNumbers.clear();
+        alreadyCheckedSerialNumbers.clear();
+        alreadyCheckedProcessorIds.clear();
+        alreadyCheckedCpuNames.clear();
+        alreadyCheckedBiosVersions.clear();
+        alreadyCheckedManufacturers.clear();
+        log.debug("resetPreviousStateSmurfVillageLookup");
+    }
 
+    public void onLookupSmurfVillage() {
         if (!checkStartUpExcludedItems()) {
             Alert alert = new Alert(Alert.AlertType.INFORMATION);
             alert.setTitle("Information Dialog");
             alert.setHeaderText(null);
             alert.setContentText("Your excludedItems.txt is empty or missing " +
-                    "See Settings-Tab (Top Right) how to get the latest version from zulip channel"
-            );
-
+                    "See Settings-Tab (Top Right) how to get the latest version from Zulip channel");
             alert.showAndWait();
             return;
         }
 
-
         setStatusWorking();
-        // TODO: Refactor the feature
+
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() {
@@ -977,27 +993,29 @@ public class UserManagementController implements Controller<SplitPane> {
                 onSmurfVillageLookup(lookupPlayerID);
                 return null;
             }
+
+            @Override
+            protected void succeeded() {
+                Platform.runLater(() -> {
+                    setStatusDone();
+                    resetPreviousStateSmurfVillageLookup();
+                    statusTextFieldProcessingPlayerID.setText("Status");
+                    statusTextFieldProcessingItem.setText("Detailed Status Information");
+                    logSmurfVillageTabTextArea.appendText("\n\nTask Done");
+
+                    if (searchSmurfVillageTabTextArea.getText().isEmpty()) {
+                        searchSmurfVillageTabTextArea.setText("No additional accounts found.");
+                    }
+                });
+            }
+
+            @Override
+            protected void failed() {
+                Platform.runLater(() -> {
+                    log.debug("Task failed");
+                });
+            }
         };
-
-        task.setOnSucceeded(event -> {
-            setStatusDone();
-            alreadyCheckedUsers.clear();
-            alreadyCheckedUuids.clear();
-            alreadyCheckedHashes.clear();
-            alreadyCheckedIps.clear();
-            alreadyCheckedMemorySerialNumbers.clear();
-            alreadyCheckedVolumeSerialNumbers.clear();
-            alreadyCheckedSerialNumbers.clear();
-            alreadyCheckedProcessorIds.clear();
-            alreadyCheckedCpuNames.clear();
-            alreadyCheckedBiosVersions.clear();
-            alreadyCheckedManufacturers.clear();
-            statusTextFieldProcessingPlayerID.setText("Status");
-            statusTextFieldProcessingItem.setText("");
-            logSmurfVillageTabTextArea.appendText("\n\nTask Done");
-        });
-
-        task.setOnFailed(e -> log.debug("fail"));
 
         new Thread(task).start();
     }
@@ -1005,14 +1023,94 @@ public class UserManagementController implements Controller<SplitPane> {
     public void updateSmurfVillageLogTextArea(String... texts) {
         Platform.runLater(() -> {
             try {
-                for (String text : texts) {
-                    if (text != null) {
-                        logSmurfVillageTabTextArea.appendText(text);
+                if (texts != null) {
+                    for (String text : texts) {
+                        if (text != null) {
+                            logSmurfVillageTabTextArea.appendText(text);
+                        }
                     }
                 }
+            } catch (IndexOutOfBoundsException e) {
+                log.error("IndexOutOfBoundsException in updateSmurfVillageLogTextArea: {}", e.getMessage(), e);
             } catch (RuntimeException e) {
-                log.debug(e.getMessage());
+                log.error("RuntimeException in updateSmurfVillageLogTextArea: {}", e.getMessage(), e);
             }
         });
+    }
+
+    public void checkRecentAccountsForSmurfs() {
+        setStatusWorking();
+        // Define a task to run in the background
+        Task<Void> task = new Task<>() {
+            private int count = 0;
+            private int amountAccountsCheck = 0;
+            private static final int DELAY_MS = 150;
+            // Setting a low delay can lead to UI-thread exceptions and unpredictable behavior.
+
+            @Override
+            protected Void call() {
+                List<PlayerFX> accounts = userService.findLatestRegistrations();
+
+                if (accounts == null || accounts.isEmpty()) {
+                    Platform.runLater(() -> statusTextRecentAccountsForSmurfs.setText("No accounts found."));
+                    return null;
+                }
+
+                try {
+                    amountAccountsCheck = Integer.parseInt(amountTextFieldRecentAccountsForSmurfsAmount.getText());
+                } catch (NumberFormatException e) {
+                    Platform.runLater(() -> statusTextRecentAccountsForSmurfs.setText("Invalid number format."));
+                    return null;
+                }
+
+                for (PlayerFX account : accounts) {
+                    if (count >= amountAccountsCheck) {
+                        final int currentCount = count;
+                        Platform.runLater(() -> statusTextRecentAccountsForSmurfs.setText(String.format("Reached the limit: %d/%d", currentCount, amountAccountsCheck)));
+                        break;
+                    }
+
+                    onSmurfVillageLookup(account.getId());
+                    count++;
+
+                    // Update status on the JavaFX Application Thread
+                    final int currentCount = count;
+                    Platform.runLater(() -> statusTextRecentAccountsForSmurfs.setText(String.format("Status: %d/%d", currentCount, amountAccountsCheck)));
+
+                    try {
+                        Thread.sleep(DELAY_MS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        Platform.runLater(() -> statusTextRecentAccountsForSmurfs.setText("Task interrupted."));
+                        log.error("Task interrupted", e);
+                        return null;
+                    }
+                }
+
+                return null;
+            }
+
+            @Override
+            protected void failed() {
+                Platform.runLater(() -> resetPreviousStateSmurfVillageLookup());
+                super.failed();
+                log.error("Task failed", getException());
+            }
+
+            @Override
+            protected void succeeded() {
+                Platform.runLater(() -> {
+                    resetPreviousStateSmurfVillageLookup();
+                    setStatusDone();
+                });
+                super.succeeded();
+                if (searchSmurfVillageTabTextArea.getText().isEmpty()) {
+                    searchSmurfVillageTabTextArea.setText("No additional accounts found.");
+                }
+                log.debug("Task completed successfully.");
+            }
+        };
+
+        new Thread(task).start();
     }
 }
