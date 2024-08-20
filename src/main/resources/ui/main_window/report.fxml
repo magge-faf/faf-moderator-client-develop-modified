@@ -53,6 +53,10 @@
             <Separator prefHeight="10"/>
             <Button fx:id="StartReplayButton" mnemonicParsing="false" minWidth="93" onAction="#onStartReplay"
                     text="Start Replay"/>
+            <Separator prefHeight="10"/>
+            <TextField fx:id="getModeratorEventsForReplayIdTextField" promptText="Enter ReplayID" />
+            <Button fx:id="getModeratorEventsReplayIdButton" mnemonicParsing="false" minWidth="93" onAction="#onModeratorEventsReplayIdButton"
+                    text="Get Chat/Events"/>
         </VBox>
         <TableView fx:id="reportTableView" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
                    HBox.hgrow="ALWAYS"/>

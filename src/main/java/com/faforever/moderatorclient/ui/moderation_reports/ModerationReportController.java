@@ -97,6 +97,8 @@ public class ModerationReportController implements Controller<Region> {
     public CheckBox reasonsCheckBox;
     public Button UseTemplateWithReasonsButton;
     public TextArea moderatorEventTextArea;
+    public TextField getModeratorEventsForReplayIdTextField;
+    public Button getModeratorEventsReplayIdButton;
 
     @Value("${faforever.vault.replay-download-url-format}")
     private String replayDownLoadFormat;
@@ -364,6 +366,34 @@ public class ModerationReportController implements Controller<Region> {
             }
         };
         new Thread(task).start();
+    }
+
+    public void onModeratorEventsReplayIdButton() {
+        String replayID = getModeratorEventsForReplayIdTextField.getText();
+
+        if (replayID == null || replayID.isEmpty()) {
+            return;
+        }
+
+        try {
+            Integer.parseInt(replayID);
+        } catch (NumberFormatException e) {
+            log.warn("Replay ID must be a valid integer.");
+            return;
+        }
+
+        // Create and initialize the ModerationReportFX, PlayerFX, and GameFX objects
+        // with the necessary default data for processing it in the showChatLog method.
+        ModerationReportFX fakeReport = new ModerationReportFX();
+        PlayerFX playerFX = new PlayerFX();
+        GameFX gameFX = new GameFX();
+
+        playerFX.setLogin("TemporaryTestUser");
+        fakeReport.setReporter(playerFX);
+        gameFX.setId(replayID);
+        fakeReport.setGame(gameFX);
+
+        showChatLog(fakeReport);
     }
 
     public static class ModeratorStatistics {
