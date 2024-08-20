@@ -6,7 +6,7 @@
 <?import javafx.scene.text.Text?>
 <VBox xmlns:fx="http://javafx.com/fxml/1" fx:id="root" alignment="TOP_CENTER" xmlns="http://javafx.com/javafx/8.0.111"
       fx:controller="com.faforever.moderatorclient.ui.main_window.RecentActivityController">
-    <Button fx:id="refreshButton" minWidth="200.0" mnemonicParsing="false" onAction="#refresh" text="Start automatic refresh event">
+    <Button fx:id="refreshButton" minWidth="200.0" mnemonicParsing="false" onAction="#refresh" text="Refresh Latest Registrations">
         <VBox.margin>
             <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
         </VBox.margin>

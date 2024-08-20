@@ -109,7 +109,6 @@ public class RecentActivityController implements Controller<VBox> {
     }
 
     public void refresh() {
-        refreshButton.setText("refresh");
         Platform.runLater(() -> {
             teamkills.setAll(userService.findLatestTeamkills());
             teamkillFeedTableView.getSortOrder().clear();

@@ -47,7 +47,7 @@
                 <Text fx:id="statusTextRecentAccountsForSmurfs" text="Status:"/>
             </HBox>
             <Text fx:id="amountAccountsText"
-                  text="Number of recent registered accounts to check (up to 1000, 135 = ~1 day of new accounts)"/>
+                  text="Number of recent registered accounts to check (up to 1000)"/>
             <TextField fx:id="amountTextFieldRecentAccountsForSmurfsAmount" text="405"/>
         </VBox>
 
