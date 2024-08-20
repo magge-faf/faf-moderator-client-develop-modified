@@ -1052,9 +1052,13 @@ public class ModerationReportController implements Controller<Region> {
         final String OFF_STRING = "Off";
 
         String commonArmy = getValueForKey(gameOptions, COMMON_ARMY_KEY);
+        log.debug("commonArmy value: {}", commonArmy);
         String cheatsEnabled = getValueForKey(gameOptions, CHEATS_ENABLED_KEY);
+        log.debug("cheatsEnabled value: {}", cheatsEnabled);
         String victoryCondition = getValueForKey(gameOptions, VICTORY_KEY);
+        log.debug("victoryCondition value: {}", victoryCondition);
         String shareCondition = getValueForKey(gameOptions, SHARE_KEY);
+        log.debug("shareCondition value: {}", shareCondition);
 
         double launchedAt = metadata.getLaunchedAt();
         double gameEnd = metadata.getGameEnd();
@@ -1067,7 +1071,7 @@ public class ModerationReportController implements Controller<Region> {
             report.append("[!] Cheats Enabled: ").append(cheatsEnabled).append("\n");
         }
 
-        if (!commonArmy.equalsIgnoreCase(OFF_STRING)) {
+        if (!commonArmy.equalsIgnoreCase(OFF_STRING) && !commonArmy.equalsIgnoreCase("Not Found")) {
             report.append("[!] Non-Default Common Army: ").append(commonArmy).append("\n");
         }
 
