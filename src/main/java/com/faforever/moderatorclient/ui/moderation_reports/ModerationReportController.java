@@ -604,7 +604,7 @@ public class ModerationReportController implements Controller<Region> {
             }
         });
         statusChoiceBox.setItems(FXCollections.observableArrayList(ChooseableStatus.values()));
-        statusChoiceBox.getSelectionModel().select(ChooseableStatus.AWAITING);
+        statusChoiceBox.getSelectionModel().select(ChooseableStatus.AWAITING_PROCESSING); // Set Default Selection
         editReportButton.disableProperty().bind(reportTableView.getSelectionModel().selectedItemProperty().isNull());
         itemMap = FXCollections.observableHashMap();
         itemList = FXCollections.observableArrayList();
@@ -707,6 +707,12 @@ public class ModerationReportController implements Controller<Region> {
             }
             ChooseableStatus selectedItemChoiceBox = statusChoiceBox.getSelectionModel().getSelectedItem();
             if (selectedItemChoiceBox.toString().equals("ALL")) return true;
+
+            if (selectedItemChoiceBox == ChooseableStatus.AWAITING_PROCESSING) {
+                return moderationReportFx.getReportStatus() == ModerationReportStatus.AWAITING ||
+                        moderationReportFx.getReportStatus() == ModerationReportStatus.PROCESSING;
+            }
+
             ModerationReportStatus moderationReportStatus = selectedItemChoiceBox.getModerationReportStatus();
             return moderationReportFx.getReportStatus() == moderationReportStatus;
         });
@@ -777,7 +783,8 @@ public class ModerationReportController implements Controller<Region> {
         AWAITING(ModerationReportStatus.AWAITING),
         PROCESSING(ModerationReportStatus.PROCESSING),
         COMPLETED(ModerationReportStatus.COMPLETED),
-        DISCARDED(ModerationReportStatus.DISCARDED);
+        DISCARDED(ModerationReportStatus.DISCARDED),
+        AWAITING_PROCESSING(null);// Combine AWAITING and PROCESSING
 
         private final ModerationReportStatus moderationReportStatus;
 
