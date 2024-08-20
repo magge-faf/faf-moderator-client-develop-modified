@@ -50,5 +50,7 @@
     <Button fx:id="saveButton" onAction="#onSaveButtonForCheckBox" text="Save"/>
     <Separator minHeight="5"/>
     <Button fx:id="openConfigurationFolderButton" mnemonicParsing="false" onAction="#onOpenConfigurationFolder"
-            text="Open Folder"/>
+            text="Open Configuration Folder"/>
+    <Button fx:id="openAiPromptButton" mnemonicParsing="false" onAction="#onOpenAiPromptButton"
+            text="Open AI Prompt"/>
 </VBox>

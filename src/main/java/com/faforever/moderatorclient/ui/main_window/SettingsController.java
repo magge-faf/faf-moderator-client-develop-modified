@@ -58,6 +58,7 @@ public class SettingsController implements Controller<Region> {
     public Button templatePoorReportQualityButton;
 
     public List<Tab> tabs;
+    public Button openAiPromptButton;
 
     private void setDefaultTab(Tab tab) {
         String tabName = tab.getId();
@@ -404,4 +405,9 @@ public class SettingsController implements Controller<Region> {
             log.error("Error creating file: {}", e.getMessage());
         }
     }
+
+    public void onOpenAiPromptButton() throws IOException {
+        openFile(CONFIGURATION_FOLDER + "/templateGamingModeratorTask.txt");
+    }
+
 }
