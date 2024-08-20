@@ -1071,6 +1071,21 @@ public class ModerationReportController implements Controller<Region> {
             report.append("[!] Non-Default Common Army: ").append(commonArmy).append("\n");
         }
 
+        String reporterLoginName = String.valueOf(currentlySelectedItemNotNull.getReporter().getLogin());
+
+        boolean found = false;
+        for (Map.Entry<String, List<String>> entry : metadata.getTeams().entrySet()) {
+            List<String> playerNames = entry.getValue();
+            if (playerNames.contains(reporterLoginName)) {
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) {
+            report.append(String.format("[!] Reporter '%s' does not exist in any of the team names.\n", reporterLoginName));
+        }
+
         report.append("Host: ").append(metadata.getHost()).append("\n")
                 .append("Victory Condition: ").append(DEMORALIZATION.equalsIgnoreCase(victoryCondition) ? ASSASSINATION : victoryCondition).append("\n")
                 .append("Share Condition: ").append(shareCondition).append("\n")
