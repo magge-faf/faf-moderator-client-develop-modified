@@ -149,5 +149,14 @@
                 </TableView>
             </VBox>
         </Tab>
+        <Tab text="Settings Moderator Events">
+            <VBox spacing="10">
+                <CheckBox fx:id="enforceRatingCheckBox" text="Disable EnforceRating"/>
+                <CheckBox fx:id="gameResultCheckBox" text="Disable GameResult"/>
+                <CheckBox fx:id="jsonStatsCheckBox" text="Disable JsonStats"/>
+                <CheckBox fx:id="gameEndedCheckBox" text="Disable GameEnded"/>
+                <Button fx:id="saveSettingsModeratorEventsButton" text="Save Settings" onAction="#onSaveSettingsModeratorEvents"/>
+            </VBox>
+        </Tab>
     </TabPane>
 </SplitPane>

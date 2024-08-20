@@ -99,6 +99,18 @@ public class ModerationReportController implements Controller<Region> {
     public TextArea moderatorEventTextArea;
     public TextField getModeratorEventsForReplayIdTextField;
     public Button getModeratorEventsReplayIdButton;
+    @FXML
+    private CheckBox enforceRatingCheckBox;
+
+    @FXML
+    private CheckBox gameResultCheckBox;
+
+    @FXML
+    private CheckBox jsonStatsCheckBox;
+
+    @FXML
+    private CheckBox gameEndedCheckBox;
+    public Button saveSettingsModeratorEventsButton;
 
     @Value("${faforever.vault.replay-download-url-format}")
     private String replayDownLoadFormat;
@@ -396,6 +408,53 @@ public class ModerationReportController implements Controller<Region> {
         showChatLog(fakeReport);
     }
 
+    Properties properties = new Properties();
+    String PROPERTIES_FILE = CONFIGURATION_FOLDER + "/config.properties";
+
+    private void loadSettingsModeratorEvents() {
+        File propertiesFile = new File(PROPERTIES_FILE);
+        if (propertiesFile.exists()) {
+            try (FileInputStream in = new FileInputStream(propertiesFile)) {
+                Properties properties = new Properties();
+                properties.load(in);
+                enforceRatingCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("enforceRatingCheckBox", "false")));
+                gameResultCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("gameResultCheckBox", "false")));
+                jsonStatsCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("jsonStatsCheckBox", "false")));
+                gameEndedCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("gameEndedCheckBox", "false")));
+            } catch (IOException e) {
+                log.warn(String.valueOf(e));
+            }
+        } else {
+            log.debug("Properties file does not exist.");
+        }
+    }
+
+    public void onSaveSettingsModeratorEvents() {
+        // Load existing properties if the file exists
+        File propertiesFile = new File(PROPERTIES_FILE);
+        if (propertiesFile.exists()) {
+            try (FileInputStream in = new FileInputStream(propertiesFile)) {
+                properties.load(in);
+            } catch (IOException e) {
+                log.warn(String.valueOf(e));
+            }
+        }
+
+        // Update properties with new values
+        properties.setProperty("enforceRatingCheckBox", Boolean.toString(enforceRatingCheckBox.isSelected()));
+        properties.setProperty("gameResultCheckBox", Boolean.toString(gameResultCheckBox.isSelected()));
+        properties.setProperty("jsonStatsCheckBox", Boolean.toString(jsonStatsCheckBox.isSelected()));
+        properties.setProperty("gameEndedCheckBox", Boolean.toString(gameEndedCheckBox.isSelected()));
+
+        // Save the updated properties back to the file
+        try (FileOutputStream out = new FileOutputStream(PROPERTIES_FILE)) {
+            properties.store(out, "Checkbox Settings");
+        } catch (IOException e) {
+            log.warn(String.valueOf(e));
+        }
+    }
+
+
     public static class ModeratorStatistics {
         private final StringProperty moderator;
         private final LongProperty completedReports;
@@ -621,6 +680,8 @@ public class ModerationReportController implements Controller<Region> {
 
     @FXML
     public void initialize() {
+        loadSettingsModeratorEvents();
+        log.debug("loadSettingsModeratorEvents");
         mostReportedAccountsTableView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
             try {
                 ModerationReportController.Offender selectedAccount = (ModerationReportController.Offender) newValue;
@@ -886,8 +947,32 @@ public class ModerationReportController implements Controller<Region> {
         Unpaused
          */
 
+        boolean enforceRating = enforceRatingCheckBox.isSelected();
+        boolean gameEnded = gameEndedCheckBox.isSelected();
+        boolean gameResult = gameResultCheckBox.isSelected();
+        boolean jsonStats = jsonStatsCheckBox.isSelected();
+
         String moderatorEventsLog = moderatorEvents.stream()
-                .filter(event -> !event.message().contains("focus army from"))
+                .filter(event -> {
+                    String message = event.message();
+                    // Define filters based on the state of the checkboxes from Settings Moderator Events
+                    boolean filterOut = false;
+                    if (enforceRating) {
+                        filterOut |= message.contains("command 'EnforceRating' and data");
+                    }
+                    if (gameEnded) {
+                        filterOut |= message.contains("command 'GameEnded' and data");
+                    }
+                    if (gameResult) {
+                        filterOut |= message.contains("command 'GameResult' and data");
+                    }
+                    if (jsonStats) {
+                        filterOut |= message.contains("command 'JsonStats' and data");
+                    }
+
+                    // Apply additional filtering conditions
+                    return !message.contains("focus army from") && !filterOut;
+                })
                 .map(event -> {
                     long timeMillis = event.time().toMillis();
                     String formattedChatMessageTime = formatChatMessageTime(timeMillis);
