@@ -44,7 +44,6 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
 
@@ -62,8 +61,7 @@ public class UserManagementController implements Controller<SplitPane> {
     public TextField amountTextFieldRecentAccountsForSmurfsAmount;
     public Text amountAccountsText;
     private int depthCounter = 0;
-    private StringBuilder logOutput = new StringBuilder();
-    private StringBuilder usersNotBanned = new StringBuilder();
+    private final StringBuilder logOutput = new StringBuilder();
     private final UiService uiService;
     private final PlatformService platformService;
     private final UserService userService;
@@ -169,7 +167,7 @@ public class UserManagementController implements Controller<SplitPane> {
         try (InputStream in = new FileInputStream(CONFIGURATION_FOLDER + "/config.properties")) {
             props.load(in);
         } catch (IOException e) {
-            log.warn("Error initializing config.properties " + e);
+            log.warn("Error initializing config.properties: {}", e.getMessage());
         }
         // Load config
         excludeItemsCheckBox.setSelected(Boolean.parseBoolean(props.getProperty("excludeItemsCheckBox")));
@@ -205,9 +203,9 @@ public class UserManagementController implements Controller<SplitPane> {
         editNoteButton.disableProperty().bind(userNoteTableView.getSelectionModel().selectedItemProperty().isNull());
 
         loadMoreGamesButton.visibleProperty()
-                .bind(Bindings.createBooleanBinding(() -> userLastGamesTable.getItems().size() != 0 && userLastGamesTable.getItems().size() % 100 == 0, userLastGamesTable.getItems()));
+                .bind(Bindings.createBooleanBinding(() -> !userLastGamesTable.getItems().isEmpty() && userLastGamesTable.getItems().size() % 100 == 0, userLastGamesTable.getItems()));
 
-        featuredModFilterChoiceBox.setConverter(new StringConverter<FeaturedModFX>() {
+        featuredModFilterChoiceBox.setConverter(new StringConverter<>() {
             @Override
             public String toString(FeaturedModFX object) {
                 return object == null ? "All" : object.getDisplayName();
@@ -249,6 +247,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
     @FXML
     private void saveSettings() throws IOException {
+        //TODO Refactor scheduler
         Properties props = new Properties();
         props.setProperty("excludeItemsCheckBox", Boolean.toString(excludeItemsCheckBox.isSelected()));
         props.setProperty("includeProcessorNameCheckBox", Boolean.toString(includeProcessorNameCheckBox.isSelected()));
@@ -270,12 +269,7 @@ public class UserManagementController implements Controller<SplitPane> {
         }
         saveSettingsButton.setText("config saved");
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-        ScheduledFuture<?> scheduledFuture = scheduler.schedule(new Runnable() {
-            @Override
-            public void run() {
-                Platform.runLater(() -> saveSettingsButton.setText("Save Settings"));
-            }
-        }, 2, TimeUnit.SECONDS);
+        ScheduledFuture<?> scheduledFuture = scheduler.schedule(() -> Platform.runLater(() -> saveSettingsButton.setText("Save Settings")), 2, TimeUnit.SECONDS);
         log.debug("[info] config saved");
     }
 
@@ -338,7 +332,7 @@ public class UserManagementController implements Controller<SplitPane> {
             if (!userGroupsTab.isDisable()) {
                 permissionService.getPlayersUserGroups(newValue).thenAccept(playerGroups -> {
                     userGroups.addAll(playerGroups);
-                    groupPermissions.addAll(playerGroups.stream().flatMap(userGroupFX -> userGroupFX.getPermissions().stream()).distinct().collect(Collectors.toList()));
+                    groupPermissions.addAll(playerGroups.stream().flatMap(userGroupFX -> userGroupFX.getPermissions().stream()).distinct().toList());
                 });
             }
 
@@ -363,8 +357,8 @@ public class UserManagementController implements Controller<SplitPane> {
 
         String searchParameter = searchUserPropertyMapping.get(searchUserProperties.getValue());
         String searchPattern = userSearchTextField.getText();
-        log.debug("beforeSearchParameter: " + searchParameter);
-        log.debug("beforeSearchPattern: " + searchPattern);
+        log.debug("beforeSearchParameter: {}", searchParameter);
+        log.debug("beforeSearchPattern: {}", searchPattern);
 
         if (Objects.equals(searchParameter, "allInOne")) {
             searchParameter = determineSearchParameter(searchPattern);
@@ -382,8 +376,8 @@ public class UserManagementController implements Controller<SplitPane> {
                 searchParameter = "id";
             }
         }
-        log.debug("afterSearchParameter: " + searchParameter);
-        log.debug("afterSearchPattern: " + searchPattern);
+        log.debug("afterSearchParameter: {}", searchParameter);
+        log.debug("afterSearchPattern: {}", searchPattern);
 
         List<PlayerFX> usersFound = userService.findUsersByAttribute(searchParameter, searchPattern);
         users.addAll(usersFound);
@@ -659,9 +653,9 @@ public class UserManagementController implements Controller<SplitPane> {
                     writer.newLine();
                     writer.write(attributeValue);  // Append the attributeValue to the last line
                 } catch (IOException e) {
-                    log.warn("Failed to write to excludedItems.txt: " + e.getMessage());
+                    log.warn("Failed to write to excludedItems.txt: {}", e.getMessage());
                 }
-                log.debug(attributeValue + " was added to the excludedItems.txt");
+                log.debug("{} was added to the excludedItems.txt", attributeValue);
                 return;
             }
 
@@ -679,8 +673,6 @@ public class UserManagementController implements Controller<SplitPane> {
 
                     if (user.getId() != null && !foundSmurfs.contains(user.getId())) {
                         foundSmurfs.add(user.getId());
-                        //logSmurfVillageTabTextArea.appendText("\nPossibly smurf account found: " + user.getId() + " " + user.getRepresentation());
-                        usersNotBanned.append(user.getId());
                     }
                 }
             }
@@ -708,15 +700,18 @@ public class UserManagementController implements Controller<SplitPane> {
         try {
             File folder = new File("SmurfVillageLookup");
             if (!folder.exists()) {
-                folder.mkdir();
+                if (!folder.mkdir()) {
+                    log.error("Failed to create directory: {}", folder.getAbsolutePath());
+                    throw new IOException("Could not create directory: " + folder.getAbsolutePath());
+                }
             }
             String fileName = "SmurfVillageLookup/UserID_" + smurfVillageLookupTextField.getText() + ".txt";
             BufferedWriter bw = new BufferedWriter(new FileWriter(fileName));
             bw.append(logOutput.toString());
             bw.close();
-            log.debug("Output was added in " + fileName);
+            log.debug("Output was added in {}", fileName);
         } catch (IOException e) {
-            log.warn("Error in writeSmurfVillageLookup2File:" + e);
+            log.warn("Error in writeSmurfVillageLookup2File", e);
         }
     }
 
@@ -732,7 +727,7 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     public void onSmurfVillageLookup(String playerID) {
-        log.debug("Checking " + playerID);
+        log.debug("Checking {}", playerID);
         AtomicReference<String> text = new AtomicReference<>(String.format("\n\n--- Checking: " + playerID));
         updateSmurfVillageLogTextArea(text.get());
         text.set(String.format("\nPlayer IDs seen so far: " + alreadyCheckedUsers));
@@ -925,7 +920,7 @@ public class UserManagementController implements Controller<SplitPane> {
         depthCounter += 1;
         int depthThreshold = Integer.parseInt(depthScanningInputTextField.getText());
         if (depthCounter >= depthThreshold) {
-            log.debug("Depth limit reached: " + depthCounter + "/" + depthThreshold);
+            log.debug("Depth limit reached: {}/{}", depthCounter, depthThreshold);
             searchSmurfVillageTabTextArea.setText(logOutput.toString());
             writeSmurfVillageLookup2File(logOutput);
             return;
@@ -988,7 +983,6 @@ public class UserManagementController implements Controller<SplitPane> {
                 logSmurfVillageTabTextArea.setText("");
                 depthCounter = 0;
                 logOutput.setLength(0);
-                usersNotBanned.setLength(0);
                 String lookupPlayerID = smurfVillageLookupTextField.getText();
                 onSmurfVillageLookup(lookupPlayerID);
                 return null;
@@ -1011,9 +1005,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
             @Override
             protected void failed() {
-                Platform.runLater(() -> {
-                    log.debug("Task failed");
-                });
+                Platform.runLater(() -> log.debug("Task failed"));
             }
         };
 
