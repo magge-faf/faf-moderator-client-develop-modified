@@ -9,6 +9,7 @@ import javafx.scene.control.*;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -57,29 +58,44 @@ public class SettingsController implements Controller<Region> {
     public Button openConfigurationFolderButton;
     public Button templatePoorReportQualityButton;
 
+    private static final Path CONFIG_FILE_PATH = Paths.get(CONFIGURATION_FOLDER + File.separator + "config.properties");
+    private final Properties properties = new Properties();
+
+    @Setter
     public List<Tab> tabs;
     public Button openAiPromptButton;
 
     private void setDefaultTab(Tab tab) {
         String tabName = tab.getId();
-
-        Properties config = new Properties();
-        try {
-            config.load(new FileInputStream(CONFIGURATION_FOLDER + File.separator + "config.properties"));
-            config.setProperty("user.choice.tab", tabName);
-            config.store(new FileOutputStream(CONFIGURATION_FOLDER + File.separator + "config.properties"), null);
-            defaultStartingTabMenuBar.setText("current default is " + tabName);
-        } catch (IOException e) {
-            log.error(e.getMessage());
+        if (CONFIG_FILE_PATH.toFile().exists()) {
+            try (InputStream in = new FileInputStream(CONFIG_FILE_PATH.toFile())) {
+                properties.load(in);
+                properties.setProperty("user.choice.tab", tabName);
+                properties.store(new FileOutputStream(CONFIG_FILE_PATH.toFile()), null);
+                defaultStartingTabMenuBar.setText("New Starting Default Tab is " + tabName);
+            } catch (IOException e) {log.error(e.getMessage());}
         }
     }
 
-    public void handleDefaultTabClick(Tab tab) {
-        setDefaultTab(tab);
+    public void loadConfigurationProperties() {
+        try {
+            properties.load(new FileInputStream(CONFIG_FILE_PATH.toFile()));
+            autoDiscardCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("autoDiscardCheckBox")));
+            autoCompleteCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("autoCompleteCheckBox")));
+            String defaultStartingTab = properties.getProperty("user.choice.tab");
+            defaultStartingTabMenuBar.setText("Default Starting Tab is " + defaultStartingTab);
+        } catch (IOException e) {log.error(e.getMessage());}
     }
 
-    public void setTabs(List<Tab> tabs) {
-        this.tabs = tabs;
+    public void onSaveButtonForCheckBox() {
+        if (CONFIG_FILE_PATH.toFile().exists()) {
+            try (InputStream in = new FileInputStream(CONFIG_FILE_PATH.toFile())) {
+                properties.load(in);
+                properties.setProperty("autoDiscardCheckBox", Boolean.toString(autoDiscardCheckBox.isSelected()));
+                properties.setProperty("autoCompleteCheckBox", Boolean.toString(autoCompleteCheckBox.isSelected()));
+                properties.store(new FileOutputStream(CONFIG_FILE_PATH.toFile()), null);
+            } catch (IOException e) {log.error(e.getMessage());}
+        }
     }
 
     @Override
@@ -264,18 +280,7 @@ public class SettingsController implements Controller<Region> {
         }
     }
 
-    public void loadConfigurationProperties() {
-        try {
-            Properties config = new Properties();
-            config.load(new FileInputStream(CONFIGURATION_FOLDER + File.separator + "config.properties"));
-            autoDiscardCheckBox.setSelected(Boolean.parseBoolean(config.getProperty("autoDiscardCheckBox")));
-            autoCompleteCheckBox.setSelected(Boolean.parseBoolean(config.getProperty("autoCompleteCheckBox")));
-            String defaultStartingTab = config.getProperty("user.choice.tab");
-            defaultStartingTabMenuBar.setText("current default is " + defaultStartingTab);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
+
 
     public void saveAccount() {
     String accountNameOrEmail = accountNameOrEmailTextField.getText();
@@ -324,17 +329,7 @@ public class SettingsController implements Controller<Region> {
     public void onReasonsTemplateCheckBoxButton() throws IOException {openFile(CONFIGURATION_FOLDER + "/templateReasonsCheckBox.txt");}
     public void onTemplatePoorReportQualityButton() throws IOException {openFile(CONFIGURATION_FOLDER + "/templatePoorReportQuality.txt");}
 
-    public void onSaveButtonForCheckBox() {
-        Properties config = new Properties();
-        try {
-            config.load(new FileInputStream(CONFIGURATION_FOLDER + File.separator + "config.properties"));
-            config.setProperty("autoDiscardCheckBox", Boolean.toString(autoDiscardCheckBox.isSelected()));
-            config.setProperty("autoCompleteCheckBox", Boolean.toString(autoCompleteCheckBox.isSelected()));
-            config.store(new FileOutputStream(CONFIGURATION_FOLDER + File.separator + "config.properties"), null);
-        } catch (IOException e) {
-            log.error(e.getMessage());
-        }
-    }
+
 
     public void onOpenConfigurationFolder() {
         File folder = new File(CONFIGURATION_FOLDER);

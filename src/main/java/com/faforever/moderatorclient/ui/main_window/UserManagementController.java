@@ -145,6 +145,9 @@ public class UserManagementController implements Controller<SplitPane> {
     private Runnable loadMoreGamesRunnable;
     private int userGamesPage = 1;
 
+    private static final Path CONFIG_FILE_PATH = Paths.get(CONFIGURATION_FOLDER + File.separator + "config.properties");
+    private final Properties properties = new Properties();
+
     @Override
     public SplitPane getRoot() {
         return root;
@@ -156,6 +159,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
     @FXML
     public void initialize() {
+        loadProperties();
         saveSettingsButton.setOnAction(event -> {
             try {
                 saveSettings();
@@ -163,28 +167,6 @@ public class UserManagementController implements Controller<SplitPane> {
                 throw new RuntimeException(e);
             }
         });
-        Properties props = new Properties();
-        try (InputStream in = new FileInputStream(CONFIGURATION_FOLDER + "/config.properties")) {
-            props.load(in);
-        } catch (IOException e) {
-            log.warn("Error initializing config.properties: {}", e.getMessage());
-        }
-        // Load config
-        excludeItemsCheckBox.setSelected(Boolean.parseBoolean(props.getProperty("excludeItemsCheckBox")));
-        includeUUIDCheckBox.setSelected(Boolean.parseBoolean(props.getProperty("includeUUIDCheckBox")));
-        includeUIDHashCheckBox.setSelected(Boolean.parseBoolean(props.getProperty("includeUIDHashCheckBox")));
-        includeMemorySerialNumberCheckBox.setSelected(Boolean.parseBoolean(props.getProperty("includeMemorySerialNumberCheckBox")));
-        includeVolumeSerialNumberCheckBox.setSelected(Boolean.parseBoolean(props.getProperty("includeVolumeSerialNumberCheckBox")));
-        includeSerialNumberCheckBox.setSelected(Boolean.parseBoolean(props.getProperty("includeSerialNumberCheckBox")));
-        includeProcessorIdCheckBox.setSelected(Boolean.parseBoolean(props.getProperty("includeProcessorIdCheckBox")));
-        includeManufacturerCheckBox.setSelected(Boolean.parseBoolean(props.getProperty("includeManufacturerCheckBox")));
-        includeIPCheckBox.setSelected(Boolean.parseBoolean(props.getProperty("includeIPCheckBox")));
-        includeProcessorNameCheckBox.setSelected(Boolean.parseBoolean(props.getProperty("includeProcessorNameCheckBox")));
-        String depthScanningInput = props.getProperty("depthScanningInputTextField");
-        depthScanningInputTextField.setText(depthScanningInput);
-        String maxUniqueUsersThreshold = props.getProperty("maxUniqueUsersThresholdTextField");
-        maxUniqueUsersThresholdTextField.setText(maxUniqueUsersThreshold);
-        log.debug("[info] config loaded");
 
         disableTabOnMissingPermission(notesTab, GroupPermission.ROLE_ADMIN_ACCOUNT_NOTE);
         disableTabOnMissingPermission(bansTab, GroupPermission.ROLE_ADMIN_ACCOUNT_BAN);
@@ -243,34 +225,6 @@ public class UserManagementController implements Controller<SplitPane> {
         editBanButton.disableProperty().bind(userBansTableView.getSelectionModel().selectedItemProperty().isNull());
 
         initializeSearchProperties();
-    }
-
-    @FXML
-    private void saveSettings() throws IOException {
-        //TODO Refactor scheduler
-        Properties props = new Properties();
-        props.setProperty("excludeItemsCheckBox", Boolean.toString(excludeItemsCheckBox.isSelected()));
-        props.setProperty("includeProcessorNameCheckBox", Boolean.toString(includeProcessorNameCheckBox.isSelected()));
-        props.setProperty("includeUUIDCheckBox", Boolean.toString(includeUUIDCheckBox.isSelected()));
-        props.setProperty("includeUIDHashCheckBox", Boolean.toString(includeUIDHashCheckBox.isSelected()));
-        props.setProperty("includeMemorySerialNumberCheckBox", Boolean.toString(includeMemorySerialNumberCheckBox.isSelected()));
-        props.setProperty("includeVolumeSerialNumberCheckBox", Boolean.toString(includeVolumeSerialNumberCheckBox.isSelected()));
-        props.setProperty("includeSerialNumberCheckBox", Boolean.toString(includeSerialNumberCheckBox.isSelected()));
-        props.setProperty("includeProcessorIdCheckBox", Boolean.toString(includeProcessorIdCheckBox.isSelected()));
-        props.setProperty("includeManufacturerCheckBox", Boolean.toString(includeManufacturerCheckBox.isSelected()));
-        props.setProperty("includeIPCheckBox", Boolean.toString(includeIPCheckBox.isSelected()));
-        props.setProperty("depthScanningInputTextField", depthScanningInputTextField.getText());
-        props.setProperty("maxUniqueUsersThresholdTextField", maxUniqueUsersThresholdTextField.getText());
-
-        try (OutputStream out = new FileOutputStream(CONFIGURATION_FOLDER + "/config.properties")) {
-            props.store(out, null);
-        } catch (IOException e) {
-            log.debug(String.valueOf(e));
-        }
-        saveSettingsButton.setText("config saved");
-        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-        ScheduledFuture<?> scheduledFuture = scheduler.schedule(() -> Platform.runLater(() -> saveSettingsButton.setText("Save Settings")), 2, TimeUnit.SECONDS);
-        log.debug("[info] config saved");
     }
 
     private void initializeSearchProperties() {
@@ -1104,5 +1058,64 @@ public class UserManagementController implements Controller<SplitPane> {
         };
 
         new Thread(task).start();
+    }
+
+    private void loadProperties() {
+        if (CONFIG_FILE_PATH.toFile().exists()) {
+            try (InputStream in = new FileInputStream(CONFIG_FILE_PATH.toFile())) {
+                properties.load(in);
+            } catch (IOException e) {
+                log.warn("Error loading config file:", e);
+            }
+            String value = properties.getProperty("amount_check_recent_accounts", "42");
+            amountTextFieldRecentAccountsForSmurfsAmount.setText(value);
+            excludeItemsCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("excludeItemsCheckBox")));
+            includeUUIDCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeUUIDCheckBox")));
+            includeUIDHashCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeUIDHashCheckBox")));
+            includeMemorySerialNumberCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeMemorySerialNumberCheckBox")));
+            includeVolumeSerialNumberCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeVolumeSerialNumberCheckBox")));
+            includeSerialNumberCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeSerialNumberCheckBox")));
+            includeProcessorIdCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeProcessorIdCheckBox")));
+            includeManufacturerCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeManufacturerCheckBox")));
+            includeIPCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeIPCheckBox")));
+            includeProcessorNameCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeProcessorNameCheckBox")));
+            String depthScanningInput = properties.getProperty("depthScanningInputTextField");
+            depthScanningInputTextField.setText(depthScanningInput);
+            String maxUniqueUsersThreshold = properties.getProperty("maxUniqueUsersThresholdTextField");
+            maxUniqueUsersThresholdTextField.setText(maxUniqueUsersThreshold);
+            log.debug("Configuration loaded.");
+        }
+    }
+
+    @FXML
+    private void saveSettings() throws IOException {
+        properties.setProperty("excludeItemsCheckBox", Boolean.toString(excludeItemsCheckBox.isSelected()));
+        properties.setProperty("includeProcessorNameCheckBox", Boolean.toString(includeProcessorNameCheckBox.isSelected()));
+        properties.setProperty("includeUUIDCheckBox", Boolean.toString(includeUUIDCheckBox.isSelected()));
+        properties.setProperty("includeUIDHashCheckBox", Boolean.toString(includeUIDHashCheckBox.isSelected()));
+        properties.setProperty("includeMemorySerialNumberCheckBox", Boolean.toString(includeMemorySerialNumberCheckBox.isSelected()));
+        properties.setProperty("includeVolumeSerialNumberCheckBox", Boolean.toString(includeVolumeSerialNumberCheckBox.isSelected()));
+        properties.setProperty("includeSerialNumberCheckBox", Boolean.toString(includeSerialNumberCheckBox.isSelected()));
+        properties.setProperty("includeProcessorIdCheckBox", Boolean.toString(includeProcessorIdCheckBox.isSelected()));
+        properties.setProperty("includeManufacturerCheckBox", Boolean.toString(includeManufacturerCheckBox.isSelected()));
+        properties.setProperty("includeIPCheckBox", Boolean.toString(includeIPCheckBox.isSelected()));
+        properties.setProperty("depthScanningInputTextField", depthScanningInputTextField.getText());
+        properties.setProperty("maxUniqueUsersThresholdTextField", maxUniqueUsersThresholdTextField.getText());
+
+        try (OutputStream out = new FileOutputStream(CONFIG_FILE_PATH.toFile())) {
+            properties.store(out, null);
+        } catch (IOException e) {
+            log.warn("Error saving config file:", e);
+        }
+    }
+
+    public void savePropertiesAmountToCheckRecentAccounts() throws IOException {
+        properties.setProperty("amount_check_recent_accounts", amountTextFieldRecentAccountsForSmurfsAmount.getText());
+
+        try (OutputStream out = new FileOutputStream(CONFIG_FILE_PATH.toFile())) {
+            properties.store(out, null);
+        } catch (IOException e) {
+            log.warn("Error saving config file:", e);
+        }
     }
 }
