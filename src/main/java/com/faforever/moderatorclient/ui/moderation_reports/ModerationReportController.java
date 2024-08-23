@@ -67,6 +67,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -98,16 +99,25 @@ public class ModerationReportController implements Controller<Region> {
     public Button UseTemplateWithReasonsButton;
     public TextArea moderatorEventTextArea;
     public TextField getModeratorEventsForReplayIdTextField;
+    @FXML
     public Button getModeratorEventsReplayIdButton;
+    public CheckBox pingOfTypeMoveFilterCheckBox;
+    public CheckBox pingOfTypeAttackFilterCheckBox;
+    public CheckBox pingOfTypeAlertFilterCheckBox;
+    public CheckBox selfDestructionFilterCheckBox;
+    public TextField selfDestructionFilterAmountTextField;
+    @FXML
+    public CheckBox focusArmyFromFilterCheckBox;
+    @FXML
+    public CheckBox showAdvancedStatisticsModeratorEventsCheckBox;
+    @FXML
+    public CheckBox textMarkerTypeFilterCheckBox;
     @FXML
     private CheckBox enforceRatingCheckBox;
-
     @FXML
     private CheckBox gameResultCheckBox;
-
     @FXML
     private CheckBox jsonStatsCheckBox;
-
     @FXML
     private CheckBox gameEndedCheckBox;
     public Button saveSettingsModeratorEventsButton;
@@ -421,6 +431,16 @@ public class ModerationReportController implements Controller<Region> {
                 gameResultCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("gameResultCheckBox", "false")));
                 jsonStatsCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("jsonStatsCheckBox", "false")));
                 gameEndedCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("gameEndedCheckBox", "false")));
+                focusArmyFromFilterCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("focusArmyFromFilterCheckBox", "false")));
+                pingOfTypeAlertFilterCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("pingOfTypeAlertFilterCheckBox", "false")));
+                pingOfTypeMoveFilterCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("pingOfTypeMoveFilterCheckBox", "false")));
+                pingOfTypeAttackFilterCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("pingOfTypeAttackFilterCheckBox", "false")));
+                selfDestructionFilterCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("selfDestructionFilterCheckBox", "false")));
+                selfDestructionFilterAmountTextField.setText(properties.getProperty("selfDestructionFilterAmountTextField", "0"));
+                textMarkerTypeFilterCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("textMarkerTypeFilterCheckBox", "false")));
+                showAdvancedStatisticsModeratorEventsCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("showAdvancedStatisticsModeratorEventsCheckBox", "false")));
+
+
             } catch (IOException e) {
                 log.warn(String.valueOf(e));
             }
@@ -430,7 +450,6 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     public void onSaveSettingsModeratorEvents() {
-        // Load existing properties if the file exists
         File propertiesFile = new File(PROPERTIES_FILE);
         if (propertiesFile.exists()) {
             try (FileInputStream in = new FileInputStream(propertiesFile)) {
@@ -440,20 +459,25 @@ public class ModerationReportController implements Controller<Region> {
             }
         }
 
-        // Update properties with new values
         properties.setProperty("enforceRatingCheckBox", Boolean.toString(enforceRatingCheckBox.isSelected()));
         properties.setProperty("gameResultCheckBox", Boolean.toString(gameResultCheckBox.isSelected()));
         properties.setProperty("jsonStatsCheckBox", Boolean.toString(jsonStatsCheckBox.isSelected()));
         properties.setProperty("gameEndedCheckBox", Boolean.toString(gameEndedCheckBox.isSelected()));
+        properties.setProperty("focusArmyFromFilterCheckBox", Boolean.toString(focusArmyFromFilterCheckBox.isSelected()));
+        properties.setProperty("pingOfTypeAlertFilterCheckBox", Boolean.toString(pingOfTypeAlertFilterCheckBox.isSelected()));
+        properties.setProperty("pingOfTypeMoveFilterCheckBox", Boolean.toString(pingOfTypeMoveFilterCheckBox.isSelected()));
+        properties.setProperty("pingOfTypeAttackFilterCheckBox", Boolean.toString(pingOfTypeAttackFilterCheckBox.isSelected()));
+        properties.setProperty("selfDestructionFilterCheckBox", Boolean.toString(selfDestructionFilterCheckBox.isSelected()));
+        properties.setProperty("selfDestructionFilterAmountTextField", String.valueOf(selfDestructionFilterAmountTextField.getText()));
+        properties.setProperty("textMarkerTypeFilterCheckBox", Boolean.toString(textMarkerTypeFilterCheckBox.isSelected()));
+        properties.setProperty("showAdvancedStatisticsModeratorEventsCheckBox", Boolean.toString(showAdvancedStatisticsModeratorEventsCheckBox.isSelected()));
 
-        // Save the updated properties back to the file
         try (FileOutputStream out = new FileOutputStream(PROPERTIES_FILE)) {
             properties.store(out, null);
         } catch (IOException e) {
             log.warn(String.valueOf(e));
         }
     }
-
 
     public static class ModeratorStatistics {
         private final StringProperty moderator;
@@ -615,7 +639,6 @@ public class ModerationReportController implements Controller<Region> {
         private final LongProperty totalOffenseCountCompleted;
         private final LongProperty totalOffenseCountDiscarded;
         private final LongProperty totalOffenseCountProcessing;
-        @Getter
         private LocalDateTime lastReported;
 
         public Offender(String player,
@@ -708,7 +731,6 @@ public class ModerationReportController implements Controller<Region> {
             }
         };
         itemMap.addListener(listener);
-
         filteredItemList = new FilteredList<>(itemList);
 
         renewFilter();
@@ -937,20 +959,73 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private void showModeratorEvent(List<ModeratorEvent> moderatorEvents){
-        /* Current Events:
-        Created a marker with the text
-        Created a ping of type
-        Self-destructed X units
-        Switched focus army from
-        Is changing focus army from
-        Paused
-        Unpaused
-         */
+
+        Map<String, Integer> chatLineCount = new HashMap<>();
+        Map<String, Map<String, Integer>> pingCount = new HashMap<>();
 
         boolean enforceRating = enforceRatingCheckBox.isSelected();
         boolean gameEnded = gameEndedCheckBox.isSelected();
         boolean gameResult = gameResultCheckBox.isSelected();
         boolean jsonStats = jsonStatsCheckBox.isSelected();
+        boolean pingOfTypeMoveFilter = pingOfTypeMoveFilterCheckBox.isSelected();
+        boolean pingOfTypeAttackFilter = pingOfTypeAttackFilterCheckBox.isSelected();
+        boolean pingOfTypeAlertFilter = pingOfTypeAlertFilterCheckBox.isSelected();
+        boolean selfDestructionFilter = selfDestructionFilterCheckBox.isSelected();
+        boolean focusArmyFromFilter = focusArmyFromFilterCheckBox.isSelected();
+        boolean textMarkerTypeFilter = textMarkerTypeFilterCheckBox.isSelected();
+
+        int selfDestructionFilterAmount = Integer.parseInt(selfDestructionFilterAmountTextField.getText());
+
+        for (ModeratorEvent event : moderatorEvents) {
+            String playerName = event.playerNameFromCommandSource();
+            String message = event.message();
+
+            // Track the number and type of pings created by each player
+            if (message.contains("Created a ping of type")) {
+                String pingType = extractPingType(message);
+                pingCount.putIfAbsent(playerName, new HashMap<>());
+                Map<String, Integer> playerPings = pingCount.get(playerName);
+                playerPings.put(pingType, playerPings.getOrDefault(pingType, 0) + 1);
+            }
+
+            // Track the number of text markers created by each player
+            if (message.contains("Created a marker with the text")) {
+                pingCount.putIfAbsent(playerName, new HashMap<>());
+                Map<String, Integer> playerPings = pingCount.get(playerName);
+                playerPings.put("TextMarker", playerPings.getOrDefault("TextMarker", 0) + 1);
+            }
+
+            // Track the number of chat lines for each player
+            chatLineCount.put(playerName, chatLineCount.getOrDefault(playerName, 0) + 1);
+        }
+
+        StringBuilder statsSummary = new StringBuilder("Statistics:\n");
+
+        statsSummary.append("Pings Created:\n");
+        statsSummary.append(String.format("%-15s | %-6s | %-4s | %-5s | %-10s\n", "Player", "Attack", "Move", "Alert", "TextMarker"));
+        statsSummary.append(String.join("", Collections.nCopies(50, "-"))).append("\n");
+
+        Set<String> players = new HashSet<>(chatLineCount.keySet());
+        players.addAll(pingCount.keySet());
+
+        for (String player : players) {
+            Map<String, Integer> pings = pingCount.getOrDefault(player, new HashMap<>());
+            statsSummary.append(String.format("%-15s | %-6d | %-4d | %-5d | %-10d\n",
+                    player,
+                    pings.getOrDefault("Attack", 0),
+                    pings.getOrDefault("Move", 0),
+                    pings.getOrDefault("Alert", 0),
+                    pings.getOrDefault("TextMarker", 0)));
+        }
+
+        // Chat Lines Table
+        statsSummary.append("\nChat Lines:\n");
+        statsSummary.append(String.format("%-15s | %-5s\n", "Player", "Lines"));
+        statsSummary.append(String.join("", Collections.nCopies(25, "-"))).append("\n");
+
+        for (Map.Entry<String, Integer> entry : chatLineCount.entrySet()) {
+            statsSummary.append(String.format("%-15s | %-5d\n", entry.getKey(), entry.getValue()));
+        }
 
         String moderatorEventsLog = moderatorEvents.stream()
                 .filter(event -> {
@@ -969,9 +1044,36 @@ public class ModerationReportController implements Controller<Region> {
                     if (jsonStats) {
                         filterOut |= message.contains("command 'JsonStats' and data");
                     }
+                    if (pingOfTypeMoveFilter) {
+                        filterOut |= message.contains("Created a ping of type 'Move'");
+                    }
+                    if (pingOfTypeAttackFilter) {
+                        filterOut |= message.contains("Created a ping of type 'Attack'");
+                    }
+                    if (pingOfTypeAlertFilter) {
+                        filterOut |= message.contains("Created a ping of type 'Alert'");
+                    }
+                    if (focusArmyFromFilter) {
+                        filterOut |= message.contains("focus army from");
+                    }
+                    if (textMarkerTypeFilter){
+                        filterOut |= message.contains("Created a marker with the text");
+                    }
 
-                    // Apply additional filtering conditions
-                    return !message.contains("focus army from") && !filterOut;
+                    if (selfDestructionFilter) {
+                        if (message.contains("Self-destructed")) {
+                            Pattern pattern = Pattern.compile("Self-destructed (\\d+) units");
+                            Matcher matcher = pattern.matcher(message);
+                            if (matcher.find()) {
+                                int unitsDestroyed = Integer.parseInt(matcher.group(1));
+                                if (unitsDestroyed < selfDestructionFilterAmount) {
+                                    filterOut = true;
+                                }
+                            }
+                        }
+                    }
+
+                    return !filterOut;
                 })
                 .map(event -> {
                     long timeMillis = event.time().toMillis();
@@ -985,9 +1087,17 @@ public class ModerationReportController implements Controller<Region> {
                 })
                 .collect(Collectors.joining("\n"));
 
+        if (showAdvancedStatisticsModeratorEventsCheckBox.isSelected()) {
+            moderatorEventTextArea.setText(statsSummary + moderatorEventsLog + "\n");
+        } else {
+            moderatorEventTextArea.setText(moderatorEventsLog);
+        }
+    }
 
-        moderatorEventsLog += "\n";
-        moderatorEventTextArea.setText(moderatorEventsLog);
+    private String extractPingType(String message) {
+        int startIndex = message.indexOf("Created a ping of type '") + "Created a ping of type '".length();
+        int endIndex = message.indexOf("'", startIndex);
+        return message.substring(startIndex, endIndex).trim();
     }
 
     private String formatChatMessageTime(long timeMillis) {
