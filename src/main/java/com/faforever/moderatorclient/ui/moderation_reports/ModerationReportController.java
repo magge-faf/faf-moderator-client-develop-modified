@@ -448,7 +448,7 @@ public class ModerationReportController implements Controller<Region> {
 
         // Save the updated properties back to the file
         try (FileOutputStream out = new FileOutputStream(PROPERTIES_FILE)) {
-            properties.store(out, "Checkbox Settings");
+            properties.store(out, null);
         } catch (IOException e) {
             log.warn(String.valueOf(e));
         }

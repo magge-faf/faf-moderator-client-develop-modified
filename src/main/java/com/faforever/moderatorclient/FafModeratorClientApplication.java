@@ -7,6 +7,7 @@ import com.faforever.moderatorclient.ui.PlatformServiceImpl;
 import com.faforever.moderatorclient.ui.StageHolder;
 import com.faforever.moderatorclient.ui.UiService;
 import com.faforever.moderatorclient.ui.main_window.SettingsController;
+import com.faforever.moderatorclient.ui.main_window.UserManagementController;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -14,12 +15,14 @@ import javafx.scene.image.Image;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
@@ -31,6 +34,9 @@ import java.util.concurrent.TimeUnit;
 public class FafModeratorClientApplication extends Application {
 
     private ConfigurableApplicationContext applicationContext;
+
+    @Autowired
+    private UserManagementController userManagementController;
 
     public static void applicationMain(String[] args) {
         Application.launch(FafModeratorClientApplication.class, args);
@@ -63,7 +69,14 @@ public class FafModeratorClientApplication extends Application {
         primaryStage.setOnCloseRequest(e -> {
             e.consume();
             log.info("Close request received, exiting");
+            log.info("Saving Configuration.");
+            try {
+                userManagementController.savePropertiesAmountToCheckRecentAccounts();
+            } catch (IOException ex) {
+                log.error("Error saving properties", ex);
+            }
             Platform.exit();
+            waitSecond();
             System.exit(0);
         });
         startTimerThread(primaryStage);
