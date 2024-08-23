@@ -15,6 +15,7 @@
 <?import javafx.scene.control.TableColumn?>
 <?import javafx.scene.control.cell.PropertyValueFactory?>
 <?import javafx.scene.text.Text?>
+<?import javafx.scene.control.Label?>
 <SplitPane fx:id="root" dividerPositions="0.5" orientation="VERTICAL" xmlns="http://javafx.com/javafx/11.0.1"
            xmlns:fx="http://javafx.com/fxml/1"
            fx:controller="com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController">
@@ -151,11 +152,51 @@
         </Tab>
         <Tab text="Settings Moderator Events">
             <VBox spacing="10">
-                <CheckBox fx:id="enforceRatingCheckBox" text="Disable EnforceRating"/>
-                <CheckBox fx:id="gameResultCheckBox" text="Disable GameResult"/>
-                <CheckBox fx:id="jsonStatsCheckBox" text="Disable JsonStats"/>
-                <CheckBox fx:id="gameEndedCheckBox" text="Disable GameEnded"/>
-                <Button fx:id="saveSettingsModeratorEventsButton" text="Save Settings" onAction="#onSaveSettingsModeratorEvents"/>
+                <!-- Filter Following Events -->
+                <Label text="Filter Following Events:"/>
+                <Separator/>
+
+                <!-- Game Data -->
+                <Label text="Game Data:"/>
+                <HBox spacing="5">
+                    <CheckBox fx:id="enforceRatingCheckBox" text="EnforceRating"/>
+                    <CheckBox fx:id="gameResultCheckBox" text="GameResult"/>
+                    <CheckBox fx:id="jsonStatsCheckBox" text="JsonStats"/>
+                    <CheckBox fx:id="gameEndedCheckBox" text="GameEnded"/>
+                    <CheckBox fx:id="focusArmyFromFilterCheckBox" text="focusArmyFrom"/>
+                </HBox>
+                <Separator/>
+
+                <!-- Ping of Type -->
+                <Label text="Ping of Type:"/>
+                <HBox spacing="5">
+                    <CheckBox fx:id="pingOfTypeMoveFilterCheckBox" text="Move"/>
+                    <CheckBox fx:id="pingOfTypeAttackFilterCheckBox" text="Attack"/>
+                    <CheckBox fx:id="pingOfTypeAlertFilterCheckBox" text="Alert"/>
+                    <CheckBox fx:id="textMarkerTypeFilterCheckBox" text="Text Markers"/>
+                </HBox>
+                <Separator/>
+
+                <!-- Self-Destruction -->
+                <Label text="Self-Destruction"/>
+                <HBox spacing="5">
+                    <CheckBox fx:id="selfDestructionFilterCheckBox"
+                              text="Do not show the event 'Self-destructed' for less than the following amount of units:"/>
+                    <TextField fx:id="selfDestructionFilterAmountTextField"
+                               promptText="0"
+                               maxWidth="50"/>
+                </HBox>
+                <Separator/>
+
+                <!-- Advanced Statistics -->
+                <CheckBox fx:id="showAdvancedStatisticsModeratorEventsCheckBox"
+                          text="Show summarized statistics about players for Moderator Events (WIP)"/>
+                <Separator/>
+
+                <!-- Save Button -->
+                <Button fx:id="saveSettingsModeratorEventsButton"
+                        text="Save Settings"
+                        onAction="#onSaveSettingsModeratorEvents"/>
             </VBox>
         </Tab>
     </TabPane>
