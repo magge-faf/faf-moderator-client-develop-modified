@@ -42,18 +42,22 @@
             <TextField fx:id="statusTextFieldProcessingItem" text="Detailed Status Information" editable="false"/>
             <Separator/>
             <HBox spacing="10" alignment="CENTER_LEFT">
-                <Button fx:id="checkRecentAccountsForSmurfsButton" minWidth="200.0" mnemonicParsing="false"
-                        onAction="#checkRecentAccountsForSmurfs" text="checkRecentAccountsForSmurfs"/>
-                <Text fx:id="statusTextRecentAccountsForSmurfs" text="Status:"/>
+                <VBox spacing="10">
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Button fx:id="checkRecentAccountsForSmurfsButton" mnemonicParsing="false" onAction="#checkRecentAccountsForSmurfs" text="Check For Smurf Accounts"/>
+                        <Text fx:id="statusTextRecentAccountsForSmurfs" text="Status: 0/? "/>
+                        <Button fx:id="checkRecentAccountsForSmurfsPauseButton" mnemonicParsing="false" onAction="#checkRecentAccountsForSmurfsPause" text="Pause"/>
+                        <Button fx:id="checkRecentAccountsForSmurfsStopButton" mnemonicParsing="false" onAction="#checkRecentAccountsForSmurfsStop" text="Stop"/>
+
+                    </HBox>
+                    <Text text="Number of recent registered accounts to check (up to 1000)" style="-fx-font-weight: bold;"/>
+                    <TextField fx:id="amountTextFieldRecentAccountsForSmurfsAmount" text="42"/>
+                </VBox>
             </HBox>
-            <Text fx:id="amountAccountsText"
-                  text="Number of recent registered accounts to check (up to 1000)"/>
-            <TextField fx:id="amountTextFieldRecentAccountsForSmurfsAmount" text="405"/>
         </VBox>
 
         <!-- TableView for user search results -->
-        <TableView fx:id="userSearchTableView" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
-                   minWidth="550.0" prefHeight="200.0" HBox.hgrow="ALWAYS"/>
+        <TableView fx:id="userSearchTableView" maxHeight="Infinity" maxWidth="Infinity" minWidth="550.0" prefHeight="200.0" HBox.hgrow="ALWAYS"/>
     </SplitPane>
 
     <!-- Bottom section with Tabs -->
@@ -65,10 +69,7 @@
                         <Insets bottom="10.0"/>
                     </VBox.margin>
                 </TableView>
-                <HBox alignment="CENTER">
-                    <padding>
-                        <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
-                    </padding>
+                <HBox alignment="CENTER" >
                     <Button fx:id="addNoteButton" mnemonicParsing="false" onAction="#addNote" text="Add note"/>
                     <Button fx:id="editNoteButton" mnemonicParsing="false" onAction="#editNote" text="Edit selected note">
                         <HBox.margin>
@@ -89,9 +90,6 @@
                     <VBox.margin>
                         <Insets/>
                     </VBox.margin>
-                    <padding>
-                        <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
-                    </padding>
                     <Button fx:id="newBanButton" disable="true" mnemonicParsing="false" onAction="#onNewBan" text="Apply new ban">
                         <HBox.margin>
                             <Insets/>
@@ -129,9 +127,6 @@
                 <TableView fx:id="userAvatarsTableView" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
                            prefHeight="200.0" prefWidth="200.0" VBox.vgrow="ALWAYS"/>
                 <HBox alignment="CENTER" spacing="10.0">
-                    <padding>
-                        <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
-                    </padding>
                     <Button fx:id="giveAvatarButton" mnemonicParsing="false" onAction="#onGiveAvatar" text="Give selected avatar from main avatar tab"/>
                     <Separator orientation="VERTICAL"/>
                     <TextField fx:id="expiresAtTextfield" promptText="2018-12-31T23:59:59Z"/>
@@ -188,7 +183,7 @@
                 <TextField fx:id="depthScanningInputTextField" layoutX="10" layoutY="10" promptText="Default 1000" editable="false"/>
                 <Text>WIP - Needs further development. Not editable.</Text>
                 <Separator orientation="VERTICAL"/>
-                <Label text="Check For Smurf Accounts in Latest Registrations:" />
+                <Label text="Option for Check Latest Registrations and Smurf Lookup:" />
                 <CheckBox fx:id="catchFirstLayerSmurfsOnlyCheckBox" text="No Tracing, First-Layer Detection Only."/>
                 <Text>
                     Info: When enabled, this option will only detect smurf accounts that are directly linked to the main account.
