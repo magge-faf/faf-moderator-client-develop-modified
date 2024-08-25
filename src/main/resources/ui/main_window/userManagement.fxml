@@ -17,61 +17,82 @@
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 
-<SplitPane xmlns:fx="http://javafx.com/fxml/1" fx:id="root" dividerPositions="0.3" orientation="VERTICAL"
-           prefHeight="600.0" xmlns="http://javafx.com/javafx/8.0.171"
-           fx:controller="com.faforever.moderatorclient.ui.main_window.UserManagementController">
+<SplitPane xmlns="http://javafx.com/javafx/8.0.171"
+           xmlns:fx="http://javafx.com/fxml/1"
+           fx:id="root"
+           fx:controller="com.faforever.moderatorclient.ui.main_window.UserManagementController"
+           dividerPositions="0.3"
+           orientation="VERTICAL"
+           prefHeight="600.0">
 
     <!-- Top section with VBox and TableView -->
     <SplitPane>
         <!-- VBox containing search and other controls -->
-        <VBox minWidth="220.0" maxWidth="440" spacing="5">
+        <VBox minWidth="220.0" maxWidth="440.0" spacing="5">
+            <!-- Section for User Search -->
+            <Label text="User Search" alignment="CENTER" style="-fx-font-weight: bold; -fx-font-size: 14px;" />
             <ComboBox fx:id="searchUserProperties" promptText="Search by" visibleRowCount="42"/>
-            <TextField fx:id="userSearchTextField" onAction="#onUserSearch"/>
-            <Button mnemonicParsing="false" onAction="#onUserSearch" text="Search" alignment="CENTER"/>
-            <Label text="Search History:" fx:id="searchHistoryLabel" alignment="CENTER"/>
-            <TextArea fx:id="SearchHistoryTextArea" editable="false" promptText="history (resets with new start)"/>
-            <Label text="User Notes:" fx:id="userNotesLabel" alignment="CENTER"/>
-            <TextArea fx:id="NotesTextArea" promptText="notes (resets with new start)"/>
+            <TextField fx:id="userSearchTextField" onAction="#onUserSearch" promptText="Enter search text"/>
+            <Button text="Search" alignment="CENTER" onAction="#onUserSearch" mnemonicParsing="false"/>
             <Separator/>
-            <TextField fx:id="smurfVillageLookupTextField" onAction="#onLookupSmurfVillage" promptText="player ID required here"/>
-            <HBox spacing="10" alignment="CENTER_LEFT">
-                <Button mnemonicParsing="false" onAction="#onLookupSmurfVillage" text="Smurf Village Lookup"/>
-                <Label fx:id="statusLabelSmurfVillageLookup" text="Idle      " style="-fx-background-color: blue;"/>
-                <TextField fx:id="statusTextFieldProcessingPlayerID" text="Status" editable="false"/>
-            </HBox>
+
+            <!-- Search History -->
+            <Label fx:id="searchHistoryLabel" text="Search History:" alignment="CENTER" style="-fx-font-weight: bold;"/>
+            <TextArea fx:id="SearchHistoryTextArea" editable="false" promptText="No history available" wrapText="true"/>
+
+            <!-- User Notes -->
+            <Label fx:id="userNotesLabel" text="User Notes:" alignment="CENTER" style="-fx-font-weight: bold;"/>
+            <TextArea fx:id="NotesTextArea" promptText="Add your notes here" wrapText="true"/>
+            <Separator/>
+
+            <!-- Smurf Village Lookup -->
+            <Label text="Smurf Village Lookup:" alignment="CENTER" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
+            <VBox spacing="10">
+                <HBox spacing="10" alignment="CENTER_LEFT">
+                    <Label text="Enter PlayerID:" style="-fx-font-size: 14px;"/>
+                    <TextField fx:id="smurfVillageLookupTextField" onAction="#onLookupSmurfVillage" promptText="PlayerID"/>
+                    <Button text="Lookup" onAction="#onLookupSmurfVillage" mnemonicParsing="false"/>
+                </HBox>
+                <Separator/>
+                <Label text="Processing Details:" style="-fx-font-size: 14px;"/>
+                <HBox spacing="10" alignment="CENTER_LEFT">
+                    <Label fx:id="statusLabelSmurfVillageLookup" text="Idle" style="-fx-background-color: blue; -fx-text-fill: white;"/>
+                    <TextField fx:id="statusTextFieldProcessingPlayerID" text="Status" editable="false"/>
+                </HBox>
+            </VBox>
             <TextField fx:id="statusTextFieldProcessingItem" text="Detailed Status Information" editable="false"/>
             <Separator/>
-            <HBox spacing="10" alignment="CENTER_LEFT">
-                <VBox spacing="10">
-                    <HBox spacing="10" alignment="CENTER_LEFT">
-                        <Button fx:id="checkRecentAccountsForSmurfsButton" mnemonicParsing="false" onAction="#checkRecentAccountsForSmurfs" text="Check For Smurf Accounts"/>
-                        <Text fx:id="statusTextRecentAccountsForSmurfs" text="Status: 0/? "/>
-                        <Button fx:id="checkRecentAccountsForSmurfsPauseButton" mnemonicParsing="false" onAction="#checkRecentAccountsForSmurfsPause" text="Pause"/>
-                        <Button fx:id="checkRecentAccountsForSmurfsStopButton" mnemonicParsing="false" onAction="#checkRecentAccountsForSmurfsStop" text="Stop"/>
 
-                    </HBox>
-                    <Text text="Number of recent registered accounts to check (up to 1000)" style="-fx-font-weight: bold;"/>
-                    <TextField fx:id="amountTextFieldRecentAccountsForSmurfsAmount" text="42"/>
-                </VBox>
-            </HBox>
+            <!-- Recent Accounts Check -->
+            <Label text="Latest Registrations:" alignment="CENTER" style="-fx-font-weight: bold; -fx-font-size: 14px;"/>
+            <VBox spacing="10">
+                <HBox spacing="10" alignment="CENTER_LEFT">
+                    <Button fx:id="checkRecentAccountsForSmurfsButton" text="Check For Smurf Accounts" onAction="#checkRecentAccountsForSmurfs" mnemonicParsing="false"/>
+                    <Text fx:id="statusTextRecentAccountsForSmurfs" text="Status: 0/?"/>
+                    <Button fx:id="checkRecentAccountsForSmurfsPauseButton" text="Pause" onAction="#checkRecentAccountsForSmurfsPause" mnemonicParsing="false"/>
+                    <Button fx:id="checkRecentAccountsForSmurfsStopButton" text="Stop" onAction="#checkRecentAccountsForSmurfsStop" mnemonicParsing="false"/>
+                </HBox>
+                <Text text="Number of recent registered accounts to check (up to 1000)" style="-fx-font-weight: bold;"/>
+                <TextField fx:id="amountTextFieldRecentAccountsForSmurfsAmount" text="42"/>
+            </VBox>
         </VBox>
 
         <!-- TableView for user search results -->
-        <TableView fx:id="userSearchTableView" maxHeight="Infinity" maxWidth="Infinity" minWidth="550.0" prefHeight="200.0" HBox.hgrow="ALWAYS"/>
+        <TableView fx:id="userSearchTableView" maxWidth="Infinity" minWidth="550.0" prefHeight="200.0" HBox.hgrow="ALWAYS"/>
     </SplitPane>
 
     <!-- Bottom section with Tabs -->
     <TabPane minHeight="200.0" tabClosingPolicy="UNAVAILABLE">
         <Tab fx:id="notesTab" text="Notes">
-            <VBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308">
+            <VBox maxWidth="Infinity" maxHeight="Infinity">
                 <TableView fx:id="userNoteTableView" prefHeight="200.0" prefWidth="200.0" VBox.vgrow="ALWAYS">
                     <VBox.margin>
                         <Insets bottom="10.0"/>
                     </VBox.margin>
                 </TableView>
-                <HBox alignment="CENTER" >
-                    <Button fx:id="addNoteButton" mnemonicParsing="false" onAction="#addNote" text="Add note"/>
-                    <Button fx:id="editNoteButton" mnemonicParsing="false" onAction="#editNote" text="Edit selected note">
+                <HBox alignment="CENTER">
+                    <Button fx:id="addNoteButton" text="Add note" onAction="#addNote" mnemonicParsing="false"/>
+                    <Button fx:id="editNoteButton" text="Edit selected note" onAction="#editNote" mnemonicParsing="false">
                         <HBox.margin>
                             <Insets left="10.0"/>
                         </HBox.margin>
@@ -87,15 +108,12 @@
                     </VBox.margin>
                 </TableView>
                 <HBox alignment="CENTER">
-                    <VBox.margin>
-                        <Insets/>
-                    </VBox.margin>
-                    <Button fx:id="newBanButton" disable="true" mnemonicParsing="false" onAction="#onNewBan" text="Apply new ban">
+                    <Button fx:id="newBanButton" text="Apply new ban" onAction="#onNewBan" mnemonicParsing="false" disable="true">
                         <HBox.margin>
                             <Insets/>
                         </HBox.margin>
                     </Button>
-                    <Button fx:id="editBanButton" disable="true" mnemonicParsing="false" onAction="#onEditBan" text="Edit selected ban">
+                    <Button fx:id="editBanButton" text="Edit selected ban" onAction="#onEditBan" mnemonicParsing="false" disable="true">
                         <HBox.margin>
                             <Insets left="10.0"/>
                         </HBox.margin>
@@ -107,7 +125,7 @@
             <TableView fx:id="userTeamkillsTableView" prefHeight="200.0" prefWidth="200.0"/>
         </Tab>
         <Tab fx:id="nameHistoryTab" text="Name History">
-            <TableView fx:id="userNameHistoryTableView" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" prefHeight="200.0"/>
+            <TableView fx:id="userNameHistoryTableView" maxWidth="Infinity" maxHeight="Infinity" prefHeight="200.0"/>
         </Tab>
         <Tab fx:id="lastGamesTab" text="Last Games">
             <VBox>
@@ -115,84 +133,99 @@
                     <VBox.margin>
                         <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
                     </VBox.margin>
-                    <Label maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" text="Show featured Mods:"/>
+                    <Label text="Show featured Mods:" maxWidth="Infinity" maxHeight="Infinity"/>
                     <ChoiceBox fx:id="featuredModFilterChoiceBox" minWidth="150.0"/>
-                    <Button fx:id="loadMoreGamesButton" onAction="#loadMoreGames" text="Load more"/>
+                    <Button fx:id="loadMoreGamesButton" text="Load more" onAction="#loadMoreGames"/>
                 </HBox>
-                <TableView fx:id="userLastGamesTable" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" VBox.vgrow="ALWAYS"/>
+                <TableView fx:id="userLastGamesTable" maxWidth="Infinity" maxHeight="Infinity" VBox.vgrow="ALWAYS"/>
             </VBox>
         </Tab>
         <Tab fx:id="avatarsTab" text="Avatars">
             <VBox>
-                <TableView fx:id="userAvatarsTableView" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
-                           prefHeight="200.0" prefWidth="200.0" VBox.vgrow="ALWAYS"/>
+                <TableView fx:id="userAvatarsTableView" maxWidth="Infinity" maxHeight="Infinity" prefHeight="200.0" prefWidth="200.0" VBox.vgrow="ALWAYS"/>
                 <HBox alignment="CENTER" spacing="10.0">
-                    <Button fx:id="giveAvatarButton" mnemonicParsing="false" onAction="#onGiveAvatar" text="Give selected avatar from main avatar tab"/>
+                    <Button fx:id="giveAvatarButton" text="Give selected avatar from main avatar tab" onAction="#onGiveAvatar" mnemonicParsing="false"/>
                     <Separator orientation="VERTICAL"/>
                     <TextField fx:id="expiresAtTextfield" promptText="2018-12-31T23:59:59Z"/>
-                    <Button fx:id="setExpiresAtButton" mnemonicParsing="false" onAction="#onSetExpiresAt" text="Set expires at"/>
+                    <Button fx:id="setExpiresAtButton" text="Set expires at" onAction="#onSetExpiresAt" mnemonicParsing="false"/>
                     <Separator orientation="VERTICAL"/>
-                    <Button fx:id="takeAvatarButton" mnemonicParsing="false" onAction="#onTakeAvatar" text="Take avatar"/>
+                    <Button fx:id="takeAvatarButton" text="Take avatar" onAction="#onTakeAvatar" mnemonicParsing="false"/>
                 </HBox>
             </VBox>
         </Tab>
         <Tab fx:id="userGroupsTab" text="User Groups">
             <VBox>
                 <HBox VBox.vgrow="ALWAYS">
-                    <TableView fx:id="userGroupsTableView" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
-                               prefHeight="200.0" prefWidth="200.0" HBox.hgrow="ALWAYS"/>
-                    <TableView fx:id="permissionsTableView" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
-                               prefHeight="200.0" prefWidth="200.0" HBox.hgrow="ALWAYS"/>
+                    <TableView fx:id="userGroupsTableView" maxWidth="Infinity" maxHeight="Infinity" prefHeight="200.0" prefWidth="200.0" HBox.hgrow="ALWAYS"/>
+                    <TableView fx:id="permissionsTableView" maxWidth="Infinity" maxHeight="Infinity" prefHeight="200.0" prefWidth="200.0" HBox.hgrow="ALWAYS"/>
                 </HBox>
-                <HBox VBox.vgrow="NEVER" maxHeight="50" spacing="10.0" alignment="CENTER">
+                <HBox VBox.vgrow="NEVER" maxHeight="50.0" spacing="10.0" alignment="CENTER">
                     <Button text="Add User To Group" onAction="#openGroupDialog"/>
-                    <Button fx:id="removeGroupButton" text="Remove User from Group" onAction="#onRemoveGroup"/>
+                    <Button fx:id="removeGroupButton" text="Remove Group" onAction="#onRemoveGroup"/>
                 </HBox>
             </VBox>
         </Tab>
         <Tab fx:id="searchSmurfVillageLookupTab" text="Output of Smurf Village Lookup">
             <VBox>
-                <TextArea fx:id="searchSmurfVillageTabTextArea" promptText="Debug status is displayed in the console window. The output will be saved as a .txt file in the project folder." VBox.vgrow="ALWAYS"/>
+                <TextArea fx:id="searchSmurfVillageTabTextArea"
+                          promptText="Debug status is displayed in the console window. The output will be saved as a .txt file in the project folder."
+                          VBox.vgrow="ALWAYS"/>
             </VBox>
         </Tab>
+
         <Tab fx:id="logSmurfVillageTab" text="Log of SVL">
             <VBox>
                 <TextArea fx:id="logSmurfVillageTabTextArea" VBox.vgrow="ALWAYS"/>
             </VBox>
         </Tab>
+
         <Tab fx:id="settingsSmurfVillageLookupTab" text="Settings Smurf Village Lookup">
-            <VBox>
-                <CheckBox fx:id="excludeItemsCheckBox" text="Exclude junk/malformed items (see Settings)" disable="true"/>
+            <VBox spacing="5">
                 <Separator/>
-                <Text style="-fx-font-size: 12pt;">Start with UUID, add further CheckBoxes as needed.</Text>
+                <Text style="-fx-font-size: 12pt;">Start with UUID and Hash, add further CheckBoxes as needed.</Text>
                 <CheckBox fx:id="includeUUIDCheckBox" text="Include UUID"/>
                 <CheckBox fx:id="includeUIDHashCheckBox" text="Include Hash"/>
-                <CheckBox fx:id="includeIPCheckBox" text="Include IP"/>
-                <CheckBox fx:id="includeMemorySerialNumberCheckBox" text="Include Memory Serial Number"/>
-                <CheckBox fx:id="includeVolumeSerialNumberCheckBox" text="Include Volume Serial Number"/>
-                <CheckBox fx:id="includeSerialNumberCheckBox" text="Include Serial Number"/>
-                <CheckBox fx:id="includeProcessorIdCheckBox" text="Include Processor Id"/>
-                <CheckBox fx:id="includeProcessorNameCheckBox" text="Include Processor Name"/>
-                <CheckBox fx:id="includeManufacturerCheckBox" text="Include Manufacturer"/>
                 <Separator/>
-                <Text>maxUniqueUsersThreshold:</Text>
-                <TextField fx:id="maxUniqueUsersThresholdTextField" layoutX="10" layoutY="10" promptText="Enter an integer value - Default 100"/>
-                <Text>If a unique hardware item has shared properties with more than X accounts, it will inform about it, but not give details about each account. Default 100</Text>
+                <Label text="Advanced Settings: Only include the following if you believe user does hardware spoofing."/>
+                <Label text="May generate excessive text noise, especially if excludedItems.txt is outdated and 'No Tracing' is disabled:"/>
                 <Separator/>
-                <Text>depthScanningInput:</Text>
-                <TextField fx:id="depthScanningInputTextField" layoutX="10" layoutY="10" promptText="Default 1000" editable="false"/>
-                <Text>WIP - Needs further development. Not editable.</Text>
-                <Separator orientation="VERTICAL"/>
-                <Label text="Option for Check Latest Registrations and Smurf Lookup:" />
+                <Label text="Include:"/>
+                <HBox spacing="5">
+                    <CheckBox fx:id="includeMemorySerialNumberCheckBox" text="Memory Serial Number"/>
+                    <CheckBox fx:id="includeVolumeSerialNumberCheckBox" text="Volume Serial Number"/>
+                    <CheckBox fx:id="includeSerialNumberCheckBox" text="Serial Number"/>
+                    <CheckBox fx:id="includeProcessorIdCheckBox" text="Processor Id"/>
+                    <CheckBox fx:id="includeProcessorNameCheckBox" text="Processor Name"/>
+                    <CheckBox fx:id="includeManufacturerCheckBox" text="Manufacturer"/>
+                    <CheckBox fx:id="includeIPCheckBox" text="IP"/>
+                </HBox>
+
+                <Separator/>
+                <Label text="Option for Check Latest Registrations and Smurf Lookup:"/>
                 <CheckBox fx:id="catchFirstLayerSmurfsOnlyCheckBox" text="No Tracing, First-Layer Detection Only."/>
                 <Text>
                     Info: When enabled, this option will only detect smurf accounts that are directly linked to the main account.
                     It will not search through additional layers of accounts connected to the main account.
                 </Text>
-
                 <Separator/>
                 <Button fx:id="saveSettingsButton" text="Save Settings" onAction="#saveSettings"/>
-                <Separator orientation="VERTICAL"/>
+                <Separator/>
+                <Text>WIP - The Following is not editable currently</Text>
+                <Separator/>
+                <Text>maxUniqueUsersThreshold:</Text>
+                <TextField fx:id="maxUniqueUsersThresholdTextField"
+                           layoutX="10" layoutY="10"
+                           promptText="Enter an integer value - Default 100"/>
+                <Text>
+                    If a unique hardware item has shared properties with more than X accounts, it will inform about it,
+                    but not give details about each account. Default 100
+                </Text>
+                <Text>depthScanningInput:</Text>
+                <TextField fx:id="depthScanningInputTextField"
+                           layoutX="10" layoutY="10"
+                           promptText="Default 1000"
+                           editable="false"/>
+                <CheckBox fx:id="excludeItemsCheckBox" text="Exclude junk/malformed items (see Settings)" disable="true"/>
             </VBox>
         </Tab>
     </TabPane>
