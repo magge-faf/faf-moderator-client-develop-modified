@@ -72,11 +72,11 @@ public class FafModeratorClientApplication extends Application {
             log.info("Saving Configuration.");
             try {
                 userManagementController.savePropertiesAmountToCheckRecentAccounts();
+                userManagementController.saveContent();
             } catch (IOException ex) {
-                log.error("Error saving properties", ex);
+                log.error("Error saving:", ex);
             }
             Platform.exit();
-            waitSecond();
             System.exit(0);
         });
         startTimerThread(primaryStage);
