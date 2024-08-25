@@ -61,6 +61,15 @@ public class UserManagementController implements Controller<SplitPane> {
     public TextField amountTextFieldRecentAccountsForSmurfsAmount;
     public Text amountAccountsText;
     public CheckBox catchFirstLayerSmurfsOnlyCheckBox;
+    @FXML
+    private Button checkRecentAccountsForSmurfsPauseButton;
+
+    private volatile boolean isPaused = false;
+    private volatile boolean isStopped = false;
+    private final Object pauseLock = new Object(); // Monitor object for synchronization
+
+    @FXML
+    public Button checkRecentAccountsForSmurfsStopButton;
     private int depthCounter = 0;
     private final StringBuilder logOutput = new StringBuilder();
     private final UiService uiService;
@@ -582,13 +591,47 @@ public class UserManagementController implements Controller<SplitPane> {
         return excludedItems;
     }
 
+    @FXML
+    private void checkRecentAccountsForSmurfsPause() {
+        synchronized (pauseLock) {
+            // Toggle pause/resume state
+            isPaused = !isPaused;
+
+            if (isPaused) {
+                checkRecentAccountsForSmurfsPauseButton.setText("Resume");
+            } else {
+                checkRecentAccountsForSmurfsPauseButton.setText("Pause");
+                pauseLock.notifyAll();
+            }
+        }
+    }
+
+    @FXML
+    public void checkRecentAccountsForSmurfsStop() {
+        synchronized (pauseLock) {
+            isPaused = false;
+            isStopped = true;
+            checkRecentAccountsForSmurfsPauseButton.setText("Pause");
+            pauseLock.notifyAll();
+        }
+    }
+
     private void processUsers(String attributeName, String attributeValue, int threshold, StringBuilder logOutput, ArrayList<Object> foundSmurfs) {
+        checkRecentAccountsForSmurfsPauseButton.setOnAction(event -> checkRecentAccountsForSmurfsPause());
         try {
             String text = String.format("\nProcessing ... [%s] [%s]", attributeName, attributeValue);
             updateSmurfVillageLogTextArea(text);
 
             List<String> excludedItems = loadExcludedItems();
             boolean excludeItemsSelected = excludeItemsCheckBox.isSelected();
+
+            synchronized (pauseLock) {
+                while (isPaused) {
+                    text = "\t\t PROCESS PAUSED. Waiting for RESUME.\n";
+                    updateSmurfVillageLogTextArea(text);
+                    pauseLock.wait();
+                }
+            }
 
             if (excludeItemsSelected && excludedItems.contains(attributeValue)) {
 
@@ -636,20 +679,22 @@ public class UserManagementController implements Controller<SplitPane> {
             }
         } catch (IndexOutOfBoundsException e) {
             log.error("An IndexOutOfBoundsException occurred: {}", e.getMessage());
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
     }
 
-    public List<String> alreadyCheckedUsers = new ArrayList<>();
-    public List<String> alreadyCheckedUuids = new ArrayList<>();
-    public List<String> alreadyCheckedHashes = new ArrayList<>();
-    public List<String> alreadyCheckedIps = new ArrayList<>();
-    public List<String> alreadyCheckedMemorySerialNumbers = new ArrayList<>();
-    public List<String> alreadyCheckedVolumeSerialNumbers = new ArrayList<>();
-    public List<String> alreadyCheckedSerialNumbers = new ArrayList<>();
-    public List<String> alreadyCheckedProcessorIds = new ArrayList<>();
-    public List<String> alreadyCheckedCpuNames = new ArrayList<>();
-    public List<String> alreadyCheckedBiosVersions = new ArrayList<>();
-    public List<String> alreadyCheckedManufacturers = new ArrayList<>();
+    public Set<String> alreadyCheckedUsers = new HashSet<>();
+    public Set<String> alreadyCheckedUuids = new HashSet<>();
+    public Set<String> alreadyCheckedHashes = new HashSet<>();
+    public Set<String> alreadyCheckedIps = new HashSet<>();
+    public Set<String> alreadyCheckedMemorySerialNumbers = new HashSet<>();
+    public Set<String> alreadyCheckedVolumeSerialNumbers = new HashSet<>();
+    public Set<String> alreadyCheckedSerialNumbers = new HashSet<>();
+    public Set<String> alreadyCheckedProcessorIds = new HashSet<>();
+    public Set<String> alreadyCheckedCpuNames = new HashSet<>();
+    public Set<String> alreadyCheckedBiosVersions = new HashSet<>();
+    public Set<String> alreadyCheckedManufacturers = new HashSet<>();
 
     public void writeSmurfVillageLookup2File(StringBuilder logOutput) {
         try {
@@ -762,109 +807,15 @@ public class UserManagementController implements Controller<SplitPane> {
 
         ArrayList<Object> foundSmurfs = new ArrayList<>();
 
-        // TODO create methode to handle logic and avoid repetition
-
-        uuids.forEach(uuid -> {
-            statusTextFieldProcessingItem.setText("uuid: " + uuid);
-            if (!alreadyCheckedUuids.contains(uuid)) {
-                processUsers(propertyUUID, uuid, maxUniqueUsersThreshold, logOutput, foundSmurfs);
-                alreadyCheckedUuids.add(uuid);
-            } else {
-                text.set(String.format("\nIgnoring duplicate: UUID [%s] already processed.\n", uuid));
-                updateSmurfVillageLogTextArea(text.get());
-            }
-        });
-
-        hashes.forEach(hash -> {
-            statusTextFieldProcessingItem.setText("hash: " + hash);
-            if (!alreadyCheckedHashes.contains(hash)) {
-                processUsers(propertyHash, hash, maxUniqueUsersThreshold, logOutput, foundSmurfs);
-                alreadyCheckedHashes.add(hash);
-            } else {
-                log.debug(String.format("\nIgnoring duplicate: Hash [%s] already processed.", hash));
-                updateSmurfVillageLogTextArea("\nIgnoring duplicate: Hash [%s] already processed.", hash);
-            }
-        });
-
-        ips.forEach(ip -> {
-            statusTextFieldProcessingItem.setText(ip);
-            if (!alreadyCheckedIps.contains(ip)) {
-                processUsers(propertyIP, ip, maxUniqueUsersThreshold, logOutput, foundSmurfs);
-                alreadyCheckedIps.add(ip);
-            } else {
-                log.debug(String.format("Ignoring duplicate: IP [%s] already processed.", ip));
-                updateSmurfVillageLogTextArea("\nIgnoring duplicate: IP [%s] already processed.", ip);
-            }
-        });
-
-        memorySerialNumbers.forEach(memorySerialNumber -> {
-            statusTextFieldProcessingItem.setText("memorySerialNumber:" + memorySerialNumber);
-            if (!alreadyCheckedMemorySerialNumbers.contains(memorySerialNumber)) {
-                processUsers(propertyMemorySerialNumber, memorySerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs);
-                alreadyCheckedMemorySerialNumbers.add(memorySerialNumber);
-            } else {
-                log.debug(String.format("Ignoring duplicate: Memory Serial Number [%s] already processed.", memorySerialNumber));
-                updateSmurfVillageLogTextArea("\nIgnoring duplicate: Memory Serial Number [%s] already processed.", memorySerialNumber);
-            }
-        });
-
-        volumeSerialNumbers.forEach(volumeSerialNumber -> {
-            statusTextFieldProcessingItem.setText("volumeSerialNumber: " + volumeSerialNumber);
-            if (!alreadyCheckedVolumeSerialNumbers.contains(volumeSerialNumber)) {
-                processUsers(propertyVolumeSerialNumber, volumeSerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs);
-                alreadyCheckedVolumeSerialNumbers.add(volumeSerialNumber);
-            } else {
-                log.debug(String.format("Ignoring duplicate: Volume Serial Number [%s] already processed.", volumeSerialNumber));
-                updateSmurfVillageLogTextArea("\nIgnoring duplicate: Volume Serial Number [%s] already processed.", volumeSerialNumber);
-            }
-        });
-
-        serialNumbers.forEach(serialNumber -> {
-            statusTextFieldProcessingItem.setText("serialNumber:" + serialNumber);
-            if (!alreadyCheckedSerialNumbers.contains(serialNumber)) {
-                processUsers(propertySerialNumber, serialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs);
-                alreadyCheckedSerialNumbers.add(serialNumber);
-            } else {
-                log.debug(String.format("Ignoring duplicate: Serial Number [%s] already processed.", serialNumber));
-                updateSmurfVillageLogTextArea("\nIgnoring duplicate: Serial Number [%s] already processed.", serialNumber);
-            }
-        });
-
-        processorIds.forEach(processorId -> {
-            statusTextFieldProcessingItem.setText("processorId:" + processorId);
-            if (!alreadyCheckedProcessorIds.contains(processorId)) {
-                processUsers(propertyProcessorId, processorId, maxUniqueUsersThreshold, logOutput, foundSmurfs);
-                alreadyCheckedProcessorIds.add(processorId);
-            } else {
-                log.debug(String.format("Ignoring duplicate: Processor ID [%s] already processed.", processorId));
-                updateSmurfVillageLogTextArea("\nIgnoring duplicate: Processor ID [%s] already processed.", processorId);
-            }
-        });
-
-        cpuNames.forEach(cpu -> {
-            statusTextFieldProcessingItem.setText("cpu:" + cpu);
-            if (!alreadyCheckedCpuNames.contains(cpu)) {
-                processUsers(propertyCPUName, cpu, maxUniqueUsersThreshold, logOutput, foundSmurfs);
-                alreadyCheckedCpuNames.add(cpu);
-
-            } else {
-                log.debug(String.format("Ignoring duplicate: CPU Name [%s] already processed.", cpu));
-                updateSmurfVillageLogTextArea("\nIgnoring duplicate: CPU Name [%s] already processed.", cpu);
-            }
-        });
-
-        manufacturers.forEach(manufacturer -> {
-            statusTextFieldProcessingItem.setText("manufacturer: "+ manufacturer);
-            if (!alreadyCheckedManufacturers.contains(manufacturer)) {
-                processUsers(propertyManufacturer, manufacturer, maxUniqueUsersThreshold, logOutput, foundSmurfs);
-                alreadyCheckedManufacturers.add(manufacturer);
-
-            } else {
-                log.debug(String.format("Ignoring duplicate: Manufacturer [%s] already processed.", manufacturer));
-                updateSmurfVillageLogTextArea("\nIgnoring duplicate: Manufacturer [%s] already processed.", manufacturer);
-            }
-        });
-
+        processSet(uuids, propertyUUID, maxUniqueUsersThreshold, logOutput, foundSmurfs, alreadyCheckedUuids, "uuid");
+        processSet(hashes, propertyHash, maxUniqueUsersThreshold, logOutput, foundSmurfs, alreadyCheckedHashes, "hash");
+        processSet(ips, propertyIP, maxUniqueUsersThreshold, logOutput, foundSmurfs, alreadyCheckedIps, "ip");
+        processSet(memorySerialNumbers, propertyMemorySerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, alreadyCheckedMemorySerialNumbers, "memorySerialNumber");
+        processSet(volumeSerialNumbers, propertyVolumeSerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, alreadyCheckedVolumeSerialNumbers, "volumeSerialNumber");
+        processSet(serialNumbers, propertySerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, alreadyCheckedSerialNumbers, "serialNumber");
+        processSet(processorIds, propertyProcessorId, maxUniqueUsersThreshold, logOutput, foundSmurfs, alreadyCheckedProcessorIds, "processorId");
+        processSet(cpuNames, propertyCPUName, maxUniqueUsersThreshold, logOutput, foundSmurfs, alreadyCheckedCpuNames, "cpu");
+        processSet(manufacturers, propertyManufacturer, maxUniqueUsersThreshold, logOutput, foundSmurfs, alreadyCheckedManufacturers, "manufacturer");
         //biosVersions.stream().forEach(biosVersion -> processUsers(propertyBiosVersion, biosVersion, searchPattern, maxUniqueUsersThreshold, logOutput));
 
         if (!foundSmurfs.isEmpty()) {
@@ -895,6 +846,20 @@ public class UserManagementController implements Controller<SplitPane> {
 
     }
 
+    private void processSet(Set<String> items, String property, int maxUniqueUsersThreshold, StringBuilder logOutput, List<Object> foundSmurfs, Set<String> alreadyCheckedSet, String type) {
+        items.forEach(item -> {
+            statusTextFieldProcessingItem.setText(type + ": " + item);
+            if (!alreadyCheckedSet.contains(item)) {
+                processUsers(property, item, maxUniqueUsersThreshold, logOutput, (ArrayList<Object>) foundSmurfs);
+                alreadyCheckedSet.add(item);
+            } else {
+                String message = String.format("\nIgnoring duplicate: %s [%s] already processed.\n", type, item);
+                log.debug(message);
+                updateSmurfVillageLogTextArea(message);
+            }
+        });
+    }
+
     public boolean checkStartUpExcludedItems() {
         String filePath = CONFIGURATION_FOLDER + "/excludedItems.txt";
         Path path = Paths.get(filePath);
@@ -922,6 +887,11 @@ public class UserManagementController implements Controller<SplitPane> {
         alreadyCheckedCpuNames.clear();
         alreadyCheckedBiosVersions.clear();
         alreadyCheckedManufacturers.clear();
+        statusTextFieldProcessingPlayerID.setText("Status");
+        statusTextFieldProcessingItem.setText("Detailed Status Information");
+        logOutput.setLength(0);
+        depthCounter = 0;
+        isPaused = false;
         log.debug("resetPreviousStateSmurfVillageLookup");
     }
 
@@ -941,6 +911,7 @@ public class UserManagementController implements Controller<SplitPane> {
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() {
+                isStopped = false;
                 searchSmurfVillageTabTextArea.setText("");
                 logSmurfVillageTabTextArea.setText("");
                 depthCounter = 0;
@@ -955,8 +926,6 @@ public class UserManagementController implements Controller<SplitPane> {
                 Platform.runLater(() -> {
                     setStatusDone();
                     resetPreviousStateSmurfVillageLookup();
-                    statusTextFieldProcessingPlayerID.setText("Status");
-                    statusTextFieldProcessingItem.setText("Detailed Status Information");
                     logSmurfVillageTabTextArea.appendText("\n\nTask Done");
 
                     if (searchSmurfVillageTabTextArea.getText().isEmpty()) {
@@ -993,6 +962,9 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     public void checkRecentAccountsForSmurfs() {
+        resetPreviousStateSmurfVillageLookup();
+        searchSmurfVillageTabTextArea.setText("");
+        logSmurfVillageTabTextArea.setText("");
         setStatusWorking();
         // Define a task to run in the background
         Task<Void> task = new Task<>() {
@@ -1018,6 +990,11 @@ public class UserManagementController implements Controller<SplitPane> {
                 }
 
                 for (PlayerFX account : accounts) {
+                    if (isStopped) {
+                        isStopped = false;
+                        break;
+                    }
+
                     if (count >= amountAccountsCheck) {
                         final int currentCount = count;
                         Platform.runLater(() -> statusTextRecentAccountsForSmurfs.setText(String.format("Reached the limit: %d/%d", currentCount, amountAccountsCheck)));
