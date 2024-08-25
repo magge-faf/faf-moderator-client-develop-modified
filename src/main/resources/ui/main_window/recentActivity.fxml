@@ -11,7 +11,7 @@
             <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
         </VBox.margin>
     </Button>
-
+    <TextArea fx:id="statsLatestRegistrations" editable="false" prefRowCount="9"/>
     <CheckBox fx:id="includeGlobalBannedUserCheckBox" mnemonicParsing="false" text="Include already banned users">
     </CheckBox>
     <Text fx:id="excludedItemsText" text="junk/malformed items are filtered from file (see Settings)">
