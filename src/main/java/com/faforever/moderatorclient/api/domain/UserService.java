@@ -18,8 +18,13 @@ import com.faforever.moderatorclient.ui.domain.*;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 @Service
 @Slf4j
@@ -60,17 +65,35 @@ public class UserService {
                 .addInclude(variablePrefix + "bans.revokeAuthor");
     }
 
-    public List<PlayerFX> findLatestRegistrations() {
+    public List<PlayerFX> findLatestRegistrations() throws InterruptedException, ExecutionException {
         log.debug("Searching for latest registrations");
-        ElideNavigatorOnCollection<Player> navigator = ElideNavigator.of(Player.class)
-                .collection()
-                .addSortingRule("id", false)
-                .pageSize(1000);
-        addModeratorIncludes(navigator);
+        List<Player> allPlayers = new ArrayList<>();
+        int pageSize = 1000; // Max request
+        int totalPages = 4; // To get ~4k users
+        int threads = 4;
+        ExecutorService executor = Executors.newFixedThreadPool(threads);
+        List<Future<List<Player>>> futures = new ArrayList<>();
 
-        List<Player> result = fafApi.getPage(Player.class, navigator, 1000, 1, Collections.emptyMap());
-        log.trace("found {} users", result.size());
-        return playerMapper.mapToFx(result);
+        for (int page = 1; page <= totalPages; page++) {
+            final int currentPage = page;
+            futures.add(executor.submit(() -> {
+                ElideNavigatorOnCollection<Player> navigator = ElideNavigator.of(Player.class)
+                        .collection()
+                        .addSortingRule("id", false)
+                        .pageSize(pageSize);
+                addModeratorIncludes(navigator);
+                List<Player> result = fafApi.getPage(Player.class, navigator, pageSize, currentPage, Collections.emptyMap());
+                log.trace("found {} users on page {}", result.size(), currentPage);
+                return result;
+            }));
+        }
+
+        for (Future<List<Player>> future : futures) {
+            allPlayers.addAll(future.get());
+        }
+
+        executor.shutdown();
+        return playerMapper.mapToFx(allPlayers);
     }
 
     public List<PlayerFX> findUsersByAttribute(@NotNull String attribute, @NotNull String pattern) {

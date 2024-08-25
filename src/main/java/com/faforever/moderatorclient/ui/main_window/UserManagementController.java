@@ -979,7 +979,7 @@ public class UserManagementController implements Controller<SplitPane> {
             // Setting a low delay can lead to UI-thread exceptions and unpredictable behavior.
 
             @Override
-            protected Void call() {
+            protected Void call() throws ExecutionException, InterruptedException {
                 List<PlayerFX> accounts = userService.findLatestRegistrations();
 
                 if (accounts == null || accounts.isEmpty()) {

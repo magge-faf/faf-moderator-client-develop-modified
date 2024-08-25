@@ -21,7 +21,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
@@ -53,6 +57,7 @@ public class RecentActivityController implements Controller<VBox> {
     public CheckBox includeGlobalBannedUserCheckBox;
     @FXML
     public Button refreshButton;
+    public TextArea statsLatestRegistrations;
 
     @Override public VBox getRoot() {return root;}
 
@@ -82,7 +87,6 @@ public class RecentActivityController implements Controller<VBox> {
         }
 
     }
-
 
     private void addBan(PlayerFX playerFX) {
         BanInfoController banInfoController = uiService.loadFxml("ui/banInfo.fxml");
@@ -145,14 +149,53 @@ public class RecentActivityController implements Controller<VBox> {
             }
 
             // Load recent registrations and loop through accounts
-            users.setAll(userService.findLatestRegistrations());
-            List<PlayerFX> accounts = userService.findLatestRegistrations();
+            try {
+                users.setAll(userService.findLatestRegistrations());
+            } catch (InterruptedException | ExecutionException e) {
+                throw new RuntimeException(e);
+            }
+
             userRegistrationFeedTableView.getSortOrder().clear();
 
-            for (PlayerFX account : accounts) {
-                checkAccountAgainstBlacklists(account, whitelistUserID, filteredBlacklistedData);
+            for (PlayerFX user : users) {
+                checkAccountAgainstBlacklists(user, whitelistUserID, filteredBlacklistedData);
             }
-            log.debug("[info] Recent users checked.");
+
+            // Stats about user registrations and logins in the last 30 days
+            int totalRegistrations = 0;
+            int totalLogins = 0;
+            Map<LocalDate, Integer> registrationsPerDay = new TreeMap<>(Comparator.reverseOrder());
+            Map<LocalDate, Integer> loginsPerDay = new TreeMap<>(Comparator.reverseOrder());
+
+            LocalDate currentDate = LocalDate.now(ZoneId.of("UTC"));
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'");
+
+            for (PlayerFX user : users) {
+                LocalDate registrationDate = LocalDate.parse(user.getCreateTime().format(formatter), formatter);
+                LocalDate lastLoginDate = user.getLastLogin() != null ? LocalDate.parse(user.getLastLogin().format(formatter), formatter) : null;
+
+                if (!registrationDate.isBefore(currentDate.minusDays(30))) {
+                    registrationsPerDay.put(registrationDate, registrationsPerDay.getOrDefault(registrationDate, 0) + 1);
+                    totalRegistrations++;
+
+                    if (lastLoginDate != null) {
+                        loginsPerDay.put(registrationDate, loginsPerDay.getOrDefault(registrationDate, 0) + 1);
+                        totalLogins++;
+                    }
+                }
+            }
+
+            StringBuilder stats = new StringBuilder("Registrations in the last 30 days (Registrations/Logins):\n");
+            for (LocalDate date : registrationsPerDay.keySet()) {
+                int registrations = registrationsPerDay.getOrDefault(date, 0);
+                int logins = loginsPerDay.getOrDefault(date, 0);
+                stats.append(date).append(": ").append(registrations).append(" / ").append(logins).append("\n");
+            }
+
+            stats.append("Total registrations: ").append(totalRegistrations).append(" registrations\n");
+            stats.append("Number of users who have logged in since registration: ").append(totalLogins).append(" logins");
+            statsLatestRegistrations.setText(stats.toString());
+
         });
     }
 
