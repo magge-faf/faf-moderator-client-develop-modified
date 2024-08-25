@@ -91,7 +91,11 @@ public class UserManagementController implements Controller<SplitPane> {
 
     private final Map<String, String> searchUserPropertyMapping = new LinkedHashMap<>();
     public TextArea SearchHistoryTextArea;
-    public TextArea NotesTextArea;
+    public TextArea UserNotesTextArea;
+
+    private static final String SEARCH_HISTORY_FILE = CONFIGURATION_FOLDER + File.separator +  "searchHistory.txt";
+    private static final String USER_NOTES_FILE = CONFIGURATION_FOLDER + File.separator + "userNotes.txt";
+
     public TextField smurfVillageLookupTextField;
     public Tab searchSmurfVillageLookupTab;
     public TextArea searchSmurfVillageTabTextArea;
@@ -170,6 +174,7 @@ public class UserManagementController implements Controller<SplitPane> {
     @FXML
     public void initialize() {
         loadProperties();
+        loadContent();
         saveSettingsButton.setOnAction(event -> {
             try {
                 saveSettings();
@@ -1103,6 +1108,30 @@ public class UserManagementController implements Controller<SplitPane> {
             properties.store(out, null);
         } catch (IOException e) {
             log.warn("Error saving config file:", e);
+        }
+    }
+
+    public void saveContent() {
+        try {
+            Files.write(Paths.get(SEARCH_HISTORY_FILE), SearchHistoryTextArea.getText().getBytes());
+            Files.write(Paths.get(USER_NOTES_FILE), UserNotesTextArea.getText().getBytes());
+        } catch (IOException e) {
+            log.debug(String.valueOf(e));
+        }
+    }
+
+    private void loadContent() {
+        try {
+            if (Files.exists(Paths.get(SEARCH_HISTORY_FILE))) {
+                String searchHistory = new String(Files.readAllBytes(Paths.get(SEARCH_HISTORY_FILE)));
+                SearchHistoryTextArea.setText(searchHistory);
+            }
+            if (Files.exists(Paths.get(USER_NOTES_FILE))) {
+                String userNotes = new String(Files.readAllBytes(Paths.get(USER_NOTES_FILE)));
+                UserNotesTextArea.setText(userNotes);
+            }
+        } catch (IOException e) {
+            log.debug(String.valueOf(e));
         }
     }
 }

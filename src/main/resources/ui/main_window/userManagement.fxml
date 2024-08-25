@@ -38,11 +38,11 @@
 
             <!-- Search History -->
             <Label fx:id="searchHistoryLabel" text="Search History:" alignment="CENTER" style="-fx-font-weight: bold;"/>
-            <TextArea fx:id="SearchHistoryTextArea" editable="false" promptText="No history available" wrapText="true"/>
+            <TextArea fx:id="SearchHistoryTextArea" promptText="No history available" wrapText="true"/>
 
             <!-- User Notes -->
             <Label fx:id="userNotesLabel" text="User Notes:" alignment="CENTER" style="-fx-font-weight: bold;"/>
-            <TextArea fx:id="NotesTextArea" promptText="Add your notes here" wrapText="true"/>
+            <TextArea fx:id="UserNotesTextArea" promptText="Add your notes here" wrapText="true"/>
             <Separator/>
 
             <!-- Smurf Village Lookup -->
