@@ -60,6 +60,7 @@ public class UserManagementController implements Controller<SplitPane> {
     public Text statusTextRecentAccountsForSmurfs;
     public TextField amountTextFieldRecentAccountsForSmurfsAmount;
     public Text amountAccountsText;
+    public CheckBox catchFirstLayerSmurfsOnlyCheckBox;
     private int depthCounter = 0;
     private final StringBuilder logOutput = new StringBuilder();
     private final UiService uiService;
@@ -880,6 +881,13 @@ public class UserManagementController implements Controller<SplitPane> {
             return;
         }
 
+        if (catchFirstLayerSmurfsOnlyCheckBox.isSelected()) {
+            log.debug("The 'catchFirstLayerSmurfsOnlyCheckBox' is enabled. Smurf tracing is disabled.");
+            searchSmurfVillageTabTextArea.setText(logOutput.toString());
+            writeSmurfVillageLookup2File(logOutput);
+            return;
+        }
+
         foundSmurfs.forEach(s -> onSmurfVillageLookup((String) s));
 
         searchSmurfVillageTabTextArea.setText(logOutput.toString());
@@ -1078,6 +1086,7 @@ public class UserManagementController implements Controller<SplitPane> {
             includeProcessorIdCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeProcessorIdCheckBox")));
             includeManufacturerCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeManufacturerCheckBox")));
             includeIPCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeIPCheckBox")));
+            catchFirstLayerSmurfsOnlyCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("catchFirstLayerSmurfsOnlyCheckBox", String.valueOf(true))));
             includeProcessorNameCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeProcessorNameCheckBox")));
             String depthScanningInput = properties.getProperty("depthScanningInputTextField");
             depthScanningInputTextField.setText(depthScanningInput);
@@ -1099,6 +1108,7 @@ public class UserManagementController implements Controller<SplitPane> {
         properties.setProperty("includeProcessorIdCheckBox", Boolean.toString(includeProcessorIdCheckBox.isSelected()));
         properties.setProperty("includeManufacturerCheckBox", Boolean.toString(includeManufacturerCheckBox.isSelected()));
         properties.setProperty("includeIPCheckBox", Boolean.toString(includeIPCheckBox.isSelected()));
+        properties.setProperty("catchFirstLayerSmurfsOnlyCheckBox", Boolean.toString(catchFirstLayerSmurfsOnlyCheckBox.isSelected()));
         properties.setProperty("depthScanningInputTextField", depthScanningInputTextField.getText());
         properties.setProperty("maxUniqueUsersThresholdTextField", maxUniqueUsersThresholdTextField.getText());
 

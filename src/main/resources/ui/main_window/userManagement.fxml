@@ -188,6 +188,13 @@
                 <TextField fx:id="depthScanningInputTextField" layoutX="10" layoutY="10" promptText="Default 1000" editable="false"/>
                 <Text>WIP - Needs further development. Not editable.</Text>
                 <Separator orientation="VERTICAL"/>
+                <Label text="Check For Smurf Accounts in Latest Registrations:" />
+                <CheckBox fx:id="catchFirstLayerSmurfsOnlyCheckBox" text="No Tracing, First-Layer Detection Only."/>
+                <Text>
+                    Info: When enabled, this option will only detect smurf accounts that are directly linked to the main account.
+                    It will not search through additional layers of accounts connected to the main account.
+                </Text>
+
                 <Separator/>
                 <Button fx:id="saveSettingsButton" text="Save Settings" onAction="#saveSettings"/>
                 <Separator orientation="VERTICAL"/>
