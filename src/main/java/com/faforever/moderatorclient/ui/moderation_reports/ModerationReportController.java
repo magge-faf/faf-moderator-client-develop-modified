@@ -633,6 +633,8 @@ public class ModerationReportController implements Controller<Region> {
         new Thread(task).start();
     }
 
+    @Getter
+    @Setter
     public static class Offender {
         private final StringProperty player;
         private final LongProperty currentOffenseCount;
@@ -655,48 +657,9 @@ public class ModerationReportController implements Controller<Region> {
             this.totalOffenseCountDiscarded = new SimpleLongProperty(totalOffenseCountDiscarded);
             this.lastReported = lastReported;
         }
-        public long getTotalOffenseCountCompleted() {
-            return totalOffenseCountCompleted.get();
-        }
-
-        public LongProperty totalOffenseCountCompletedProperty() {
-            return totalOffenseCountCompleted;
-        }
-
-        public long getTotalOffenseCountProcessing() {
-            return totalOffenseCountProcessing.get();
-        }
-
-        public LongProperty totalOffenseCountProcessingroperty() {
-            return totalOffenseCountProcessing;
-        }
-
-        public long getTotalOffenseCountDiscarded() {
-            return totalOffenseCountDiscarded.get();
-        }
-
-        public LongProperty totalOffenseCountDiscardedgroperty() {
-            return totalOffenseCountDiscarded;
-        }
-
-        public void lastReported(LocalDateTime lastReported) {
-            this.lastReported = lastReported;
-        }
 
         public String getPlayer() {
             return player.get();
-        }
-
-        public StringProperty playerProperty() {
-            return player;
-        }
-
-        public long getCurrentOffenseCount() {
-            return currentOffenseCount.get();
-        }
-
-        public LongProperty currentOffenseCountProperty() {
-            return currentOffenseCount;
         }
 
     }
