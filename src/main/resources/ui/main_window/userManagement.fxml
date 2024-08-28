@@ -33,7 +33,10 @@
             <Label text="User Search" alignment="CENTER" style="-fx-font-weight: bold; -fx-font-size: 14px;" />
             <ComboBox fx:id="searchUserProperties" promptText="Search by" visibleRowCount="42"/>
             <TextField fx:id="userSearchTextField" onAction="#onUserSearch" promptText="Enter search text"/>
-            <Button text="Search" alignment="CENTER" onAction="#onUserSearch" mnemonicParsing="false"/>
+            <HBox spacing="5" alignment="CENTER">
+                <Button text="Search" onAction="#onUserSearch" mnemonicParsing="false"/>
+                <Button text="Previous Search" onAction="#onUserPreviousSearch" mnemonicParsing="false"/>
+            </HBox>
             <Separator/>
 
             <!-- Search History -->

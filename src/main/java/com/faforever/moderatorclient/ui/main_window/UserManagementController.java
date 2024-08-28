@@ -326,6 +326,10 @@ public class UserManagementController implements Controller<SplitPane> {
 
         String searchParameter = searchUserPropertyMapping.get(searchUserProperties.getValue());
         String searchPattern = userSearchTextField.getText();
+
+        previousUserSearchTerm = currentUserSearchTerm;
+        currentUserSearchTerm = userSearchTextField.getText();
+
         log.debug("beforeSearchParameter: {}", searchParameter);
         log.debug("beforeSearchPattern: {}", searchPattern);
 
@@ -1137,6 +1141,16 @@ public class UserManagementController implements Controller<SplitPane> {
             }
         } catch (IOException e) {
             log.debug(String.valueOf(e));
+        }
+    }
+
+    private String previousUserSearchTerm = "";
+    private String currentUserSearchTerm = "";
+
+    public void onUserPreviousSearch() {
+        if (!previousUserSearchTerm.isEmpty()) {
+            userSearchTextField.setText(previousUserSearchTerm);
+            onUserSearch();
         }
     }
 }
