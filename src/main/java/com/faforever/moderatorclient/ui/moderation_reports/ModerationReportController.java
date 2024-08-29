@@ -832,38 +832,34 @@ public class ModerationReportController implements Controller<Region> {
     private void renewFilter() {
         filteredItemList.setPredicate(moderationReportFx -> {
             String filterText = playerNameFilterTextField.getText().toLowerCase();
-
-            // Extract report ID as a string if the text starts with "rid" to search for ReportID
             Optional<String> reportIdFilter = extractReportId(filterText);
 
             if (reportIdFilter.isPresent()) {
-                String reportId = reportIdFilter.get();
-                // Check if the report ID matches
-                if (!moderationReportFx.getId().toLowerCase().contains(reportId)) {
+                if (!moderationReportFx.getId().toLowerCase().contains(reportIdFilter.get())) {
                     return false;
                 }
             } else if (!Strings.isNullOrEmpty(filterText)) {
-                boolean reportedPlayerPositive = moderationReportFx.getReportedUsers().stream()
-                        .anyMatch(accountFX -> accountFX.getLogin().toLowerCase().contains(filterText));
-                boolean reporterPositive = moderationReportFx.getReporter().getLogin().toLowerCase().contains(filterText);
-                if (!(reportedPlayerPositive || reporterPositive)) {
+                if (moderationReportFx.getReportedUsers().stream()
+                        .map(accountFX -> accountFX.getLogin().toLowerCase())
+                        .noneMatch(login -> login.contains(filterText)) &&
+                        !moderationReportFx.getReporter().getLogin().toLowerCase().contains(filterText)) {
                     return false;
                 }
             }
-            ChooseableStatus selectedItemChoiceBox = statusChoiceBox.getSelectionModel().getSelectedItem();
-            if (selectedItemChoiceBox.toString().equals("ALL")) return true;
 
-            if (selectedItemChoiceBox == ChooseableStatus.AWAITING_PROCESSING) {
-                return moderationReportFx.getReportStatus() == ModerationReportStatus.AWAITING ||
-                        moderationReportFx.getReportStatus() == ModerationReportStatus.PROCESSING;
+            ChooseableStatus selectedItem = statusChoiceBox.getSelectionModel().getSelectedItem();
+            if (selectedItem == ChooseableStatus.AWAITING_PROCESSING) {
+                ModerationReportStatus status = moderationReportFx.getReportStatus();
+                return status == ModerationReportStatus.AWAITING || status == ModerationReportStatus.PROCESSING;
             }
 
-            ModerationReportStatus moderationReportStatus = selectedItemChoiceBox.getModerationReportStatus();
-            return moderationReportFx.getReportStatus() == moderationReportStatus;
+            return selectedItem.toString().equals("ALL") ||
+                    moderationReportFx.getReportStatus() == selectedItem.getModerationReportStatus();
         });
     }
 
     private Optional<String> extractReportId(String filterText) {
+        // Extract report ID from text if it starts with "rid" for searching
         Pattern pattern = Pattern.compile("rid(\\w+)");
         Matcher matcher = pattern.matcher(filterText);
         if (matcher.find()) {
