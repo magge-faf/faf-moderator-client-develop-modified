@@ -16,52 +16,43 @@
 <?import javafx.scene.control.cell.PropertyValueFactory?>
 <?import javafx.scene.text.Text?>
 <?import javafx.scene.control.Label?>
-<?import javafx.scene.control.Tooltip?>
 <SplitPane fx:id="root" dividerPositions="0.5" orientation="VERTICAL" xmlns="http://javafx.com/javafx/11.0.1"
            xmlns:fx="http://javafx.com/fxml/1"
            fx:controller="com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController">
-    <HBox maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" VBox.vgrow="ALWAYS">
-        <VBox spacing="1.0">
-            <ChoiceBox fx:id="statusChoiceBox" minWidth="93"/>
-            <TextField fx:id="playerNameFilterTextField" promptText="Enter player name to search"/>
-            <Button fx:id="editReportButton" mnemonicParsing="false" minWidth="93" onAction="#onEdit" text="Edit"/>
-            <Button mnemonicParsing="false" onAction="#onRefreshAllReports" minWidth="93" text="Refresh"/>
-            <Separator minHeight="5" />
-            <Text>Copy2Clipboard:</Text>
-            <Button fx:id="copyReportIdButton" mnemonicParsing="false" minWidth="93" onAction="#onCopyReportID"
-                    text="Report ID"/>
-            <Text>Offender:</Text>
-            <Button fx:id="copyReportedUserIdButton" mnemonicParsing="false" minWidth="93" onAction="#onCopyReportedUserID"
-                    text="Offender ID"/>
-            <Button fx:id="copyGameIdButton" mnemonicParsing="false" minWidth="93" onAction="#onCopyGameID" text="Game ID"/>
-            <Text>Reporter:</Text>
-            <Button fx:id="copyReporterIdButton" mnemonicParsing="false" minWidth="93" onAction="#onCopyReporterIdButton" text="Reporter ID"/>
-            <Separator prefHeight="5" />
-            <Button fx:id="copyChatLogButton" mnemonicParsing="false" minWidth="93" onAction="#onCopyChatLog"
-                    text="Chat Log"/>
-            <Separator prefHeight="5" />
-            <Button fx:id="useTemplateWithoutReasonsButton" mnemonicParsing="false" minWidth="93" onAction="#onUseTemplateWithoutReasonsButton"
-                    text="Apply template"/>
-            <Button fx:id="useTemplateWithReasonsButton" mnemonicParsing="false" minWidth="93" onAction="#onUseTemplateWithReasonsButton"
-                    text="with adding reasons"/>
-            <Separator prefHeight="5"/>
+    <HBox maxHeight="Infinity" maxWidth="Infinity" VBox.vgrow="ALWAYS">
+        <VBox spacing="5.0">
+            <ChoiceBox fx:id="statusChoiceBox" minWidth="150"/>
+            <TextField fx:id="playerNameFilterTextField" promptText="Enter player name to search" minWidth="150"/>
+            <Button fx:id="editReportButton" text="Edit" onAction="#onEdit" minWidth="150"/>
+            <Button text="Refresh" onAction="#onRefreshAllReports" minWidth="150"/>
+
+            <Separator minHeight="10"/>
+
+            <Text>Copy to Clipboard:</Text>
+            <Button fx:id="copyReportIdButton" text="Report ID" onAction="#onCopyReportID" minWidth="150"/>
+            <Button fx:id="copyReporterIdButton" text="Reporter ID" onAction="#onCopyReporterIdButton" minWidth="150"/>
+            <Button fx:id="copyReportedUserIdButton" text="Offender ID" onAction="#onCopyReportedUserID" minWidth="150"/>
+            <Button fx:id="copyGameIdButton" text="Game ID" onAction="#onCopyGameID" minWidth="150"/>
+
+            <Separator minHeight="10"/>
+
+            <Button fx:id="copyChatLogButton" text="Chat Log" onAction="#onCopyChatLog" minWidth="150"/>
+            <Button fx:id="startReplayButton" text="Start Replay" onAction="#onStartReplay" minWidth="150"/>
+
+            <Separator minHeight="10"/>
+
             <Text>Replay settings</Text>
-            <CheckBox fx:id="filterLogCheckBox" selected="true" mnemonicParsing="false"
-                      text="Ignore notify messages">
-            </CheckBox>
-            <CheckBox fx:id="automaticallyLoadChatLogCheckBox" selected="true" mnemonicParsing="false"
-                      text="Auto load chat log">
-            </CheckBox>
-            <Separator prefHeight="10"/>
-            <Button fx:id="startReplayButton" mnemonicParsing="false" minWidth="93" onAction="#onStartReplay"
-                    text="Start Replay"/>
-            <Separator prefHeight="10"/>
-            <TextField fx:id="getModeratorEventsForReplayIdTextField" promptText="Enter ReplayID" />
-            <Button fx:id="getModeratorEventsReplayIdButton" mnemonicParsing="false" minWidth="93" onAction="#onModeratorEventsReplayIdButton"
-                    text="Get Chat/Events"/>
+            <CheckBox fx:id="filterLogCheckBox" text="Ignore notify messages" selected="true"/>
+            <CheckBox fx:id="automaticallyLoadChatLogCheckBox" text="Auto load chat log" selected="true"/>
+            <TextField fx:id="getModeratorEventsForReplayIdTextField" promptText="Enter Replay ID" minWidth="150"/>
+            <Button fx:id="getModeratorEventsReplayIdButton" text="Get Chat/Events" onAction="#onModeratorEventsReplayIdButton" minWidth="150"/>
+
+            <Separator minHeight="10"/>
+
+            <Button fx:id="useTemplateWithoutReasonsButton" text="Apply template" onAction="#onUseTemplateWithoutReasonsButton" minWidth="150"/>
+            <Button fx:id="useTemplateWithReasonsButton" text="with adding reasons" onAction="#onUseTemplateWithReasonsButton" minWidth="150"/>
         </VBox>
-        <TableView fx:id="reportTableView" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
-                   HBox.hgrow="ALWAYS"/>
+        <TableView fx:id="reportTableView" maxHeight="Infinity" maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
     </HBox>
     <TabPane tabClosingPolicy="UNAVAILABLE">
         <Tab text="Chat log">
