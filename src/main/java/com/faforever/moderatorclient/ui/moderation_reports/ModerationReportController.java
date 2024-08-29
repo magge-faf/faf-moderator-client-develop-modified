@@ -8,6 +8,7 @@ import com.faforever.commons.replay.ReplayMetadata;
 import com.faforever.commons.replay.GameOption;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.ModerationReportService;
+import com.faforever.moderatorclient.config.TemplateAndReasonConfig;
 import com.faforever.moderatorclient.ui.*;
 import com.faforever.moderatorclient.ui.domain.BanInfoFX;
 import com.faforever.moderatorclient.ui.domain.GameFX;
@@ -31,6 +32,7 @@ import javafx.fxml.FXML;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.*;
@@ -218,7 +220,7 @@ public class ModerationReportController implements Controller<Region> {
             timer.schedule(new TimerTask() {
                 @Override
                 public void run() {
-                    Platform.runLater(() -> useTemplateWithoutReasonsButton.setText("Use template"));
+                    Platform.runLater(() -> useTemplateWithoutReasonsButton.setText("Template No Reasons"));
                 }
             }, 750);
         } catch (NullPointerException e) {
@@ -241,74 +243,120 @@ public class ModerationReportController implements Controller<Region> {
                     .distinct()
                     .collect(Collectors.joining(","));
 
-            removeTrailingComma(new StringBuilder(selectedIds));
-            removeTrailingComma(new StringBuilder(selectedGameIds));
-
-            Stage stage = new Stage();
-            final String selectedReasons = "";
-            stage.setTitle("Select reasons:");
-
-            GridPane gridPane = new GridPane();
-            gridPane.setHgap(10);
-            gridPane.setVgap(10);
-            gridPane.setPadding(new Insets(120, 120, 120, 120));
-
-            File file = new File(CONFIGURATION_FOLDER + File.separator + "templateReasonsCheckBox.txt");
-            List<String> checkBoxLabels = new ArrayList<>();
-            try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    checkBoxLabels.add(line);
-                }
-            } catch (IOException e) {
-                log.debug(String.valueOf(e));
+            TemplateAndReasonConfig templateAndReasonConfig = loadTemplateAndReasonConfig();
+            if (templateAndReasonConfig == null) {
+                log.error("Error importing templatesAndReasons.json - Maybe JSON style errors.");
+                return;
             }
 
-            List<CheckBox> checkBoxes = checkBoxLabels.stream().map(CheckBox::new).toList();
+            List<TemplateAndReasonConfig> templates = templateAndReasonConfig.getTemplates();
+            List<String> reasons = templateAndReasonConfig.getReasons();
 
-            for (int i = 0; i < checkBoxes.size(); i++) {
-                gridPane.add(checkBoxes.get(i), 0, i);
-            }
+            Platform.runLater(() -> {
+                Stage templateStage = new Stage();
+                templateStage.setTitle("Select Template");
 
-            Button okButton = new Button("OK");
-            gridPane.add(okButton, 0, checkBoxLabels.size());
+                GridPane gridPane = new GridPane();
+                gridPane.setHgap(10);
+                gridPane.setVgap(10);
+                gridPane.setPadding(new Insets(10));
 
-            Scene scene = new Scene(gridPane);
-            stage.setScene(scene);
-            stage.show();
-
-            final String[] updatedReasons = {selectedReasons};
-            okButton.setOnAction(event -> {
-                for (CheckBox checkBox : checkBoxes) {
-                    if (checkBox.isSelected()) {
-                        updatedReasons[0] += checkBox.getText() + ", ";
+                ComboBox<TemplateAndReasonConfig> templateComboBox = new ComboBox<>();
+                templateComboBox.getItems().addAll(templates);
+                templateComboBox.setValue(templates.getFirst());
+                templateComboBox.setCellFactory(param -> new ListCell<TemplateAndReasonConfig>() {
+                    @Override
+                    protected void updateItem(TemplateAndReasonConfig item, boolean empty) {
+                        super.updateItem(item, empty);
+                        setText(empty ? "" : item.getName());
                     }
+                });
+                templateComboBox.setButtonCell(new ListCell<TemplateAndReasonConfig>() {
+                    @Override
+                    protected void updateItem(TemplateAndReasonConfig item, boolean empty) {
+                        super.updateItem(item, empty);
+                        setText(empty ? "" : item.getName());
+                    }
+                });
+
+                gridPane.add(new Label("Template:"), 0, 0);
+                gridPane.add(templateComboBox, 1, 0);
+
+                List<CheckBox> reasonCheckBoxes = reasons.stream()
+                        .map(CheckBox::new)
+                        .toList();
+
+                for (int i = 0; i < reasonCheckBoxes.size(); i++) {
+                    gridPane.add(reasonCheckBoxes.get(i), 0, i + 1);
                 }
 
-                String updatedReasonsString = Arrays.toString(updatedReasons);
-                updatedReasonsString = updatedReasonsString.substring(1, updatedReasonsString.length() - 1); // Remove brackets
-                updatedReasonsString = updatedReasonsString.substring(0, updatedReasonsString.length() - 2); // Remove latest two char
+                Button okButton = new Button("OK");
+                gridPane.add(okButton, 0, reasonCheckBoxes.size() + 1);
 
-                String result;
-                result = selectedIds + "\n\n" + "DAY_NUMBER day ban - ReplayID " + selectedGameIds + " - " + updatedReasonsString;
+                Scene scene = new Scene(gridPane);
+                templateStage.setScene(scene);
+                templateStage.show();
 
-                ClipboardContent clipboardContent = new ClipboardContent();
-                clipboardContent.putString(result);
-                javafx.scene.input.Clipboard.getSystemClipboard().setContent(clipboardContent);
-                stage.close();
+                okButton.setOnAction(event -> {
+                    TemplateAndReasonConfig selectedTemplate = templateComboBox.getValue();
+                    if (selectedTemplate == null) {
+                        return;
+                    }
+
+                    StringBuilder selectedReasons = new StringBuilder();
+                    for (CheckBox checkBox : reasonCheckBoxes) {
+                        if (checkBox.isSelected()) {
+                            selectedReasons.append(checkBox.getText()).append(", ");
+                        }
+                    }
+
+                    if (!selectedReasons.isEmpty()) {
+                        selectedReasons.setLength(selectedReasons.length() - 2); // Remove trailing comma
+                    }
+
+                    // Format result based on the template
+                    String result = selectedTemplate.getFormat()
+                            .replace("{ids}", selectedIds)
+                            .replace("{reason}", selectedReasons.toString());
+
+                    if (selectedGameIds.isEmpty()) {
+                        result = result.replace("ReplayID", "");
+                        result = result.replace(" -  {gameIds}", "");
+                    } else {
+                        result = result.replace("{gameIds}", selectedGameIds);
+                    }
+
+                    // Copy result to clipboard
+                    ClipboardContent clipboardContent = new ClipboardContent();
+                    clipboardContent.putString(result);
+                    javafx.scene.input.Clipboard.getSystemClipboard().setContent(clipboardContent);
+
+                    useTemplateWithReasonsButton.setText("Copied");
+                    templateStage.close();
+
+                    // Reset button text after a delay
+                    Timer timer = new Timer();
+                    timer.schedule(new TimerTask() {
+                        @Override
+                        public void run() {
+                            Platform.runLater(() -> useTemplateWithReasonsButton.setText("Template With Reasons"));
+                        }
+                    }, 750);
+                });
             });
-
-            useTemplateWithReasonsButton.setText("Copied");
-            Timer timer = new Timer();
-            timer.schedule(new TimerTask() {
-                @Override
-                public void run() {
-                    Platform.runLater(() -> useTemplateWithReasonsButton.setText("Use template, with reasons"));
-                }
-            }, 750);
-        } catch (NullPointerException e) {
-            log.debug(String.valueOf(e));
+        } catch (Exception e) {
+            log.warn(String.valueOf(e));
         }
+    }
+
+    private TemplateAndReasonConfig loadTemplateAndReasonConfig() {
+        File templatesAndReasonsFile = new File(CONFIGURATION_FOLDER + File.separator + "templatesAndReasons.json");
+        try {
+            return objectMapper.readValue(templatesAndReasonsFile, TemplateAndReasonConfig.class);
+        } catch (IOException e) {
+            log.warn(String.valueOf(e));
+        }
+        return null;
     }
 
     private void showInTableRepeatedOffenders(List<ModerationReportFX> reps) {

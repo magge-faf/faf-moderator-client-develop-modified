@@ -33,6 +33,8 @@
     <Text text="IMPORTANT: Check link for latest ExcludedItems.txt" textAlignment="CENTER"/>
     <TextField fx:id="genericJunkButton" minWidth="200"
                text="https://faforever.zulipchat.com/#narrow/stream/203851-moderators/topic/AntiSmurfForce.20-.20ExcludedItems"/>
+    <Button fx:id="templatesAndReasonsReportButton" mnemonicParsing="false" onAction="#templatesAndReasonsReportButton"
+            prefWidth="300" text="Open Templates and Reasons for Processing Reports"/>
     <Button fx:id="templateCompletedButton" mnemonicParsing="false" onAction="#onTemplateCompletedButton"
             prefWidth="300" text="Open Template for Completed Report"/>
     <Button fx:id="templateDiscardedButton" mnemonicParsing="false" onAction="#onTemplateDiscardedButton"

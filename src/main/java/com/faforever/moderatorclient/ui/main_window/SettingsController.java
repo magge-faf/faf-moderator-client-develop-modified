@@ -164,8 +164,54 @@ public class SettingsController implements Controller<Region> {
                     createTemplatePoorReportQuality();
             }
         }
+        initTemplatesAndReasons();
         createTemplateGamingModeratorTask();
         loadConfigurationProperties();
+    }
+
+    private static final String jsonFile = CONFIGURATION_FOLDER + File.separator + "templatesAndReasons.json";
+    private static final String JSON_CONTENT = """
+            {
+              "templates": [
+                {
+                  "name": "Standard Ban",
+                  "format": "{ids}\\n\\nDAY_NUMBER day ban - ReplayID {gameIds} - {reason}"
+                },
+                {
+                  "name": "Your Custom Ban",
+                  "format": "{ids}\\n\\nDAY_NUMBER day ban - ReplayID {gameIds} - {reason}"
+                }
+              ],
+              "reasons": [
+                "Offensive Language",
+                "Reclaiming Friendly Units",
+                "Attacking Friendly Units",
+                "CTRL+K All Units in Fullshare Game Mode",
+                "Harassment via Private Chat",
+                "Offensive Kick Messages",
+                "Racism",
+                "Offensive Game Titles",
+                "Leaving on Own Terms/Game Ruining",
+                "Abuse of Exploits",
+                "Bad/Illegal Username - Your login name was changed to NEW_USERNAME"
+              ]
+            }""";
+
+    private void initTemplatesAndReasons(){
+        File file = new File(jsonFile);
+        if (!file.exists()) {
+            try {
+                Files.createDirectories(Paths.get(CONFIGURATION_FOLDER));
+                try (FileWriter writer = new FileWriter(file)) {
+                    writer.write(JSON_CONTENT);
+                    System.out.println("File created and content written successfully.");
+                }
+            } catch (IOException e) {
+                log.warn(String.valueOf(e));
+            }
+        } else {
+            log.info(jsonFile +" already exists.");
+        }
     }
 
     public void initTabStuff() {
@@ -381,4 +427,8 @@ public class SettingsController implements Controller<Region> {
         openFile(CONFIGURATION_FOLDER + "/templateGamingModeratorTask.txt");
     }
 
+    public void templatesAndReasonsReportButton() throws IOException {
+        openFile(CONFIGURATION_FOLDER + "/templatesAndReasons.json");
+
+    }
 }

@@ -41,21 +41,21 @@
 
             <Separator minHeight="10"/>
 
-            <Text>Replay settings</Text>
+            <Text>Replay Settings</Text>
             <CheckBox fx:id="filterLogCheckBox" text="Ignore notify messages" selected="true"/>
             <CheckBox fx:id="automaticallyLoadChatLogCheckBox" text="Auto load chat log" selected="true"/>
             <TextField fx:id="getModeratorEventsForReplayIdTextField" promptText="Enter Replay ID" minWidth="150"/>
             <Button fx:id="getModeratorEventsReplayIdButton" text="Get Chat/Events" onAction="#onModeratorEventsReplayIdButton" minWidth="150"/>
 
             <Separator minHeight="10"/>
-
-            <Button fx:id="useTemplateWithoutReasonsButton" text="Apply template" onAction="#onUseTemplateWithoutReasonsButton" minWidth="150"/>
-            <Button fx:id="useTemplateWithReasonsButton" text="with adding reasons" onAction="#onUseTemplateWithReasonsButton" minWidth="150"/>
+            <Text>Select Reports and apply:</Text>
+            <Button fx:id="useTemplateWithoutReasonsButton" text="Template No Reasons" onAction="#onUseTemplateWithoutReasonsButton" minWidth="150"/>
+            <Button fx:id="useTemplateWithReasonsButton" text="Template With Reasons" onAction="#onUseTemplateWithReasonsButton" minWidth="150"/>
         </VBox>
         <TableView fx:id="reportTableView" maxHeight="Infinity" maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
     </HBox>
     <TabPane tabClosingPolicy="UNAVAILABLE">
-        <Tab text="Chat log">
+        <Tab text="Chat Log">
             <TextArea fx:id="chatLogTextArea" editable="false" prefHeight="200.0" prefWidth="200.0"/>
         </Tab>
         <Tab text="Reported Accounts">
