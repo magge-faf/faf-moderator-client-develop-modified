@@ -5,6 +5,7 @@ import com.faforever.moderatorclient.api.TokenService;
 import com.faforever.moderatorclient.api.event.ApiAuthorizedEvent;
 import com.faforever.moderatorclient.config.ApplicationProperties;
 import com.faforever.moderatorclient.config.EnvironmentProperties;
+import com.faforever.moderatorclient.ui.main_window.SettingsController;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.ComboBox;
@@ -20,22 +21,10 @@ import org.springframework.boot.autoconfigure.ldap.embedded.EmbeddedLdapProperti
 import org.springframework.context.event.EventListener;
 import org.springframework.security.oauth2.common.OAuth2AccessToken;
 import org.springframework.stereotype.Component;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
-import java.io.File;
 import java.io.IOException;
-import java.io.StringWriter;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.text.MessageFormat;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -63,41 +52,16 @@ public class LoginController implements Controller<Pane> {
 
     private CompletableFuture<Void> resetPageFuture;
 
+    String[] credentials = SettingsController.loadCredentials();
+
     private EmbeddedLdapProperties.Credential loadAccountCredentials() {
-        String nameOrEmail = null;
-        String password = null;
-
-        try {
-            String homeDirectory = System.getProperty("user.home");
-            String filePath = homeDirectory + File.separator + "account_credentials_mordor.txt";
-            File file = new File(filePath);
-
-            if (!file.exists()) {
-                if (file.createNewFile()) {
-                    log.debug("Created account_credentials_mordor.txt file.");
-                }
-            }
-
-            List<String> accountCredentials = Files.readAllLines(Paths.get(filePath));
-            if (!accountCredentials.isEmpty()) {
-                nameOrEmail = accountCredentials.get(0);
-                password = accountCredentials.size() > 1 ? accountCredentials.get(1) : null;
-                log.debug("[autologin] Credentials loaded for user:" + nameOrEmail);
-            }
-        } catch (IOException e) {
-            log.debug("Error reading account credentials: " + e.getMessage());
-        }
-
-        if (nameOrEmail != null && password != null) {
-            EmbeddedLdapProperties.Credential credential = new EmbeddedLdapProperties.Credential();
-            credential.setUsername(nameOrEmail);
-            credential.setPassword(password);
-            return credential;
-        } else {
-            return null;
-        }
+        String username = credentials[0];
+        String password = credentials[1];
+        EmbeddedLdapProperties.Credential credential = new EmbeddedLdapProperties.Credential();
+        credential.setUsername(username);
+        credential.setPassword(password);
+        return credential;
     }
-
 
     @Override
     public Pane getRoot() {
@@ -134,7 +98,7 @@ public class LoginController implements Controller<Pane> {
                         "clickAuthorizeButton();";
 
         loginWebView.getEngine().getLoadWorker().runningProperty().addListener((observable, oldValue, newValue) -> {
-            if (credential != null) {
+            if (credential.getUsername() != null) {
                 try {
                     String fillLoginNameAndPasswordScript = String.format(
                             "function setValueToNameOrEmail() {" +

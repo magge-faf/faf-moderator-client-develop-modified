@@ -72,7 +72,7 @@ public class EditModerationReportController implements Controller<Pane> {
 		properties.setProperty("autoApplyTemplateAndSaveCheckBox", Boolean.toString(autoApplyTemplateAndSaveCheckBox.isSelected()));
 
 		try (FileOutputStream out = new FileOutputStream(propertiesFile)) {
-			properties.store(out, "");
+			properties.store(out, null );
 		} catch (IOException e) {
 			throw new IOException("Failed to save properties file: " + propertiesFile.getAbsolutePath(), e);
 		}

@@ -8,6 +8,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.*;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.Text;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +24,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Properties;
+import java.util.prefs.Preferences;
 
 import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
 
@@ -34,7 +36,8 @@ public class SettingsController implements Controller<Region> {
     public VBox root;
     public TextField accountNameOrEmailTextField;
     public TextField accountPasswordField;
-    public Button saveAccountButton;
+    @FXML
+    public static Button saveAccountCredentialsButton;
     public TextField pathAccountFile;
     public Button blacklistedHashButton;
     public Button blacklistedIPButton;
@@ -55,6 +58,8 @@ public class SettingsController implements Controller<Region> {
     @Setter
     public List<Tab> tabs;
     public Button openAiPromptButton;
+    public Text excludedItemsLoadedText;
+    public Text accountCredentialsText;
 
     private void setDefaultTab(Tab tab) {
         String tabName = tab.getId();
@@ -71,22 +76,9 @@ public class SettingsController implements Controller<Region> {
     public void loadConfigurationProperties() {
         try {
             properties.load(new FileInputStream(CONFIG_FILE_PATH.toFile()));
-            autoDiscardCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("autoDiscardCheckBox", String.valueOf(false))));
-            autoCompleteCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("autoCompleteCheckBox", String.valueOf(false))));
             String defaultStartingTab = properties.getProperty("user.choice.tab");
             defaultStartingTabMenuBar.setText("Default Starting Tab is " + defaultStartingTab);
         } catch (IOException e) {log.error(e.getMessage());}
-    }
-
-    public void onSaveButtonForCheckBox() {
-        if (CONFIG_FILE_PATH.toFile().exists()) {
-            try (InputStream in = new FileInputStream(CONFIG_FILE_PATH.toFile())) {
-                properties.load(in);
-                properties.setProperty("autoDiscardCheckBox", Boolean.toString(autoDiscardCheckBox.isSelected()));
-                properties.setProperty("autoCompleteCheckBox", Boolean.toString(autoCompleteCheckBox.isSelected()));
-                properties.store(new FileOutputStream(CONFIG_FILE_PATH.toFile()), null);
-            } catch (IOException e) {log.error(e.getMessage());}
-        }
     }
 
     @Override
@@ -94,6 +86,15 @@ public class SettingsController implements Controller<Region> {
 
     @FXML
     public void initialize() throws IOException {
+        String[] credentials = SettingsController.loadCredentials();
+        String username = credentials[0];
+
+        if (username == null) {
+            accountCredentialsText.setText("Account Credentials (no profile active)");
+        } else {
+            accountCredentialsText.setText("Account Credentials (profile " + username + " active)");
+        }
+
         log.debug("Initializing blacklistedFiles");
         String[] blacklistedFiles = { "blacklistedHash", "blacklistedIP", "blacklistedMemorySN",
                 "blacklistedSN", "blacklistedUUID", "blacklistedVolumeSN", "excludedItems" };
@@ -115,9 +116,9 @@ public class SettingsController implements Controller<Region> {
             try {
                 if (!f.exists()) {
                     if (f.createNewFile()) {
-                        log.info("[info] " + f + " was successfully created.");
+                        log.info("[info] {} was successfully created.", f);
                     } else {
-                        log.info("[info] " + f + " already exists.");
+                        log.info("[info] {} already exists.", f);
                     }
                 }
             } catch (IOException e) {
@@ -125,36 +126,33 @@ public class SettingsController implements Controller<Region> {
             }
         }
 
-        String homeDirectory = System.getProperty("user.home");
-        String filePath = homeDirectory + File.separator + "account_credentials_mordor.txt";
-        pathAccountFile.setText(filePath);
-        File f = new File(filePath);
+        int lineCount = countLinesInFile(new File(CONFIGURATION_FOLDER + File.separator + "excludedItems.txt"));
+        excludedItemsLoadedText.setText("Total Excluded Items Loaded " + lineCount + ":");
 
-        if (f.exists() && !f.isDirectory()) {
-            Path pathCredentialsFile = Path.of(filePath);
-            try {
-                List<String> credentials = Files.readAllLines(pathCredentialsFile);
-                String nameOrEmail = credentials.get(0);
-                String password = credentials.get(1);
-                accountNameOrEmailTextField.setText(nameOrEmail);
-                accountPasswordField.setText(password);
-            } catch (Exception e) {
-                log.debug("Error reading account credentials: " + e.getMessage());
-            }
-
-            // Create configuration properties if not exist already
-            File configFile = new File(CONFIGURATION_FOLDER + File.separator + "config.properties");
-                try {
-                    configFile.createNewFile();
-                    log.debug(configFile + " was created.");
-                    } catch (IOException e) {
-                        log.error("[error] Failed to create " + configFile, e);
-            }
+        File configFile = new File(CONFIGURATION_FOLDER + File.separator + "config.properties");
+        try {
+            configFile.createNewFile();
+            log.debug("{} was created.", configFile);
+        } catch (IOException e) {
+            log.error("[error] Failed to create {}", configFile, e);
         }
+
         initTemplatesAndReasons();
         initTemplatesFinishReports();
         createTemplateGamingModeratorTask();
         loadConfigurationProperties();
+    }
+
+    private int countLinesInFile(File file) throws IOException {
+        int lines = 0;
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            while (reader.readLine() != null) {
+                lines++;
+            }
+        } catch (IOException e) {
+            throw new IOException();
+        }
+        return lines;
     }
 
     private static final String jsonFileTemplatesAndReasons = CONFIGURATION_FOLDER + File.separator + "templatesAndReasons.json";
@@ -292,25 +290,14 @@ public class SettingsController implements Controller<Region> {
         }
     }
 
-    public void saveAccount() {
-    String accountNameOrEmail = accountNameOrEmailTextField.getText();
-    String accountPassword = accountPasswordField.getText();
-    String data = accountNameOrEmail + "\n" + accountPassword;
-    String filePath = System.getProperty("user.home") + File.separator + "account_credentials_mordor.txt";
-
-    try {
-        FileWriter fw = new FileWriter(filePath, false);
-        fw.write(data);
-        fw.flush();
-        fw.close();
-        saveAccountButton.setText("Credentials were saved.");
-        } catch (IOException e) {
-            log.error("Error saving account credentials: " + e.getMessage());
-        }
-    }
-
     public void onSaveAccountButton() {
-        saveAccount();
+        String accountNameOrEmail = accountNameOrEmailTextField.getText();
+        String accountPassword = accountPasswordField.getText();
+        accountCredentialsText.setText("Account Credentials (profile " + accountNameOrEmail + " active)");
+        accountNameOrEmailTextField.setText("");
+        accountPasswordField.setText("");
+
+        saveCredentials(accountNameOrEmail, accountPassword);
     }
 
     public void openFile(String fileName) throws IOException {
@@ -415,5 +402,23 @@ public class SettingsController implements Controller<Region> {
     public void templatesFinishReportsButton() throws IOException {
         openFile(CONFIGURATION_FOLDER + File.separator +  "templatesFinishReports.json");
 
+    }
+
+    private static final String PREF_NODE = "com.faforever.moderatorclient.credentials";
+    private static final String USERNAME_KEY = "username";
+    private static final String PASSWORD_KEY = "password";
+
+    public static void saveCredentials(String username, String password) {
+        Preferences prefs = Preferences.userRoot().node(PREF_NODE);
+        prefs.put(USERNAME_KEY, username);
+        prefs.put(PASSWORD_KEY, password);
+    }
+
+    public static String[] loadCredentials() {
+        Preferences prefs = Preferences.userRoot().node(PREF_NODE);
+        String username = prefs.get(USERNAME_KEY, null);
+        String password = prefs.get(PASSWORD_KEY, null);
+
+        return new String[]{username, password};
     }
 }

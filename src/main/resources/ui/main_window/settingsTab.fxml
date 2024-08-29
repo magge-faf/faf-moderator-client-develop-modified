@@ -6,12 +6,11 @@
 <VBox fx:id="root" spacing="5" style="-fx-padding: 10px;" xmlns="http://javafx.com/javafx/20.0.1"
       xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.faforever.moderatorclient.ui.main_window.SettingsController">
-    <Text style="-fx-font-size: 14pt;">Account Credentials:</Text>
+    <Text fx:id="accountCredentialsText" style="-fx-font-size: 14pt;">Account Credentials:</Text>
     <TextField fx:id="accountNameOrEmailTextField" promptText="Account name or email"/>
     <PasswordField fx:id="accountPasswordField" promptText="Password"/>
-    <Button fx:id="saveAccountButton" mnemonicParsing="false" onAction="#onSaveAccountButton" text="Save"/>
+    <Button fx:id="saveAccountCredentialsButton" mnemonicParsing="false" onAction="#onSaveAccountButton" text="Save Account Credentials"/>
     <Separator prefHeight="5"/>
-    <Text style="-fx-font-size: 12pt;" text="Account credentials are saved in user.home"/>
     <TextField fx:id="pathAccountFile"/>
     <Text style="-fx-font-size: 14pt;">Open Blacklisted Items:</Text>
     <Button fx:id="blacklistedHashButton" mnemonicParsing="false" onAction="#onBlacklistedHash" prefWidth="100"
@@ -27,7 +26,7 @@
     <Button fx:id="blacklistedVolumeSNButton" mnemonicParsing="false" onAction="#onBlacklistedVolumeSN"
             prefWidth="100" text="VolumeSN"/>
     <Separator prefHeight="5"/>
-    <Text style="-fx-font-size: 14pt;">Items to Exclude:</Text>
+    <Text fx:id="excludedItemsLoadedText" style="-fx-font-size: 14pt;">Excluded Items Loaded:</Text>
     <Button fx:id="excludedItemsButton" mnemonicParsing="false" onAction="#onExcludedItems" prefWidth="70"
             text="Excluded"/>
     <Text text="IMPORTANT: Check link for latest ExcludedItems.txt" textAlignment="CENTER"/>
