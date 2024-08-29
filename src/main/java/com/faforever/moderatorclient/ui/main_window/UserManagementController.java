@@ -905,16 +905,11 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     public void onLookupSmurfVillage() {
-        if (!checkStartUpExcludedItems()) {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.setTitle("Information Dialog");
-            alert.setHeaderText(null);
-            alert.setContentText("Your excludedItems.txt is empty or missing " +
-                    "See Settings-Tab (Top Right) how to get the latest version from Zulip channel");
-            alert.showAndWait();
+        boolean safeCheck = checkAndAlertExcludedItems();
+
+        if (safeCheck){
             return;
         }
-
         setStatusWorking();
 
         Task<Void> task = new Task<>() {
@@ -970,7 +965,27 @@ public class UserManagementController implements Controller<SplitPane> {
         });
     }
 
+    public boolean checkAndAlertExcludedItems() {
+        if (!checkStartUpExcludedItems()) {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("Information Dialog");
+            alert.setHeaderText(null); // No header text
+            alert.setContentText("Your excludedItems.txt is empty or missing. " +
+                    "See Settings-Tab (Top Right) to get the latest version from Zulip channel.");
+
+            alert.showAndWait();
+            return true;
+        }
+        return false;
+    }
+
+
     public void checkRecentAccountsForSmurfs() {
+        boolean safeCheck = checkAndAlertExcludedItems();
+
+        if (safeCheck){
+            return;
+        }
         resetPreviousStateSmurfVillageLookup();
         searchSmurfVillageTabTextArea.setText("");
         logSmurfVillageTabTextArea.setText("");

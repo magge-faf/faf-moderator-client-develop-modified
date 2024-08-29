@@ -11,7 +11,6 @@
     <PasswordField fx:id="accountPasswordField" promptText="Password"/>
     <Button fx:id="saveAccountCredentialsButton" mnemonicParsing="false" onAction="#onSaveAccountButton" text="Save Account Credentials"/>
     <Separator prefHeight="5"/>
-    <TextField fx:id="pathAccountFile"/>
     <Text style="-fx-font-size: 14pt;">Open Blacklisted Items:</Text>
     <Button fx:id="blacklistedHashButton" mnemonicParsing="false" onAction="#onBlacklistedHash" prefWidth="100"
             text="Hash"/>

@@ -38,7 +38,6 @@ public class SettingsController implements Controller<Region> {
     public TextField accountPasswordField;
     @FXML
     public static Button saveAccountCredentialsButton;
-    public TextField pathAccountFile;
     public Button blacklistedHashButton;
     public Button blacklistedIPButton;
     public Button blacklistedMemorySNButton;
@@ -48,8 +47,6 @@ public class SettingsController implements Controller<Region> {
     public Button excludedItemsButton;
     public TextField genericJunkButton;
     public javafx.scene.control.Menu defaultStartingTabMenuBar;
-    public CheckBox autoDiscardCheckBox;
-    public CheckBox autoCompleteCheckBox;
     public Button openConfigurationFolderButton;
 
     private static final Path CONFIG_FILE_PATH = Paths.get(CONFIGURATION_FOLDER + File.separator + "config.properties");
