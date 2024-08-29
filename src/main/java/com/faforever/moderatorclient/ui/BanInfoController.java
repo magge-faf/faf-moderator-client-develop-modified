@@ -144,7 +144,7 @@ public class BanInfoController implements Controller<Pane> {
             } else {
                 revocationTimeTextField.setText(OffsetDateTime.now().atZoneSameInstant(ZoneOffset.UTC).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
             }
-            // chat and vault ban are not working
+            // chat ban is not working since ages
             //chatOnlyBanRadioButton.setSelected(banInfo.getLevel() == BanLevel.CHAT);
             //vaultBanRadioButton.setSelected(banInfo.getLevel() == BanLevel.VAULT);
             globalBanRadioButton.setSelected(banInfo.getLevel() == BanLevel.GLOBAL);
@@ -345,26 +345,5 @@ public class BanInfoController implements Controller<Pane> {
     public void preSetReportId(String id) {
         reportIdTextField.setText(id);
         reportIdTextField.setDisable(true);
-    }
-
-    private void loadBanReasonTemplate(String fileName, RadioButton radioButton) {
-        String filePath = CONFIGURATION_FOLDER + File.separator+ fileName + ".txt";
-        File f = new File(filePath);
-        if (f.exists() && !f.isDirectory()) {
-            try {
-                String banReason = Files.readString(Paths.get(filePath));
-                banReasonTextField.setText(banReason);
-                radioButton.setSelected(true);
-                log.debug("Successfully loaded " + fileName + " file.");
-            } catch (Exception e) {
-                log.debug("Error reading " + fileName + " file: " + e.getMessage());
-            }
-        } else {
-            log.debug("File not found: " + filePath);
-        }
-    }
-
-    public void templateButtonPermanentBan() {
-        loadBanReasonTemplate("templateButtonPermanentBan", permanentBanRadioButton);
     }
 }
