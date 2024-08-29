@@ -33,26 +33,21 @@
     <Text text="IMPORTANT: Check link for latest ExcludedItems.txt" textAlignment="CENTER"/>
     <TextField fx:id="genericJunkButton" minWidth="200"
                text="https://faforever.zulipchat.com/#narrow/stream/203851-moderators/topic/AntiSmurfForce.20-.20ExcludedItems"/>
+    <Separator prefHeight="5"/>
+    <Text style="-fx-font-size: 14pt;" text="Templates" textAlignment="CENTER"/>
     <Button fx:id="templatesAndReasonsReportButton" mnemonicParsing="false" onAction="#templatesAndReasonsReportButton"
-            prefWidth="300" text="Open Templates and Reasons for Processing Reports"/>
-    <Button fx:id="templateCompletedButton" mnemonicParsing="false" onAction="#onTemplateCompletedButton"
-            prefWidth="300" text="Open Template for Completed Report"/>
-    <Button fx:id="templateDiscardedButton" mnemonicParsing="false" onAction="#onTemplateDiscardedButton"
-            prefWidth="300" text="Open Template for Discarded Report"/>
-    <Button fx:id="templatePoorReportQualityButton" mnemonicParsing="false"
-            onAction="#onTemplatePoorReportQualityButton" prefWidth="300"
-            text="Open Template for 'PoorReportQuality' Report"/>
+            prefWidth="300" text="View Templates for FAF Forum and Ban Reasons"/>
+    <Button fx:id="templatesFinishReportsButton" mnemonicParsing="false" onAction="#templatesFinishReportsButton"
+            prefWidth="300" text="View Templates to 'edit' reports"/>
+    <Separator prefHeight="5"/>
+    <Text style="-fx-font-size: 14pt;" text="Starting Tab" textAlignment="CENTER"/>
     <MenuBar xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml">
         <Menu fx:id="defaultStartingTabMenuBar" text="Choose Starting Tab:"/>
     </MenuBar>
     <Separator minHeight="5"/>
-    <Text style="-fx-font-size: 14pt;" text="Options for ReportsTab"/>
-    <CheckBox fx:id="autoDiscardCheckBox" text="Auto Discard Report on Blueprint Click"/>
-    <CheckBox fx:id="autoCompleteCheckBox" text="Auto Complete Report on Blueprint Click"/>
-    <Button fx:id="saveButton" onAction="#onSaveButtonForCheckBox" text="Save"/>
-    <Separator minHeight="5"/>
+    <Text style="-fx-font-size: 14pt;" text="Misc"/>
     <Button fx:id="openConfigurationFolderButton" mnemonicParsing="false" onAction="#onOpenConfigurationFolder"
             text="Open Configuration Folder"/>
     <Button fx:id="openAiPromptButton" mnemonicParsing="false" onAction="#onOpenAiPromptButton"
-            text="Open AI Prompt"/>
+            text="View AI Prompt"/>
 </VBox>

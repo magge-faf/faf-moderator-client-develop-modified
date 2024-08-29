@@ -195,7 +195,7 @@ public class ModerationReportController implements Controller<Region> {
         try {
             ObservableList<ModerationReportFX> selectedItems = reportTableView.getSelectionModel().getSelectedItems();
 
-            String selectedIds = selectedItems.stream()
+            String selectedReportIds = selectedItems.stream()
                     .map(item -> String.valueOf(item.getId()))
                     .collect(Collectors.joining(","));
 
@@ -206,11 +206,11 @@ public class ModerationReportController implements Controller<Region> {
                     .distinct()
                     .collect(Collectors.joining(","));
 
-            removeTrailingComma(new StringBuilder(selectedIds));
+            removeTrailingComma(new StringBuilder(selectedReportIds));
             removeTrailingComma(new StringBuilder(selectedGameIds));
 
             String result;
-            result = selectedIds + "\n\n" + "DAY_NUMBER day ban - ReplayID " + selectedGameIds + " - SOME_REASON";
+            result = selectedReportIds + "\n\n" + "DAY_NUMBER day ban - ReplayID " + selectedGameIds + " - SOME_REASON";
             ClipboardContent clipboardContent = new ClipboardContent();
             clipboardContent.putString(result);
             javafx.scene.input.Clipboard.getSystemClipboard().setContent(clipboardContent);
@@ -316,7 +316,7 @@ public class ModerationReportController implements Controller<Region> {
 
                     // Format result based on the template
                     String result = selectedTemplate.getFormat()
-                            .replace("{ids}", selectedIds)
+                            .replace("{reportIds}", selectedIds)
                             .replace("{reason}", selectedReasons.toString());
 
                     if (selectedGameIds.isEmpty()) {
@@ -899,17 +899,59 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     public void onEdit() {
-        EditModerationReportController editModerationReportController = uiService.loadFxml("ui/edit_moderation_report.fxml");
-        editModerationReportController.setModerationReportFx(reportTableView.getSelectionModel().getSelectedItem());
-        editModerationReportController.setOnSaveRunnable(() -> Platform.runLater(() -> {
-            renewFilter();
-            this.onRefreshAllReports();
-        }));
-        //statusChoiceBox.setItems(FXCollections.observableArrayList(ChooseableStatus.values()));
-        Stage newCategoryDialog = new Stage();
-        newCategoryDialog.setTitle("Edit Report");
-        newCategoryDialog.setScene(new Scene(editModerationReportController.getRoot()));
-        newCategoryDialog.showAndWait();
+        ObservableList<ModerationReportFX> selectedItems = reportTableView.getSelectionModel().getSelectedItems();
+        final int MAX_SELECTION_LIMIT = 4;
+
+        if (selectedItems.isEmpty()) {
+            return;
+        }
+
+        if (selectedItems.size() > MAX_SELECTION_LIMIT) {
+            Alert confirmationAlert = new Alert(Alert.AlertType.CONFIRMATION);
+            confirmationAlert.setTitle("Confirmation/Failsafe");
+            confirmationAlert.setHeaderText("You have selected (" + selectedItems.size() + ") more than " + MAX_SELECTION_LIMIT + " reports.");
+            confirmationAlert.setContentText("Are you sure you want to edit all selected reports?");
+
+            ButtonType okButton = new ButtonType("OK");
+            ButtonType cancelButton = new ButtonType("Cancel");
+            confirmationAlert.getButtonTypes().setAll(okButton, cancelButton);
+
+            Optional<ButtonType> result = confirmationAlert.showAndWait();
+            if (result.isPresent() && result.get() == cancelButton) {
+                return;
+            }
+        }
+
+        AtomicInteger remainingDialogs = new AtomicInteger(selectedItems.size());
+
+        Platform.runLater(() -> {
+            for (ModerationReportFX selectedItem : selectedItems) {
+                if (selectedItem == null) {
+                    continue;
+                }
+
+                try {
+                    EditModerationReportController editModerationReportController = uiService.loadFxml("ui/edit_moderation_report.fxml");
+                    editModerationReportController.setModerationReportFx(selectedItem);
+
+                    editModerationReportController.setOnSaveRunnable(() -> Platform.runLater(() -> {
+                        if (remainingDialogs.decrementAndGet() == 0) {
+                            renewFilter();
+                            this.onRefreshAllReports();
+                        }
+                    }));
+
+                    Stage editDialog = new Stage();
+                    String title = "Edit Report ID: " + selectedItem.getId();
+                    editDialog.setTitle(title);
+                    editDialog.setScene(new Scene(editModerationReportController.getRoot()));
+                    editDialog.showAndWait();
+
+                } catch (Exception e) {
+                    log.error("Error while editing report: " + selectedItem, e);
+                }
+            }
+        });
     }
 
     @Getter

@@ -43,20 +43,11 @@ public class SettingsController implements Controller<Region> {
     public Button blacklistedUUIDButton;
     public Button blacklistedVolumeSNButton;
     public Button excludedItemsButton;
-    public Button templateCompletedButton;
-    public Button templateDiscardedButton;
-    public Button templateReasonsCheckBoxButton;
     public TextField genericJunkButton;
-    public MenuItem optionUserManagementTab;
-    public MenuItem optionReportTab;
-    public MenuItem optionRecentActivityTab;
     public javafx.scene.control.Menu defaultStartingTabMenuBar;
     public CheckBox autoDiscardCheckBox;
     public CheckBox autoCompleteCheckBox;
-    public Button templateButtonPermanentBanButton;
-    public Button saveButton;
     public Button openConfigurationFolderButton;
-    public Button templatePoorReportQualityButton;
 
     private static final Path CONFIG_FILE_PATH = Paths.get(CONFIGURATION_FOLDER + File.separator + "config.properties");
     private final Properties properties = new Properties();
@@ -158,28 +149,25 @@ public class SettingsController implements Controller<Region> {
                     log.debug(configFile + " was created.");
                     } catch (IOException e) {
                         log.error("[error] Failed to create " + configFile, e);
-                    createTemplateReasonsCheckBoxFile();
-                    createTemplateDiscardedFile();
-                    createTemplateCompletedFile();
-                    createTemplatePoorReportQuality();
             }
         }
         initTemplatesAndReasons();
+        initTemplatesFinishReports();
         createTemplateGamingModeratorTask();
         loadConfigurationProperties();
     }
 
-    private static final String jsonFile = CONFIGURATION_FOLDER + File.separator + "templatesAndReasons.json";
-    private static final String JSON_CONTENT = """
+    private static final String jsonFileTemplatesAndReasons = CONFIGURATION_FOLDER + File.separator + "templatesAndReasons.json";
+    private static final String JSON_CONTENT_templatesAndReasons = """
             {
               "templates": [
                 {
                   "name": "Standard Ban",
-                  "format": "{ids}\\n\\nDAY_NUMBER day ban - ReplayID {gameIds} - {reason}"
+                  "format": "{reportIds}\\n\\nDAY_NUMBER day ban - ReplayID {gameIds} - {reason}"
                 },
                 {
                   "name": "Your Custom Ban",
-                  "format": "{ids}\\n\\nDAY_NUMBER day ban - ReplayID {gameIds} - {reason}"
+                  "format": "{reportIds}\\n\\nDAY_NUMBER day ban - ReplayID {gameIds} - {reason}"
                 }
               ],
               "reasons": [
@@ -198,21 +186,76 @@ public class SettingsController implements Controller<Region> {
             }""";
 
     private void initTemplatesAndReasons(){
-        File file = new File(jsonFile);
+        File file = new File(jsonFileTemplatesAndReasons);
         if (!file.exists()) {
             try {
                 Files.createDirectories(Paths.get(CONFIGURATION_FOLDER));
                 try (FileWriter writer = new FileWriter(file)) {
-                    writer.write(JSON_CONTENT);
+                    writer.write(JSON_CONTENT_templatesAndReasons);
                     System.out.println("File created and content written successfully.");
                 }
             } catch (IOException e) {
                 log.warn(String.valueOf(e));
             }
         } else {
-            log.info(jsonFile +" already exists.");
+            log.info(jsonFileTemplatesAndReasons +" already exists.");
         }
     }
+
+    private static final String jsonFileTemplatesFinishReports = CONFIGURATION_FOLDER + File.separator + "templatesFinishReports.json";
+    private static final String JSON_CONTENT_templatesFinishReports = """
+            {
+              "templatesEditReports": [
+                {
+            	  "setReportStatusTo": "COMPLETED",
+                  "buttonName": "Completed - Standard",
+                  "description": "Thank you for bringing this to our attention. Action was taken."
+                },
+            	{
+            	  "setReportStatusTo": "COMPLETED",
+                  "buttonName": "Completed - Replay Desync",
+                  "description": "Thank you for bringing this to our attention. Unfortunately, the game desyncs. I have made a note for the player in case it becomes a pattern. Please report any further violations."
+                },
+                {
+            	  "setReportStatusTo": "DISCARDED",
+                  "buttonName": "Discarded - Standard",
+                  "description": "No additional information or proof was provided."
+                },
+            	{
+            	  "setReportStatusTo": "DISCARDED",
+                  "buttonName": "Discarded - Replay Missing",
+                  "description": "Please report again with the ReplayID."
+                },
+            	{
+            	  "setReportStatusTo": "DISCARDED",
+                  "buttonName": "Discarded - Timecode Missing",
+                  "description": "Please report again with the specific timecode of the violation."
+                },
+            	{
+            	  "setReportStatusTo": "PROCESSING",
+                  "buttonName": "Processing - Investigation",
+                  "description": "Thank you for bringing this to our attention. We are investigating the case and it may take some time, until we set it to 'completed'."
+                }
+              ]
+            }""";
+
+    private void initTemplatesFinishReports(){
+        File file = new File(jsonFileTemplatesFinishReports);
+        if (!file.exists()) {
+            try {
+                Files.createDirectories(Paths.get(CONFIGURATION_FOLDER));
+                try (FileWriter writer = new FileWriter(file)) {
+                    writer.write(JSON_CONTENT_templatesFinishReports);
+                    System.out.println("File created and content written successfully.");
+                }
+            } catch (IOException e) {
+                log.warn(String.valueOf(e));
+            }
+        } else {
+            log.info(jsonFileTemplatesFinishReports +" already exists.");
+        }
+    }
+
 
     public void initTabStuff() {
         for (Tab tab : tabs) {
@@ -228,60 +271,6 @@ public class SettingsController implements Controller<Region> {
                 }
             });
             defaultStartingTabMenuBar.getItems().add(menuItem);
-        }
-    }
-
-    public void createTemplatePoorReportQuality() {
-        try {
-            File fileTemplatePoorReportQuality = new File(CONFIGURATION_FOLDER + File.separator + "templatePoorReportQuality.txt");
-            String contentFileTemplatePoorReportQuality = "We appreciate your effort in submitting a report; however, the quality of the report can be improved to show that you care about it - More information at §2 here: https://forum.faforever.com/topic/6061/report-system-a-comprehensive-guide";
-            FileWriter writer = new FileWriter(fileTemplatePoorReportQuality);
-            writer.write(contentFileTemplatePoorReportQuality);
-            writer.close();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public void createTemplateCompletedFile() {
-        try {
-            // Create templateCompleted.txt file
-            File fileCompleted = new File(CONFIGURATION_FOLDER + File.separator + "templateCompleted.txt");
-            String contentCompleted = "Thank you for bringing this to our attention. Action was taken.";
-            // Write content to file
-            FileWriter writer = new FileWriter(fileCompleted);
-            writer.write(contentCompleted);
-            writer.close();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public void createTemplateDiscardedFile() {
-        try {
-            // Create templateDiscarded.txt file
-            File fileDiscarded = new File(CONFIGURATION_FOLDER + File.separator + "templateDiscarded.txt");
-            String contentDiscarded = "No additional information or proof was provided.";
-            // Write content to file
-            FileWriter writer = new FileWriter(fileDiscarded);
-            writer.write(contentDiscarded);
-            writer.close();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public void createTemplateReasonsCheckBoxFile() {
-        try {
-            // Create templateReasonsCheckBox.txt file
-            File fileReasonsCheckBox = new File(CONFIGURATION_FOLDER + File.separator + "templateReasonsCheckBox.txt");
-            String contentReasonsCheckBox = "offensive language\nreclaiming friendly units\nattacking friendly units\nCTRL+K all units in full share\nleaving game on own terms\nharassment in private chat\nracism\noffensive game titles\noffensive kick messages";
-            // Write content to file
-            FileWriter writer = new FileWriter(fileReasonsCheckBox);
-            writer.write(contentReasonsCheckBox);
-            writer.close();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
         }
     }
 
@@ -302,8 +291,6 @@ public class SettingsController implements Controller<Region> {
             throw new RuntimeException(e);
         }
     }
-
-
 
     public void saveAccount() {
     String accountNameOrEmail = accountNameOrEmailTextField.getText();
@@ -339,7 +326,6 @@ public class SettingsController implements Controller<Region> {
             }
         }
 
-    public void onTemplateButtonPermanentBanButton() throws IOException {openFile(CONFIGURATION_FOLDER + "/templateButtonPermanentBan.txt");}
     public void onBlacklistedHash() throws IOException {openFile(CONFIGURATION_FOLDER + "/blacklistedHash.txt");}
     public void onBlacklistedIP() throws IOException {openFile(CONFIGURATION_FOLDER + "/blacklistedIP.txt");}
     public void onBlacklistedSN() throws IOException {openFile(CONFIGURATION_FOLDER + "/blacklistedSN.txt");}
@@ -347,12 +333,6 @@ public class SettingsController implements Controller<Region> {
     public void onBlacklistedVolumeSN() throws IOException {openFile(CONFIGURATION_FOLDER + "/blacklistedVolumeSN.txt");}
     public void onBlacklistedMemorySN() throws IOException {openFile(CONFIGURATION_FOLDER + "/blacklistedMemorySN.txt");}
     public void onExcludedItems() throws IOException {openFile(CONFIGURATION_FOLDER + "/excludedItems.txt");}
-    public void onTemplateCompletedButton() throws IOException {openFile(CONFIGURATION_FOLDER + "/templateCompleted.txt");}
-    public void onTemplateDiscardedButton() throws IOException {openFile(CONFIGURATION_FOLDER + "/templateDiscarded.txt");}
-    public void onReasonsTemplateCheckBoxButton() throws IOException {openFile(CONFIGURATION_FOLDER + "/templateReasonsCheckBox.txt");}
-    public void onTemplatePoorReportQualityButton() throws IOException {openFile(CONFIGURATION_FOLDER + "/templatePoorReportQuality.txt");}
-
-
 
     public void onOpenConfigurationFolder() {
         File folder = new File(CONFIGURATION_FOLDER);
@@ -424,11 +404,16 @@ public class SettingsController implements Controller<Region> {
     }
 
     public void onOpenAiPromptButton() throws IOException {
-        openFile(CONFIGURATION_FOLDER + "/templateGamingModeratorTask.txt");
+        openFile(CONFIGURATION_FOLDER + File.separator + "templateGamingModeratorTask.txt");
     }
 
     public void templatesAndReasonsReportButton() throws IOException {
-        openFile(CONFIGURATION_FOLDER + "/templatesAndReasons.json");
+        openFile(CONFIGURATION_FOLDER + File.separator +  "templatesAndReasons.json");
+
+    }
+
+    public void templatesFinishReportsButton() throws IOException {
+        openFile(CONFIGURATION_FOLDER + File.separator +  "templatesFinishReports.json");
 
     }
 }
