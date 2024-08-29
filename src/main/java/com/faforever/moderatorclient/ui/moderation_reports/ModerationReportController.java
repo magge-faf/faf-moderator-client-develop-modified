@@ -831,10 +831,21 @@ public class ModerationReportController implements Controller<Region> {
 
     private void renewFilter() {
         filteredItemList.setPredicate(moderationReportFx -> {
-            String playerFilter = playerNameFilterTextField.getText().toLowerCase();
-            if (!Strings.isNullOrEmpty(playerFilter)) {
-                boolean reportedPlayerPositive = moderationReportFx.getReportedUsers().stream().anyMatch(accountFX -> accountFX.getLogin().toLowerCase().contains(playerFilter));
-                boolean reporterPositive = moderationReportFx.getReporter().getLogin().toLowerCase().contains(playerFilter);
+            String filterText = playerNameFilterTextField.getText().toLowerCase();
+
+            // Extract report ID as a string if the text starts with "rid" to search for ReportID
+            Optional<String> reportIdFilter = extractReportId(filterText);
+
+            if (reportIdFilter.isPresent()) {
+                String reportId = reportIdFilter.get();
+                // Check if the report ID matches
+                if (!moderationReportFx.getId().toLowerCase().contains(reportId)) {
+                    return false;
+                }
+            } else if (!Strings.isNullOrEmpty(filterText)) {
+                boolean reportedPlayerPositive = moderationReportFx.getReportedUsers().stream()
+                        .anyMatch(accountFX -> accountFX.getLogin().toLowerCase().contains(filterText));
+                boolean reporterPositive = moderationReportFx.getReporter().getLogin().toLowerCase().contains(filterText);
                 if (!(reportedPlayerPositive || reporterPositive)) {
                     return false;
                 }
@@ -850,6 +861,15 @@ public class ModerationReportController implements Controller<Region> {
             ModerationReportStatus moderationReportStatus = selectedItemChoiceBox.getModerationReportStatus();
             return moderationReportFx.getReportStatus() == moderationReportStatus;
         });
+    }
+
+    private Optional<String> extractReportId(String filterText) {
+        Pattern pattern = Pattern.compile("rid(\\w+)");
+        Matcher matcher = pattern.matcher(filterText);
+        if (matcher.find()) {
+            return Optional.of(matcher.group(1));
+        }
+        return Optional.empty();
     }
 
     public void onRefreshAllReports() {
