@@ -883,14 +883,19 @@ public class ModerationReportController implements Controller<Region> {
 
     private final AtomicInteger totalReportsLoaded = new AtomicInteger(0);
     private final List<Integer> reportsLoadedPerThread = Collections.synchronizedList(new ArrayList<>());
+    private final AtomicInteger activeApiRequests = new AtomicInteger(0);
 
     private void createNewApiRequestThread(int x, boolean recursive) {
+        int activeRequestsBefore = activeApiRequests.incrementAndGet();
+        log.debug("Incremented active API requests. Current count: {}", activeRequestsBefore);
+
         int pageSize = 100;
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() {
                 moderationReportService.getPageOfReports(x, pageSize).thenAccept(reportFxes -> {
                     Platform.runLater(() -> reportFxes.forEach(report -> itemMap.put(Integer.valueOf(report.getId()), report)));
+
                     if (reportFxes.size() == pageSize || x < 2) {
                         if (recursive) {
                             createNewApiRequestThread(x + 5, true);
@@ -898,7 +903,6 @@ public class ModerationReportController implements Controller<Region> {
                                 createNewApiRequestThread(x + i, false);
                             }
                         }
-
                     } else {
                         isLoading = false;
                         int totalReports = reportsLoadedPerThread.stream().mapToInt(Integer::intValue).sum();
@@ -909,9 +913,13 @@ public class ModerationReportController implements Controller<Region> {
                         showInTableRepeatedOffenders(itemList);
                     }
                 }).exceptionally(throwable -> {
-                    log.error("error loading reports", throwable);
+                    log.error("Error loading reports", throwable);
                     return null;
+                }).whenComplete((result, throwable) -> {
+                    int activeRequestsAfter = activeApiRequests.decrementAndGet();
+                    log.debug("Decremented active API requests. Current count: {}", activeRequestsAfter);
                 });
+
                 return null;
             }
         };
