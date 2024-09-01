@@ -925,58 +925,29 @@ public class ModerationReportController implements Controller<Region> {
 
     public void onEdit() {
         ObservableList<ModerationReportFX> selectedItems = reportTableView.getSelectionModel().getSelectedItems();
-        final int MAX_SELECTION_LIMIT = 4;
 
         if (selectedItems.isEmpty()) {
             return;
         }
 
-        if (selectedItems.size() > MAX_SELECTION_LIMIT) {
-            Alert confirmationAlert = new Alert(Alert.AlertType.CONFIRMATION);
-            confirmationAlert.setTitle("Confirmation/Failsafe");
-            confirmationAlert.setHeaderText("You have selected (" + selectedItems.size() + ") more than " + MAX_SELECTION_LIMIT + " reports.");
-            confirmationAlert.setContentText("Are you sure you want to edit all selected reports?");
+        try {
+            EditModerationReportController editModerationReportController = uiService.loadFxml("ui/edit_moderation_report.fxml");
+            editModerationReportController.setSelectedReports(new ArrayList<>(selectedItems));
 
-            ButtonType okButton = new ButtonType("OK");
-            ButtonType cancelButton = new ButtonType("Cancel");
-            confirmationAlert.getButtonTypes().setAll(okButton, cancelButton);
+            editModerationReportController.setOnSaveRunnable(this::onRefreshAllReports);
 
-            Optional<ButtonType> result = confirmationAlert.showAndWait();
-            if (result.isPresent() && result.get() == cancelButton) {
-                return;
-            }
+            Stage editDialog = new Stage();
+            int numberOfReports = selectedItems.size();
+            String title = "Edit Selected Reports (" + numberOfReports + " Report" + (numberOfReports > 1 ? "s" : "") + ")";
+            editDialog.setTitle(title);
+            editDialog.setScene(new Scene(editModerationReportController.getRoot()));
+            editDialog.showAndWait();
+
+            this.onRefreshAllReports();
+
+        } catch (Exception e) {
+            log.error("Error while editing reports", e);
         }
-
-        AtomicInteger remainingDialogs = new AtomicInteger(selectedItems.size());
-
-        Platform.runLater(() -> {
-            for (ModerationReportFX selectedItem : selectedItems) {
-                if (selectedItem == null) {
-                    continue;
-                }
-
-                try {
-                    EditModerationReportController editModerationReportController = uiService.loadFxml("ui/edit_moderation_report.fxml");
-                    editModerationReportController.setModerationReportFx(selectedItem);
-
-                    editModerationReportController.setOnSaveRunnable(() -> Platform.runLater(() -> {
-                        if (remainingDialogs.decrementAndGet() == 0) {
-                            renewFilter();
-                            this.onRefreshAllReports();
-                        }
-                    }));
-
-                    Stage editDialog = new Stage();
-                    String title = "Edit Report ID: " + selectedItem.getId();
-                    editDialog.setTitle(title);
-                    editDialog.setScene(new Scene(editModerationReportController.getRoot()));
-                    editDialog.showAndWait();
-
-                } catch (Exception e) {
-                    log.error("Error while editing report: " + selectedItem, e);
-                }
-            }
-        });
     }
 
     @Getter

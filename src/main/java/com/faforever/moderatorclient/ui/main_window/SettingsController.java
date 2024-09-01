@@ -204,32 +204,32 @@ public class SettingsController implements Controller<Region> {
                 {
             	  "setReportStatusTo": "COMPLETED",
                   "buttonName": "Completed - Standard",
-                  "description": "Thank you for bringing this to our attention. Action was taken."
+                  "descriptionPublicNote": "Thank you for bringing this to our attention. Action was taken."
                 },
             	{
             	  "setReportStatusTo": "COMPLETED",
                   "buttonName": "Completed - Replay Desync",
-                  "description": "Thank you for bringing this to our attention. Unfortunately, the game desyncs. I have made a note for the player in case it becomes a pattern. Please report any further violations."
+                  "descriptionPublicNote": "Thank you for bringing this to our attention. Unfortunately, the game desyncs. I have made a note for the player in case it becomes a pattern. Please report any further violations."
                 },
                 {
             	  "setReportStatusTo": "DISCARDED",
                   "buttonName": "Discarded - Standard",
-                  "description": "No additional information or proof was provided."
+                  "descriptionPublicNote": "No additional information or proof was provided."
                 },
             	{
             	  "setReportStatusTo": "DISCARDED",
                   "buttonName": "Discarded - Replay Missing",
-                  "description": "Please report again with the ReplayID."
+                  "descriptionPublicNote": "Please report again with the ReplayID."
                 },
             	{
             	  "setReportStatusTo": "DISCARDED",
                   "buttonName": "Discarded - Timecode Missing",
-                  "description": "Please report again with the specific timecode of the violation."
+                  "descriptionPublicNote": "Please report again with the specific timecode of the violation."
                 },
             	{
             	  "setReportStatusTo": "PROCESSING",
                   "buttonName": "Processing - Investigation",
-                  "description": "Thank you for bringing this to our attention. We are investigating the case and it may take some time, until we set it to 'completed'."
+                  "descriptionPublicNote": "Thank you for bringing this to our attention. We are investigating the case and it may take some time, until we set it to 'completed'."
                 }
               ]
             }""";
@@ -250,7 +250,6 @@ public class SettingsController implements Controller<Region> {
             log.info(jsonFileTemplatesFinishReports +" already exists.");
         }
     }
-
 
     public void initTabStuff() {
         for (Tab tab : tabs) {

@@ -23,6 +23,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -32,6 +34,7 @@ import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLD
 @Component
 @RequiredArgsConstructor
 public class EditModerationReportController implements Controller<Pane> {
+	private List<ModerationReportFX> selectedReports = new ArrayList<>();
 	private final ModerationReportService moderationReportService;
 	public TextArea privateNoteTextArea;
 	public TextArea publicNoteTextArea;
@@ -41,19 +44,16 @@ public class EditModerationReportController implements Controller<Pane> {
 	@FXML
 	public VBox dynamicButtonsContainer;
 	@Setter
-    private Runnable onSaveRunnable;
-	private ModerationReportFX moderationReportFx;
-
-	@FXML
+	private Runnable onSaveRunnable = () -> {};
+    @FXML
 	public void initialize() throws IOException {
-		loadAutoApplyTemplateAndSaveProperties();
 		try {
 			loadButtonsFromJson(CONFIGURATION_FOLDER + File.separator + "templatesFinishReports.json");
 		} catch (IOException e) {
 			throw new IOException("Failed to initialize Buttons" + e);
-
 		}
 
+		loadAutoApplyTemplateAndSaveProperties();
 		statusChoiceBox.setItems(FXCollections.observableArrayList(ModerationReportStatus.values()));
 	}
 
@@ -92,22 +92,23 @@ public class EditModerationReportController implements Controller<Pane> {
 	}
 
 	public void onSave() throws IOException {
+		for (ModerationReportFX report : selectedReports) {
+			ModerationReport updateModerationReport = new ModerationReport();
+			updateModerationReport.setId(report.getId());
+			updateModerationReport.setReportStatus(statusChoiceBox.getSelectionModel().getSelectedItem());
+			updateModerationReport.setModeratorPrivateNote(privateNoteTextArea.getText());
+			updateModerationReport.setModeratorNotice(publicNoteTextArea.getText());
+			moderationReportService.patchReport(updateModerationReport);
+			report.setReportStatus(statusChoiceBox.getSelectionModel().getSelectedItem());
+			report.setModeratorPrivateNote(privateNoteTextArea.getText());
+			report.setModeratorNotice(publicNoteTextArea.getText());
+		}
 		onSaveAutoApplyTemplateAndSaveCheckBox();
-		ModerationReport updateModerationReport = new ModerationReport();
-		updateModerationReport.setId(moderationReportFx.getId());
-		updateModerationReport.setReportStatus(statusChoiceBox.getSelectionModel().getSelectedItem());
-		updateModerationReport.setModeratorPrivateNote(privateNoteTextArea.getText());
-		updateModerationReport.setModeratorNotice(publicNoteTextArea.getText());
-		moderationReportService.patchReport(updateModerationReport);
-		moderationReportFx.setReportStatus(statusChoiceBox.getSelectionModel().getSelectedItem());
-		moderationReportFx.setModeratorPrivateNote(privateNoteTextArea.getText());
-		moderationReportFx.setModeratorNotice(publicNoteTextArea.getText());
 		onSaveRunnable.run();
 		close();
 	}
 
     public void setModerationReportFx(ModerationReportFX moderationReportFx) {
-		this.moderationReportFx = moderationReportFx;
 		statusChoiceBox.getSelectionModel().select(moderationReportFx.getReportStatus());
 		privateNoteTextArea.setText(moderationReportFx.getModeratorPrivateNote());
 		publicNoteTextArea.setText(moderationReportFx.getModeratorNotice());
@@ -131,20 +132,19 @@ public class EditModerationReportController implements Controller<Pane> {
 		for (int i = 0; i < templates.length(); i++) {
 			JSONObject template = templates.getJSONObject(i);
 			String buttonName = template.getString("buttonName");
-			String description = template.getString("description");
+			String descriptionPublicNote = template.getString("descriptionPublicNote");
 			String setReportStatusTo = template.getString("setReportStatusTo");
 
 			Button button = new Button(buttonName);
 			button.setOnAction(e -> {
 				try {
-					handleButtonAction(buttonName, setReportStatusTo, description);
+					handleButtonAction(setReportStatusTo, descriptionPublicNote);
 				} catch (IOException ex) {
 					throw new RuntimeException(ex);
 				}
 			});
 
-			// Tooltip setup
-			Tooltip tooltip = new Tooltip(description);
+			Tooltip tooltip = new Tooltip(descriptionPublicNote);
 			PauseTransition pause = new PauseTransition(Duration.millis(0));
 
 			button.addEventHandler(MouseEvent.MOUSE_ENTERED, e -> pause.playFromStart());
@@ -159,12 +159,19 @@ public class EditModerationReportController implements Controller<Pane> {
 		}
 	}
 
-	private void handleButtonAction(String buttonName, String setReportStatusTo, String description) throws IOException {
-
-		publicNoteTextArea.setText(description);
+	private void handleButtonAction(String setReportStatusTo, String descriptionPublicNote) throws IOException {
+		publicNoteTextArea.setText(descriptionPublicNote);
 		statusChoiceBox.getSelectionModel().select(ModerationReportStatus.valueOf(setReportStatusTo));
-			if (autoApplyTemplateAndSaveCheckBox.isSelected()) {
-				onSave();
-			}
+		if (autoApplyTemplateAndSaveCheckBox.isSelected()) {
+			onSave();
+		}
 	}
+
+	public void setSelectedReports(List<ModerationReportFX> reports) {
+		this.selectedReports = reports;
+		if (!selectedReports.isEmpty()) {
+			setModerationReportFx(selectedReports.getFirst());
+		}
+	}
+
 }

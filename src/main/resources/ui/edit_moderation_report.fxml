@@ -9,31 +9,31 @@
     <!-- First Row -->
     <HBox spacing="10" alignment="CENTER_LEFT" GridPane.rowIndex="0" GridPane.columnIndex="0">
         <ChoiceBox fx:id="statusChoiceBox"/>
-        <CheckBox fx:id="autoApplyTemplateAndSaveCheckBox" text="Auto Apply Status and Save from Bottom Templates on Click"/>
+    </HBox>
+    <HBox spacing="10" alignment="CENTER_LEFT" GridPane.rowIndex="0" GridPane.columnIndex="1">
+        <CheckBox fx:id="autoApplyTemplateAndSaveCheckBox" text="Apply Template on Click for All Selected Reports and Save Automatically"/>
     </HBox>
 
     <!-- Second Row -->
-    <HBox spacing="10" alignment="CENTER_LEFT" GridPane.rowIndex="1" GridPane.columnIndex="0">
+    <HBox spacing="10" alignment="CENTER_LEFT" GridPane.rowIndex="2" GridPane.columnIndex="0" GridPane.columnSpan="2">
         <Label text="Private Note" prefWidth="80.0" alignment="CENTER"/>
-        <TextArea fx:id="privateNoteTextArea" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
-                  prefHeight="100.0" prefWidth="400.0" wrapText="true"/>
+        <TextArea fx:id="privateNoteTextArea" maxHeight="Infinity" maxWidth="Infinity" prefHeight="100.0" prefWidth="400.0" wrapText="true"/>
     </HBox>
 
     <!-- Third Row -->
-    <HBox spacing="10" alignment="CENTER_LEFT" GridPane.rowIndex="2" GridPane.columnIndex="0">
+    <HBox spacing="10" alignment="CENTER_LEFT" GridPane.rowIndex="3" GridPane.columnIndex="0" GridPane.columnSpan="2">
         <Label text="Public Note" prefWidth="80.0" alignment="CENTER"/>
-        <TextArea fx:id="publicNoteTextArea" maxHeight="1.7976931348623157E308"
-                  maxWidth="1.7976931348623157E308" prefHeight="100.0" prefWidth="400.0" wrapText="true"/>
+        <TextArea fx:id="publicNoteTextArea" maxHeight="Infinity" maxWidth="Infinity" prefHeight="100.0" prefWidth="400.0" wrapText="true"/>
     </HBox>
 
     <!-- Fourth Row (Placeholder for Dynamic Buttons) -->
-    <HBox spacing="10" alignment="CENTER_LEFT" GridPane.rowIndex="3" GridPane.columnIndex="0" GridPane.columnSpan="2">
+    <HBox spacing="10" alignment="CENTER_LEFT" GridPane.rowIndex="4" GridPane.columnIndex="0" GridPane.columnSpan="2">
         <Label text="Apply Templates" prefWidth="160.0"/>
         <VBox fx:id="dynamicButtonsContainer" spacing="10" alignment="CENTER_LEFT" />
     </HBox>
 
     <!-- Fifth Row -->
-    <HBox spacing="10" alignment="BOTTOM_CENTER" GridPane.rowIndex="4" GridPane.columnIndex="0" GridPane.columnSpan="2">
+    <HBox spacing="10" alignment="CENTER" GridPane.rowIndex="5" GridPane.columnIndex="0" GridPane.columnSpan="2">
         <Button mnemonicParsing="false" prefHeight="30" onAction="#close" text="Cancel" style="-fx-background-color: red; -fx-text-fill: white;"/>
         <Button defaultButton="true" prefHeight="30" mnemonicParsing="false" text="Save" onAction="#onSave" style="-fx-background-color: green; -fx-text-fill: white;"/>
     </HBox>
