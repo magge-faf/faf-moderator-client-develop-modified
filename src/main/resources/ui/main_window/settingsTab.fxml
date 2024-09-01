@@ -10,7 +10,17 @@
     <TextField fx:id="accountNameOrEmailTextField" promptText="Account name or email"/>
     <PasswordField fx:id="accountPasswordField" promptText="Password"/>
     <Button fx:id="saveAccountCredentialsButton" mnemonicParsing="false" onAction="#onSaveAccountButton" text="Save Account Credentials"/>
+
     <Separator prefHeight="5"/>
+    <Text style="-fx-font-size: 12pt;" text="Important: This section will be removed in the next version"/>
+    <Text style="-fx-font-size: 12pt;">The previous "txt"-credentials is being replaced by Java internal credentials management. The old file can now be safely deleted.</Text>
+    <Text style="-fx-font-size: 12pt;">Previously, account credentials were stored in the user home directory.</Text>
+    <TextField fx:id="pathAccountFile"/>
+    <Text style="-fx-font-size: 12pt;">Confirm-Box will appear that shows the file and path before anything gets deleted.</Text>
+    <Button fx:id="removeOldAccountCredentials" mnemonicParsing="false" onAction="#onRemoveOldAccountCredentials" text="Remove File"/>
+
+    <Separator prefHeight="5"/>
+
     <Text style="-fx-font-size: 14pt;">Open Blacklisted Items:</Text>
     <Button fx:id="blacklistedHashButton" mnemonicParsing="false" onAction="#onBlacklistedHash" prefWidth="100"
             text="Hash"/>

@@ -17,6 +17,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import javax.swing.*;
 import java.awt.*;
 import java.io.*;
 import java.nio.file.Files;
@@ -57,6 +58,7 @@ public class SettingsController implements Controller<Region> {
     public Button openAiPromptButton;
     public Text excludedItemsLoadedText;
     public Text accountCredentialsText;
+    public TextField pathAccountFile;
 
     private void setDefaultTab(Tab tab) {
         String tabName = tab.getId();
@@ -83,6 +85,19 @@ public class SettingsController implements Controller<Region> {
 
     @FXML
     public void initialize() throws IOException {
+        // Temporary for next version only
+        String homeDirectory = System.getProperty("user.home");
+        String filePath = homeDirectory + File.separator + "account_credentials_mordor.txt";
+        pathAccountFile.setText(filePath);
+        File fileOldAccountCredentials = new File(filePath);
+
+        if (fileOldAccountCredentials.exists()) {
+            pathAccountFile.setText(filePath);
+        } else {
+            pathAccountFile.setText("File does not exist anymore - This is good news.");
+        }
+        //
+
         String[] credentials = SettingsController.loadCredentials();
         String username = credentials[0];
 
@@ -416,5 +431,29 @@ public class SettingsController implements Controller<Region> {
         String password = prefs.get(PASSWORD_KEY, null);
 
         return new String[]{username, password};
+    }
+
+    public void onRemoveOldAccountCredentials() {
+        String homeDirectory = System.getProperty("user.home");
+        String filePath = homeDirectory + File.separator + "account_credentials_mordor.txt";
+        File file = new File(filePath);
+
+        if (file.exists()) {
+            int response = JOptionPane.showConfirmDialog(null,
+                    "Are you sure you want to delete the file:\n" + filePath,
+                    "Confirm Deletion",
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.WARNING_MESSAGE);
+
+            if (response == JOptionPane.YES_OPTION) {
+                file.delete();
+                JOptionPane.showMessageDialog(null, "File deleted successfully.");
+                pathAccountFile.setText("File does not exist anymore - This is good news.");
+            }
+        } else {
+            JOptionPane.showMessageDialog(null, "File does not exist.");
+            pathAccountFile.setText("File does not exist anymore - This is good news.");
+
+        }
     }
 }
