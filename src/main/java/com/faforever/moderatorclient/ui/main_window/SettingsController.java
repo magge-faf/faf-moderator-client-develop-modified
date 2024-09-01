@@ -176,7 +176,7 @@ public class SettingsController implements Controller<Region> {
                 "Offensive Game Titles",
                 "Leaving on Own Terms/Game Ruining",
                 "Abuse of Exploits",
-                "Bad/Illegal Username - Your login name was changed to NEW_USERNAME"
+                "Bad/Illegal Username"
               ]
             }""";
 
