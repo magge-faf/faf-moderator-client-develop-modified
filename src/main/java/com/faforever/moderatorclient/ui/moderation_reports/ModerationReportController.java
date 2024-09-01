@@ -453,10 +453,11 @@ public class ModerationReportController implements Controller<Region> {
         PlayerFX playerFX = new PlayerFX();
         GameFX gameFX = new GameFX();
 
-        playerFX.setLogin("TemporaryTestUser");
+        playerFX.setLogin("");
         fakeReport.setReporter(playerFX);
         gameFX.setId(replayID);
         fakeReport.setGame(gameFX);
+        currentlySelectedItemNotNull = fakeReport;
 
         showChatLog(fakeReport);
     }
