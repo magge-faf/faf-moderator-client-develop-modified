@@ -878,8 +878,10 @@ public class ModerationReportController implements Controller<Region> {
         createNewApiRequestThread(1, true);
     }
 
-    private final AtomicInteger totalReportsLoaded = new AtomicInteger(0);
-    private final List<Integer> reportsLoadedPerThread = Collections.synchronizedList(new ArrayList<>());
+    @Getter
+    @Setter
+    private AtomicInteger totalReportsLoaded = new AtomicInteger(0);
+    @Getter
     private final AtomicInteger activeApiRequests = new AtomicInteger(0);
 
     private void createNewApiRequestThread(int x, boolean recursive) {
@@ -891,7 +893,15 @@ public class ModerationReportController implements Controller<Region> {
             @Override
             protected Void call() {
                 moderationReportService.getPageOfReports(x, pageSize).thenAccept(reportFxes -> {
-                    Platform.runLater(() -> reportFxes.forEach(report -> itemMap.put(Integer.valueOf(report.getId()), report)));
+                    Platform.runLater(() -> {
+                        reportFxes.forEach(report -> {
+                            itemMap.put(Integer.valueOf(report.getId()), report);
+                        });
+
+                        int loadedCount = reportFxes.size();
+                        totalReportsLoaded.addAndGet(loadedCount);
+                        log.debug("Loaded {} reports in this thread. Total loaded: {}", loadedCount, totalReportsLoaded.get());
+                    });
 
                     if (reportFxes.size() == pageSize || x < 2) {
                         if (recursive) {
@@ -902,9 +912,7 @@ public class ModerationReportController implements Controller<Region> {
                         }
                     } else {
                         isLoading = false;
-                        int totalReports = reportsLoadedPerThread.stream().mapToInt(Integer::intValue).sum();
-                        totalReportsLoaded.set(totalReports);
-                        log.debug("Loaded Reports: {}", totalReportsLoaded.get());
+                        log.debug("Loading complete. Total Reports Loaded: {}", totalReportsLoaded.get());
 
                         processStatisticsModerator(itemList);
                         showInTableRepeatedOffenders(itemList);

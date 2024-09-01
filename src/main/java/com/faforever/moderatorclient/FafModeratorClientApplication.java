@@ -8,12 +8,16 @@ import com.faforever.moderatorclient.ui.StageHolder;
 import com.faforever.moderatorclient.ui.UiService;
 import com.faforever.moderatorclient.ui.main_window.SettingsController;
 import com.faforever.moderatorclient.ui.main_window.UserManagementController;
+import com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
@@ -24,7 +28,9 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import java.io.IOException;
 import java.util.Objects;
-import java.util.concurrent.TimeUnit;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Configuration
 @EnableConfigurationProperties(ApplicationProperties.class)
@@ -33,10 +39,17 @@ import java.util.concurrent.TimeUnit;
 
 public class FafModeratorClientApplication extends Application {
 
+    @Bean
+    public PlatformService platformService() {
+        return new PlatformServiceImpl(getHostServices());
+    }
+
     private ConfigurableApplicationContext applicationContext;
 
     @Autowired
     private UserManagementController userManagementController;
+    @Autowired
+    private ModerationReportController moderationReportController;
 
     public static void applicationMain(String[] args) {
         Application.launch(FafModeratorClientApplication.class, args);
@@ -82,41 +95,71 @@ public class FafModeratorClientApplication extends Application {
         startTimerThread(primaryStage);
     }
 
-    private void waitSecond() {
-        try {
-            Thread.sleep(1000);
-        } catch (InterruptedException e) {
-            log.error(e.getMessage());
+    private void startTimerThread(Stage primaryStage) {
+        long startTime = System.currentTimeMillis();
+        Timer timer = new Timer(true);
+        TimerTask task = new TimerTask() {
+            @Override
+            public void run() {
+                Platform.runLater(() -> updateWindowTitle(primaryStage, startTime));
+            }
+        };
+        timer.scheduleAtFixedRate(task, 0, 1000);
+    }
+
+    private Timeline timeline;
+    private Stage primaryStage;
+    private long startTime;
+
+    public void updateWindowTitle(Stage primaryStage, long startTime) {
+        this.primaryStage = primaryStage;
+        this.startTime = startTime;
+
+        AtomicInteger activeRequests = moderationReportController.getActiveApiRequests();
+        boolean hasActiveRequests = activeRequests.get() > 0;
+
+        if (hasActiveRequests) {
+            startFetchingPattern();
+        } else {
+            stopFetchingPattern();
+            updateTitle();
         }
     }
 
-    private void startTimerThread(Stage primaryStage) {
+    private void startFetchingPattern() {
+        if (timeline != null && timeline.getStatus() == Timeline.Status.RUNNING) {
+            return;
+        }
 
-        long startTime = System.currentTimeMillis();
-        Thread timerThread = new Thread(() -> {
-            while (true) {
+        timeline = new Timeline(new KeyFrame(Duration.seconds(1), event -> {
+            long elapsedTimeMillis = System.currentTimeMillis() - startTime;
+            long elapsedTimeSeconds = elapsedTimeMillis / 1000;
+            long minutes = elapsedTimeSeconds / 60;
+            long seconds = elapsedTimeSeconds % 60;
+            String elapsedTimeStr = String.format("%02d:%02d", minutes, seconds);
 
-                long elapsedTime = (System.currentTimeMillis() - startTime) / 1000;
-                long minutes = TimeUnit.SECONDS.toMinutes(elapsedTime) % 60;
-                long seconds = TimeUnit.SECONDS.toSeconds(elapsedTime) % 60;
-                String elapsedTimeStr = String.format("%02d:%02d:%02d", TimeUnit.SECONDS.toHours(elapsedTime),
-                        TimeUnit.SECONDS.toMinutes(elapsedTime) % TimeUnit.HOURS.toMinutes(1),
-                        TimeUnit.SECONDS.toSeconds(elapsedTime) % TimeUnit.MINUTES.toSeconds(1));
-                Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr));
-                if (minutes == 4 && seconds >= 14 && seconds <= 20) {
-                    String[] emoticons = {" (o︵o )"," (o︵o)"," ( o︵o)", " ( o︵o)/", " ( o︵o)y─", " ( o︵o)y─\uD83D\uDD25", " ( *‿*)y─┛~"};
-                    int index = (int) (seconds - 14) % emoticons.length;
-                    String emoticon = emoticons[index];
-                    Platform.runLater(() -> primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr + " " + emoticon));
-                }
-                waitSecond();
-            }
-        });
-        timerThread.start();
+            primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr + " - Fetching Reports (" + moderationReportController.getTotalReportsLoaded() + ")");
+        }));
+
+        timeline.setCycleCount(Timeline.INDEFINITE);
+        timeline.play();
     }
 
-    @Bean
-    public PlatformService platformService() {
-        return new PlatformServiceImpl(getHostServices());
+    private void stopFetchingPattern() {
+        if (timeline != null) {
+            timeline.stop();
+            timeline = null;
+            moderationReportController.setTotalReportsLoaded(new AtomicInteger(0));
+        }
+    }
+
+    private void updateTitle() {
+        long elapsedTimeMillis = System.currentTimeMillis() - startTime;
+        long elapsedTimeSeconds = elapsedTimeMillis / 1000;
+        long minutes = elapsedTimeSeconds / 60;
+        long seconds = elapsedTimeSeconds % 60;
+        String elapsedTimeStr = String.format("%02d:%02d", minutes, seconds);
+
+        primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr);
     }
 }
