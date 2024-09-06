@@ -16,6 +16,7 @@
 <?import javafx.scene.text.Text?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
+<?import javafx.scene.control.ScrollPane?>
 
 <SplitPane xmlns="http://javafx.com/javafx/8.0.171"
            xmlns:fx="http://javafx.com/fxml/1"
@@ -183,11 +184,14 @@
         </Tab>
 
         <Tab fx:id="settingsSmurfVillageLookupTab" text="Settings Smurf Village Lookup">
+            <ScrollPane fitToWidth="true">
             <VBox spacing="5">
                 <Separator/>
                 <Text style="-fx-font-size: 12pt;">Start with UUID and Hash, add further CheckBoxes as needed.</Text>
+                <HBox spacing="5">
                 <CheckBox fx:id="includeUUIDCheckBox" text="Include UUID"/>
                 <CheckBox fx:id="includeUIDHashCheckBox" text="Include Hash"/>
+                </HBox>
                 <Separator/>
                 <Label text="Advanced Settings: Only include the following if you believe user does hardware spoofing."/>
                 <Label text="May generate excessive text noise, especially if excludedItems.txt is outdated and 'No Tracing' is disabled:"/>
@@ -230,6 +234,7 @@
                            editable="false"/>
                 <CheckBox fx:id="excludeItemsCheckBox" text="Exclude junk/malformed items (see Settings)" disable="true"/>
             </VBox>
+            </ScrollPane>
         </Tab>
     </TabPane>
 </SplitPane>

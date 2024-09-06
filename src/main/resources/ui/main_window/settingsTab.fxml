@@ -3,59 +3,66 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.*?>
+<?import javafx.scene.control.ScrollPane?>
+
 <VBox fx:id="root" spacing="5" style="-fx-padding: 10px;" xmlns="http://javafx.com/javafx/20.0.1"
       xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.faforever.moderatorclient.ui.main_window.SettingsController">
-    <Text fx:id="accountCredentialsText" style="-fx-font-size: 14pt;">Account Credentials:</Text>
-    <TextField fx:id="accountNameOrEmailTextField" promptText="Account name or email"/>
-    <PasswordField fx:id="accountPasswordField" promptText="Password"/>
-    <Button fx:id="saveAccountCredentialsButton" mnemonicParsing="false" onAction="#onSaveAccountButton" text="Save Account Credentials"/>
 
-    <Separator prefHeight="5"/>
-    <Text style="-fx-font-size: 12pt;" text="Important: This section will be removed in the next version"/>
-    <Text style="-fx-font-size: 12pt;">The previous "txt"-credentials is being replaced by Java internal credentials management. The old file can now be safely deleted.</Text>
-    <Text style="-fx-font-size: 12pt;">Previously, account credentials were stored in the user home directory.</Text>
-    <TextField fx:id="pathAccountFile"/>
-    <Text style="-fx-font-size: 12pt;">Confirm-Box will appear that shows the file and path before anything gets deleted.</Text>
-    <Button fx:id="removeOldAccountCredentials" mnemonicParsing="false" onAction="#onRemoveOldAccountCredentials" text="Remove File"/>
+    <ScrollPane fitToWidth="true">
+        <VBox spacing="5">
+            <Text fx:id="accountCredentialsText" style="-fx-font-size: 14pt;">Account Credentials:</Text>
+            <TextField fx:id="accountNameOrEmailTextField" promptText="Account name or email"/>
+            <PasswordField fx:id="accountPasswordField" promptText="Password"/>
+            <Button fx:id="saveAccountCredentialsButton" mnemonicParsing="false" onAction="#onSaveAccountButton" text="Save Account Credentials"/>
 
-    <Separator prefHeight="5"/>
+            <Separator prefHeight="5"/>
+            <Text style="-fx-font-size: 12pt;" text="Important: This section will be removed in the next version"/>
+            <Text style="-fx-font-size: 12pt;">The previous "txt"-credentials is being replaced by Java internal credentials management. The old file can now be safely deleted.</Text>
+            <Text style="-fx-font-size: 12pt;">Previously, account credentials were stored in the user home directory.</Text>
+            <TextField fx:id="pathAccountFile"/>
+            <Text style="-fx-font-size: 12pt;">Confirm-Box will appear that shows the file and path before anything gets deleted.</Text>
+            <Button fx:id="removeOldAccountCredentials" mnemonicParsing="false" onAction="#onRemoveOldAccountCredentials" text="Remove File"/>
 
-    <Text style="-fx-font-size: 14pt;">Open Blacklisted Items:</Text>
-    <Button fx:id="blacklistedHashButton" mnemonicParsing="false" onAction="#onBlacklistedHash" prefWidth="100"
-            text="Hash"/>
-    <Button fx:id="blacklistedIPButton" mnemonicParsing="false" onAction="#onBlacklistedIP" prefWidth="100"
-            text="IP"/>
-    <Button fx:id="blacklistedMemorySNButton" mnemonicParsing="false" onAction="#onBlacklistedMemorySN"
-            prefWidth="100" text="MemorySN"/>
-    <Button fx:id="blacklistedSNButton" mnemonicParsing="false" onAction="#onBlacklistedSN" prefWidth="100"
-            text="SN"/>
-    <Button fx:id="blacklistedUUIDButton" mnemonicParsing="false" onAction="#onBlacklistedUUID" prefWidth="100"
-            text="UUID"/>
-    <Button fx:id="blacklistedVolumeSNButton" mnemonicParsing="false" onAction="#onBlacklistedVolumeSN"
-            prefWidth="100" text="VolumeSN"/>
-    <Separator prefHeight="5"/>
-    <Text fx:id="excludedItemsLoadedText" style="-fx-font-size: 14pt;">Excluded Items Loaded:</Text>
-    <Button fx:id="excludedItemsButton" mnemonicParsing="false" onAction="#onExcludedItems" prefWidth="70"
-            text="Excluded"/>
-    <Text text="IMPORTANT: Check link for latest ExcludedItems.txt" textAlignment="CENTER"/>
-    <TextField fx:id="genericJunkButton" minWidth="200"
-               text="https://faforever.zulipchat.com/#narrow/stream/203851-moderators/topic/AntiSmurfForce.20-.20ExcludedItems"/>
-    <Separator prefHeight="5"/>
-    <Text style="-fx-font-size: 14pt;" text="Templates" textAlignment="CENTER"/>
-    <Button fx:id="templatesAndReasonsReportButton" mnemonicParsing="false" onAction="#templatesAndReasonsReportButton"
-            prefWidth="300" text="View Templates for FAF Forum and Ban Reasons"/>
-    <Button fx:id="templatesFinishReportsButton" mnemonicParsing="false" onAction="#templatesFinishReportsButton"
-            prefWidth="300" text="View Templates to 'edit' reports"/>
-    <Separator prefHeight="5"/>
-    <Text style="-fx-font-size: 14pt;" text="Starting Tab" textAlignment="CENTER"/>
-    <MenuBar xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml">
-        <Menu fx:id="defaultStartingTabMenuBar" text="Choose Starting Tab:"/>
-    </MenuBar>
-    <Separator minHeight="5"/>
-    <Text style="-fx-font-size: 14pt;" text="Misc"/>
-    <Button fx:id="openConfigurationFolderButton" mnemonicParsing="false" onAction="#onOpenConfigurationFolder"
-            text="Open Configuration Folder"/>
-    <Button fx:id="openAiPromptButton" mnemonicParsing="false" onAction="#onOpenAiPromptButton"
-            text="View AI Prompt"/>
+            <Separator prefHeight="5"/>
+
+            <Text style="-fx-font-size: 14pt;">Open Blacklisted Items:</Text>
+            <Button fx:id="blacklistedHashButton" mnemonicParsing="false" onAction="#onBlacklistedHash" prefWidth="100"
+                    text="Hash"/>
+            <Button fx:id="blacklistedIPButton" mnemonicParsing="false" onAction="#onBlacklistedIP" prefWidth="100"
+                    text="IP"/>
+            <Button fx:id="blacklistedMemorySNButton" mnemonicParsing="false" onAction="#onBlacklistedMemorySN"
+                    prefWidth="100" text="MemorySN"/>
+            <Button fx:id="blacklistedSNButton" mnemonicParsing="false" onAction="#onBlacklistedSN" prefWidth="100"
+                    text="SN"/>
+            <Button fx:id="blacklistedUUIDButton" mnemonicParsing="false" onAction="#onBlacklistedUUID" prefWidth="100"
+                    text="UUID"/>
+            <Button fx:id="blacklistedVolumeSNButton" mnemonicParsing="false" onAction="#onBlacklistedVolumeSN"
+                    prefWidth="100" text="VolumeSN"/>
+            <Separator prefHeight="5"/>
+            <Text fx:id="excludedItemsLoadedText" style="-fx-font-size: 14pt;">Excluded Items Loaded:</Text>
+            <Button fx:id="excludedItemsButton" mnemonicParsing="false" onAction="#onExcludedItems" prefWidth="70"
+                    text="Excluded"/>
+            <Text text="IMPORTANT: Check link for latest ExcludedItems.txt" textAlignment="CENTER"/>
+            <TextField fx:id="genericJunkButton" minWidth="200"
+                       text="https://faforever.zulipchat.com/#narrow/stream/203851-moderators/topic/AntiSmurfForce.20-.20ExcludedItems"/>
+            <Separator prefHeight="5"/>
+            <Text style="-fx-font-size: 14pt;" text="Templates" textAlignment="CENTER"/>
+            <Button fx:id="templatesAndReasonsReportButton" mnemonicParsing="false" onAction="#templatesAndReasonsReportButton"
+                    prefWidth="300" text="View Templates for FAF Forum and Ban Reasons"/>
+            <Button fx:id="templatesFinishReportsButton" mnemonicParsing="false" onAction="#templatesFinishReportsButton"
+                    prefWidth="300" text="View Templates to 'edit' reports"/>
+            <Separator prefHeight="5"/>
+            <Text style="-fx-font-size: 14pt;" text="Starting Tab" textAlignment="CENTER"/>
+            <MenuBar xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml">
+                <Menu fx:id="defaultStartingTabMenuBar" text="Choose Starting Tab:"/>
+            </MenuBar>
+            <Separator minHeight="5"/>
+            <Text style="-fx-font-size: 14pt;" text="Misc"/>
+            <Button fx:id="openConfigurationFolderButton" mnemonicParsing="false" onAction="#onOpenConfigurationFolder"
+                    text="Open Configuration Folder"/>
+            <Button fx:id="openAiPromptButton" mnemonicParsing="false" onAction="#onOpenAiPromptButton"
+                    text="View AI Prompt"/>
+        </VBox>
+    </ScrollPane>
 </VBox>
