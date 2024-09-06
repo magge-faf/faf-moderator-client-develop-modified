@@ -13,8 +13,8 @@ import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
-import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
+import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
@@ -44,6 +44,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
 
@@ -61,6 +62,8 @@ public class UserManagementController implements Controller<SplitPane> {
     public TextField amountTextFieldRecentAccountsForSmurfsAmount;
     public Text amountAccountsText;
     public CheckBox catchFirstLayerSmurfsOnlyCheckBox;
+    public TextField playerIDField1SharedGamesTextfield;
+    public TextField playerIDField2SharedGamesTextfield;
     @FXML
     private Button checkRecentAccountsForSmurfsPauseButton;
 
@@ -236,7 +239,11 @@ public class UserManagementController implements Controller<SplitPane> {
         takeAvatarButton.disableProperty().bind(userAvatarsTableView.getSelectionModel().selectedItemProperty().isNull());
         removeGroupButton.disableProperty().bind(userGroupsTableView.getSelectionModel().selectedItemProperty().isNull());
 
-        userSearchTableView.getSelectionModel().selectedItemProperty().addListener(this::onSelectedUser);
+        //userSearchTableView.getSelectionModel().selectedItemProperty().addListener(this::onSelectedUser);
+        userSearchTableView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        userSearchTableView.getSelectionModel().getSelectedItems().addListener((ListChangeListener<PlayerFX>) change -> {
+            onSelectedUser();
+        });
         editBanButton.disableProperty().bind(userBansTableView.getSelectionModel().selectedItemProperty().isNull());
 
         initializeSearchProperties();
@@ -271,7 +278,8 @@ public class UserManagementController implements Controller<SplitPane> {
         currentSelectedAvatar.setValue(avatarFX);
     }
 
-    private void onSelectedUser(ObservableValue<? extends PlayerFX> observable, PlayerFX oldValue, PlayerFX newValue) {
+    private void onSelectedUser() {
+        // Clear previous data
         nameRecords.clear();
         userNameHistoryTableView.getSortOrder().clear();
         bans.clear();
@@ -292,32 +300,39 @@ public class UserManagementController implements Controller<SplitPane> {
         userGroups.clear();
         userGroupsTableView.getSortOrder().clear();
 
-        if (newValue != null) {
-            teamkills.addAll(userService.findTeamkillsByUserId(newValue.getId()));
-            userNotes.addAll(userService.getUserNotes(newValue.getId()));
-            nameRecords.addAll(newValue.getNames());
-            bans.addAll(newValue.getBans());
-            avatarAssignments.addAll(newValue.getAvatarAssignments());
-            if (!userGroupsTab.isDisable()) {
-                permissionService.getPlayersUserGroups(newValue).thenAccept(playerGroups -> {
-                    userGroups.addAll(playerGroups);
-                    groupPermissions.addAll(playerGroups.stream().flatMap(userGroupFX -> userGroupFX.getPermissions().stream()).distinct().toList());
-                });
+        ObservableList<PlayerFX> selectedUsers = userSearchTableView.getSelectionModel().getSelectedItems();
+
+        if (selectedUsers != null && !selectedUsers.isEmpty()) {
+            for (PlayerFX user : selectedUsers) {
+                teamkills.addAll(userService.findTeamkillsByUserId(user.getId()));
+                userNotes.addAll(userService.getUserNotes(user.getId()));
+                nameRecords.addAll(user.getNames());
+                bans.addAll(user.getBans());
+                avatarAssignments.addAll(user.getAvatarAssignments());
+
+                if (!userGroupsTab.isDisable()) {
+                    permissionService.getPlayersUserGroups(user).thenAccept(playerGroups -> {
+                        userGroups.addAll(playerGroups);
+                        groupPermissions.addAll(playerGroups.stream()
+                                .flatMap(userGroupFX -> userGroupFX.getPermissions().stream())
+                                .distinct().toList());
+                    });
+                }
+
+                userGamesPage = 1;
+                int numberOfPagesToLoad = 50; // TODO Customize value in settingsTab
+
+                for (int i = 0; i < numberOfPagesToLoad; i++) {
+                    final int currentPage = userGamesPage + i;
+                    loadMoreGamesRunnable = () -> CompletableFuture.supplyAsync(() ->
+                                    gamePlayerStatsMapper.map(userService.getLastHundredPlayedGamesByFeaturedMod(user.getId(), currentPage, featuredModFilterChoiceBox.getSelectionModel().getSelectedItem())))
+                            .thenAccept(gamePlayerStats -> Platform.runLater(() -> userLastGamesTable.getItems().addAll(gamePlayerStats)));
+                    loadMoreGamesRunnable.run();
+                }
             }
-
-            userGamesPage = 1; // Reset userGamesPage to start from the first page
-            int numberOfPagesToLoad = 10; // Load 10 more pages TODO Customize value in settingsTab
-
-            for (int i = 0; i < numberOfPagesToLoad; i++) {
-                final int currentPage = userGamesPage + i;
-                loadMoreGamesRunnable = () -> CompletableFuture.supplyAsync(() -> gamePlayerStatsMapper.map(userService.getLastHundredPlayedGamesByFeaturedMod(newValue.getId(), currentPage, featuredModFilterChoiceBox.getSelectionModel().getSelectedItem())))
-                        .thenAccept(gamePlayerStats -> Platform.runLater(() -> userLastGamesTable.getItems().addAll(gamePlayerStats)));
-                loadMoreGamesRunnable.run();
-            }
-
         }
 
-        newBanButton.setDisable(newValue == null);
+        newBanButton.setDisable(selectedUsers == null || selectedUsers.isEmpty());
     }
 
     public void onUserSearch() {
@@ -1167,5 +1182,67 @@ public class UserManagementController implements Controller<SplitPane> {
             userSearchTextField.setText(previousUserSearchTerm);
             onUserSearch();
         }
+    }
+
+    public void onCheckSharedGames() {
+        String playerID1 = playerIDField1SharedGamesTextfield.getText();
+        String playerID2 = playerIDField2SharedGamesTextfield.getText();
+
+        userGamesPage = 1;
+        int numberOfPagesToLoad = 50;
+
+        List<GamePlayerStatsFX> allPlayer1Games = Collections.synchronizedList(new ArrayList<>());
+        List<GamePlayerStatsFX> allPlayer2Games = Collections.synchronizedList(new ArrayList<>());
+
+        CompletableFuture<Void> allOf = CompletableFuture.allOf();
+
+        for (int i = 0; i < numberOfPagesToLoad; i++) {
+            final int currentPage = userGamesPage + i;
+
+            CompletableFuture<List<GamePlayerStatsFX>> player1GamesFuture = CompletableFuture.supplyAsync(() ->
+                    gamePlayerStatsMapper.map(userService.getLastHundredPlayedGamesByFeaturedMod(playerID1, currentPage, featuredModFilterChoiceBox.getSelectionModel().getSelectedItem())));
+            CompletableFuture<List<GamePlayerStatsFX>> player2GamesFuture = CompletableFuture.supplyAsync(() ->
+                    gamePlayerStatsMapper.map(userService.getLastHundredPlayedGamesByFeaturedMod(playerID2, currentPage, featuredModFilterChoiceBox.getSelectionModel().getSelectedItem())));
+
+            allOf = allOf.thenCombine(CompletableFuture.allOf(player1GamesFuture, player2GamesFuture), (v, ignored) -> {
+                try {
+                    List<GamePlayerStatsFX> player1Games = player1GamesFuture.get();
+                    List<GamePlayerStatsFX> player2Games = player2GamesFuture.get();
+
+                    allPlayer1Games.addAll(player1Games);
+                    allPlayer2Games.addAll(player2Games);
+                } catch (InterruptedException | ExecutionException e) {
+                    log.warn(String.valueOf(e));
+                }
+                return null;
+            });
+        }
+
+        allOf.thenRun(() -> {
+            Set<GameFX> player1Games = allPlayer1Games.stream()
+                    .map(GamePlayerStatsFX::getGame)
+                    .collect(Collectors.toSet());
+
+            Set<GameFX> player2Games = allPlayer2Games.stream()
+                    .map(GamePlayerStatsFX::getGame)
+                    .collect(Collectors.toSet());
+
+            Set<GameFX> commonGames = new HashSet<>(player1Games);
+            commonGames.retainAll(player2Games);
+
+            Set<GamePlayerStatsFX> commonGameStats = allPlayer1Games.stream()
+                    .filter(stats -> commonGames.contains(stats.getGame()))
+                    .collect(Collectors.toSet());
+
+            Platform.runLater(() -> {
+                userLastGamesTable.getItems().clear();
+
+                if (!commonGameStats.isEmpty()) {
+                    userLastGamesTable.getItems().setAll(commonGameStats);
+                } else {
+                    log.info("No common games found.");
+                }
+            });
+        }).join();
     }
 }

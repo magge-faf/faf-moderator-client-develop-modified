@@ -137,11 +137,16 @@
                     <VBox.margin>
                         <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
                     </VBox.margin>
-                    <Label text="Show featured Mods:" maxWidth="Infinity" maxHeight="Infinity"/>
+                    <Label maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" text="Show featured Mods:"/>
                     <ChoiceBox fx:id="featuredModFilterChoiceBox" minWidth="150.0"/>
-                    <Button fx:id="loadMoreGamesButton" text="Load more" onAction="#loadMoreGames"/>
+                    <Label text="Check for Shared Games between" alignment="CENTER"/>
+                    <TextField fx:id="playerIDField1SharedGamesTextfield" minWidth="100.0" promptText="PlayerID"/>
+                    <Label text="and" alignment="CENTER"/>
+                    <TextField fx:id="playerIDField2SharedGamesTextfield" minWidth="100.0" promptText="PlayerID"/>
+                    <Button fx:id="checkSharedGamesButton" text="Check" onAction="#onCheckSharedGames" mnemonicParsing="false"/>
+                    <Button fx:id="loadMoreGamesButton" onAction="#loadMoreGames" text="Load more"/>
                 </HBox>
-                <TableView fx:id="userLastGamesTable" maxWidth="Infinity" maxHeight="Infinity" VBox.vgrow="ALWAYS"/>
+                <TableView fx:id="userLastGamesTable" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" VBox.vgrow="ALWAYS"/>
             </VBox>
         </Tab>
         <Tab fx:id="avatarsTab" text="Avatars">
