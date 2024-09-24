@@ -103,42 +103,44 @@
             </TableView>
         </Tab>
         <Tab text="Moderator Statistics">
-            <TextArea fx:id="moderatorStatisticsTextArea" editable="false" prefHeight="30" maxHeight="30" minHeight="30"/>
-            <TableView fx:id="moderatorStatisticsTableView" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
-                       HBox.hgrow="ALWAYS">
-                <columns>
-                    <TableColumn text="Moderator" minWidth="200">
-                        <cellValueFactory>
-                            <PropertyValueFactory property="moderator"/>
-                        </cellValueFactory>
-                    </TableColumn>
-                    <TableColumn text="All reports" minWidth="100">
-                        <cellValueFactory>
-                            <PropertyValueFactory property="allReports"/>
-                        </cellValueFactory>
-                    </TableColumn>
-                    <TableColumn text="Completed reports" minWidth="100">
-                        <cellValueFactory>
-                            <PropertyValueFactory property="completedReports"/>
-                        </cellValueFactory>
-                    </TableColumn>
-                    <TableColumn text="Discarded reports" minWidth="100">
-                        <cellValueFactory>
-                            <PropertyValueFactory property="discardedReports"/>
-                        </cellValueFactory>
-                    </TableColumn>
-                    <TableColumn text="Processing reports" minWidth="100">
-                        <cellValueFactory>
-                            <PropertyValueFactory property="processingReports"/>
-                        </cellValueFactory>
-                    </TableColumn>
-                    <TableColumn text="Last activity" minWidth="200">
-                        <cellValueFactory>
-                            <PropertyValueFactory property="lastActivity"/>
-                        </cellValueFactory>
-                    </TableColumn>
-                </columns>
-            </TableView>
+            <VBox>
+                <TextArea fx:id="moderatorStatisticsTextArea" editable="false" prefHeight="30" maxHeight="30" minHeight="30" prefRowCount="1"/>
+                <TableView fx:id="moderatorStatisticsTableView" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
+                           VBox.vgrow="ALWAYS">
+                    <columns>
+                        <TableColumn text="Moderator" minWidth="200">
+                            <cellValueFactory>
+                                <PropertyValueFactory property="moderator"/>
+                            </cellValueFactory>
+                        </TableColumn>
+                        <TableColumn text="All reports" minWidth="100">
+                            <cellValueFactory>
+                                <PropertyValueFactory property="allReports"/>
+                            </cellValueFactory>
+                        </TableColumn>
+                        <TableColumn text="Completed reports" minWidth="100">
+                            <cellValueFactory>
+                                <PropertyValueFactory property="completedReports"/>
+                            </cellValueFactory>
+                        </TableColumn>
+                        <TableColumn text="Discarded reports" minWidth="100">
+                            <cellValueFactory>
+                                <PropertyValueFactory property="discardedReports"/>
+                            </cellValueFactory>
+                        </TableColumn>
+                        <TableColumn text="Processing reports" minWidth="100">
+                            <cellValueFactory>
+                                <PropertyValueFactory property="processingReports"/>
+                            </cellValueFactory>
+                        </TableColumn>
+                        <TableColumn text="Last activity" minWidth="200">
+                            <cellValueFactory>
+                                <PropertyValueFactory property="lastActivity"/>
+                            </cellValueFactory>
+                        </TableColumn>
+                    </columns>
+                </TableView>
+            </VBox>
         </Tab>
         <Tab text="Settings Moderator Events">
             <VBox spacing="10">
