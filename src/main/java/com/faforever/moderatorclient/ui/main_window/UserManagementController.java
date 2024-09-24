@@ -64,6 +64,7 @@ public class UserManagementController implements Controller<SplitPane> {
     public CheckBox catchFirstLayerSmurfsOnlyCheckBox;
     public TextField playerIDField1SharedGamesTextfield;
     public TextField playerIDField2SharedGamesTextfield;
+    public Button checkSharedGamesButton;
     @FXML
     private Button checkRecentAccountsForSmurfsPauseButton;
 
@@ -1184,65 +1185,84 @@ public class UserManagementController implements Controller<SplitPane> {
         }
     }
 
+    private boolean isValidPlayerId(String playerId) {
+        if (playerId == null || playerId.isEmpty()) {
+            return false;
+        }
+        try {
+            Integer.parseInt(playerId);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
     public void onCheckSharedGames() {
         String playerID1 = playerIDField1SharedGamesTextfield.getText();
         String playerID2 = playerIDField2SharedGamesTextfield.getText();
 
-        userGamesPage = 1;
-        int numberOfPagesToLoad = 50;
+        if (isValidPlayerId(playerID1) && isValidPlayerId(playerID2)) {
+            userGamesPage = 1;
+            int numberOfPagesToLoad = 50;
 
-        List<GamePlayerStatsFX> allPlayer1Games = Collections.synchronizedList(new ArrayList<>());
-        List<GamePlayerStatsFX> allPlayer2Games = Collections.synchronizedList(new ArrayList<>());
+            List<GamePlayerStatsFX> allPlayer1Games = Collections.synchronizedList(new ArrayList<>());
+            List<GamePlayerStatsFX> allPlayer2Games = Collections.synchronizedList(new ArrayList<>());
 
-        CompletableFuture<Void> allOf = CompletableFuture.allOf();
+            CompletableFuture<Void> allOf = CompletableFuture.allOf();
 
-        for (int i = 0; i < numberOfPagesToLoad; i++) {
-            final int currentPage = userGamesPage + i;
+            for (int i = 0; i < numberOfPagesToLoad; i++) {
+                final int currentPage = userGamesPage + i;
 
-            CompletableFuture<List<GamePlayerStatsFX>> player1GamesFuture = CompletableFuture.supplyAsync(() ->
-                    gamePlayerStatsMapper.map(userService.getLastHundredPlayedGamesByFeaturedMod(playerID1, currentPage, featuredModFilterChoiceBox.getSelectionModel().getSelectedItem())));
-            CompletableFuture<List<GamePlayerStatsFX>> player2GamesFuture = CompletableFuture.supplyAsync(() ->
-                    gamePlayerStatsMapper.map(userService.getLastHundredPlayedGamesByFeaturedMod(playerID2, currentPage, featuredModFilterChoiceBox.getSelectionModel().getSelectedItem())));
+                CompletableFuture<List<GamePlayerStatsFX>> player1GamesFuture = CompletableFuture.supplyAsync(() ->
+                        gamePlayerStatsMapper.map(userService.getLastHundredPlayedGamesByFeaturedMod(playerID1, currentPage, featuredModFilterChoiceBox.getSelectionModel().getSelectedItem())));
+                CompletableFuture<List<GamePlayerStatsFX>> player2GamesFuture = CompletableFuture.supplyAsync(() ->
+                        gamePlayerStatsMapper.map(userService.getLastHundredPlayedGamesByFeaturedMod(playerID2, currentPage, featuredModFilterChoiceBox.getSelectionModel().getSelectedItem())));
 
-            allOf = allOf.thenCombine(CompletableFuture.allOf(player1GamesFuture, player2GamesFuture), (v, ignored) -> {
-                try {
-                    List<GamePlayerStatsFX> player1Games = player1GamesFuture.get();
-                    List<GamePlayerStatsFX> player2Games = player2GamesFuture.get();
+                allOf = allOf.thenCombine(CompletableFuture.allOf(player1GamesFuture, player2GamesFuture), (v, ignored) -> {
+                    try {
+                        List<GamePlayerStatsFX> player1Games = player1GamesFuture.get();
+                        List<GamePlayerStatsFX> player2Games = player2GamesFuture.get();
 
-                    allPlayer1Games.addAll(player1Games);
-                    allPlayer2Games.addAll(player2Games);
-                } catch (InterruptedException | ExecutionException e) {
-                    log.warn(String.valueOf(e));
-                }
-                return null;
-            });
+                        allPlayer1Games.addAll(player1Games);
+                        allPlayer2Games.addAll(player2Games);
+                    } catch (InterruptedException | ExecutionException e) {
+                        log.warn(String.valueOf(e));
+                    }
+                    return null;
+                });
+            }
+
+            allOf.thenRun(() -> {
+                Set<GameFX> player1Games = allPlayer1Games.stream()
+                        .map(GamePlayerStatsFX::getGame)
+                        .collect(Collectors.toSet());
+
+                Set<GameFX> player2Games = allPlayer2Games.stream()
+                        .map(GamePlayerStatsFX::getGame)
+                        .collect(Collectors.toSet());
+
+                Set<GameFX> commonGames = new HashSet<>(player1Games);
+                commonGames.retainAll(player2Games);
+
+                Set<GamePlayerStatsFX> commonGameStats = allPlayer1Games.stream()
+                        .filter(stats -> commonGames.contains(stats.getGame()))
+                        .collect(Collectors.toSet());
+
+                Platform.runLater(() -> {
+                    userLastGamesTable.getItems().clear();
+
+                    if (!commonGameStats.isEmpty()) {
+                        userLastGamesTable.getItems().setAll(commonGameStats);
+                    } else {
+                        log.info("No common games found.");
+                        checkSharedGamesButton.setText("Check");
+                    }
+                });
+            }).join();
+
+        } else {
+            checkSharedGamesButton.setText("Check - Error Fix Invalid player IDs.");
         }
-
-        allOf.thenRun(() -> {
-            Set<GameFX> player1Games = allPlayer1Games.stream()
-                    .map(GamePlayerStatsFX::getGame)
-                    .collect(Collectors.toSet());
-
-            Set<GameFX> player2Games = allPlayer2Games.stream()
-                    .map(GamePlayerStatsFX::getGame)
-                    .collect(Collectors.toSet());
-
-            Set<GameFX> commonGames = new HashSet<>(player1Games);
-            commonGames.retainAll(player2Games);
-
-            Set<GamePlayerStatsFX> commonGameStats = allPlayer1Games.stream()
-                    .filter(stats -> commonGames.contains(stats.getGame()))
-                    .collect(Collectors.toSet());
-
-            Platform.runLater(() -> {
-                userLastGamesTable.getItems().clear();
-
-                if (!commonGameStats.isEmpty()) {
-                    userLastGamesTable.getItems().setAll(commonGameStats);
-                } else {
-                    log.info("No common games found.");
-                }
-            });
-        }).join();
     }
+
 }
