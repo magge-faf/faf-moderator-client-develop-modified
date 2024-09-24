@@ -85,19 +85,6 @@ public class SettingsController implements Controller<Region> {
 
     @FXML
     public void initialize() throws IOException {
-        // Temporary for next version only
-        String homeDirectory = System.getProperty("user.home");
-        String filePath = homeDirectory + File.separator + "account_credentials_mordor.txt";
-        pathAccountFile.setText(filePath);
-        File fileOldAccountCredentials = new File(filePath);
-
-        if (fileOldAccountCredentials.exists()) {
-            pathAccountFile.setText(filePath);
-        } else {
-            pathAccountFile.setText("File does not exist anymore - This is good news.");
-        }
-        //
-
         String[] credentials = SettingsController.loadCredentials();
         String username = credentials[0];
 
