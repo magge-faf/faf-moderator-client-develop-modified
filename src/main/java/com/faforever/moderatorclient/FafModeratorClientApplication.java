@@ -69,7 +69,7 @@ public class FafModeratorClientApplication extends Application {
 
         Font.loadFont(getClass().getResource("/style/NotoEmoji-Regular.ttf").toExternalForm(), 12);
         StageHolder.setStage(primaryStage);
-        primaryStage.setTitle("magge's modified Mordor");
+        primaryStage.setTitle("magge's Mordor");
         UiService uiService = applicationContext.getBean(UiService.class);
         MainController mainController = uiService.loadFxml("ui/mainWindow.fxml");
         mainController.display();
@@ -86,6 +86,8 @@ public class FafModeratorClientApplication extends Application {
             try {
                 userManagementController.savePropertiesAmountToCheckRecentAccounts();
                 userManagementController.saveContent();
+                userManagementController.saveSettings();
+                moderationReportController.onSaveSettingsModeratorEvents();
             } catch (IOException ex) {
                 log.error("Error saving:", ex);
             }
@@ -110,6 +112,7 @@ public class FafModeratorClientApplication extends Application {
     private Timeline timeline;
     private Stage primaryStage;
     private long startTime;
+    private boolean isFetching = false;
 
     public void updateWindowTitle(Stage primaryStage, long startTime) {
         this.primaryStage = primaryStage;
@@ -119,10 +122,27 @@ public class FafModeratorClientApplication extends Application {
         boolean hasActiveRequests = activeRequests.get() > 0;
 
         if (hasActiveRequests) {
-            startFetchingPattern();
+            if (!isFetching) {
+                moderationReportController.setTotalReportsLoaded(new AtomicInteger(0));
+                startFetchingPattern();
+                isFetching = true;
+                lastRefreshedTime = System.currentTimeMillis();
+            }
         } else {
             stopFetchingPattern();
-            updateTitle();
+            isFetching = false;
+
+            long elapsedTimeMillis = System.currentTimeMillis() - startTime;
+            long elapsedTimeSeconds = elapsedTimeMillis / 1000;
+            long minutes = elapsedTimeSeconds / 60;
+            long seconds = elapsedTimeSeconds % 60;
+            String elapsedTimeStr = String.format("%02d:%02d", minutes, seconds);
+
+            String lastUpdateStr = getLastUpdateTime();
+
+            primaryStage.setTitle("magge's Mordor - Session: " + elapsedTimeStr +
+                    " | Reports Loaded: " + moderationReportController.getTotalReportsLoaded() +
+                    " | Last Refresh was " + lastUpdateStr);
         }
     }
 
@@ -138,7 +158,14 @@ public class FafModeratorClientApplication extends Application {
             long seconds = elapsedTimeSeconds % 60;
             String elapsedTimeStr = String.format("%02d:%02d", minutes, seconds);
 
-            primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr + " - Fetching Reports (" + moderationReportController.getTotalReportsLoaded() + ")");
+            int totalReportsLoaded = moderationReportController.getTotalReportsLoaded().get();
+
+            int fixedWidth = 5;
+            String reportsLoadedStr = String.format("%" + fixedWidth + "d", totalReportsLoaded);
+
+            primaryStage.setTitle("magge's Mordor - Session: " + elapsedTimeStr +
+                    " | Reports Loaded: " + reportsLoadedStr +
+                    " | ⚠️⚠️⚠️ Do not change the filter while reports are loading.⚠️⚠️⚠️");
         }));
 
         timeline.setCycleCount(Timeline.INDEFINITE);
@@ -149,17 +176,25 @@ public class FafModeratorClientApplication extends Application {
         if (timeline != null) {
             timeline.stop();
             timeline = null;
-            moderationReportController.setTotalReportsLoaded(new AtomicInteger(0));
         }
     }
 
-    private void updateTitle() {
-        long elapsedTimeMillis = System.currentTimeMillis() - startTime;
-        long elapsedTimeSeconds = elapsedTimeMillis / 1000;
-        long minutes = elapsedTimeSeconds / 60;
-        long seconds = elapsedTimeSeconds % 60;
-        String elapsedTimeStr = String.format("%02d:%02d", minutes, seconds);
+    private long lastRefreshedTime;
 
-        primaryStage.setTitle("magge's modified Mordor - Running Time: " + elapsedTimeStr);
+    private String getLastUpdateTime() {
+        long now = System.currentTimeMillis();
+        long elapsedMillis = now - lastRefreshedTime;
+        long elapsedSeconds = elapsedMillis / 1000;
+
+        if (elapsedSeconds < 60) {
+            return "a few seconds ago";
+        } else if (elapsedSeconds < 3600) {
+            long minutes = elapsedSeconds / 60;
+            return minutes + (minutes == 1 ? " minute ago" : " minutes ago");
+        } else {
+            long hours = elapsedSeconds / 3600;
+            return hours + (hours == 1 ? " hour ago" : " hours ago");
+        }
     }
+
 }
