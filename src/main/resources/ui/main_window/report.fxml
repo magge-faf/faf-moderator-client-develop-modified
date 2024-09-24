@@ -140,6 +140,9 @@
                         </TableColumn>
                     </columns>
                 </TableView>
+                <HBox alignment="CENTER">
+                    <Button text="Copy All Stats Data" onAction="#handleCopyAllStatsButtonAction"/>
+                </HBox>
             </VBox>
         </Tab>
         <Tab text="Settings Moderator Events">

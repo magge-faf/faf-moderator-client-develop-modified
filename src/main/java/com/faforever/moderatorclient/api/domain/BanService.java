@@ -15,10 +15,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
-import java.util.Map;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -57,53 +56,32 @@ public class BanService {
 
     public CompletableFuture<List<BanInfoFX>> getLatestBans() {
         return CompletableFuture.supplyAsync(() -> {
-            List<BanInfo> banInfos = fafApi.getPage(BanInfo.class, ElideNavigator.of(BanInfo.class)
-                            .collection()
-                            .addInclude("player")
-                            .addInclude("author")
-                            .addInclude("revokeAuthor")
-                            .addSortingRule("createTime", false),
-                    10000,
-                    1,
-                    ImmutableMap.of()
-            );
+            List<BanInfoFX> allBanInfos = new ArrayList<>();
+            int currentPage = 1;
+            List<BanInfo> banInfos;
 
-            int totalBans = banInfos.size();
-            long permanentBans = banInfos.stream()
-                    .filter(info -> "PERMANENT".equalsIgnoreCase(String.valueOf(info.getDuration())))
-                    .count();
-            long temporaryBans = banInfos.stream()
-                    .filter(info -> "TEMPORARY".equalsIgnoreCase(String.valueOf(info.getDuration())))
-                    .count();
+            do {
+                banInfos = fafApi.getPage(BanInfo.class, ElideNavigator.of(BanInfo.class)
+                                .collection()
+                                .addInclude("player")
+                                .addInclude("author")
+                                .addInclude("revokeAuthor")
+                                .addSortingRule("createTime", false),
+                        10000,
+                        currentPage,
+                        ImmutableMap.of()
+                );
 
-            Map<String, Long> modPermanentBansCount = banInfos.stream()
-                    .filter(info -> "PERMANENT".equalsIgnoreCase(String.valueOf(info.getDuration())))
-                    .collect(Collectors.groupingBy(info -> info.getAuthor().getLogin(), Collectors.counting()));
+                List<BanInfoFX> mappedBanInfos = banInfos.stream()
+                        .map(banInfoMapper::map)
+                        .toList();
+                allBanInfos.addAll(mappedBanInfos);
 
-            Map<String, Long> modTemporaryBansCount = banInfos.stream()
-                    .filter(info -> "TEMPORARY".equalsIgnoreCase(String.valueOf(info.getDuration())))
-                    .collect(Collectors.groupingBy(info -> info.getAuthor().getLogin(), Collectors.counting()));
+                currentPage++;
+                log.info("Current page: {}", currentPage);
+            } while (banInfos.size() == 10000);
 
-            System.out.println("\nModerator Permanent Bans Count (Descending Order; Ignore 2 or less):");
-            modPermanentBansCount.entrySet().stream()
-                    .filter(entry -> entry.getValue() > 2)
-                    .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
-                    .forEach(entry ->
-                            System.out.println("Moderator: " + entry.getKey() + ", Permanent Bans Count: " + entry.getValue()));
-
-            System.out.println("\nModerator Temporary Bans Count (Descending Order; Ignore 2 or less):");
-            modTemporaryBansCount.entrySet().stream()
-                    .filter(entry -> entry.getValue() > 2)
-                    .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
-                    .forEach(entry ->
-                            System.out.println("Moderator: " + entry.getKey() + ", Temporary Bans Count: " + entry.getValue()));
-
-            System.out.println("\n");
-            System.out.println("Total Bans: " + totalBans);
-            System.out.println("Permanent Bans: " + permanentBans);
-            System.out.println("Temporary Bans: " + temporaryBans);
-
-            return banInfos.stream().map(banInfoMapper::map).collect(Collectors.toList());
+            return allBanInfos;
         });
     }
 

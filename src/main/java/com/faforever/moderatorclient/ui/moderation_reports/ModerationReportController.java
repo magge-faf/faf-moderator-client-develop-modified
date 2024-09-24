@@ -7,6 +7,7 @@ import com.faforever.commons.replay.ReplayDataParser;
 import com.faforever.commons.replay.ReplayMetadata;
 import com.faforever.commons.replay.GameOption;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
+import com.faforever.moderatorclient.api.domain.BanService;
 import com.faforever.moderatorclient.api.domain.ModerationReportService;
 import com.faforever.moderatorclient.config.TemplateAndReasonConfig;
 import com.faforever.moderatorclient.ui.*;
@@ -52,7 +53,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.awt.*;
-import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
 import java.awt.datatransfer.Transferable;
 import java.io.*;
@@ -79,6 +79,7 @@ import static java.text.MessageFormat.format;
 @Slf4j
 @RequiredArgsConstructor
 public class ModerationReportController implements Controller<Region> {
+
     private final ObjectMapper objectMapper;
     private final ModerationReportService moderationReportService;
     private final UiService uiService;
@@ -88,6 +89,7 @@ public class ModerationReportController implements Controller<Region> {
     private final HttpClient httpClient = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.ALWAYS)
             .build();
+    private final BanService banService;
 
     @FXML
     private CheckBox enforceRatingCheckBox;
@@ -422,7 +424,7 @@ public class ModerationReportController implements Controller<Region> {
                         Offender selectedOffender = mostReportedAccountsTableView.getSelectionModel().getSelectedItem();
                         if (selectedOffender != null) {
                             StringSelection stringSelection = new StringSelection(selectedOffender.getPlayer());
-                            Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+                            java.awt.datatransfer.Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
                             clipboard.setContents(stringSelection, null);
                         }
                     }
@@ -521,6 +523,102 @@ public class ModerationReportController implements Controller<Region> {
         } catch (IOException e) {
             log.warn(String.valueOf(e));
         }
+    }
+
+    public void handleCopyAllStatsButtonAction() {
+        StringBuilder content = new StringBuilder(moderatorStatisticsTextArea.getText() + "\n\n");
+        content.append("**Moderator Statistics**\n\n");
+        content.append("| **Moderator** | **All Reports** | **Completed** | **Discarded** | **Awaiting** | **Processing** | **Last Activity** |\n");
+        content.append("|---------------|-----------------|---------------|---------------|--------------|----------------|-------------------|\n");
+
+        // Iterate through the moderatorStatisticsTableView rows and format them into a Markdown table
+        for (int i = 0; i < moderatorStatisticsTableView.getItems().size(); i++) {
+            for (TableColumn<?, ?> column : moderatorStatisticsTableView.getColumns()) {
+                Object cellData = column.getCellData(i);
+                content.append("| ").append(cellData == null ? "" : cellData.toString()).append(" ");
+            }
+            content.append("|\n");
+        }
+
+        content.append("\n\n");
+
+        banService.getLatestBans().thenAccept(banInfos -> {
+            if (banInfos.isEmpty()) {
+                log.warn("No ban information retrieved.");
+                return;
+            }
+
+            log.info("Retrieved ban information: {} entries.", banInfos.size());
+
+            // Calculate total bans for each moderator
+            Map<String, Long> modTotalBansCount = new HashMap<>();
+            banInfos.forEach(info -> {
+                String moderatorLogin = info.getAuthor().getLogin();
+                modTotalBansCount.put(moderatorLogin, modTotalBansCount.getOrDefault(moderatorLogin, 0L) + 1);
+            });
+
+            // Filter for moderators with at least 10 total bans
+            Map<String, Long> filteredMods = modTotalBansCount.entrySet().stream()
+                    .filter(entry -> entry.getValue() >= 10)
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+            Map<String, Long> modPermanentBansCount = banInfos.stream()
+                    .filter(info -> "PERMANENT".equalsIgnoreCase(String.valueOf(info.getDuration())))
+                    .collect(Collectors.groupingBy(info -> info.getAuthor().getLogin(), Collectors.counting()));
+
+            Map<String, Long> modTemporaryBansCount = banInfos.stream()
+                    .filter(info -> "TEMPORARY".equalsIgnoreCase(String.valueOf(info.getDuration())))
+                    .collect(Collectors.groupingBy(info -> info.getAuthor().getLogin(), Collectors.counting()));
+
+            content.append("**Moderator Ban Statistics**\n\n");
+            content.append("| **Moderator** | **Total Bans** | **Permanent Bans** | **Temporary Bans** |\n");
+            content.append("|---------------|----------------|-------------------|-------------------|\n");
+
+            // Create a list of moderators sorted by total bans in descending order
+            List<String> sortedModerators = filteredMods.keySet().stream()
+                    .sorted((m1, m2) -> Long.compare(
+                            filteredMods.get(m2),
+                            filteredMods.get(m1)))
+                    .toList();
+
+            for (String moderator : sortedModerators) {
+                long permanentBanCount = modPermanentBansCount.getOrDefault(moderator, 0L);
+                long temporaryBanCount = modTemporaryBansCount.getOrDefault(moderator, 0L);
+                long totalBanCount = permanentBanCount + temporaryBanCount;
+
+                content.append("| ")
+                        .append(moderator)
+                        .append(" | ")
+                        .append(totalBanCount)
+                        .append(" | ")
+                        .append(permanentBanCount)
+                        .append(" | ")
+                        .append(temporaryBanCount)
+                        .append(" |\n");
+            }
+
+            // Add summary about ban statistics
+            int totalBans = banInfos.size();
+            long permanentBans = banInfos.stream()
+                    .filter(info -> "PERMANENT".equalsIgnoreCase(String.valueOf(info.getDuration())))
+                    .count();
+            long temporaryBans = banInfos.stream()
+                    .filter(info -> "TEMPORARY".equalsIgnoreCase(String.valueOf(info.getDuration())))
+                    .count();
+
+            content.append("\n**Summary**\n\n");
+            content.append("- **Total Bans**: ").append(totalBans).append("\n");
+            content.append("- **Permanent Bans**: ").append(permanentBans).append("\n");
+            content.append("- **Temporary Bans**: ").append(temporaryBans).append("\n");
+
+            Platform.runLater(() -> {
+                javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
+                javafx.scene.input.ClipboardContent clipboardContent = new javafx.scene.input.ClipboardContent();
+                clipboardContent.putString(content.toString());
+                clipboard.setContent(clipboardContent);
+                System.out.println("Content copied to clipboard.");
+            });
+        });
     }
 
     public static class ModeratorStatistics {
@@ -812,7 +910,7 @@ public class ModerationReportController implements Controller<Region> {
 
     public static void setSysClipboardText(String writeMe) {
         System.setProperty("java.awt.headless", "false");
-        Clipboard clip = Toolkit.getDefaultToolkit().getSystemClipboard();
+        java.awt.datatransfer.Clipboard clip = Toolkit.getDefaultToolkit().getSystemClipboard();
         Transferable tText = new StringSelection(writeMe);
         clip.setContents(tText, null);
     }
