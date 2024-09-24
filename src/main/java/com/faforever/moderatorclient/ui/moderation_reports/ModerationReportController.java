@@ -888,7 +888,7 @@ public class ModerationReportController implements Controller<Region> {
         int activeRequestsBefore = activeApiRequests.incrementAndGet();
         log.debug("Incremented active API requests. Current count: {}", activeRequestsBefore);
 
-        int pageSize = 1000;
+        int pageSize = 100;
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() {
@@ -905,8 +905,8 @@ public class ModerationReportController implements Controller<Region> {
 
                     if (reportFxes.size() == pageSize || x < 2) {
                         if (recursive) {
-                            createNewApiRequestThread(x + 10, true);
-                            for (int i = 1; i < 10; i++) {
+                            createNewApiRequestThread(x + 5, true);
+                            for (int i = 1; i < 5; i++) {
                                 createNewApiRequestThread(x + i, false);
                             }
                         }
@@ -1348,9 +1348,6 @@ public class ModerationReportController implements Controller<Region> {
                 break;
             }
         }
-
-        log.debug("TEAMSTEAMS");
-        log.debug(metadata.getTeams().toString());
 
         if (!found) {
             report.append(String.format("[!] Reporter '%s' does not exist in any of the team names.\n", reporterLoginName));
