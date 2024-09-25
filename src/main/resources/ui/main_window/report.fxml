@@ -48,9 +48,15 @@
             <Button fx:id="getModeratorEventsReplayIdButton" text="Get Chat/Events" onAction="#onModeratorEventsReplayIdButton" minWidth="150"/>
 
             <Separator minHeight="10"/>
+
             <Text>Select Reports and apply:</Text>
             <Button fx:id="useTemplateWithoutReasonsButton" text="Template No Reasons" onAction="#onUseTemplateWithoutReasonsButton" minWidth="150"/>
             <Button fx:id="useTemplateWithReasonsButton" text="Template With Reasons" onAction="#onUseTemplateWithReasonsButton" minWidth="150"/>
+
+            <Separator minHeight="10"/>
+
+            <Button fx:id="createReportForumButton" mnemonicParsing="false" minWidth="150" onAction="#onCreateReportForumButton"
+                    text="Search Forum"/>
         </VBox>
         <TableView fx:id="reportTableView" maxHeight="Infinity" maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
     </HBox>

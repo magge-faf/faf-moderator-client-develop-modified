@@ -25,6 +25,7 @@ import javafx.stage.Stage;
 import javafx.util.StringConverter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -165,6 +166,9 @@ public class UserManagementController implements Controller<SplitPane> {
 
     private static final Path CONFIG_FILE_PATH = Paths.get(CONFIGURATION_FOLDER + File.separator + "config.properties");
     private final Properties properties = new Properties();
+
+    @Autowired
+    public SettingsController settingsController;
 
     @Override
     public SplitPane getRoot() {
@@ -1109,12 +1113,14 @@ public class UserManagementController implements Controller<SplitPane> {
             depthScanningInputTextField.setText(depthScanningInput);
             String maxUniqueUsersThreshold = properties.getProperty("maxUniqueUsersThresholdTextField", "100");
             maxUniqueUsersThresholdTextField.setText(maxUniqueUsersThreshold);
+            String selectedBrowser = properties.getProperty("browserComboBox", "selectBrowser");
+            settingsController.setSelectedBrowser(selectedBrowser);
             log.debug("Configuration loaded.");
         }
     }
 
     @FXML
-    private void saveSettings() throws IOException {
+    public void saveSettings() throws IOException {
         if (CONFIG_FILE_PATH.toFile().exists()) {
             try (InputStream in = new FileInputStream(CONFIG_FILE_PATH.toFile())) {
                 properties.load(in);
@@ -1131,6 +1137,9 @@ public class UserManagementController implements Controller<SplitPane> {
                 properties.setProperty("catchFirstLayerSmurfsOnlyCheckBox", Boolean.toString(catchFirstLayerSmurfsOnlyCheckBox.isSelected()));
                 properties.setProperty("depthScanningInputTextField", depthScanningInputTextField.getText());
                 properties.setProperty("maxUniqueUsersThresholdTextField", maxUniqueUsersThresholdTextField.getText());
+                String browserName = settingsController.getSelectedBrowser();
+                properties.setProperty("browserComboBox", browserName);
+                log.debug("Configuration saved.");
 
                 try (OutputStream out = new FileOutputStream(CONFIG_FILE_PATH.toFile())) {
                     properties.store(out, null);

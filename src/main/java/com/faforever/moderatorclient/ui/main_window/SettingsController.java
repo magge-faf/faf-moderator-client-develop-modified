@@ -17,7 +17,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import javax.swing.*;
 import java.awt.*;
 import java.io.*;
 import java.nio.file.Files;
@@ -58,7 +57,9 @@ public class SettingsController implements Controller<Region> {
     public Button openAiPromptButton;
     public Text excludedItemsLoadedText;
     public Text accountCredentialsText;
-    public TextField pathAccountFile;
+
+    @FXML
+    public ComboBox<String> browserComboBox;
 
     private void setDefaultTab(Tab tab) {
         String tabName = tab.getId();
@@ -420,27 +421,14 @@ public class SettingsController implements Controller<Region> {
         return new String[]{username, password};
     }
 
-    public void onRemoveOldAccountCredentials() {
-        String homeDirectory = System.getProperty("user.home");
-        String filePath = homeDirectory + File.separator + "account_credentials_mordor.txt";
-        File file = new File(filePath);
-
-        if (file.exists()) {
-            int response = JOptionPane.showConfirmDialog(null,
-                    "Are you sure you want to delete the file:\n" + filePath,
-                    "Confirm Deletion",
-                    JOptionPane.YES_NO_OPTION,
-                    JOptionPane.WARNING_MESSAGE);
-
-            if (response == JOptionPane.YES_OPTION) {
-                file.delete();
-                JOptionPane.showMessageDialog(null, "File deleted successfully.");
-                pathAccountFile.setText("File does not exist anymore - This is good news.");
-            }
-        } else {
-            JOptionPane.showMessageDialog(null, "File does not exist.");
-            pathAccountFile.setText("File does not exist anymore - This is good news.");
-
+    public String getSelectedBrowser() {
+        String selectedBrowser = browserComboBox.getValue();
+        log.debug("Selected Browser: {}", selectedBrowser);
+        return selectedBrowser;
         }
-    }
+
+    public void setSelectedBrowser(String browserName) {
+        log.debug("Set Browser: {}", browserComboBox.getItems());
+        browserComboBox.setValue(browserName);
+        }
 }

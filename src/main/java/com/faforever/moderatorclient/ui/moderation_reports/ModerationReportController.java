@@ -15,6 +15,8 @@ import com.faforever.moderatorclient.ui.domain.BanInfoFX;
 import com.faforever.moderatorclient.ui.domain.GameFX;
 import com.faforever.moderatorclient.ui.domain.ModerationReportFX;
 import com.faforever.moderatorclient.ui.domain.PlayerFX;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.faforever.moderatorclient.ui.main_window.SettingsController;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import javafx.application.Platform;
@@ -77,10 +79,14 @@ import java.util.stream.Collectors;
 import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
 import static java.text.MessageFormat.format;
 
+
+
 @Component
 @Slf4j
 @RequiredArgsConstructor
 public class ModerationReportController implements Controller<Region> {
+    @Autowired
+    public SettingsController settingsController;
 
     private final ObjectMapper objectMapper;
     private final ModerationReportService moderationReportService;
@@ -92,6 +98,7 @@ public class ModerationReportController implements Controller<Region> {
             .followRedirects(HttpClient.Redirect.ALWAYS)
             .build();
     private final BanService banService;
+    public Button createReportForumButton;
 
     @FXML
     private CheckBox enforceRatingCheckBox;
@@ -145,7 +152,6 @@ public class ModerationReportController implements Controller<Region> {
 
     @Value("${faforever.vault.replay-download-url-format}")
     private String replayDownLoadFormat;
-
 
     @Override
     public SplitPane getRoot() {
@@ -485,8 +491,6 @@ public class ModerationReportController implements Controller<Region> {
                 selfDestructionFilterAmountTextField.setText(properties.getProperty("selfDestructionFilterAmountTextField", "0"));
                 textMarkerTypeFilterCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("textMarkerTypeFilterCheckBox", "false")));
                 showAdvancedStatisticsModeratorEventsCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("showAdvancedStatisticsModeratorEventsCheckBox", "false")));
-
-
             } catch (IOException e) {
                 log.warn(String.valueOf(e));
             }
@@ -846,6 +850,8 @@ public class ModerationReportController implements Controller<Region> {
         for (PlayerFX offender : reportedPlayersOfCurrentlySelectedReport) {
             copyReportedUserIdButton.setId(offender.getRepresentation());
             copyReportedUserIdButton.setText(offender.getRepresentation());
+            createReportForumButton.setId(offender.getId());
+            createReportForumButton.setText("Search Forum:\n" + offender.getRepresentation());
         }
 
         if (newValue.getGame() != null) {
@@ -1544,5 +1550,33 @@ public class ModerationReportController implements Controller<Region> {
         }
 
         return filteredChatLog.toString();
+    }
+
+    public void onCreateReportForumButton() throws IOException {
+        String reportedUserId = createReportForumButton.getId();
+        String url = "https://forum.faforever.com/search?term=" + reportedUserId +
+                "&in=titlesposts&matchWords=all&sortBy=relevance&sortDirection=desc&showAs=posts";
+
+        String browser = settingsController.getSelectedBrowser();
+
+        if ("selectBrowser".equalsIgnoreCase(browser)) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Browser Selection Required");
+            alert.setHeaderText("No Browser Selected");
+            alert.setContentText("Please go to the Settings tab (top right) and select a browser.");
+
+            alert.showAndWait();
+            return;
+        }
+
+        String cmd;
+
+        if ("Microsoft Edge".equalsIgnoreCase(browser)) {
+            cmd = "cmd /c start microsoft-edge:" + url;
+        } else {
+            cmd = "cmd /c start " + browser + " \"" + url + "\"";
+        }
+
+        Runtime.getRuntime().exec(cmd);
     }
 }

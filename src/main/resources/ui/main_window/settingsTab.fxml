@@ -5,6 +5,8 @@
 <?import javafx.scene.text.*?>
 <?import javafx.scene.control.ScrollPane?>
 
+<?import javafx.collections.FXCollections?>
+<?import java.lang.String?>
 <VBox fx:id="root" spacing="5" style="-fx-padding: 10px;" xmlns="http://javafx.com/javafx/20.0.1"
       xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.faforever.moderatorclient.ui.main_window.SettingsController">
@@ -55,6 +57,18 @@
                     text="Open Configuration Folder"/>
             <Button fx:id="openAiPromptButton" mnemonicParsing="false" onAction="#onOpenAiPromptButton"
                     text="View AI Prompt"/>
+            <Separator minHeight="5"/>
+            <Text style="-fx-font-size: 12;" text="Select Browser for 'Search Forum' Button" textAlignment="CENTER"/>
+            <ComboBox fx:id="browserComboBox" minWidth="150">
+                <items>
+                    <FXCollections fx:factory="observableArrayList">
+                        <String fx:value="Firefox" />
+                        <String fx:value="Chrome" />
+                        <String fx:value="Opera" />
+                        <String fx:value="Microsoft Edge" />
+                    </FXCollections>
+                </items>
+            </ComboBox>
         </VBox>
     </ScrollPane>
 </VBox>
