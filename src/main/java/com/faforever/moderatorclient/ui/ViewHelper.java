@@ -16,6 +16,7 @@ import javafx.beans.binding.Bindings;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
+import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.ObservableSet;
 import javafx.scene.Scene;
@@ -614,14 +615,44 @@ public class ViewHelper {
         return maxTextWidth + 10; // Extra Padding
     }
 
+    private static final int PAGE_SIZE = 100;
+
+    private static void addScrollListener(TableView<PlayerFX> tableView, ObservableList<PlayerFX> allData) {
+        tableView.setOnScroll(event -> {
+            if (event.getDeltaY() < 0) { // Scroll down
+                int currentSize = tableView.getItems().size();
+                if (currentSize < allData.size()) {
+                    // Load more users if available
+                    int nextPageEnd = Math.min(currentSize + PAGE_SIZE, allData.size());
+                    ObservableList<PlayerFX> moreData = FXCollections.observableArrayList(allData.subList(currentSize, nextPageEnd));
+                    tableView.getItems().addAll(moreData);
+                }
+            }
+        });
+    }
+
+
     /**
-     * @param tableView            The tableview to be populated
-     * @param data                 data to be put in the tableView
-     * @param onAddBan             if not null shows a ban button which triggers this consumer
-     * @param communicationService
+     * @param platformService      The platform service for dependencies
+     * @param tableView            The table view to be populated
+     * @param allData              The full list of data to be put in the tableView
+     * @param onAddBan             If not null, shows a ban button which triggers this consumer
+     * @param onForceRename        If not null, shows a force rename button which triggers this consumer
+     * @param communicationService  Communication service for interactions
      */
-    public static void buildUserTableView(PlatformService platformService, TableView<PlayerFX> tableView, ObservableList<PlayerFX> data, Consumer<PlayerFX> onAddBan, Consumer<PlayerFX> onForceRename, FafApiCommunicationService communicationService) {
-        tableView.setItems(data);
+    public static void buildUserTableView(PlatformService platformService, TableView<PlayerFX> tableView, ObservableList<PlayerFX> allData,
+                                          Consumer<PlayerFX> onAddBan, Consumer<PlayerFX> onForceRename,
+                                          FafApiCommunicationService communicationService) {
+        if ("buildModerationReportTableView".equals(tableView.getId())) {
+            // Populate the entire table with lazy loading when using buildModerationReportTableView
+            addScrollListener(tableView, allData);
+            tableView.setItems(FXCollections.observableArrayList());
+            int initialEnd = Math.min(PAGE_SIZE, allData.size());
+            tableView.getItems().addAll(allData.subList(0, initialEnd));
+        } else {
+            tableView.setItems(allData);
+        }
+
         HashMap<TableColumn<PlayerFX, ?>, Function<PlayerFX, ?>> extractors = new HashMap<>();
 
         TableColumn<PlayerFX, PlayerFX> idColumn = new TableColumn<>("ID");
