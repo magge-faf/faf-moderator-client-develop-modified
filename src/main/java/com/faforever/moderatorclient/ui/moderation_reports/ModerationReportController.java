@@ -1304,9 +1304,15 @@ public class ModerationReportController implements Controller<Region> {
                 .collect(Collectors.joining("\n"));
 
         if (showAdvancedStatisticsModeratorEventsCheckBox.isSelected()) {
-            moderatorEventTextArea.setText(statsSummary + moderatorEventsLog + "\n");
+            Platform.runLater(() -> {
+                moderatorEventTextArea.clear();
+                moderatorEventTextArea.setText(statsSummary + moderatorEventsLog + "\n");
+            });
         } else {
-            moderatorEventTextArea.setText(moderatorEventsLog);
+            Platform.runLater(() -> {
+                moderatorEventTextArea.clear();
+                moderatorEventTextArea.setText(moderatorEventsLog);;
+            });
         }
     }
 
