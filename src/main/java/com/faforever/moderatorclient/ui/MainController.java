@@ -248,7 +248,7 @@ public class MainController implements Controller<TabPane> {
 
         Stage loginDialog = new Stage();
         loginDialog.setOnCloseRequest(event -> System.exit(0));
-        loginDialog.setTitle("Login - magge's modified Mordor");
+        loginDialog.setTitle("Login - magge's Mordor");
         loginDialog.getIcons().add(new Image(Objects.requireNonNull(this.getClass().getResourceAsStream("/media/favicon.png"))));
         Scene scene = new Scene(loginController.getRoot());
         scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/style/main.css")).toExternalForm());
