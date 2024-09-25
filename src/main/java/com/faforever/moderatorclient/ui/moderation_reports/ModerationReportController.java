@@ -1140,7 +1140,10 @@ public class ModerationReportController implements Controller<Region> {
                 HttpResponse<Path> response = downloadReplay(game, tempFilePath);
 
                 if (response == null || response.statusCode() == 404) {
-                    updateUIUnavailable(header, "Replay not available");
+                    updateUIUnavailable(header, """
+                            Server Status Code 404 - Replay not available.
+                            Please note that new replays may take some time to become accessible when they got immediately reported after a game.
+                            Additionally, legacy replays are hosted on a separate server, which may occasionally experience issues requiring a restart.""");
                 } else {
                     String offenderNames = report.getReportedUsers().stream()
                             .map(PlayerFX::getRepresentation)
@@ -1361,8 +1364,8 @@ public class ModerationReportController implements Controller<Region> {
 
     private void updateUIUnavailable(String header, String message) {
         Platform.runLater(() -> {
-            startReplayButton.setText(message);
-            copyChatLogButton.setText(message);
+            startReplayButton.setText("Replay n/a");
+            copyChatLogButton.setText("Chat n/a");
             chatLogTextArea.setText(header + message);
         });
     }
