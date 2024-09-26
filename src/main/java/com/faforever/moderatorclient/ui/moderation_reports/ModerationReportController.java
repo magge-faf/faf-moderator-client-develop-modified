@@ -1198,7 +1198,15 @@ public class ModerationReportController implements Controller<Region> {
         boolean focusArmyFromFilter = focusArmyFromFilterCheckBox.isSelected();
         boolean textMarkerTypeFilter = textMarkerTypeFilterCheckBox.isSelected();
 
-        int selfDestructionFilterAmount = Integer.parseInt(selfDestructionFilterAmountTextField.getText());
+        String textValue = selfDestructionFilterAmountTextField.getText();
+
+        int selfDestructionFilterAmount;
+
+        if (textValue.isEmpty()) {
+            selfDestructionFilterAmount = 0; // Use 0 if there is no value set by user
+        } else {
+            selfDestructionFilterAmount = Integer.parseInt(textValue);
+        }
 
         for (ModeratorEvent event : moderatorEvents) {
             String playerName = event.playerNameFromCommandSource();
