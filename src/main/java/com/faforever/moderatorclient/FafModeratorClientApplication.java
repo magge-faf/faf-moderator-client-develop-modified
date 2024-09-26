@@ -83,16 +83,20 @@ public class FafModeratorClientApplication extends Application {
             e.consume();
             log.info("Close request received, exiting");
             log.info("Saving Configuration.");
-            try {
-                userManagementController.savePropertiesAmountToCheckRecentAccounts();
-                userManagementController.saveOnExitContent();
-                userManagementController.saveOnExitSettings();
-                moderationReportController.onSaveSettingsModeratorEvents();
-            } catch (IOException ex) {
-                log.error("Error saving:", ex);
-            }
-            Platform.exit();
-            System.exit(0);
+
+            Platform.runLater(() -> {
+                try {
+                    userManagementController.savePropertiesAmountToCheckRecentAccounts();
+                    userManagementController.saveOnExitContent();
+                    userManagementController.saveOnExitSettings();
+                    moderationReportController.onSaveSettingsModeratorEvents();
+                } catch (IOException ex) {
+                    log.error("Error saving:", ex);
+                } finally {
+                    Platform.exit();
+                    System.exit(0);
+                }
+            });
         });
         startTimerThread(primaryStage);
     }
@@ -179,9 +183,12 @@ public class FafModeratorClientApplication extends Application {
         }
     }
 
-    private long lastRefreshedTime;
+    private long lastRefreshedTime = -1;
 
     private String getLastUpdateTime() {
+        if (lastRefreshedTime < 0) {
+            return "Never";
+        }
         long now = System.currentTimeMillis();
         long elapsedMillis = now - lastRefreshedTime;
         long elapsedSeconds = elapsedMillis / 1000;
