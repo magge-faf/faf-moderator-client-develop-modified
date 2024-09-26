@@ -821,6 +821,7 @@ public class ModerationReportController implements Controller<Region> {
         copyGameIdButton.setId("");
         startReplayButton.setText("Replay n/a");
         startReplayButton.setId("");
+        chatLogTextArea.setText("No Game ID was reported.");
     }
 
     private void initializeUserTableView() {
