@@ -147,7 +147,7 @@
                     </columns>
                 </TableView>
                 <HBox alignment="CENTER">
-                    <Button text="Copy All Stats Data" onAction="#handleCopyAllStatsButtonAction"/>
+                    <Button text="Copy All Stats Data to Clipboard (takes a few seconds)" onAction="#handleCopyAllStatsButtonAction"/>
                 </HBox>
             </VBox>
         </Tab>

@@ -220,7 +220,7 @@
                     It will not search through additional layers of accounts connected to the main account.
                 </Text>
                 <Separator/>
-                <Button fx:id="saveSettingsButton" text="Save Settings" onAction="#saveSettings"/>
+                <Button fx:id="saveSettingsButton" text="Save Settings" onAction="#saveOnExitSettings"/>
                 <Separator/>
                 <Text>WIP - The Following is not editable currently</Text>
                 <Separator/>
