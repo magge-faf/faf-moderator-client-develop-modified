@@ -412,11 +412,14 @@ public class ModerationReportController implements Controller<Region> {
 
                             if (maxCreateTime.isPresent()) {
                                 LocalDateTime lastReported = maxCreateTime.get().toLocalDateTime();
-                                return new Offender(offenderUsername, offenderReportCount,
-                                        offenderTotalReportCountCompleted,
-                                        offenderTotalReportCountDiscarded,
-                                        offenderTotalReportCountProcessing,
-                                        lastReported); // Pass total report count for this offender
+                                return new Offender(
+                                        offenderUsername,
+                                        offenderReportCount != null ? offenderReportCount.intValue() : 0,
+                                        offenderTotalReportCountCompleted != null ? offenderTotalReportCountCompleted.intValue() : 0,
+                                        offenderTotalReportCountDiscarded != null ? offenderTotalReportCountDiscarded.intValue() : 0,
+                                        offenderTotalReportCountProcessing != null ? offenderTotalReportCountProcessing.intValue() : 0,
+                                        lastReported
+                                );
                             } else {
                                 log.debug("MaxCreateTime is not present.");
                                 return null;
@@ -625,6 +628,7 @@ public class ModerationReportController implements Controller<Region> {
         });
     }
 
+    // TODO refactor with setter getter and use Integer
     public static class ModeratorStatistics {
         private final StringProperty moderator;
         private final LongProperty completedReports;
@@ -783,24 +787,24 @@ public class ModerationReportController implements Controller<Region> {
     @Setter
     public static class Offender {
         private final StringProperty player;
-        private final LongProperty currentOffenseCount;
-        private final LongProperty totalOffenseCountCompleted;
-        private final LongProperty totalOffenseCountDiscarded;
-        private final LongProperty totalOffenseCountProcessing;
+        private final Integer currentOffenseCount;
+        private final Integer totalOffenseCountCompleted;
+        private final Integer totalOffenseCountDiscarded;
+        private final Integer totalOffenseCountProcessing;
         private LocalDateTime lastReported;
 
         public Offender(String player,
-                        long offenseCount,
-                        long totalOffenseCountCompleted,
-                        long totalOffenseCountDiscarded,
-                        long totalOffenseCountProcessing,
+                        int offenseCount,
+                        int totalOffenseCountCompleted,
+                        int totalOffenseCountDiscarded,
+                        int totalOffenseCountProcessing,
                         LocalDateTime lastReported) {
 
             this.player = new SimpleStringProperty(player);
-            this.currentOffenseCount = new SimpleLongProperty(offenseCount);
-            this.totalOffenseCountCompleted = new SimpleLongProperty(totalOffenseCountCompleted);
-            this.totalOffenseCountProcessing = new SimpleLongProperty(totalOffenseCountProcessing);
-            this.totalOffenseCountDiscarded = new SimpleLongProperty(totalOffenseCountDiscarded);
+            this.currentOffenseCount = offenseCount;
+            this.totalOffenseCountCompleted = totalOffenseCountCompleted;
+            this.totalOffenseCountProcessing = totalOffenseCountProcessing;
+            this.totalOffenseCountDiscarded = totalOffenseCountDiscarded;
             this.lastReported = lastReported;
         }
 
