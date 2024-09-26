@@ -61,17 +61,38 @@ public class SettingsController implements Controller<Region> {
     @FXML
     public ComboBox<String> browserComboBox;
 
+    private String defaultStartingTab;
+
+    public String getDefaultTab() {
+        return defaultStartingTab;
+    }
+
     private void setDefaultTab(Tab tab) {
         String tabName = tab.getId();
         if (CONFIG_FILE_PATH.toFile().exists()) {
             try (InputStream in = new FileInputStream(CONFIG_FILE_PATH.toFile())) {
                 properties.load(in);
+
+                if (!properties.containsKey("user.choice.tab")) {
+                    properties.setProperty("user.choice.tab", tabName);
+                }
+
                 properties.setProperty("user.choice.tab", tabName);
-                properties.store(new FileOutputStream(CONFIG_FILE_PATH.toFile()), null);
+
+                try (OutputStream out = new FileOutputStream(CONFIG_FILE_PATH.toFile())) {
+                    properties.store(out, null);
+                }
+
                 defaultStartingTabMenuBar.setText("New Starting Default Tab is " + tabName);
-            } catch (IOException e) {log.error(e.getMessage());}
+                log.debug("Current defaultStartingTab: " + defaultStartingTab);
+                defaultStartingTab = tabName;
+
+            } catch (IOException e) {
+                log.error("Error setting default tab: {}", e.getMessage());
+            }
         }
     }
+
 
     public void loadConfigurationProperties() {
         try {

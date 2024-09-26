@@ -185,7 +185,7 @@ public class UserManagementController implements Controller<SplitPane> {
         loadContent();
         saveSettingsButton.setOnAction(event -> {
             try {
-                saveSettings();
+                saveOnExitSettings();
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -1120,7 +1120,7 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     @FXML
-    public void saveSettings() throws IOException {
+    public void saveOnExitSettings() throws IOException {
         if (CONFIG_FILE_PATH.toFile().exists()) {
             try (InputStream in = new FileInputStream(CONFIG_FILE_PATH.toFile())) {
                 properties.load(in);
@@ -1139,6 +1139,8 @@ public class UserManagementController implements Controller<SplitPane> {
                 properties.setProperty("maxUniqueUsersThresholdTextField", maxUniqueUsersThresholdTextField.getText());
                 String browserName = settingsController.getSelectedBrowser();
                 properties.setProperty("browserComboBox", browserName);
+                String startingTab = settingsController.getDefaultTab();
+                properties.setProperty("user.choice.tab", startingTab);
                 log.debug("Configuration saved.");
 
                 try (OutputStream out = new FileOutputStream(CONFIG_FILE_PATH.toFile())) {
@@ -1160,7 +1162,7 @@ public class UserManagementController implements Controller<SplitPane> {
         }
     }
 
-    public void saveContent() {
+    public void saveOnExitContent() {
         try {
             Files.write(Paths.get(SEARCH_HISTORY_FILE), SearchHistoryTextArea.getText().getBytes());
             Files.write(Paths.get(USER_NOTES_FILE), UserNotesTextArea.getText().getBytes());

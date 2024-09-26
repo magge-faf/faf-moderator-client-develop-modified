@@ -85,8 +85,8 @@ public class FafModeratorClientApplication extends Application {
             log.info("Saving Configuration.");
             try {
                 userManagementController.savePropertiesAmountToCheckRecentAccounts();
-                userManagementController.saveContent();
-                userManagementController.saveSettings();
+                userManagementController.saveOnExitContent();
+                userManagementController.saveOnExitSettings();
                 moderationReportController.onSaveSettingsModeratorEvents();
             } catch (IOException ex) {
                 log.error("Error saving:", ex);
