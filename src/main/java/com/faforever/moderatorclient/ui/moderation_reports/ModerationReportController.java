@@ -99,6 +99,7 @@ public class ModerationReportController implements Controller<Region> {
             .build();
     private final BanService banService;
     public Button createReportForumButton;
+    public TableColumn lastActivity;
 
     @FXML
     private CheckBox enforceRatingCheckBox;
@@ -775,6 +776,9 @@ public class ModerationReportController implements Controller<Region> {
                 }
                 Platform.runLater(() -> {
                     moderatorStatisticsTableView.setItems(data);
+                    moderatorStatisticsTableView.getSortOrder().add(lastActivity);
+                    lastActivity.setSortType(TableColumn.SortType.DESCENDING);
+                    moderatorStatisticsTableView.sort();
                     moderatorStatisticsTextArea.setText(sb.toString());
                 });
                 return null;
