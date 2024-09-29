@@ -16,6 +16,8 @@
 <?import javafx.scene.control.cell.PropertyValueFactory?>
 <?import javafx.scene.text.Text?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.text.TextFlow?>
+<?import javafx.scene.control.ScrollPane?>
 <SplitPane fx:id="root" dividerPositions="0.5" orientation="VERTICAL" xmlns="http://javafx.com/javafx/11.0.1"
            xmlns:fx="http://javafx.com/fxml/1"
            fx:controller="com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController">
@@ -26,7 +28,7 @@
             <Button fx:id="editReportButton" text="Edit" onAction="#onEdit" minWidth="150"/>
             <Button text="Refresh" onAction="#onRefreshAllReports" minWidth="150"/>
 
-            <Separator minHeight="10"/>
+            <Separator minHeight="5"/>
 
             <Text>Copy to Clipboard:</Text>
             <Button fx:id="copyReportIdButton" text="Report ID" onAction="#onCopyReportID" minWidth="150"/>
@@ -34,26 +36,22 @@
             <Button fx:id="copyReportedUserIdButton" text="Offender ID" onAction="#onCopyReportedUserID" minWidth="150"/>
             <Button fx:id="copyGameIdButton" text="Game ID" onAction="#onCopyGameID" minWidth="150"/>
 
-            <Separator minHeight="10"/>
+            <Separator minHeight="5"/>
 
             <Button fx:id="copyChatLogButton" text="Chat Log" onAction="#onCopyChatLog" minWidth="150"/>
+            <Button fx:id="copyModeratorEventsButton" text="Moderator Events" onAction="#onCopyModeratorEvents" minWidth="150"/>
             <Button fx:id="startReplayButton" text="Start Replay" onAction="#onStartReplay" minWidth="150"/>
 
-            <Separator minHeight="10"/>
-
-            <Text>Replay Settings</Text>
-            <CheckBox fx:id="filterLogCheckBox" text="Ignore notify messages" selected="true"/>
-            <CheckBox fx:id="automaticallyLoadChatLogCheckBox" text="Auto load chat log" selected="true"/>
             <TextField fx:id="getModeratorEventsForReplayIdTextField" promptText="Enter Replay ID" minWidth="150"/>
             <Button fx:id="getModeratorEventsReplayIdButton" text="Get Chat/Events" onAction="#onModeratorEventsReplayIdButton" minWidth="150"/>
 
-            <Separator minHeight="10"/>
+            <Separator minHeight="5"/>
 
             <Text>Select Reports and apply:</Text>
             <Button fx:id="useTemplateWithoutReasonsButton" text="Template No Reasons" onAction="#onUseTemplateWithoutReasonsButton" minWidth="150"/>
             <Button fx:id="useTemplateWithReasonsButton" text="Template With Reasons" onAction="#onUseTemplateWithReasonsButton" minWidth="150"/>
 
-            <Separator minHeight="10"/>
+            <Separator minHeight="5"/>
 
             <Button fx:id="createReportForumButton" mnemonicParsing="false" minWidth="150" onAction="#onCreateReportForumButton"
                     text="Search Forum"/>
@@ -62,14 +60,18 @@
     </HBox>
     <TabPane tabClosingPolicy="UNAVAILABLE">
         <Tab text="Chat Log">
-            <TextArea fx:id="chatLogTextArea" editable="false" prefHeight="200.0" prefWidth="200.0"/>
+            <ScrollPane prefHeight="200.0" prefWidth="200.0">
+                <TextFlow fx:id="chatLogTextFlow" />
+            </ScrollPane>
         </Tab>
         <Tab text="Reported Accounts">
             <TableView fx:id="reportedPlayerTableView" maxHeight="1.7976931348623157E308"
                        maxWidth="1.7976931348623157E308"/>
         </Tab>
         <Tab text="Moderator Events">
-            <TextArea fx:id="moderatorEventTextArea" editable="false" prefHeight="200.0" prefWidth="200.0"/>
+            <ScrollPane prefHeight="200.0" prefWidth="200.0">
+                <TextFlow fx:id="moderatorEventTextFlow" prefHeight="200.0" prefWidth="200.0"/>
+            </ScrollPane>
         </Tab>
         <Tab text="Most Reported Accounts">
             <TableView fx:id="mostReportedAccountsTableView">
@@ -119,27 +121,27 @@
                                 <PropertyValueFactory property="moderator"/>
                             </cellValueFactory>
                         </TableColumn>
-                        <TableColumn text="All reports" minWidth="100">
+                        <TableColumn text="All Reports" minWidth="100">
                             <cellValueFactory>
                                 <PropertyValueFactory property="allReports"/>
                             </cellValueFactory>
                         </TableColumn>
-                        <TableColumn text="Completed reports" minWidth="100">
+                        <TableColumn text="Completed Reports" minWidth="100">
                             <cellValueFactory>
                                 <PropertyValueFactory property="completedReports"/>
                             </cellValueFactory>
                         </TableColumn>
-                        <TableColumn text="Discarded reports" minWidth="100">
+                        <TableColumn text="Discarded Reports" minWidth="100">
                             <cellValueFactory>
                                 <PropertyValueFactory property="discardedReports"/>
                             </cellValueFactory>
                         </TableColumn>
-                        <TableColumn text="Processing reports" minWidth="100">
+                        <TableColumn text="Processing Reports" minWidth="100">
                             <cellValueFactory>
                                 <PropertyValueFactory property="processingReports"/>
                             </cellValueFactory>
                         </TableColumn>
-                        <TableColumn text="Last activity" minWidth="200">
+                        <TableColumn fx:id="lastActivity" text="Last Activity" minWidth="200">
                             <cellValueFactory>
                                 <PropertyValueFactory property="lastActivity"/>
                             </cellValueFactory>
@@ -151,7 +153,7 @@
                 </HBox>
             </VBox>
         </Tab>
-        <Tab text="Settings Moderator Events">
+        <Tab text="Settings Moderator Events, Replay and Chat Log">
             <VBox spacing="10">
                 <!-- Filter Following Events -->
                 <Label text="Filter Following Events:"/>
@@ -191,13 +193,18 @@
 
                 <!-- Advanced Statistics -->
                 <CheckBox fx:id="showAdvancedStatisticsModeratorEventsCheckBox"
-                          text="Show summarized statistics about players for Moderator Events (WIP)"/>
+                          text="Show summarized statistics about players for Moderator Events (WIP - has no effect in this version)"/>
                 <Separator/>
 
                 <!-- Save Button -->
                 <Button fx:id="saveSettingsModeratorEventsButton"
                         text="Save Settings"
                         onAction="#onSaveSettingsModeratorEvents"/>
+
+                <Separator minHeight="5"/>
+                <Label text="Replay and Chat Log (WIP - default on, can be toggled, but status is not savable in this version )"/>
+                <CheckBox fx:id="filterLogCheckBox" text="Ignore notify messages" selected="true"/>
+                <CheckBox fx:id="automaticallyLoadChatLogCheckBox" text="Auto load chat log" selected="true"/>
             </VBox>
         </Tab>
     </TabPane>

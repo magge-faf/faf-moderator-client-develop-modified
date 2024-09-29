@@ -15,6 +15,8 @@ import com.faforever.moderatorclient.ui.domain.BanInfoFX;
 import com.faforever.moderatorclient.ui.domain.GameFX;
 import com.faforever.moderatorclient.ui.domain.ModerationReportFX;
 import com.faforever.moderatorclient.ui.domain.PlayerFX;
+import javafx.scene.text.Text;
+import javafx.scene.text.TextFlow;
 import org.springframework.beans.factory.annotation.Autowired;
 import com.faforever.moderatorclient.ui.main_window.SettingsController;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -76,6 +78,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import javafx.scene.paint.Color;
+
 import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
 import static java.text.MessageFormat.format;
 
@@ -100,7 +104,8 @@ public class ModerationReportController implements Controller<Region> {
     private final BanService banService;
     public Button createReportForumButton;
     public TableColumn lastActivity;
-
+    @FXML
+    public Button copyModeratorEventsButton;
     @FXML
     private CheckBox enforceRatingCheckBox;
     @FXML
@@ -124,7 +129,8 @@ public class ModerationReportController implements Controller<Region> {
     public Button useTemplateWithoutReasonsButton;
     public TableView<ModeratorStatistics> moderatorStatisticsTableView;
     public Button useTemplateWithReasonsButton;
-    public TextArea moderatorEventTextArea;
+    @FXML
+    public TextFlow moderatorEventTextFlow;
     public TextField getModeratorEventsForReplayIdTextField;
     @FXML
     public Button getModeratorEventsReplayIdButton;
@@ -144,7 +150,8 @@ public class ModerationReportController implements Controller<Region> {
     public TableView<ModerationReportFX> reportTableView;
     public Button editReportButton;
     public TableView<PlayerFX> reportedPlayerTableView;
-    public TextArea chatLogTextArea;
+    @FXML
+    public TextFlow chatLogTextFlow;
     public Button copyReportedUserIdButton;
     public Button copyChatLogButton;
     public Button copyReportIdButton;
@@ -165,6 +172,10 @@ public class ModerationReportController implements Controller<Region> {
 
     public void onCopyChatLog() {
         setSysClipboardText(copyChatLogButton.getId());
+    }
+
+    public void onCopyModeratorEvents() {
+        setSysClipboardText(copyModeratorEventsButton.getId());
     }
 
     public void onCopyReporterIdButton() {
@@ -819,13 +830,17 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private void resetButtonsToInvalidState() {
-        copyChatLogButton.setText("Chat n/a");
+        copyChatLogButton.setText("Chat Log n/a");
         copyChatLogButton.setId("");
+        copyModeratorEventsButton.setText("Moderator Events n/a");
+        copyModeratorEventsButton.setId("");
         copyGameIdButton.setText("Game ID n/a");
         copyGameIdButton.setId("");
         startReplayButton.setText("Replay n/a");
         startReplayButton.setId("");
-        chatLogTextArea.setText("No Game ID was reported.");
+        Text messageTextNoGame = new Text("No Game ID was reported.");
+        chatLogTextFlow.getChildren().clear();
+        chatLogTextFlow.getChildren().add(messageTextNoGame);
     }
 
     private void initializeUserTableView() {
@@ -839,7 +854,9 @@ public class ModerationReportController implements Controller<Region> {
                 updateReportDetails(newValue);
             } catch (Exception e) {
                 log.debug("Exception for selected report: ");
-                chatLogTextArea.setText("Game ID is invalid or missing.");
+                Text messageTextNoGameID = new Text("No Game ID was reported.");
+                chatLogTextFlow.getChildren().clear();
+                chatLogTextFlow.getChildren().add(messageTextNoGameID);
                 resetButtonsToInvalidState();
             }
         });
@@ -888,7 +905,9 @@ public class ModerationReportController implements Controller<Region> {
         initializeItemMapAndListeners();
         initializeReportTableView();
         initializeUserTableView();
-        chatLogTextArea.setText("Please select a report to view details.");
+        Text messageTextNoSelection = new Text("Please select a report to view details.");
+        chatLogTextFlow.getChildren().clear();
+        chatLogTextFlow.getChildren().add(messageTextNoSelection);
     }
 
     private void initializeItemMapAndListeners() {
@@ -1325,13 +1344,22 @@ public class ModerationReportController implements Controller<Region> {
 
         if (showAdvancedStatisticsModeratorEventsCheckBox.isSelected()) {
             Platform.runLater(() -> {
-                moderatorEventTextArea.clear();
-                moderatorEventTextArea.setText(statsSummary + moderatorEventsLog + "\n");
+                copyModeratorEventsButton.setId(moderatorEventsLog);
+                copyModeratorEventsButton.setText("Copy Moderator Events");
+                    //TODO make stats work with textflow statsSummary
+                moderatorEventTextFlow.getChildren().clear();
+                updateModeratorEventToColorTextFlow(moderatorEventTextFlow, moderatorEventsLog,
+                            extractName(copyReporterIdButton.getText()),
+                            extractName(copyReportedUserIdButton.getText()));
             });
         } else {
             Platform.runLater(() -> {
-                moderatorEventTextArea.clear();
-                moderatorEventTextArea.setText(moderatorEventsLog);;
+                copyModeratorEventsButton.setId(moderatorEventsLog);
+                copyModeratorEventsButton.setText("Copy Moderator Events");
+                moderatorEventTextFlow.getChildren().clear();
+                updateModeratorEventToColorTextFlow(moderatorEventTextFlow, moderatorEventsLog,
+                        extractName(copyReporterIdButton.getText()),
+                        extractName(copyReportedUserIdButton.getText()));
             });
         }
     }
@@ -1382,8 +1410,14 @@ public class ModerationReportController implements Controller<Region> {
     private void updateUIUnavailable(String header, String message) {
         Platform.runLater(() -> {
             startReplayButton.setText("Replay n/a");
-            copyChatLogButton.setText("Chat n/a");
-            chatLogTextArea.setText(header + message);
+            copyChatLogButton.setText("Chat Log n/a");
+            copyChatLogButton.setId("");
+            copyModeratorEventsButton.setText("Moderator Events n/a");
+            copyModeratorEventsButton.setId("");
+            chatLogTextFlow.getChildren().clear();
+            Text headerText = new Text(header);
+            Text messageText = new Text(message);
+            chatLogTextFlow.getChildren().addAll(headerText, messageText);
         });
     }
 
@@ -1429,10 +1463,111 @@ public class ModerationReportController implements Controller<Region> {
             Platform.runLater(() -> {
                 copyChatLogButton.setId(chatLogFiltered.toString());
                 copyChatLogButton.setText("Copy Chat Log");
-                chatLogTextArea.setText(chatLogFiltered.toString());
+
+                updateChatLogToColorTextFlow(chatLogTextFlow, String.valueOf(chatLogFiltered),
+                        extractName(copyReporterIdButton.getText()),
+                        extractName(copyReportedUserIdButton.getText()));
             });
         } catch (Exception e) {
             log.error("An error occurred while parsing replay data.", e);
+        }
+    }
+
+    private String extractName(String fullNameWithId) {
+        if (fullNameWithId.contains("[")) {
+            return fullNameWithId.split("\\[")[0].trim();
+        }
+        return fullNameWithId.trim();
+    }
+
+    public void updateChatLogToColorTextFlow(TextFlow textFlow, String filteredLog, String reporterName, String offenderName) {
+
+        String colorOffender = "LIGHTCORAL";
+        String colorReporter = "LIGHTBLUE";
+
+        if (textFlow == null) {
+            log.debug("TextFlow is not initialized in updateChatLogToColorTextFlow");
+            return;
+        }
+
+        textFlow.getChildren().clear();
+
+        String[] lines = filteredLog.split("\n");
+
+        for (String line : lines) {
+            if (line == null || line.trim().isEmpty()) {
+                textFlow.getChildren().add(new Text("\n"));
+            } else {
+                if (line.contains("boundsType=LOGICAL")) {
+                    continue;
+                }
+
+                int offenderIndex = line.indexOf(offenderName);
+                int reporterIndex = line.indexOf(reporterName);
+
+                if (offenderIndex != -1 && reporterIndex != -1) {
+                    if (offenderIndex < reporterIndex) {
+                        processLineWithBothNames(textFlow, line, offenderName, reporterName, colorOffender, colorReporter);
+                    } else {
+                        processLineWithBothNames(textFlow, line, reporterName, offenderName, colorReporter, colorOffender);
+                    }
+                } else if (offenderIndex != -1) {
+                    processLineWithSingleName(textFlow, line, offenderName, colorOffender);
+                } else if (reporterIndex != -1) {
+                    processLineWithSingleName(textFlow, line, reporterName, colorReporter);
+                } else {
+                    Text text = new Text(line);
+                    text.setFill(Color.WHITE);
+                    textFlow.getChildren().add(text);
+                }
+
+                textFlow.getChildren().add(new Text("\n"));
+            }
+        }
+    }
+
+    private void processLineWithSingleName(TextFlow textFlow, String line, String name, String color) {
+        String[] parts = line.split(name);
+        Text textBefore = new Text(parts[0]);
+        textBefore.setFill(Color.WHITE);
+        textFlow.getChildren().add(textBefore);
+
+        Text nameText = new Text(name);
+        nameText.setFill(Color.web(color));
+        textFlow.getChildren().add(nameText);
+
+        if (parts.length > 1) {
+            Text textAfter = new Text(parts[1]);
+            textAfter.setFill(Color.WHITE);
+            textFlow.getChildren().add(textAfter);
+        }
+    }
+
+    private void processLineWithBothNames(TextFlow textFlow, String line, String firstName, String secondName, String firstColor, String secondColor) {
+        String[] firstParts = line.split(firstName, 2);
+
+        Text textBeforeFirst = new Text(firstParts[0]);
+        textBeforeFirst.setFill(Color.WHITE);
+        textFlow.getChildren().add(textBeforeFirst);
+
+        Text firstNameText = new Text(firstName);
+        firstNameText.setFill(Color.web(firstColor));
+        textFlow.getChildren().add(firstNameText);
+
+        String[] secondParts = firstParts[1].split(secondName, 2);
+
+        Text textBetween = new Text(secondParts[0]);
+        textBetween.setFill(Color.WHITE);
+        textFlow.getChildren().add(textBetween);
+
+        Text secondNameText = new Text(secondName);
+        secondNameText.setFill(Color.web(secondColor));
+        textFlow.getChildren().add(secondNameText);
+
+        if (secondParts.length > 1) {
+            Text textAfterSecond = new Text(secondParts[1]);
+            textAfterSecond.setFill(Color.WHITE);
+            textFlow.getChildren().add(textAfterSecond);
         }
     }
 
@@ -1443,6 +1578,53 @@ public class ModerationReportController implements Controller<Region> {
             } catch (IOException e) {
                 log.error("An error occurred while deleting the temporary file.", e);
             }
+        }
+    }
+    public void updateModeratorEventToColorTextFlow(TextFlow textFlow, String moderatorEvents, String reporterName, String offenderName) {
+        String colorOffender = "LIGHTCORAL";
+        String colorReporter = "LIGHTBLUE";
+
+        if (textFlow == null) {
+            log.debug("TextFlow is not initialized in updateModeratorEventToColorTextFlow");
+            return;
+        }
+
+        textFlow.getChildren().clear();
+
+        String[] events = moderatorEvents.split("\n");
+
+        for (String event : events) {
+            TextFlow eventFlow = new TextFlow();
+
+            String[] parts = event.split("from ");
+            if (parts.length > 1) {
+                String timestamp = parts[0] + " from ";
+                String namePart = parts[1].substring(0, parts[1].indexOf(':'));
+                String eventMessage = parts[1].substring(parts[1].indexOf(':') + 1);
+
+                Text timestampText = new Text(timestamp);
+                timestampText.setStyle("-fx-fill: white;");
+
+                Text nameText = new Text(namePart + ": ");
+                if (namePart.toLowerCase().contains(reporterName.toLowerCase())) {
+                    nameText.setStyle("-fx-fill: " + colorReporter + ";");
+                } else if (namePart.toLowerCase().contains(offenderName.toLowerCase())) {
+                    nameText.setStyle("-fx-fill: " + colorOffender + ";");
+                } else {
+                    nameText.setStyle("-fx-fill: white;");
+                }
+
+                Text defaultMessageText = new Text(eventMessage);
+                defaultMessageText.setStyle("-fx-fill: white;");
+
+                eventFlow.getChildren().addAll(timestampText, nameText, defaultMessageText);
+            } else {
+                Text fallbackText = new Text(event);
+                fallbackText.setStyle("-fx-fill: white;");
+                eventFlow.getChildren().add(fallbackText);
+            }
+
+            textFlow.getChildren().add(eventFlow);
         }
     }
 
