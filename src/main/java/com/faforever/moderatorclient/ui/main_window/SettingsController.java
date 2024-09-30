@@ -64,7 +64,9 @@ public class SettingsController implements Controller<Region> {
     private String defaultStartingTab;
 
     public String getDefaultTab() {
-        return defaultStartingTab;
+        String text = defaultStartingTabMenuBar.getText();
+        String[] words = text.split("\\s+");
+        return words.length > 0 ? words[words.length - 1] : "";
     }
 
     private void setDefaultTab(Tab tab) {
