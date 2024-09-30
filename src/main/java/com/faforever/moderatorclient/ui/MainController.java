@@ -24,6 +24,7 @@ import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.image.Image;
 import javafx.stage.Stage;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.compress.utils.Lists;
@@ -71,6 +72,7 @@ public class MainController implements Controller<TabPane> {
     private MessagesController messagesController;
     private UserGroupsController userGroupsController;
 
+    @Getter
     public List<Tab> tabs = Lists.newArrayList();
     private final Map<Tab, Boolean> dataLoadingState = new HashMap<>();
     private final FafApiCommunicationService communicationService;
@@ -126,10 +128,6 @@ public class MainController implements Controller<TabPane> {
         settingsController.setTabs(tabs);
         settingsController.initTabStuff();
         settingsTab.setContent(settingsController.getRoot());
-    }
-
-    public List<Tab> getTabs() {
-        return tabs;
     }
 
     private void initLoading(Tab tab, Runnable loadingFunction) {
