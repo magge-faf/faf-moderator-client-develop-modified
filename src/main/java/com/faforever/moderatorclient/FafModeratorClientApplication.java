@@ -94,7 +94,6 @@ public class FafModeratorClientApplication extends Application {
                     log.error("Error saving:", ex);
                 } finally {
                     Platform.exit();
-                    System.exit(0);
                 }
             });
         });
