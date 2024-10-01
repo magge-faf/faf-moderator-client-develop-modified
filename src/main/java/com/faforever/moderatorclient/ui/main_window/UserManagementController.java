@@ -61,7 +61,6 @@ public class UserManagementController implements Controller<SplitPane> {
     public Button checkRecentAccountsForSmurfsButton;
     public Text statusTextRecentAccountsForSmurfs;
     public TextField amountTextFieldRecentAccountsForSmurfsAmount;
-    public Text amountAccountsText;
     public CheckBox catchFirstLayerSmurfsOnlyCheckBox;
     public TextField playerIDField1SharedGamesTextfield;
     public TextField playerIDField2SharedGamesTextfield;
@@ -183,6 +182,13 @@ public class UserManagementController implements Controller<SplitPane> {
     public void initialize() {
         loadProperties();
         loadContent();
+        // Set last search term for userSearchTextField
+        String textAreaContent = SearchHistoryTextArea.getText();
+        String[] lines = textAreaContent.split("\n");
+        if (lines.length > 0) {
+            userSearchTextField.setText(lines[0]);
+        }
+
         saveSettingsButton.setOnAction(event -> {
             try {
                 saveOnExitSettings();
