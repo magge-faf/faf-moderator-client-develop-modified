@@ -547,8 +547,8 @@ public class ModerationReportController implements Controller<Region> {
     public void handleCopyAllStatsButtonAction() {
         StringBuilder content = new StringBuilder(moderatorStatisticsTextArea.getText() + "\n\n");
         content.append("**Moderator Statistics**\n\n");
-        content.append("| **Moderator** | **All Reports** | **Completed** | **Discarded** | **Awaiting** | **Processing** | **Last Activity** |\n");
-        content.append("|---------------|-----------------|---------------|---------------|--------------|----------------|-------------------|\n");
+        content.append("| **Moderator** | **All Reports** | **Completed** | **Discarded** | **Processing** | **Last Activity** |\n");
+        content.append("|---------------|-----------------|---------------|---------------|----------------|-------------------|\n");
 
         // Iterate through the moderatorStatisticsTableView rows and format them into a Markdown table
         for (int i = 0; i < moderatorStatisticsTableView.getItems().size(); i++) {
