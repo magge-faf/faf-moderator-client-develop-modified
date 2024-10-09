@@ -96,7 +96,7 @@ public class BanInfoController implements Controller<Pane> {
     public void initialize() {
         banIsRevokedNotice.managedProperty().bind(banIsRevokedNotice.visibleProperty());
         banReasonTextField.textProperty().addListener((observable, oldValue, newValue) -> {
-            Pattern pattern = Pattern.compile("(\\d+)\\s+day\\s+ban");
+            Pattern pattern = Pattern.compile("(?i)(\\d+)\\s+day\\s+ban");
             Matcher matcher = pattern.matcher(banReasonTextField.getText());
             if (matcher.find()) {
                 String numDays = matcher.group(1);
