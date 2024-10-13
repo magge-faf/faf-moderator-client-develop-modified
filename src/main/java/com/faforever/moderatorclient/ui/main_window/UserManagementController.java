@@ -47,6 +47,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
+import javafx.scene.control.ButtonType;
+
 import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
 
 @Slf4j
@@ -65,6 +69,7 @@ public class UserManagementController implements Controller<SplitPane> {
     public TextField playerIDField1SharedGamesTextfield;
     public TextField playerIDField2SharedGamesTextfield;
     public Button checkSharedGamesButton;
+    public Button removeNoteButton;
     @FXML
     private Button checkRecentAccountsForSmurfsPauseButton;
 
@@ -212,6 +217,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
         addNoteButton.disableProperty().bind(userSearchTableView.getSelectionModel().selectedItemProperty().isNull());
         editNoteButton.disableProperty().bind(userNoteTableView.getSelectionModel().selectedItemProperty().isNull());
+        //removeNoteButton.disableProperty().bind(userSearchTableView.getSelectionModel().selectedItemProperty().isNull());
 
         loadMoreGamesButton.visibleProperty()
                 .bind(Bindings.createBooleanBinding(() -> !userLastGamesTable.getItems().isEmpty() && userLastGamesTable.getItems().size() % 100 == 0, userLastGamesTable.getItems()));
@@ -521,6 +527,22 @@ public class UserManagementController implements Controller<SplitPane> {
         openUserNoteDialog(selectedUserNote, false);
     }
 
+    public void removeNote() {
+        UserNoteFX selectedUserNote = userNoteTableView.getSelectionModel().getSelectedItem();
+        Assert.notNull(selectedUserNote, "You need to select a player note to delete it.");
+
+        if (showConfirmationDialog("Are you sure you want to delete this note?")) {
+            try {
+                userService.deleteUserNote(selectedUserNote.getId());
+
+                userNotes.remove(selectedUserNote);
+                userNoteTableView.getItems().remove(selectedUserNote);
+            } catch (Exception e) {
+                log.debug("Failed to delete the note: {}", e.getMessage());
+            }
+        }
+    }
+
     private void openUserNoteDialog(UserNoteFX userNoteFX, boolean isNew) {
         UserNoteController userNoteController = uiService.loadFxml("ui/userNote.fxml");
         userNoteController.setUserNoteFX(userNoteFX);
@@ -532,6 +554,19 @@ public class UserManagementController implements Controller<SplitPane> {
         userNoteDialog.setTitle(isNew ? "Add new player note" : "Edit player note");
         userNoteDialog.setScene(new Scene(userNoteController.getRoot()));
         userNoteDialog.showAndWait();
+    }
+
+    public boolean showConfirmationDialog(String message) {
+        Alert alert = new Alert(AlertType.CONFIRMATION);
+        alert.setTitle("Confirmation");
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+
+        alert.getButtonTypes().setAll(ButtonType.YES, ButtonType.NO);
+
+        Optional<ButtonType> result = alert.showAndWait();
+
+        return result.isPresent() && result.get() == ButtonType.YES;
     }
 
     public void loadMoreGames() {

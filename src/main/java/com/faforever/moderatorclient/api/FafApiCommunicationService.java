@@ -46,6 +46,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -167,16 +168,24 @@ public class FafApiCommunicationService {
         try {
             JSONAPIDocument<T> data = new JSONAPIDocument<>(object);
             String dataString = new String(defaultResourceConverter.writeDocument(data));
-            authorizedLatch.await();
+
+            if (!authorizedLatch.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("Timeout waiting for authorization");
+            }
+
             HttpEntity<String> httpEntity = new HttpEntity<>(dataString, httpHeaders);
             ResponseEntity<T> entity = restTemplate.exchange(url, HttpMethod.POST, httpEntity, navigator.getDtoClass());
+
+            if (entity.getStatusCode() != HttpStatus.OK && entity.getStatusCode() != HttpStatus.CREATED) {
+                throw new RuntimeException("Unexpected response status: " + entity.getStatusCode());
+            }
 
             cycleAvoidingMappingContext.clearCache();
 
             return entity.getBody();
-        } catch (Throwable t) {
-            applicationEventPublisher.publishEvent(new FafApiFailModifyEvent(t, navigator.getDtoClass(), url));
-            throw t;
+        } catch (Exception e) {
+            applicationEventPublisher.publishEvent(new FafApiFailModifyEvent(e, navigator.getDtoClass(), url));
+            throw e;
         }
     }
 

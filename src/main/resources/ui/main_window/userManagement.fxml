@@ -101,6 +101,11 @@
                             <Insets left="10.0"/>
                         </HBox.margin>
                     </Button>
+                    <Button fx:id="removeNoteButton" text="Remove note (No Permission)" onAction="#removeNote" mnemonicParsing="false" disable="true">
+                    <HBox.margin>
+                        <Insets left="10.0"/>
+                    </HBox.margin>
+                </Button>
                 </HBox>
             </VBox>
         </Tab>

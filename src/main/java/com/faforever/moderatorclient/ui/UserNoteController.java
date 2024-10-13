@@ -1,7 +1,9 @@
 package com.faforever.moderatorclient.ui;
 
+import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.UserService;
 import com.faforever.moderatorclient.mapstruct.UserNoteMapper;
+import com.faforever.moderatorclient.ui.domain.PlayerFX;
 import com.faforever.moderatorclient.ui.domain.UserNoteFX;
 import javafx.fxml.FXML;
 import javafx.scene.control.Alert;
@@ -34,6 +36,7 @@ import java.util.stream.Collectors;
 public class UserNoteController implements Controller<Pane> {
     private final UserService userService;
     private final UserNoteMapper userNoteMapper;
+    private final FafApiCommunicationService fafApi;
 
     public GridPane root;
     public TextField affectedUserTextField;
@@ -62,8 +65,18 @@ public class UserNoteController implements Controller<Pane> {
         this.userNoteFX = userNoteFX;
 
         if (userNoteFX != null) {
-            Optional.ofNullable(userNoteFX.getPlayer()).ifPresent(author -> affectedUserTextField.textProperty().bind(author.representationProperty()));
-            Optional.ofNullable(userNoteFX.getAuthor()).ifPresent(author -> authorTextField.textProperty().bind(author.representationProperty()));
+            Optional.ofNullable(userNoteFX.getPlayer()).ifPresent(author -> {
+                if (author.representationProperty() != null) {
+                    affectedUserTextField.textProperty().bind(author.representationProperty());
+                }
+            });
+
+            Optional.ofNullable(userNoteFX.getAuthor()).ifPresent(author -> {
+                if (author.representationProperty() != null) {
+                    authorTextField.textProperty().bind(author.representationProperty());
+                }
+            });
+
             watchedCheckBox.setSelected(userNoteFX.isWatched());
 
             noteTextArea.setText(userNoteFX.getNote());
@@ -79,6 +92,12 @@ public class UserNoteController implements Controller<Pane> {
 
         userNoteFX.setNote(noteTextArea.getText());
         userNoteFX.setWatched(watchedCheckBox.isSelected());
+
+        if (userNoteFX.getAuthor() == null) {
+            PlayerFX author = new PlayerFX();
+            author.setId(fafApi.getMeResult().getId());
+            userNoteFX.setAuthor(author);
+        }
 
         if (userNoteFX.getId() == null) {
             log.debug("Creating userNote for player '{}'", userNoteFX.getPlayer().representationProperty().get());

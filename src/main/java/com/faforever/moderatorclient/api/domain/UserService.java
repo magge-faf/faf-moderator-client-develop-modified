@@ -186,8 +186,14 @@ public class UserService {
     }
 
     public String createUserNote(UserNote userNote) {
-        log.debug("Creating userNote");
+        log.debug("Creating userNote: {}", userNote);
         return fafApi.post(ElideNavigator.of(UserNote.class).collection(), userNote).getId();
+    }
+
+    public void deleteUserNote(@NotNull String userNoteId) {
+        log.debug("Deleting user note with id: {}", userNoteId);
+        ElideNavigatorOnId<UserNote> navigator = ElideNavigator.of(UserNote.class).id(userNoteId);
+        fafApi.delete(navigator);
     }
 
     public UserNoteFX patchUserNote(UserNote userNote) {
