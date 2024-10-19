@@ -17,6 +17,7 @@ import com.faforever.moderatorclient.ui.main_window.TutorialController;
 import com.faforever.moderatorclient.ui.main_window.UserGroupsController;
 import com.faforever.moderatorclient.ui.main_window.UserManagementController;
 import com.faforever.moderatorclient.ui.main_window.VotingController;
+import com.faforever.moderatorclient.ui.main_window.RecentNotesController;
 import com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -56,6 +57,7 @@ public class MainController implements Controller<TabPane> {
     public Tab reportTab;
     public Tab permissionTab;
     public Tab settingsTab;
+    public Tab recentNotesTab;
 
     private SettingsController settingsController;
     private ModerationReportController moderationReportController;
@@ -71,6 +73,7 @@ public class MainController implements Controller<TabPane> {
     private TutorialController tutorialController;
     private MessagesController messagesController;
     private UserGroupsController userGroupsController;
+    private RecentNotesController recentNotesController;
 
     @Getter
     public List<Tab> tabs = Lists.newArrayList();
@@ -107,7 +110,24 @@ public class MainController implements Controller<TabPane> {
     }
 
     private void initializeAfterLogin() {
-        tabs.addAll(Arrays.asList(avatarsTab, banTab, domainBlacklistTab, mapVaultTab, matchmakerMapPoolTab, messagesTab, modVaultTab, permissionTab, recentActivityTab, reportTab, settingsTab, tutorialTab, userManagementTab, votingTab));
+        tabs.addAll(Arrays.asList(
+                avatarsTab,
+                banTab,
+                domainBlacklistTab,
+                mapVaultTab,
+                matchmakerMapPoolTab,
+                messagesTab,
+                modVaultTab,
+                permissionTab,
+                recentActivityTab,
+                reportTab,
+                settingsTab,
+                tutorialTab,
+                userManagementTab,
+                votingTab,
+                recentNotesTab
+        ));
+
         initAvatarTab();
         initBanTab();
         initDomainBlacklistTab();
@@ -122,12 +142,19 @@ public class MainController implements Controller<TabPane> {
         initTutorialTab();
         initUserManagementTab();
         initVotingTab();
+        initRecentNotesTab();
     }
+
     private void initSettingsTab(List<Tab> tabs) {
         settingsController = uiService.loadFxml("ui/main_window/settingsTab.fxml");
         settingsController.setTabs(tabs);
         settingsController.initTabStuff();
         settingsTab.setContent(settingsController.getRoot());
+    }
+
+    private void initRecentNotesTab() {
+        recentNotesController = uiService.loadFxml("ui/main_window/recentNotesTab.fxml");
+        recentNotesTab.setContent(recentNotesController.getRoot());
     }
 
     private void initLoading(Tab tab, Runnable loadingFunction) {
@@ -140,6 +167,7 @@ public class MainController implements Controller<TabPane> {
 
         });
     }
+
     private void initUserManagementTab() {
         if (checkPermissionForTab(userManagementTab, GroupPermission.ROLE_READ_ACCOUNT_PRIVATE_DETAILS,
                 GroupPermission.ROLE_ADMIN_ACCOUNT_NOTE, GroupPermission.ROLE_ADMIN_ACCOUNT_BAN,

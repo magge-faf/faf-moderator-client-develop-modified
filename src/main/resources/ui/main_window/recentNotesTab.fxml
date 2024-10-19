@@ -1,0 +1,23 @@
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.layout.VBox?>
+
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TableColumn?>
+<VBox fx:id="root" spacing="5" style="-fx-padding: 10px;" xmlns="http://javafx.com/javafx/20.0.1"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.faforever.moderatorclient.ui.main_window.RecentNotesController">
+
+    <TableView fx:id="notesTable" VBox.vgrow="ALWAYS">
+        <columns>
+            <TableColumn fx:id="noteCreatedColumn" text="Created" />
+            <TableColumn fx:id="noteUpdatedColumn" text="Updated" />
+            <TableColumn fx:id="noteIdColumn" text="Note ID" />
+            <TableColumn fx:id="authorIdColumn" text="Moderator" />
+            <TableColumn fx:id="playerIdColumn" text="User" />
+            <TableColumn fx:id="noteColumn" text="Note" />
+        </columns>
+    </TableView>
+
+    <!-- <Button fx:id="refreshNotes" text="Refresh Notes"/> -->
+
+</VBox>

@@ -205,4 +205,13 @@ public class UserService {
         log.debug("Update of player of player id: " + id);
         fafApi.forceRenameUserName(id, newName);
     }
+
+    public List<UserNoteFX> getAllUserNotes() {
+        log.debug("Searching for all user notes");
+        ElideNavigatorOnCollection<UserNote> navigator = ElideNavigator.of(UserNote.class)
+                .collection()
+                .addInclude("player")
+                .addInclude("author");
+        return userNoteMapper.map(fafApi.getAll(UserNote.class, navigator));
+    }
 }

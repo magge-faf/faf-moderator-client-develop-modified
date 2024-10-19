@@ -12,7 +12,7 @@
     <Tab fx:id="mapVaultTab" closable="false" text="Map vault"/>
     <Tab fx:id="modVaultTab" closable="false" text="Mod vault"/>
     <Tab fx:id="avatarsTab" closable="false" text="Avatars"/>
-    <Tab fx:id="recentActivityTab" closable="false" text="Recent activity"/>
+    <Tab fx:id="recentActivityTab" closable="false" text="Recent Activity"/>
     <Tab fx:id="domainBlacklistTab" closable="false" text="Domain Blacklist"/>
     <Tab fx:id="banTab" closable="false" text="Bans"/>
     <Tab fx:id="votingTab" closable="false" text="Voting"/>
@@ -21,4 +21,5 @@
     <Tab fx:id="reportTab" closable="false" text="Reports"/>
     <Tab fx:id="permissionTab" closable="false" text="User Groups"/>
     <Tab fx:id="settingsTab" closable="false" text="Settings"/>
+    <Tab fx:id="recentNotesTab" closable="false" text="Recent Notes"/>
 </TabPane>

@@ -35,7 +35,7 @@ println "Platform is: ${javafxPlatform}"
 dependencies {
     def springBootVersion = "3.3.4"
     def mapStructVersion = "1.6.2"
-    def commonsVersion = "e904344614290594ba4515d910d15acf4782789f"
+    def commonsVersion = "bc0a20692e599cccb618e0c4346407a13e44464a"
 
     annotationProcessor(platform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}"))
     implementation(platform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}"))
@@ -53,7 +53,7 @@ dependencies {
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8")
     implementation("com.github.jasminb:jsonapi-converter:0.14")
     implementation("com.github.FAForever.faf-java-commons:faf-commons-data:${commonsVersion}")
-    implementation("com.github.FAForever.faf-java-commons:faf-commons-api:${commonsVersion}")
+    //implementation("com.github.FAForever.faf-java-commons:faf-commons-api:${commonsVersion}")
     implementation("org.apache.httpcomponents:httpclient:4.5.14")
     implementation("com.github.rutledgepaulv:q-builders:1.6")
     implementation("com.google.guava:guava:33.3.1-jre")
@@ -69,6 +69,9 @@ dependencies {
     implementation 'org.json:json:20240303'
     implementation 'org.apache.httpcomponents.core5:httpcore5:5.3'
     implementation 'org.apache.httpcomponents.client5:httpclient5:5.4'
+    dependencies {
+        implementation files('libs/faf-commons-api-1.0-SNAPSHOT.jar')
+    }
 }
 
 mainClassName = 'com.faforever.moderatorclient.Launcher'
