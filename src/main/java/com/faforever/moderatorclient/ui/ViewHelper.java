@@ -641,7 +641,7 @@ public class ViewHelper {
      * @param communicationService  Communication service for interactions
      */
     public static void buildUserTableView(PlatformService platformService, TableView<PlayerFX> tableView, ObservableList<PlayerFX> allData,
-                                          Consumer<PlayerFX> onAddBan, Consumer<PlayerFX> onForceRename,
+                                          Consumer<PlayerFX> onAddBan, Consumer<PlayerFX> onForceRename, boolean showUidData,
                                           FafApiCommunicationService communicationService) {
         if ("buildModerationReportTableView".equals(tableView.getId())) {
             // Populate the entire table with lazy loading when using buildModerationReportTableView
@@ -711,65 +711,68 @@ public class ViewHelper {
         tableView.getColumns().add(accountLinkColumn);
         extractors.put(accountLinkColumn, playerFX -> playerFX.getAccountLinks().stream().map(AccountLinkFx::getServiceId).collect(Collectors.toList()));
 
-        TableColumn<PlayerFX, String> ipColumn = new TableColumn<>("IP Address");
-        ipColumn.setCellValueFactory(o -> o.getValue().recentIpAddressProperty());
-        ipColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
-                calculateMaxTextWidthPlayerFX(tableView.getItems(), PlayerFX::getRecentIpAddress), tableView.getItems()));
+        {
+            {
+                if (showUidData) {
+                    TableColumn<PlayerFX, String> ipColumn = new TableColumn<>("IP Address");
+                    ipColumn.setCellValueFactory(o -> o.getValue().recentIpAddressProperty());
+                    ipColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
+                            calculateMaxTextWidthPlayerFX(tableView.getItems(), PlayerFX::getRecentIpAddress), tableView.getItems()));
 
-        tableView.getColumns().add(ipColumn);
-        extractors.put(ipColumn, PlayerFX::getRecentIpAddress);
+                    tableView.getColumns().add(ipColumn);
+                    extractors.put(ipColumn, PlayerFX::getRecentIpAddress);
 
-        TableColumn<PlayerFX, OffsetDateTime> createTimeColumn = new TableColumn<>("Registration Date");
-        createTimeColumn.setCellFactory(col -> new TableCell<>() {
-            private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+                    TableColumn<PlayerFX, OffsetDateTime> createTimeColumn = new TableColumn<>("Registration Date");
+                    createTimeColumn.setCellFactory(col -> new TableCell<>() {
+                        private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-            @Override
-            protected void updateItem(OffsetDateTime item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                } else {
-                    setText(formatter.format(item));
-                }
-            }
-        });
+                        @Override
+                        protected void updateItem(OffsetDateTime item, boolean empty) {
+                            super.updateItem(item, empty);
+                            if (empty || item == null) {
+                                setText(null);
+                            } else {
+                                setText(formatter.format(item));
+                            }
+                        }
+                    });
 
-        createTimeColumn.setCellValueFactory(o -> o.getValue().createTimeProperty());
-        createTimeColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
-                calculateMaxTextWidthPlayerFX(tableView.getItems(), PlayerFX::getCreateTime), tableView.getItems()));
-        tableView.getColumns().add(createTimeColumn);
+                    createTimeColumn.setCellValueFactory(o -> o.getValue().createTimeProperty());
+                    createTimeColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
+                            calculateMaxTextWidthPlayerFX(tableView.getItems(), PlayerFX::getCreateTime), tableView.getItems()));
+                    tableView.getColumns().add(createTimeColumn);
 
-        TableColumn<PlayerFX, OffsetDateTime> lastLoginColumn = new TableColumn<>("Last Login");
-        lastLoginColumn.setCellValueFactory(o -> o.getValue().lastLoginProperty());
+                    TableColumn<PlayerFX, OffsetDateTime> lastLoginColumn = new TableColumn<>("Last Login");
+                    lastLoginColumn.setCellValueFactory(o -> o.getValue().lastLoginProperty());
 
-        lastLoginColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
-                calculateMaxTextWidthPlayerFX(tableView.getItems(), PlayerFX::getLastLogin), tableView.getItems()));
+                    lastLoginColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
+                            calculateMaxTextWidthPlayerFX(tableView.getItems(), PlayerFX::getLastLogin), tableView.getItems()));
 
-        lastLoginColumn.setCellFactory(col -> new TableCell<>() {
-            private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+                    lastLoginColumn.setCellFactory(col -> new TableCell<>() {
+                        private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-            @Override
-            protected void updateItem(OffsetDateTime item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                } else {
-                    setText(formatter.format(item));
-                }
-            }
-        });
-        tableView.getColumns().add(lastLoginColumn);
+                        @Override
+                        protected void updateItem(OffsetDateTime item, boolean empty) {
+                            super.updateItem(item, empty);
+                            if (empty || item == null) {
+                                setText(null);
+                            } else {
+                                setText(formatter.format(item));
+                            }
+                        }
+                    });
+                    tableView.getColumns().add(lastLoginColumn);
 
-        TableColumn<PlayerFX, String> userAgentColumn = new TableColumn<>("User Agent");
-        userAgentColumn.setCellValueFactory(o -> o.getValue().userAgentProperty());
+                    TableColumn<PlayerFX, String> userAgentColumn = new TableColumn<>("User Agent");
+                    userAgentColumn.setCellValueFactory(o -> o.getValue().userAgentProperty());
 
-        userAgentColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
-                calculateMaxTextWidthPlayerFX(tableView.getItems(), PlayerFX::getUserAgent), tableView.getItems()));
+                    userAgentColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
+                            calculateMaxTextWidthPlayerFX(tableView.getItems(), PlayerFX::getUserAgent), tableView.getItems()));
 
-        tableView.getColumns().add(userAgentColumn);
-        extractors.put(userAgentColumn, PlayerFX::getUserAgent);
+                    tableView.getColumns().add(userAgentColumn);
+                    extractors.put(userAgentColumn, PlayerFX::getUserAgent);
 
-        // updateTimeColumn disabled - has always the same value as Last Login
+                    // updateTimeColumn disabled - has always the same value as Last Login
 
        /* TableColumn<PlayerFX, OffsetDateTime> updateTimeColumn = new TableColumn<>("Last update of record");
         updateTimeColumn.setCellFactory(col -> {
@@ -807,154 +810,154 @@ public class ViewHelper {
         tableView.getColumns().add(updateTimeColumn);
         */
 
-        if (onAddBan != null) {
-            TableColumn<PlayerFX, PlayerFX> banOptionColumn = new TableColumn<>("Ban");
-            banOptionColumn.setCellValueFactory(param -> new SimpleObjectProperty<>(param.getValue()));
-            banOptionColumn.setCellFactory(param -> new TableCell<>() {
+                    if (onAddBan != null) {
+                        TableColumn<PlayerFX, PlayerFX> banOptionColumn = new TableColumn<>("Ban");
+                        banOptionColumn.setCellValueFactory(param -> new SimpleObjectProperty<>(param.getValue()));
+                        banOptionColumn.setCellFactory(param -> new TableCell<>() {
 
-                @Override
-                protected void updateItem(PlayerFX item, boolean empty) {
-                    super.updateItem(item, empty);
-                    if (!empty) {
-                        if (!item.isBannedGlobally()) {
-                            Button button = new Button("Add ban");
-                            button.setOnMouseClicked(event -> onAddBan.accept(item));
-                            setGraphic(button);
-                            return;
-                        }
-                    }
-                    setGraphic(null);
-                }
-            });
-            tableView.getColumns().add(banOptionColumn);
-        }
-
-        TableColumn<PlayerFX, String> hashColumn = new TableColumn<>("Hash");
-        hashColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
-                        o.getValue().getUniqueIds().stream().map(UniqueIdFx::getHash)
-                                .collect(Collectors.joining("\n")),
-                o.getValue().getUniqueIds()));
-        hashColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
-                        calculateMaxTextWidthPlayerFX(tableView.getItems(), player ->
-                                player.getUniqueIds().stream()
-                                        .map(UniqueIdFx::getHash)
-                                        .filter(Objects::nonNull)
-                                        .max(Comparator.comparingInt(String::length))
-                                        .orElse("")),
-                tableView.getItems()));
-
-        tableView.getColumns().add(hashColumn);
-        extractors.put(hashColumn, playerFX -> playerFX.getUniqueIds().stream().map(UniqueIdFx::getHash).collect(Collectors.toList()));
-
-        TableColumn<PlayerFX, String> uuidColumn = new TableColumn<>("UUID");
-        uuidColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
-                        o.getValue().getUniqueIds().stream().map(UniqueIdFx::getUuid)
-                                .collect(Collectors.joining("\n")),
-                o.getValue().getUniqueIds()));
-        uuidColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
-                calculateMaxTextWidthPlayerFX(tableView.getItems(), player -> {
-                    List<String> uuids = player.getUniqueIds().stream()
-                            .filter(Objects::nonNull)
-                            .map(UniqueIdFx::getUuid)
-                            .toList();
-
-                    String maxUuid = uuids.stream()
-                            .filter(Objects::nonNull)
-                            .max(Comparator.comparingInt(String::length))
-                            .orElse("");
-
-
-                    if (maxUuid == null) {
-                        System.err.println("Warning: maxUuid is null for player " + player); // Add more meaningful logging
+                            @Override
+                            protected void updateItem(PlayerFX item, boolean empty) {
+                                super.updateItem(item, empty);
+                                if (!empty) {
+                                    if (!item.isBannedGlobally()) {
+                                        Button button = new Button("Add ban");
+                                        button.setOnMouseClicked(event -> onAddBan.accept(item));
+                                        setGraphic(button);
+                                        return;
+                                    }
+                                }
+                                setGraphic(null);
+                            }
+                        });
+                        tableView.getColumns().add(banOptionColumn);
                     }
 
-                    return maxUuid;
-                }), tableView.getItems()));
+                    TableColumn<PlayerFX, String> hashColumn = new TableColumn<>("Hash");
+                    hashColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
+                                    o.getValue().getUniqueIds().stream().map(UniqueIdFx::getHash)
+                                            .collect(Collectors.joining("\n")),
+                            o.getValue().getUniqueIds()));
+                    hashColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
+                                    calculateMaxTextWidthPlayerFX(tableView.getItems(), player ->
+                                            player.getUniqueIds().stream()
+                                                    .map(UniqueIdFx::getHash)
+                                                    .filter(Objects::nonNull)
+                                                    .max(Comparator.comparingInt(String::length))
+                                                    .orElse("")),
+                            tableView.getItems()));
 
-        tableView.getItems();
-        tableView.getColumns().add(uuidColumn);
-        extractors.put(uuidColumn, playerFX -> playerFX.getUniqueIds().stream().map(UniqueIdFx::getUuid).collect(Collectors.toList()));
+                    tableView.getColumns().add(hashColumn);
+                    extractors.put(hashColumn, playerFX -> playerFX.getUniqueIds().stream().map(UniqueIdFx::getHash).collect(Collectors.toList()));
 
-        TableColumn<PlayerFX, String> memorySerialColumn = new TableColumn<>("Memory S/N");
-        memorySerialColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
-                        o.getValue().getUniqueIds().stream().map(UniqueIdFx::getMemorySerialNumber)
-                                .collect(Collectors.joining("\n")),
-                o.getValue().getUniqueIds()));
-        memorySerialColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
-                        calculateMaxTextWidthPlayerFX(tableView.getItems(), player ->
-                                player.getUniqueIds().stream()
-                                        .map(UniqueIdFx::getMemorySerialNumber)
+                    TableColumn<PlayerFX, String> uuidColumn = new TableColumn<>("UUID");
+                    uuidColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
+                                    o.getValue().getUniqueIds().stream().map(UniqueIdFx::getUuid)
+                                            .collect(Collectors.joining("\n")),
+                            o.getValue().getUniqueIds()));
+                    uuidColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
+                            calculateMaxTextWidthPlayerFX(tableView.getItems(), player -> {
+                                List<String> uuids = player.getUniqueIds().stream()
+                                        .filter(Objects::nonNull)
+                                        .map(UniqueIdFx::getUuid)
+                                        .toList();
+
+                                String maxUuid = uuids.stream()
                                         .filter(Objects::nonNull)
                                         .max(Comparator.comparingInt(String::length))
-                                        .orElse("")),
-                tableView.getItems()));
-        extractors.put(memorySerialColumn, playerFX -> playerFX.getUniqueIds().stream().map(UniqueIdFx::getMemorySerialNumber).collect(Collectors.toList()));
+                                        .orElse("");
 
-        TableColumn<PlayerFX, String> deviceIdColumn = new TableColumn<>("Device ID");
-        deviceIdColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
-                        o.getValue().getUniqueIds().stream().map(UniqueIdFx::getDeviceId)
-                                .collect(Collectors.joining("\n")),
-                o.getValue().getUniqueIds()));
-        deviceIdColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
-                        calculateMaxTextWidthPlayerFX(tableView.getItems(), player ->
-                                player.getUniqueIds().stream()
-                                        .map(UniqueIdFx::getDeviceId)
-                                        .filter(Objects::nonNull)
-                                        .max(Comparator.comparingInt(String::length))
-                                        .orElse("")),
-                tableView.getItems()));
-        tableView.getColumns().add(deviceIdColumn);
-        extractors.put(deviceIdColumn, playerFX -> playerFX.getUniqueIds().stream().map(UniqueIdFx::getDeviceId).collect(Collectors.toList()));
 
-        TableColumn<PlayerFX, String> manufacturerColumn = new TableColumn<>("Manufacturer");
-        manufacturerColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
-                        o.getValue().getUniqueIds().stream().map(UniqueIdFx::getManufacturer)
-                                .collect(Collectors.joining("\n")),
-                o.getValue().getUniqueIds()));
-        manufacturerColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
-                        calculateMaxTextWidthPlayerFX(tableView.getItems(), player ->
-                                player.getUniqueIds().stream()
-                                        .map(UniqueIdFx::getManufacturer)
-                                        .filter(Objects::nonNull)
-                                        .max(Comparator.comparingInt(String::length))
-                                        .orElse("")),
-                tableView.getItems()));
-        tableView.getColumns().add(manufacturerColumn);
-        extractors.put(manufacturerColumn, playerFX -> playerFX.getUniqueIds().stream().map(UniqueIdFx::getManufacturer).collect(Collectors.toList()));
+                                if (maxUuid == null) {
+                                    System.err.println("Warning: maxUuid is null for player " + player); // Add more meaningful logging
+                                }
 
-        TableColumn<PlayerFX, String> cpuNameColumn = new TableColumn<>("CPU Name");
-        cpuNameColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
-                        o.getValue().getUniqueIds().stream().map(UniqueIdFx::getName)
-                                .collect(Collectors.joining("\n")),
-                o.getValue().getUniqueIds()));
-        cpuNameColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
-                        calculateMaxTextWidthPlayerFX(tableView.getItems(), player ->
-                                player.getUniqueIds().stream()
-                                        .map(UniqueIdFx::getName)
-                                        .filter(Objects::nonNull)
-                                        .max(Comparator.comparingInt(String::length))
-                                        .orElse("")),
-                tableView.getItems()));
-        tableView.getColumns().add(cpuNameColumn);
-        extractors.put(cpuNameColumn, playerFX -> playerFX.getUniqueIds().stream().map(UniqueIdFx::getName).collect(Collectors.toList()));
+                                return maxUuid;
+                            }), tableView.getItems()));
 
-        TableColumn<PlayerFX, String> processorIdColumn = new TableColumn<>("Processor Id");
-        processorIdColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
-                        o.getValue().getUniqueIds().stream().map(UniqueIdFx::getProcessorId)
-                                .collect(Collectors.joining("\n")),
-                o.getValue().getUniqueIds()));
-        processorIdColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
-                        calculateMaxTextWidthPlayerFX(tableView.getItems(), player ->
-                                player.getUniqueIds().stream()
-                                        .map(UniqueIdFx::getProcessorId)
-                                        .filter(Objects::nonNull)
-                                        .max(Comparator.comparingInt(String::length))
-                                        .orElse("")),
-                tableView.getItems()));
-        tableView.getColumns().add(processorIdColumn);
-        extractors.put(processorIdColumn, playerFX -> playerFX.getUniqueIds().stream().map(UniqueIdFx::getProcessorId).collect(Collectors.toList()));
+                    tableView.getItems();
+                    tableView.getColumns().add(uuidColumn);
+                    extractors.put(uuidColumn, playerFX -> playerFX.getUniqueIds().stream().map(UniqueIdFx::getUuid).collect(Collectors.toList()));
 
-        // BIOS Column disabled - we do not get any meaningful values to begin with
+                    TableColumn<PlayerFX, String> memorySerialColumn = new TableColumn<>("Memory S/N");
+                    memorySerialColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
+                                    o.getValue().getUniqueIds().stream().map(UniqueIdFx::getMemorySerialNumber)
+                                            .collect(Collectors.joining("\n")),
+                            o.getValue().getUniqueIds()));
+                    memorySerialColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
+                                    calculateMaxTextWidthPlayerFX(tableView.getItems(), player ->
+                                            player.getUniqueIds().stream()
+                                                    .map(UniqueIdFx::getMemorySerialNumber)
+                                                    .filter(Objects::nonNull)
+                                                    .max(Comparator.comparingInt(String::length))
+                                                    .orElse("")),
+                            tableView.getItems()));
+                    extractors.put(memorySerialColumn, playerFX -> playerFX.getUniqueIds().stream().map(UniqueIdFx::getMemorySerialNumber).collect(Collectors.toList()));
+
+                    TableColumn<PlayerFX, String> deviceIdColumn = new TableColumn<>("Device ID");
+                    deviceIdColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
+                                    o.getValue().getUniqueIds().stream().map(UniqueIdFx::getDeviceId)
+                                            .collect(Collectors.joining("\n")),
+                            o.getValue().getUniqueIds()));
+                    deviceIdColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
+                                    calculateMaxTextWidthPlayerFX(tableView.getItems(), player ->
+                                            player.getUniqueIds().stream()
+                                                    .map(UniqueIdFx::getDeviceId)
+                                                    .filter(Objects::nonNull)
+                                                    .max(Comparator.comparingInt(String::length))
+                                                    .orElse("")),
+                            tableView.getItems()));
+                    tableView.getColumns().add(deviceIdColumn);
+                    extractors.put(deviceIdColumn, playerFX -> playerFX.getUniqueIds().stream().map(UniqueIdFx::getDeviceId).collect(Collectors.toList()));
+
+                    TableColumn<PlayerFX, String> manufacturerColumn = new TableColumn<>("Manufacturer");
+                    manufacturerColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
+                                    o.getValue().getUniqueIds().stream().map(UniqueIdFx::getManufacturer)
+                                            .collect(Collectors.joining("\n")),
+                            o.getValue().getUniqueIds()));
+                    manufacturerColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
+                                    calculateMaxTextWidthPlayerFX(tableView.getItems(), player ->
+                                            player.getUniqueIds().stream()
+                                                    .map(UniqueIdFx::getManufacturer)
+                                                    .filter(Objects::nonNull)
+                                                    .max(Comparator.comparingInt(String::length))
+                                                    .orElse("")),
+                            tableView.getItems()));
+                    tableView.getColumns().add(manufacturerColumn);
+                    extractors.put(manufacturerColumn, playerFX -> playerFX.getUniqueIds().stream().map(UniqueIdFx::getManufacturer).collect(Collectors.toList()));
+
+                    TableColumn<PlayerFX, String> cpuNameColumn = new TableColumn<>("CPU Name");
+                    cpuNameColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
+                                    o.getValue().getUniqueIds().stream().map(UniqueIdFx::getName)
+                                            .collect(Collectors.joining("\n")),
+                            o.getValue().getUniqueIds()));
+                    cpuNameColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
+                                    calculateMaxTextWidthPlayerFX(tableView.getItems(), player ->
+                                            player.getUniqueIds().stream()
+                                                    .map(UniqueIdFx::getName)
+                                                    .filter(Objects::nonNull)
+                                                    .max(Comparator.comparingInt(String::length))
+                                                    .orElse("")),
+                            tableView.getItems()));
+                    tableView.getColumns().add(cpuNameColumn);
+                    extractors.put(cpuNameColumn, playerFX -> playerFX.getUniqueIds().stream().map(UniqueIdFx::getName).collect(Collectors.toList()));
+
+                    TableColumn<PlayerFX, String> processorIdColumn = new TableColumn<>("Processor Id");
+                    processorIdColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
+                                    o.getValue().getUniqueIds().stream().map(UniqueIdFx::getProcessorId)
+                                            .collect(Collectors.joining("\n")),
+                            o.getValue().getUniqueIds()));
+                    processorIdColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
+                                    calculateMaxTextWidthPlayerFX(tableView.getItems(), player ->
+                                            player.getUniqueIds().stream()
+                                                    .map(UniqueIdFx::getProcessorId)
+                                                    .filter(Objects::nonNull)
+                                                    .max(Comparator.comparingInt(String::length))
+                                                    .orElse("")),
+                            tableView.getItems()));
+                    tableView.getColumns().add(processorIdColumn);
+                    extractors.put(processorIdColumn, playerFX -> playerFX.getUniqueIds().stream().map(UniqueIdFx::getProcessorId).collect(Collectors.toList()));
+
+                    // BIOS Column disabled - we do not get any meaningful values to begin with
 
         /*TableColumn<PlayerFX, String> biosVersionColumn = new TableColumn<>("BIOS Version");
         biosVersionColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
@@ -971,38 +974,42 @@ public class ViewHelper {
         tableView.getColumns().add(biosVersionColumn);
         extractors.put(biosVersionColumn, playerFX -> playerFX.getUniqueIds().stream().map(UniqueIdFx::getSMBIOSBIOSVersion).collect(Collectors.toList()));
 */
-        TableColumn<PlayerFX, String> serialColumn = new TableColumn<>("S/N");
-        serialColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
-                        o.getValue().getUniqueIds().stream().map(UniqueIdFx::getSerialNumber)
-                                .collect(Collectors.joining("\n")),
-                o.getValue().getUniqueIds()));
-        serialColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
-                        calculateMaxTextWidthPlayerFX(tableView.getItems(), player ->
-                                player.getUniqueIds().stream()
-                                        .map(UniqueIdFx::getSerialNumber)
-                                        .filter(Objects::nonNull)
+                    TableColumn<PlayerFX, String> serialColumn = new TableColumn<>("S/N");
+                    serialColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
+                                    o.getValue().getUniqueIds().stream().map(UniqueIdFx::getSerialNumber)
+                                            .collect(Collectors.joining("\n")),
+                            o.getValue().getUniqueIds()));
+                    serialColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
+                                    calculateMaxTextWidthPlayerFX(tableView.getItems(), player ->
+                                            player.getUniqueIds().stream()
+                                                    .map(UniqueIdFx::getSerialNumber)
+                                                    .filter(Objects::nonNull)
 
-                                        .max(Comparator.comparingInt(String::length))
-                                        .orElse("")),
-                tableView.getItems()));
-        tableView.getColumns().add(serialColumn);
-        extractors.put(serialColumn, playerFX -> playerFX.getUniqueIds().stream().map(UniqueIdFx::getSerialNumber).collect(Collectors.toList()));
+                                                    .max(Comparator.comparingInt(String::length))
+                                                    .orElse("")),
+                            tableView.getItems()));
+                    tableView.getColumns().add(serialColumn);
+                    extractors.put(serialColumn, playerFX -> playerFX.getUniqueIds().stream().map(UniqueIdFx::getSerialNumber).collect(Collectors.toList()));
 
-        TableColumn<PlayerFX, String> volumeSerialNumber = new TableColumn<>("Volume S/N");
-        volumeSerialNumber.setCellValueFactory(o -> Bindings.createStringBinding(() ->
-                        o.getValue().getUniqueIds().stream().map(UniqueIdFx::getVolumeSerialNumber)
-                                .collect(Collectors.joining("\n")),
-                o.getValue().getUniqueIds()));
-        volumeSerialNumber.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
-                        calculateMaxTextWidthPlayerFX(tableView.getItems(), player ->
-                                player.getUniqueIds().stream()
-                                        .map(UniqueIdFx::getVolumeSerialNumber)
-                                        .filter(Objects::nonNull)
-                                        .max(Comparator.comparingInt(String::length))
-                                        .orElse("")),
-                tableView.getItems()));
-        tableView.getColumns().add(volumeSerialNumber);
-        extractors.put(volumeSerialNumber, playerFX -> playerFX.getUniqueIds().stream().map(UniqueIdFx::getVolumeSerialNumber).collect(Collectors.toList()));
+                    TableColumn<PlayerFX, String> volumeSerialNumber = new TableColumn<>("Volume S/N");
+                    volumeSerialNumber.setCellValueFactory(o -> Bindings.createStringBinding(() ->
+                                    o.getValue().getUniqueIds().stream().map(UniqueIdFx::getVolumeSerialNumber)
+                                            .collect(Collectors.joining("\n")),
+                            o.getValue().getUniqueIds()));
+                    volumeSerialNumber.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
+                                    calculateMaxTextWidthPlayerFX(tableView.getItems(), player ->
+                                            player.getUniqueIds().stream()
+                                                    .map(UniqueIdFx::getVolumeSerialNumber)
+                                                    .filter(Objects::nonNull)
+                                                    .max(Comparator.comparingInt(String::length))
+                                                    .orElse("")),
+                            tableView.getItems()));
+                    tableView.getColumns().add(volumeSerialNumber);
+                    extractors.put(volumeSerialNumber, playerFX -> playerFX.getUniqueIds().stream().map(UniqueIdFx::getVolumeSerialNumber).collect(Collectors.toList()));
+
+                }
+            }
+        }
 
         // Right-Click Context Menu
         ContextMenu contextMenu = applyCopyContextMenus(tableView, extractors);
@@ -1060,7 +1067,6 @@ public class ViewHelper {
             }
         });
 
-
         MenuItem gogLookupMenuItem = new MenuItem("Lookup GogID");
         gogLookupMenuItem.disableProperty().bind(Bindings.createBooleanBinding(() -> {
             PlayerFX selectedPlayer = tableView.getSelectionModel().getSelectedItem();
@@ -1072,7 +1078,6 @@ public class ViewHelper {
                     platformService.showDocument("https://www.gog.com/u/" + accountLink.getServiceId())
             );
         });
-
 
         contextMenu.getItems().add(steamLookupMenuItem);
 

@@ -847,7 +847,7 @@ public class ModerationReportController implements Controller<Region> {
 
     private void initializeUserTableView() {
         ViewHelper.buildUserTableView(platformService, reportedPlayerTableView, reportedPlayersOfCurrentlySelectedReport, this::addBan,
-                playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), communicationService);
+                playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), false, communicationService);
     }
 
     private void setupReportSelectionListener() {

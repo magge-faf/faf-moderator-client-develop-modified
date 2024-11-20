@@ -209,7 +209,7 @@ public class UserManagementController implements Controller<SplitPane> {
         disableTabOnMissingPermission(userGroupsTab, GroupPermission.ROLE_READ_USER_GROUP);
 
         ViewHelper.buildUserTableView(platformService, userSearchTableView, users, null,
-                playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), communicationService);
+                playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), true, communicationService);
         ViewHelper.buildNotesTableView(userNoteTableView, userNotes, false);
         ViewHelper.buildNameHistoryTableView(userNameHistoryTableView, nameRecords);
         ViewHelper.buildBanTableView(userBansTableView, bans, false);
@@ -330,9 +330,7 @@ public class UserManagementController implements Controller<SplitPane> {
                 if (!userGroupsTab.isDisable()) {
                     permissionService.getPlayersUserGroups(user).thenAccept(playerGroups -> {
                         userGroups.addAll(playerGroups);
-                        groupPermissions.addAll(playerGroups.stream()
-                                .flatMap(userGroupFX -> userGroupFX.getPermissions().stream())
-                                .distinct().toList());
+                        groupPermissions.addAll(playerGroups.stream().flatMap(userGroupFX -> userGroupFX.getPermissions().stream()).distinct().toList());
                     });
                 }
 
