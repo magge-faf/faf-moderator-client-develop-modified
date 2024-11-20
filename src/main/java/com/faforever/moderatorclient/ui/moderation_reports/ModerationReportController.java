@@ -108,6 +108,7 @@ public class ModerationReportController implements Controller<Region> {
     public TableColumn lastActivity;
     @FXML
     public Button copyModeratorEventsButton;
+    public Button copyChatLogButtonOffenderOnly;
     @FXML
     private CheckBox enforceRatingCheckBox;
     @FXML
@@ -174,6 +175,10 @@ public class ModerationReportController implements Controller<Region> {
 
     public void onCopyChatLog() {
         setSysClipboardText(copyChatLogButton.getId());
+    }
+
+    public void onCopyChatLogButtonOffenderOnly() {
+        setSysClipboardText(copyChatLogButtonOffenderOnly.getId());
     }
 
     public void onCopyModeratorEvents() {
@@ -642,6 +647,8 @@ public class ModerationReportController implements Controller<Region> {
         });
     }
 
+
+
     // TODO refactor with setter getter and use Integer
     public static class ModeratorStatistics {
         private final StringProperty moderator;
@@ -834,6 +841,8 @@ public class ModerationReportController implements Controller<Region> {
     private void resetButtonsToInvalidState() {
         copyChatLogButton.setText("Chat Log n/a");
         copyChatLogButton.setId("");
+        copyChatLogButtonOffenderOnly.setText("Chat Offender n/a");
+        copyChatLogButtonOffenderOnly.setId("");
         copyModeratorEventsButton.setText("Moderator Events n/a");
         copyModeratorEventsButton.setId("");
         copyGameIdButton.setText("Game ID n/a");
@@ -1427,6 +1436,8 @@ public class ModerationReportController implements Controller<Region> {
             startReplayButton.setText("Replay n/a");
             copyChatLogButton.setText("Chat Log n/a");
             copyChatLogButton.setId("");
+            copyChatLogButtonOffenderOnly.setText("Chat Offender n/a");
+            copyChatLogButtonOffenderOnly.setId("");
             copyModeratorEventsButton.setText("Moderator Events n/a");
             copyModeratorEventsButton.setId("");
             chatLogTextFlow.getChildren().clear();
@@ -1461,6 +1472,10 @@ public class ModerationReportController implements Controller<Region> {
             String chatLog = generateChatLog(replayDataParser);
 
             StringBuilder chatLogFiltered = new StringBuilder();
+            StringBuilder chatLogFilteredOffenderOnly = new StringBuilder();
+            String reportedUser = extractName(copyReportedUserIdButton.getText());
+
+
             chatLogFiltered.append(header);
 
             String metadataInfo = generateMetadataInfo(replayDataParser);
@@ -1474,9 +1489,20 @@ public class ModerationReportController implements Controller<Region> {
 
             chatLogFiltered.append("\n").append(promptAI);
 
+            for (String line : filteredChatLog.split("\n")) {
+                if (line.contains(reportedUser)) {
+                    chatLogFilteredOffenderOnly.append(line).append("\n");
+                }
+            }
+
+            chatLogFilteredOffenderOnly.append("\n\n").append(promptAI);
+
             Platform.runLater(() -> {
                 copyChatLogButton.setId(chatLogFiltered.toString());
                 copyChatLogButton.setText("Copy Chat Log");
+
+                copyChatLogButtonOffenderOnly.setText("Copy Chat Offender");
+                copyChatLogButtonOffenderOnly.setId(chatLogFilteredOffenderOnly.toString());
 
                 updateChatLogToColorTextFlow(chatLogTextFlow, String.valueOf(chatLogFiltered),
                         extractName(copyReporterIdButton.getText()),

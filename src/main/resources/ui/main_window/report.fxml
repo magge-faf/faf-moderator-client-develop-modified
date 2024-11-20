@@ -40,6 +40,7 @@
                 <Separator minHeight="5"/>
 
                 <Button fx:id="copyChatLogButton" text="Chat Log" onAction="#onCopyChatLog" minWidth="150"/>
+                <Button fx:id="copyChatLogButtonOffenderOnly" text="Chat Log Offender" onAction="#onCopyChatLogButtonOffenderOnly" minWidth="150"/>
                 <Button fx:id="copyModeratorEventsButton" text="Moderator Events" onAction="#onCopyModeratorEvents" minWidth="150"/>
                 <Button fx:id="startReplayButton" text="Start Replay" onAction="#onStartReplay" minWidth="150"/>
 
