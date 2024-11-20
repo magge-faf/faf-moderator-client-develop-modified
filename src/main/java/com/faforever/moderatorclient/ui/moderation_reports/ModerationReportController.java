@@ -6,6 +6,7 @@ import com.faforever.commons.replay.ModeratorEvent;
 import com.faforever.commons.replay.ReplayDataParser;
 import com.faforever.commons.replay.ReplayMetadata;
 import com.faforever.commons.replay.GameOption;
+import com.faforever.commons.replay.body.Event;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.BanService;
 import com.faforever.moderatorclient.api.domain.ModerationReportService;
@@ -1457,7 +1458,6 @@ public class ModerationReportController implements Controller<Region> {
     private void processAndDisplayReplay(String header, Path tempFilePath, String promptAI) {
         try {
             ReplayDataParser replayDataParser = new ReplayDataParser(tempFilePath, objectMapper);
-            Map<Integer, Map<Integer, AtomicInteger>> commandsPerMinuteByPlayer = replayDataParser.getCommandsPerMinuteByPlayer();
             String chatLog = generateChatLog(replayDataParser);
 
             StringBuilder chatLogFiltered = new StringBuilder();
@@ -1667,14 +1667,102 @@ public class ModerationReportController implements Controller<Region> {
         return "Not Found";
     }
 
+    public String formatTicksToTime(int ticks) {
+        // Convert ticks to total seconds (1 tick = 0.1 second)
+        int totalSeconds = ticks / 10;
+
+        int hours = totalSeconds / 3600;
+        int minutes = (totalSeconds % 3600) / 60;
+        int seconds = totalSeconds % 60;
+
+        return String.format("%02d:%02d:%02d", hours, minutes, seconds);
+    }
+
+    public Map<Integer, String> getPlayerIndicesWithNamesFromArmies(Map<Integer, Map<String, Object>> armies) {
+        return armies.entrySet().stream()
+                .filter(entry -> entry.getValue().containsKey("PlayerName"))
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> (String) entry.getValue().get("PlayerName")
+                ));
+    }
+
+    public List<String> processReplayForTerminatedPlayers(List<Event> events, Map<Integer, Map<String, Object>> armies) {
+        int ticks = 0;
+        int player = -1; // TODO: -1 could represent spectators; need to double-check
+
+        // Get player indices with names
+        Map<Integer, String> playerIndicesWithNames = getPlayerIndicesWithNamesFromArmies(armies);
+
+        // Prepare a list to collect the messages
+        List<String> terminatedMessages = new ArrayList<>();
+
+        // Process the events
+        for (Event event : events) {
+            if (event instanceof Event.CommandSourceTerminated) {
+                String playerName = playerIndicesWithNames.getOrDefault(player, "Unknown Player");
+                String message = String.format(
+                        "Player %s (Army Index %d) command source terminated at game time %s",
+                        playerName, player, formatTicksToTime(ticks)
+                );
+                terminatedMessages.add(message);
+            } else if (event instanceof Event.SetCommandSource setCommandSource) {
+                player = setCommandSource.playerIndex();
+            } else if (event instanceof Event.Advance advance) {
+                ticks += advance.ticksToAdvance();
+            }
+        }
+
+        return terminatedMessages;
+    }
+
+        public record DesyncResult(boolean desync, int tick) {
+
+    }
+
+    public DesyncResult checkReplayEventsForDesync(List<Event> events) {
+        String previousChecksum = null;
+        int previousTick = -1;
+
+        for (Event event : events) {
+            if (event instanceof Event.VerifyChecksum verifyChecksum) {
+                String currentChecksum = verifyChecksum.hash();
+                int currentTick = verifyChecksum.tick();
+
+                if (currentTick == previousTick && !Objects.equals(previousChecksum, currentChecksum)) {
+                    log.warn("Replay desynced at game time {}: expected checksum {}, got {}",
+                            formatTicksToTime(currentTick), previousChecksum, currentChecksum);
+                    return new DesyncResult(true, previousTick);
+                }
+
+                previousChecksum = currentChecksum;
+                previousTick = currentTick;
+            }
+        }
+
+        return new DesyncResult(false, -1);
+    }
+
     private String generateMetadataInfo(ReplayDataParser replayDataParser) {
         ReplayMetadata metadata = replayDataParser.getMetadata();
         List<GameOption> gameOptions = replayDataParser.getGameOptions();
         Map<String, Map<String, ?>> mods = replayDataParser.getMods();
+        List<Event> events = replayDataParser.getEvents();
+        Map<Integer, Map<String, Object>> armies = replayDataParser.getArmies();
 
-        log.debug("Mods: {}", mods);
-        log.debug("Metadata: {}", metadata);
-        log.debug("Game Options: {}", gameOptions);
+        List<String> terminatedMessages = processReplayForTerminatedPlayers(events, armies);
+        DesyncResult desyncResult = checkReplayEventsForDesync(events);
+
+        if (desyncResult.desync()) {
+            log.debug("Replay is desynchronized.");
+        } else {
+            log.debug("Replay is synchronized.");
+        }
+
+        //log.debug("Debug Mods: {}", mods);
+        //log.debug("Debug Metadata: {}", metadata);
+        //log.debug("Debug Game Options: {}", gameOptions);
+        //log.debug("Debug Events: {}", events);
 
         final String CHEATS_ENABLED_KEY = "CheatsEnabled";
         final String VICTORY_KEY = "Victory";
@@ -1700,30 +1788,40 @@ public class ModerationReportController implements Controller<Region> {
 
         StringBuilder report = new StringBuilder();
 
+        for (String message : terminatedMessages) {
+            report.append(message).append("\n");
+        }
+
         if (Boolean.parseBoolean(cheatsEnabled)) {
-            report.append("[!] Cheats Enabled: ").append(cheatsEnabled).append("\n");
+            report.append("\n[!] Cheats Enabled: ").append(cheatsEnabled).append("\n");
+        }
+
+        if (desyncResult.desync()) {
+            report.append("\n[!] Desynced Replay at Game Time: ")
+                    .append(formatTicksToTime(desyncResult.tick()))
+                    .append("\n");
         }
 
         if (!commonArmy.equalsIgnoreCase(OFF_STRING) && !commonArmy.equalsIgnoreCase("Not Found")) {
-            report.append("[!] Non-Default Common Army: ").append(commonArmy).append("\n");
+            report.append("\n[!] Non-Default Common Army: ").append(commonArmy).append("\n");
         }
 
         String reporterLoginName = String.valueOf(currentlySelectedItemNotNull.getReporter().getLogin());
 
-        boolean found = false;
+        boolean reporterParticipated = false;
         for (Map.Entry<String, List<String>> entry : metadata.getTeams().entrySet()) {
             List<String> playerNames = entry.getValue();
             if (playerNames.contains(reporterLoginName)) {
-                found = true;
+                reporterParticipated = true;
                 break;
             }
         }
 
-        if (!found) {
+        if (!reporterParticipated) {
             report.append(String.format("[!] Reporter '%s' does not exist in any of the team names.\n", reporterLoginName));
         }
 
-        report.append("Host: ").append(metadata.getHost()).append("\n")
+        report.append("\nHost: ").append(metadata.getHost()).append("\n")
                 .append("Victory Condition: ").append(DEMORALIZATION.equalsIgnoreCase(victoryCondition) ? ASSASSINATION : victoryCondition).append("\n")
                 .append("Share Condition: ").append(shareCondition).append("\n")
                 .append("Number of Players: ").append(metadata.getNumPlayers()).append("\n")
