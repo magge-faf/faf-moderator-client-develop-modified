@@ -1152,54 +1152,67 @@ public class ModerationReportController implements Controller<Region> {
 
     }
 
+    private boolean isTaskRunning = false;
+
     @SneakyThrows
     private void showChatLog(ModerationReportFX report) {
+        if (isTaskRunning) {
+            log.debug("Task is already running for report: {}", report.getId());
+            return;
+        }
+
+        isTaskRunning = true;
+
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() {
-                GameFX game = report.getGame();
-                String header = formatChatHeader(report, game);
-                Path tempFilePath = createTempFile(game);
+                Path tempFilePath = null;
+                try {
+                    GameFX game = report.getGame();
+                    String header = formatChatHeader(report, game);
+                    tempFilePath = createTempFile(game);
 
-                if (tempFilePath == null) {
-                    updateUIUnavailable(header, "An error occurred while creating a temporary file.");
-                    return null;
-                }
+                    if (tempFilePath == null) {
+                        updateUIUnavailable(header, "An error occurred while creating a temporary file.");
+                        return null;
+                    }
 
-                HttpResponse<Path> response = downloadReplay(game, tempFilePath);
+                    HttpResponse<Path> response = downloadReplay(game, tempFilePath);
 
-                if (response == null || response.statusCode() == 404) {
-                    updateUIUnavailable(header, """
-                            Server Status Code 404 - Replay not available.
-                            Please note that new replays may take some time to become accessible when they got immediately reported after a game.
-                            Additionally, legacy replays are hosted on a separate server, which may occasionally experience issues requiring a restart.""");
-                } else {
-                    String offenderNames = report.getReportedUsers().stream()
-                            .map(PlayerFX::getRepresentation)
-                            .collect(Collectors.joining(", "));
-                    String reporter = String.valueOf(report.getReporter().getRepresentation());
-                    String filePathGamingModeratorTask = CONFIGURATION_FOLDER + File.separator + "templateGamingModeratorTask.txt";
-                    StringBuilder contentGamingModeratorTask = new StringBuilder();
-                    try (BufferedReader br = new BufferedReader(new FileReader(filePathGamingModeratorTask))) {
-                        String line;
-                        while ((line = br.readLine()) != null) {
-                            line = line.replace("%offenderNames%", offenderNames);
-                            line = line.replace("%reporter%", reporter);
+                    if (response == null || response.statusCode() == 404) {
+                        updateUIUnavailable(header, """
+                                Server Status Code 404 - Replay not available.
+                                Please note that new replays may take some time to become accessible when they got immediately reported after a game.
+                                Additionally, legacy replays are hosted on a separate server, which may occasionally experience issues requiring a restart.""");
+                    } else {
+                        String offenderNames = report.getReportedUsers().stream()
+                                .map(PlayerFX::getRepresentation)
+                                .collect(Collectors.joining(", "));
+                        String reporter = String.valueOf(report.getReporter().getRepresentation());
+                        String filePathGamingModeratorTask = CONFIGURATION_FOLDER + File.separator + "templateGamingModeratorTask.txt";
+                        StringBuilder contentGamingModeratorTask = new StringBuilder();
+                        try (BufferedReader br = new BufferedReader(new FileReader(filePathGamingModeratorTask))) {
+                            String line;
+                            while ((line = br.readLine()) != null) {
+                                line = line.replace("%offenderNames%", offenderNames);
+                                line = line.replace("%reporter%", reporter);
 
-                            contentGamingModeratorTask.append(line).append("\n");
+                                contentGamingModeratorTask.append(line).append("\n");
+                            }
+                        } catch (IOException e) {
+                            log.warn(String.valueOf(e));
                         }
-                    } catch (IOException e) {
-                        log.warn(String.valueOf(e));
-                    }
 
-                    try {
-                        processAndDisplayReplay(header, tempFilePath, String.valueOf(contentGamingModeratorTask));
-                    } catch (Exception e) {
-                        log.error("An error occurred while processing and displaying the replay", e);
+                        try {
+                            processAndDisplayReplay(header, tempFilePath, String.valueOf(contentGamingModeratorTask));
+                        } catch (Exception e) {
+                            log.error("An error occurred while processing and displaying the replay", e);
+                        }
                     }
+                } finally {
+                    deleteTempFile(tempFilePath);
+                    isTaskRunning = false;
                 }
-
-                deleteTempFile(tempFilePath);
                 return null;
             }
         };
