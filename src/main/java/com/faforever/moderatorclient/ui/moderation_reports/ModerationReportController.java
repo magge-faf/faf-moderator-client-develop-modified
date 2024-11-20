@@ -15,6 +15,7 @@ import com.faforever.moderatorclient.ui.domain.BanInfoFX;
 import com.faforever.moderatorclient.ui.domain.GameFX;
 import com.faforever.moderatorclient.ui.domain.ModerationReportFX;
 import com.faforever.moderatorclient.ui.domain.PlayerFX;
+import javafx.scene.input.Clipboard;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -233,7 +234,7 @@ public class ModerationReportController implements Controller<Region> {
             result = selectedReportIds + "\n\n" + "DAY_NUMBER day ban - ReplayID " + selectedGameIds + " - SOME_REASON";
             ClipboardContent clipboardContent = new ClipboardContent();
             clipboardContent.putString(result);
-            javafx.scene.input.Clipboard.getSystemClipboard().setContent(clipboardContent);
+            Clipboard.getSystemClipboard().setContent(clipboardContent);
 
             useTemplateWithoutReasonsButton.setText("Copied");
             Timer timer = new Timer();
@@ -349,7 +350,7 @@ public class ModerationReportController implements Controller<Region> {
                     // Copy result to clipboard
                     ClipboardContent clipboardContent = new ClipboardContent();
                     clipboardContent.putString(result);
-                    javafx.scene.input.Clipboard.getSystemClipboard().setContent(clipboardContent);
+                    Clipboard.getSystemClipboard().setContent(clipboardContent);
 
                     useTemplateWithReasonsButton.setText("Copied");
                     templateStage.close();
@@ -631,8 +632,8 @@ public class ModerationReportController implements Controller<Region> {
             content.append("- **Temporary Bans**: ").append(temporaryBans).append("\n");
 
             Platform.runLater(() -> {
-                javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
-                javafx.scene.input.ClipboardContent clipboardContent = new javafx.scene.input.ClipboardContent();
+                Clipboard clipboard = Clipboard.getSystemClipboard();
+                ClipboardContent clipboardContent = new ClipboardContent();
                 clipboardContent.putString(content.toString());
                 clipboard.setContent(clipboardContent);
                 System.out.println("Content copied to clipboard.");
