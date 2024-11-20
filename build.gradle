@@ -47,7 +47,7 @@ dependencies {
     implementation("org.jetbrains:annotations:26.0.0")
     implementation("org.springframework.boot:spring-boot-starter")
     implementation("org.springframework.boot:spring-boot-starter-validation")
-    implementation("org.springframework.security.oauth.boot:spring-security-oauth2-autoconfigure:2.6.8")
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-client:3.3.5")
     implementation("javax.inject:javax.inject:1")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8")
@@ -69,6 +69,7 @@ dependencies {
     implementation 'org.json:json:20240303'
     implementation 'org.apache.httpcomponents.core5:httpcore5:5.3'
     implementation 'org.apache.httpcomponents.client5:httpclient5:5.4'
+    // Recursive Fix in Local File
     dependencies {
         implementation files('libs/faf-commons-api-1.0-SNAPSHOT.jar')
     }

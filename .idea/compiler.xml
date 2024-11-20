@@ -13,17 +13,24 @@
         </processorPath>
         <module name="com.faforever.faf-moderator-client.main" />
       </profile>
+      <profile name="Gradle Imported" enabled="true">
+        <outputRelativeToContentRoot value="true" />
+        <option name="mapstruct.defaultComponentModel" value="jsr330" />
+        <processorPath useClasspath="false">
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.springframework.boot/spring-boot-configuration-processor/3.3.4/c472859e2143ba04e87759f7dca41396346ea83e/spring-boot-configuration-processor-3.3.4.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.projectlombok/lombok/1.18.34/ec547ef414ab1d2c040118fb9c1c265ada63af14/lombok-1.18.34.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.mapstruct/mapstruct-processor/1.6.2/68f761eab9d57ea0a3721aaca822cdff5eaaf972/mapstruct-processor-1.6.2.jar" />
+        </processorPath>
+        <module name="faf-moderator-client.main" />
+      </profile>
     </annotationProcessing>
-    <bytecodeTargetLevel>
+    <bytecodeTargetLevel target="21">
       <module name="com.faforever.faf-moderator-client" target="17" />
       <module name="com.faforever.faf-moderator-client.main" target="17" />
       <module name="com.faforever.faf-moderator-client.test" target="17" />
       <module name="dev.faf-moderator-client" target="11" />
       <module name="dev.faf-moderator-client.main" target="11" />
       <module name="dev.faf-moderator-client.test" target="11" />
-      <module name="faf-moderator-client" target="1.8" />
-      <module name="faf-moderator-client.main" target="11" />
-      <module name="faf-moderator-client.test" target="11" />
     </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">
