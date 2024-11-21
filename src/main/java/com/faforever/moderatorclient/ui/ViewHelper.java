@@ -810,27 +810,7 @@ public class ViewHelper {
         tableView.getColumns().add(updateTimeColumn);
         */
 
-                    if (onAddBan != null) {
-                        TableColumn<PlayerFX, PlayerFX> banOptionColumn = new TableColumn<>("Ban");
-                        banOptionColumn.setCellValueFactory(param -> new SimpleObjectProperty<>(param.getValue()));
-                        banOptionColumn.setCellFactory(param -> new TableCell<>() {
 
-                            @Override
-                            protected void updateItem(PlayerFX item, boolean empty) {
-                                super.updateItem(item, empty);
-                                if (!empty) {
-                                    if (!item.isBannedGlobally()) {
-                                        Button button = new Button("Add ban");
-                                        button.setOnMouseClicked(event -> onAddBan.accept(item));
-                                        setGraphic(button);
-                                        return;
-                                    }
-                                }
-                                setGraphic(null);
-                            }
-                        });
-                        tableView.getColumns().add(banOptionColumn);
-                    }
 
                     TableColumn<PlayerFX, String> hashColumn = new TableColumn<>("Hash");
                     hashColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
@@ -1008,6 +988,28 @@ public class ViewHelper {
                     extractors.put(volumeSerialNumber, playerFX -> playerFX.getUniqueIds().stream().map(UniqueIdFx::getVolumeSerialNumber).collect(Collectors.toList()));
 
                 }
+            }
+
+            if (onAddBan != null) {
+                TableColumn<PlayerFX, PlayerFX> banOptionColumn = new TableColumn<>("Ban");
+                banOptionColumn.setCellValueFactory(param -> new SimpleObjectProperty<>(param.getValue()));
+                banOptionColumn.setCellFactory(param -> new TableCell<>() {
+
+                    @Override
+                    protected void updateItem(PlayerFX item, boolean empty) {
+                        super.updateItem(item, empty);
+                        if (!empty) {
+                            if (!item.isBannedGlobally()) {
+                                Button button = new Button("Add ban");
+                                button.setOnMouseClicked(event -> onAddBan.accept(item));
+                                setGraphic(button);
+                                return;
+                            }
+                        }
+                        setGraphic(null);
+                    }
+                });
+                tableView.getColumns().add(banOptionColumn);
             }
         }
 
