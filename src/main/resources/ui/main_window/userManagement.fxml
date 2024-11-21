@@ -148,7 +148,9 @@
                     <TextField fx:id="playerIDField1SharedGamesTextfield" minWidth="100.0" promptText="PlayerID"/>
                     <Label text="and" alignment="CENTER"/>
                     <TextField fx:id="playerIDField2SharedGamesTextfield" minWidth="100.0" promptText="PlayerID"/>
-                    <Button fx:id="checkSharedGamesButton" text="Check" onAction="#onCheckSharedGames" mnemonicParsing="false"/>
+                    <Button fx:id="checkSharedGamesButton" text="Check For Shared Games" onAction="#onCheckSharedGames" mnemonicParsing="false"/>
+                    <Label fx:id="pagesMaxAmountGamesLabel" text="pagesMaxAmountGamesText 1 page = 100 games:"/>
+                    <TextField fx:id="pagesMaxAmountGamesTextfield" minWidth="100.0" text="10"/>
                     <Button fx:id="loadMoreGamesButton" onAction="#loadMoreGames" text="Load more"/>
                 </HBox>
                 <TableView fx:id="userLastGamesTable" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308" VBox.vgrow="ALWAYS"/>

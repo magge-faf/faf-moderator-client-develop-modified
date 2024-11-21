@@ -71,6 +71,8 @@ public class UserManagementController implements Controller<SplitPane> {
     public Button checkSharedGamesButton;
     public Button removeNoteButton;
     @FXML
+    public TextField pagesMaxAmountGamesTextfield;
+    @FXML
     private Button checkRecentAccountsForSmurfsPauseButton;
 
     private volatile boolean isPaused = false;
@@ -1248,71 +1250,82 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     public void onCheckSharedGames() {
-        String playerID1 = playerIDField1SharedGamesTextfield.getText();
-        String playerID2 = playerIDField2SharedGamesTextfield.getText();
+        List<PlayerFX> selectedItems = new ArrayList<>(userSearchTableView.getSelectionModel().getSelectedItems());
+
+        String playerID1 = playerIDField1SharedGamesTextfield.getText().trim();
+        String playerID2 = playerIDField2SharedGamesTextfield.getText().trim();
+
+        if (playerID1.isEmpty() || playerID2.isEmpty()) {
+            if (selectedItems.size() == 2) {
+                playerID1 = selectedItems.get(0).getId();
+                playerID2 = selectedItems.get(1).getId();
+            } else {
+                checkSharedGamesButton.setText("Check - Please select exactly two users or provide two player IDs.");
+                return;
+            }
+        }
 
         if (isValidPlayerId(playerID1) && isValidPlayerId(playerID2)) {
             userGamesPage = 1;
-            int numberOfPagesToLoad = 50;
+            int numberOfPagesToLoad = Integer.parseInt(pagesMaxAmountGamesTextfield.getText());
 
             List<GamePlayerStatsFX> allPlayer1Games = Collections.synchronizedList(new ArrayList<>());
             List<GamePlayerStatsFX> allPlayer2Games = Collections.synchronizedList(new ArrayList<>());
 
-            CompletableFuture<Void> allOf = CompletableFuture.allOf();
-
             for (int i = 0; i < numberOfPagesToLoad; i++) {
                 final int currentPage = userGamesPage + i;
 
-                CompletableFuture<List<GamePlayerStatsFX>> player1GamesFuture = CompletableFuture.supplyAsync(() ->
-                        gamePlayerStatsMapper.map(userService.getLastHundredPlayedGamesByFeaturedMod(playerID1, currentPage, featuredModFilterChoiceBox.getSelectionModel().getSelectedItem())));
-                CompletableFuture<List<GamePlayerStatsFX>> player2GamesFuture = CompletableFuture.supplyAsync(() ->
-                        gamePlayerStatsMapper.map(userService.getLastHundredPlayedGamesByFeaturedMod(playerID2, currentPage, featuredModFilterChoiceBox.getSelectionModel().getSelectedItem())));
+                try {
+                    // Sequential API calls with a delay to respect rate limits
+                    List<GamePlayerStatsFX> player1Games = gamePlayerStatsMapper.map(
+                            userService.getLastHundredPlayedGamesByFeaturedMod(
+                                    playerID1, currentPage, featuredModFilterChoiceBox.getSelectionModel().getSelectedItem())
+                    );
+                    allPlayer1Games.addAll(player1Games);
 
-                allOf = allOf.thenCombine(CompletableFuture.allOf(player1GamesFuture, player2GamesFuture), (v, ignored) -> {
-                    try {
-                        List<GamePlayerStatsFX> player1Games = player1GamesFuture.get();
-                        List<GamePlayerStatsFX> player2Games = player2GamesFuture.get();
+                    Thread.sleep(250);
 
-                        allPlayer1Games.addAll(player1Games);
-                        allPlayer2Games.addAll(player2Games);
-                    } catch (InterruptedException | ExecutionException e) {
-                        log.warn(String.valueOf(e));
-                    }
-                    return null;
-                });
+                    List<GamePlayerStatsFX> player2Games = gamePlayerStatsMapper.map(
+                            userService.getLastHundredPlayedGamesByFeaturedMod(
+                                    playerID2, currentPage, featuredModFilterChoiceBox.getSelectionModel().getSelectedItem())
+                    );
+                    allPlayer2Games.addAll(player2Games);
+
+                    Thread.sleep(250);
+                } catch (Exception e) {
+                    log.warn("Error during API request: ", e);
+                    Platform.runLater(() -> checkSharedGamesButton.setText("Check - Error during request."));
+                    return;
+                }
             }
 
-            allOf.thenRun(() -> {
-                Set<GameFX> player1Games = allPlayer1Games.stream()
-                        .map(GamePlayerStatsFX::getGame)
-                        .collect(Collectors.toSet());
+            Set<GameFX> player1Games = allPlayer1Games.stream()
+                    .map(GamePlayerStatsFX::getGame)
+                    .collect(Collectors.toSet());
 
-                Set<GameFX> player2Games = allPlayer2Games.stream()
-                        .map(GamePlayerStatsFX::getGame)
-                        .collect(Collectors.toSet());
+            Set<GameFX> player2Games = allPlayer2Games.stream()
+                    .map(GamePlayerStatsFX::getGame)
+                    .collect(Collectors.toSet());
 
-                Set<GameFX> commonGames = new HashSet<>(player1Games);
-                commonGames.retainAll(player2Games);
+            Set<GameFX> commonGames = new HashSet<>(player1Games);
+            commonGames.retainAll(player2Games);
 
-                Set<GamePlayerStatsFX> commonGameStats = allPlayer1Games.stream()
-                        .filter(stats -> commonGames.contains(stats.getGame()))
-                        .collect(Collectors.toSet());
+            Set<GamePlayerStatsFX> commonGameStats = allPlayer1Games.stream()
+                    .filter(stats -> commonGames.contains(stats.getGame()))
+                    .collect(Collectors.toSet());
 
-                Platform.runLater(() -> {
-                    userLastGamesTable.getItems().clear();
+            Platform.runLater(() -> {
+                userLastGamesTable.getItems().clear();
 
-                    if (!commonGameStats.isEmpty()) {
-                        userLastGamesTable.getItems().setAll(commonGameStats);
-                    } else {
-                        log.info("No common games found.");
-                        checkSharedGamesButton.setText("Check");
-                    }
-                });
-            }).join();
-
+                if (!commonGameStats.isEmpty()) {
+                    userLastGamesTable.getItems().setAll(commonGameStats);
+                } else {
+                    log.info("No common games found.");
+                    checkSharedGamesButton.setText("Check");
+                }
+            });
         } else {
-            checkSharedGamesButton.setText("Check - Error Fix Invalid player IDs.");
+            checkSharedGamesButton.setText("Check - Invalid player IDs provided.");
         }
     }
-
 }
