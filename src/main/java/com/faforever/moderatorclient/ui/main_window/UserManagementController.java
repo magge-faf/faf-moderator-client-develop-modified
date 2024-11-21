@@ -387,7 +387,12 @@ public class UserManagementController implements Controller<SplitPane> {
         List<PlayerFX> usersFound = userService.findUsersByAttribute(searchParameter, searchPattern);
         users.addAll(usersFound);
 
-        SearchHistoryTextArea.setText(userSearchTextField.getText() + "\n" + SearchHistoryTextArea.getText());
+        String userSearchText = userSearchTextField.getText();
+        String currentHistory = SearchHistoryTextArea.getText();
+
+        if (!currentHistory.startsWith(userSearchText + "\n")) {
+            SearchHistoryTextArea.setText(userSearchText + "\n" + currentHistory);
+        }
     }
 
     private String determineSearchParameter(String searchPattern) {
