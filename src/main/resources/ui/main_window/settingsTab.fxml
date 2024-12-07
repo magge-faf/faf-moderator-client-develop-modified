@@ -3,10 +3,10 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.*?>
-<?import javafx.scene.control.ScrollPane?>
 
 <?import javafx.collections.FXCollections?>
 <?import java.lang.String?>
+<?import javafx.util.converter.IntegerStringConverter?>
 <VBox fx:id="root" spacing="5" style="-fx-padding: 10px;" xmlns="http://javafx.com/javafx/20.0.1"
       xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.faforever.moderatorclient.ui.main_window.SettingsController">
@@ -33,14 +33,18 @@
                     text="UUID"/>
             <Button fx:id="blacklistedVolumeSNButton" mnemonicParsing="false" onAction="#onBlacklistedVolumeSN"
                     prefWidth="100" text="VolumeSN"/>
+
             <Separator prefHeight="5"/>
+
             <Text fx:id="excludedItemsLoadedText" style="-fx-font-size: 14pt;">Excluded Items Loaded:</Text>
             <Button fx:id="excludedItemsButton" mnemonicParsing="false" onAction="#onExcludedItems" prefWidth="70"
                     text="Excluded"/>
-            <Text text="IMPORTANT: Check link for latest ExcludedItems.txt" textAlignment="CENTER"/>
+            <Text text="IMPORTANT: Check link for latest ExcludedItems.txt (Restart Required)" textAlignment="CENTER"/>
             <TextField fx:id="genericJunkButton" minWidth="200"
                        text="https://faforever.zulipchat.com/#narrow/stream/203851-moderators/topic/AntiSmurfForce.20-.20ExcludedItems"/>
+
             <Separator prefHeight="5"/>
+
             <Text style="-fx-font-size: 14pt;" text="Templates" textAlignment="CENTER"/>
             <Button fx:id="templatesAndReasonsReportButton" mnemonicParsing="false" onAction="#templatesAndReasonsReportButton"
                     prefWidth="300" text="View Templates for FAF Forum and Ban Reasons"/>
@@ -51,13 +55,17 @@
             <MenuBar xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml">
                 <Menu fx:id="defaultStartingTabMenuBar" text="Choose Starting Tab:"/>
             </MenuBar>
+
             <Separator minHeight="5"/>
+
             <Text style="-fx-font-size: 14pt;" text="Misc"/>
             <Button fx:id="openConfigurationFolderButton" mnemonicParsing="false" onAction="#onOpenConfigurationFolder"
                     text="Open Configuration Folder"/>
             <Button fx:id="openAiPromptButton" mnemonicParsing="false" onAction="#onOpenAiPromptButton"
                     text="View AI Prompt"/>
+
             <Separator minHeight="5"/>
+
             <Text style="-fx-font-size: 12;" text="Select Browser for 'Search Forum' Button" textAlignment="CENTER"/>
             <ComboBox fx:id="browserComboBox" minWidth="150">
                 <items>
