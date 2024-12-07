@@ -965,7 +965,7 @@ public class ModerationReportController implements Controller<Region> {
         BanInfoFX ban = new BanInfoFX();
         ban.setPlayer(accountFX);
         banInfoController.setBanInfo(ban);
-        banInfoController.addPostedListener(banInfoFX -> onRefreshAllReports());
+        banInfoController.addPostedListener(banInfoFX -> onRefreshInitialReports());
         Stage banInfoDialog = new Stage();
         banInfoDialog.setTitle("Apply new ban");
         banInfoDialog.setScene(new Scene(banInfoController.getRoot()));
@@ -977,64 +977,35 @@ public class ModerationReportController implements Controller<Region> {
     private boolean isFetchingReport = false;
 
     private void renewFilter() {
-        new SwingWorker<Void, Void>() {
-            @Override
-            protected Void doInBackground() {
-                synchronized (reportLock) {
-                    while (isFetchingReport) {
-                        try {
-                            log.debug("Waiting for reports to finish loading...");
-                            reportLock.wait();
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            log.error("Thread was interrupted", e);
-                        }
+        Platform.runLater(() -> {
+            log.debug("Updating filtered item list in UI thread...");
+            filteredItemList.setPredicate(moderationReportFx -> {
+                String filterText = playerNameFilterTextField.getText().toLowerCase();
+                Optional<String> reportIdFilter = extractReportId(filterText);
+
+                if (reportIdFilter.isPresent()) {
+                    if (!moderationReportFx.getId().toLowerCase().contains(reportIdFilter.get())) {
+                        return false;
+                    }
+                } else if (!Strings.isNullOrEmpty(filterText)) {
+                    if (moderationReportFx.getReportedUsers().stream()
+                            .map(accountFX -> accountFX.getLogin().toLowerCase())
+                            .noneMatch(login -> login.contains(filterText)) &&
+                            !moderationReportFx.getReporter().getLogin().toLowerCase().contains(filterText)) {
+                        return false;
                     }
                 }
-                return null;
-            }
 
-            @Override
-            protected void done() {
-                Platform.runLater(() -> {
-                    log.debug("Reports loaded, continuing in UI thread...");
-                    filteredItemList.setPredicate(moderationReportFx -> {
-                        String filterText = playerNameFilterTextField.getText().toLowerCase();
-                        Optional<String> reportIdFilter = extractReportId(filterText);
+                ChooseableStatus selectedItem = statusChoiceBox.getSelectionModel().getSelectedItem();
+                if (selectedItem == ChooseableStatus.AWAITING_PROCESSING) {
+                    ModerationReportStatus status = moderationReportFx.getReportStatus();
+                    return status == ModerationReportStatus.AWAITING || status == ModerationReportStatus.PROCESSING;
+                }
 
-                        if (reportIdFilter.isPresent()) {
-                            if (!moderationReportFx.getId().toLowerCase().contains(reportIdFilter.get())) {
-                                return false;
-                            }
-                        } else if (!Strings.isNullOrEmpty(filterText)) {
-                            if (moderationReportFx.getReportedUsers().stream()
-                                    .map(accountFX -> accountFX.getLogin().toLowerCase())
-                                    .noneMatch(login -> login.contains(filterText)) &&
-                                    !moderationReportFx.getReporter().getLogin().toLowerCase().contains(filterText)) {
-                                return false;
-                            }
-                        }
-
-                        ChooseableStatus selectedItem = statusChoiceBox.getSelectionModel().getSelectedItem();
-                        if (selectedItem == ChooseableStatus.AWAITING_PROCESSING) {
-                            ModerationReportStatus status = moderationReportFx.getReportStatus();
-                            return status == ModerationReportStatus.AWAITING || status == ModerationReportStatus.PROCESSING;
-                        }
-
-                        return selectedItem.toString().equals("ALL") ||
-                                moderationReportFx.getReportStatus() == selectedItem.getModerationReportStatus();
-                    });
-
-                });
-            }
-        }.execute();
-    }
-
-    private void onReportFetched() {
-        synchronized (reportLock) {
-            isFetchingReport = false;
-            reportLock.notifyAll();
-        }
+                return selectedItem.toString().equals("ALL") ||
+                        moderationReportFx.getReportStatus() == selectedItem.getModerationReportStatus();
+            });
+        });
     }
 
     private Optional<String> extractReportId(String filterText) {
@@ -1047,75 +1018,87 @@ public class ModerationReportController implements Controller<Region> {
         return Optional.empty();
     }
 
-    public void onRefreshAllReports() {
-        synchronized (reportLock) {
-            if (isFetchingReport) {
-                log.debug("onRefreshAllReports is already updating");
-                return;
-            }
-            isFetchingReport = true;
-        }
-        createNewApiRequestThread();
-    }
-
     @Getter
     @Setter
     private AtomicInteger totalReportsLoaded = new AtomicInteger(0);
     @Getter
     private final AtomicInteger activeApiRequests = new AtomicInteger(0);
 
-    private void createNewApiRequestThread() {
-        int startingPage = 1;
-        int pageSize = 1000;
-        int parallelRequests = 5;
-        isFetchingReport = true;
+    private boolean isSelectionProcessingEnabled = true;
 
-        for (int i = 0; i < parallelRequests; i++) {
-            incrementActiveRequests();
-            loadReportsAsync(startingPage + i, pageSize, parallelRequests);
-        }
+    private void disableSelectionProcessing() {
+        isSelectionProcessingEnabled = false;
     }
 
-    private void loadReportsAsync(int currentPage, int pageSize, int parallelRequests) {
+    private void enableSelectionProcessing() {
+        isSelectionProcessingEnabled = true;
+    }
+
+    public void onRefreshInitialReports() {
+        synchronized (reportLock) {
+            if (isFetchingReport) {
+                log.debug("Initial reports are already being fetched.");
+                return;
+            }
+            isFetchingReport = true;
+        }
+
+        int initialPageSize = 100; // Only load the first 100 reports
+        activeApiRequests.incrementAndGet();
+        loadInitialReports(1, initialPageSize);
+    }
+
+    private void loadInitialReports(int currentPage, int pageSize) {
         moderationReportService.getPageOfReports(currentPage, pageSize).thenAccept(reportFxes -> {
             Platform.runLater(() -> {
-                reportFxes.forEach(report -> {
-                    itemMap.put(Integer.valueOf(report.getId()), report);
-                });
+                itemList.setAll(reportFxes); // Display only the initial reports
+                showInTableRepeatedOffenders(reportFxes);
 
-                int loadedCount = reportFxes.size();
-                totalReportsLoaded.addAndGet(loadedCount);
-                log.debug("Loaded {} reports on page {}. Total loaded: {}", loadedCount, currentPage, totalReportsLoaded.get());
+                log.debug("Initial reports loaded. Total count: {}", reportFxes.size());
+                totalReportsLoaded.set(reportFxes.size());
+                log.debug("totalReportsLoaded: Total count: {}", totalReportsLoaded.get());
 
-                // Check for stopping condition
-                if (loadedCount < pageSize) {
-                    isFetchingReport = false;
-                    log.debug("Loading complete. Total Reports Loaded: {}", totalReportsLoaded.get());
-                    onReportFetched();
-                    processStatisticsModerator(itemList);
-                    showInTableRepeatedOffenders(itemList);
-                } else {
-                    incrementActiveRequests();
-                    loadReportsAsync(currentPage + parallelRequests, pageSize, parallelRequests);
-                }
+                // After the initial load burst, fetch all reports in one swoop
+                onRefreshAllReports();
             });
         }).exceptionally(throwable -> {
-            log.error("Error loading reports on page {}", currentPage, throwable);
+            log.error("Error loading initial reports", throwable);
             return null;
         }).whenComplete((result, throwable) -> {
-            decrementActiveRequests();
+            if (activeApiRequests.decrementAndGet() == 0) {
+                synchronized (reportLock) {
+                    isFetchingReport = false;
+                }
+            }
         });
     }
 
+    @FXML
+    private void onRefreshAllReports() {
+        totalReportsLoaded.set(0);
+        activeApiRequests.incrementAndGet();
+        moderationReportService.getAllReports().thenAccept(allReports -> Platform.runLater(() -> {
+            try {
+                disableSelectionProcessing(); // Disable processing of selected item
+                itemList.setAll(allReports);
+            } finally {
+                enableSelectionProcessing(); // Re-enable processing
+            }
 
-    private void incrementActiveRequests() {
-        int activeRequestsBefore = activeApiRequests.incrementAndGet();
-        log.debug("Incremented active API requests. Current count: {}", activeRequestsBefore);
-    }
-
-    private void decrementActiveRequests() {
-        int activeRequestsAfter = activeApiRequests.decrementAndGet();
-        log.debug("Decremented active API requests. Current count: {}", activeRequestsAfter);
+            processStatisticsModerator(allReports);
+            showInTableRepeatedOffenders(allReports);
+            log.debug("All reports loaded. Total count: {}", allReports.size());
+            totalReportsLoaded.set(allReports.size());
+        })).exceptionally(throwable -> {
+            log.error("Error loading all reports", throwable);
+            return null;
+        }).whenComplete((result, throwable) -> {
+            if (activeApiRequests.decrementAndGet() == 0) {
+                synchronized (reportLock) {
+                    isFetchingReport = false;
+                }
+            }
+        });
     }
 
     public void onEdit() {
@@ -1129,7 +1112,7 @@ public class ModerationReportController implements Controller<Region> {
             EditModerationReportController editModerationReportController = uiService.loadFxml("ui/edit_moderation_report.fxml");
             editModerationReportController.setSelectedReports(new ArrayList<>(selectedItems));
 
-            editModerationReportController.setOnSaveRunnable(this::onRefreshAllReports);
+            editModerationReportController.setOnSaveRunnable(this::onRefreshInitialReports);
 
             Stage editDialog = new Stage();
             int numberOfReports = selectedItems.size();
@@ -1137,8 +1120,6 @@ public class ModerationReportController implements Controller<Region> {
             editDialog.setTitle(title);
             editDialog.setScene(new Scene(editModerationReportController.getRoot()));
             editDialog.showAndWait();
-
-            this.onRefreshAllReports();
 
         } catch (Exception e) {
             log.error("Error while editing reports", e);
@@ -1474,7 +1455,6 @@ public class ModerationReportController implements Controller<Region> {
             StringBuilder chatLogFiltered = new StringBuilder();
             StringBuilder chatLogFilteredOffenderOnly = new StringBuilder();
             String reportedUser = extractName(copyReportedUserIdButton.getText());
-
 
             chatLogFiltered.append(header);
 

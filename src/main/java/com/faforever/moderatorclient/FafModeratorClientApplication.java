@@ -126,7 +126,6 @@ public class FafModeratorClientApplication extends Application {
 
         if (hasActiveRequests) {
             if (!isFetching) {
-                moderationReportController.setTotalReportsLoaded(new AtomicInteger(0));
                 startFetchingPattern();
                 isFetching = true;
                 lastRefreshedTime = System.currentTimeMillis();
@@ -154,6 +153,8 @@ public class FafModeratorClientApplication extends Application {
             return;
         }
 
+        final long[] counterSecondsRequestReportsFromServer = {0};
+
         timeline = new Timeline(new KeyFrame(Duration.seconds(1), event -> {
             long elapsedTimeMillis = System.currentTimeMillis() - startTime;
             long elapsedTimeSeconds = elapsedTimeMillis / 1000;
@@ -161,14 +162,10 @@ public class FafModeratorClientApplication extends Application {
             long seconds = elapsedTimeSeconds % 60;
             String elapsedTimeStr = String.format("%02d:%02d", minutes, seconds);
 
-            int totalReportsLoaded = moderationReportController.getTotalReportsLoaded().get();
-
-            int fixedWidth = 5;
-            String reportsLoadedStr = String.format("%" + fixedWidth + "d", totalReportsLoaded);
+            counterSecondsRequestReportsFromServer[0]++;
 
             primaryStage.setTitle("magge's Mordor - Session: " + elapsedTimeStr +
-                    " | Reports Loaded: " + reportsLoadedStr +
-                    " | ⚠️⚠️⚠️ Do not change the filter while reports are loading.⚠️⚠️⚠️");
+                    " | Latest 100 Reports Fetched | Requesting now all reports from the server... (" + counterSecondsRequestReportsFromServer[0] + " seconds ago)");
         }));
 
         timeline.setCycleCount(Timeline.INDEFINITE);

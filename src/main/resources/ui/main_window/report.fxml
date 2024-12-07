@@ -27,7 +27,7 @@
                 <ChoiceBox fx:id="statusChoiceBox"/>
                 <TextField fx:id="playerNameFilterTextField" promptText="Enter player name to search" minWidth="150"/>
                 <Button fx:id="editReportButton" text="Edit" onAction="#onEdit" minWidth="150"/>
-                <Button text="Refresh" onAction="#onRefreshAllReports" minWidth="150"/>
+                <Button text="Refresh" onAction="#onRefreshInitialReports" minWidth="150"/>
 
                 <Separator minHeight="5"/>
 
