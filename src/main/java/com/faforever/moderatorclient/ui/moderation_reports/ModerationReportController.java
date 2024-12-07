@@ -58,7 +58,6 @@ import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import javax.swing.*;
 import java.awt.*;
 import java.awt.datatransfer.StringSelection;
 import java.awt.datatransfer.Transferable;
@@ -647,8 +646,6 @@ public class ModerationReportController implements Controller<Region> {
         });
     }
 
-
-
     // TODO refactor with setter getter and use Integer
     public static class ModeratorStatistics {
         private final StringProperty moderator;
@@ -1108,6 +1105,31 @@ public class ModerationReportController implements Controller<Region> {
             return;
         }
 
+        if (selectedItems.size() > 5) {
+            if (!showConfirmationDialog(selectedItems.size())) {
+                return;
+            }
+        }
+
+        openEditDialog(selectedItems);
+    }
+
+    private boolean showConfirmationDialog(int numberOfReports) {
+        Alert confirmationDialog = new Alert(Alert.AlertType.CONFIRMATION);
+        confirmationDialog.setTitle("Confirm Bulk Action");
+        confirmationDialog.setHeaderText("Apply Changes to Multiple Reports");
+        confirmationDialog.setContentText(String.format("You are about to apply changes to %d reports. Are you really sure you want to proceed?",
+                numberOfReports));
+
+        ButtonType confirmButton = new ButtonType("Confirm", ButtonBar.ButtonData.OK_DONE);
+        ButtonType cancelButton = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+        confirmationDialog.getButtonTypes().setAll(confirmButton, cancelButton);
+
+        Optional<ButtonType> result = confirmationDialog.showAndWait();
+        return result.isPresent() && result.get() == confirmButton;
+    }
+
+    private void openEditDialog(ObservableList<ModerationReportFX> selectedItems) {
         try {
             EditModerationReportController editModerationReportController = uiService.loadFxml("ui/edit_moderation_report.fxml");
             editModerationReportController.setSelectedReports(new ArrayList<>(selectedItems));
