@@ -695,25 +695,27 @@ public class ViewHelper {
         tableView.getColumns().add(emailColumn);
         extractors.put(emailColumn, PlayerFX::getEmail);
 
-        TableColumn<PlayerFX, String> accountLinkColumn = new TableColumn<>("Account Link");
-        accountLinkColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
-                        o.getValue().getAccountLinks().stream().map(accountLink -> "%s - %s".formatted(accountLink.getServiceType(), accountLink.getServiceId()))
-                                .collect(Collectors.joining("\n")),
-                o.getValue().getUniqueIds()));
-        accountLinkColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
-                        calculateMaxTextWidthPlayerFX(tableView.getItems(), player ->
-                                player.getAccountLinks().stream()
-                                        .map(accountLink ->
-                                                "%s - %s".formatted(accountLink.getServiceType(), accountLink.getServiceId()))
-                                        .max(Comparator.comparingInt(String::length))
-                                        .orElse("")),
-                tableView.getItems()));
-        tableView.getColumns().add(accountLinkColumn);
-        extractors.put(accountLinkColumn, playerFX -> playerFX.getAccountLinks().stream().map(AccountLinkFx::getServiceId).collect(Collectors.toList()));
-
         {
             {
                 if (showUidData) {
+
+                    TableColumn<PlayerFX, String> accountLinkColumn = new TableColumn<>("Account Link");
+                    accountLinkColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
+                                    o.getValue().getAccountLinks().stream().map(accountLink -> "%s - %s".formatted(accountLink.getServiceType(), accountLink.getServiceId()))
+                                            .collect(Collectors.joining("\n")),
+                            o.getValue().getUniqueIds()));
+                    accountLinkColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
+                                    calculateMaxTextWidthPlayerFX(tableView.getItems(), player ->
+                                            player.getAccountLinks().stream()
+                                                    .map(accountLink ->
+                                                            "%s - %s".formatted(accountLink.getServiceType(), accountLink.getServiceId()))
+                                                    .max(Comparator.comparingInt(String::length))
+                                                    .orElse("")),
+                            tableView.getItems()));
+
+                    tableView.getColumns().add(accountLinkColumn);
+                    extractors.put(accountLinkColumn, playerFX -> playerFX.getAccountLinks().stream().map(AccountLinkFx::getServiceId).collect(Collectors.toList()));
+
                     TableColumn<PlayerFX, String> ipColumn = new TableColumn<>("IP Address");
                     ipColumn.setCellValueFactory(o -> o.getValue().recentIpAddressProperty());
                     ipColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
