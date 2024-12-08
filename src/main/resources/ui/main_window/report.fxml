@@ -194,11 +194,6 @@
                 </HBox>
                 <Separator/>
 
-                <!-- Advanced Statistics -->
-                <CheckBox fx:id="showAdvancedStatisticsModeratorEventsCheckBox"
-                          text="Show summarized statistics about players for Moderator Events (WIP - has no effect in this version)"/>
-                <Separator/>
-
                 <!-- Save Button -->
                 <Button fx:id="saveSettingsModeratorEventsButton"
                         text="Save Settings"

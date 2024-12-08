@@ -144,7 +144,6 @@ public class ModerationReportController implements Controller<Region> {
     public TextField selfDestructionFilterAmountTextField;
     @FXML
     public CheckBox focusArmyFromFilterCheckBox;
-    public CheckBox showAdvancedStatisticsModeratorEventsCheckBox;
     public CheckBox textMarkerTypeFilterCheckBox;
     public Button saveSettingsModeratorEventsButton;
     public Region root;
@@ -512,7 +511,6 @@ public class ModerationReportController implements Controller<Region> {
                 selfDestructionFilterCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("selfDestructionFilterCheckBox", "false")));
                 selfDestructionFilterAmountTextField.setText(properties.getProperty("selfDestructionFilterAmountTextField", "0"));
                 textMarkerTypeFilterCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("textMarkerTypeFilterCheckBox", "false")));
-                showAdvancedStatisticsModeratorEventsCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("showAdvancedStatisticsModeratorEventsCheckBox", "false")));
             } catch (IOException e) {
                 log.warn(String.valueOf(e));
             }
@@ -542,7 +540,6 @@ public class ModerationReportController implements Controller<Region> {
         properties.setProperty("selfDestructionFilterCheckBox", Boolean.toString(selfDestructionFilterCheckBox.isSelected()));
         properties.setProperty("selfDestructionFilterAmountTextField", String.valueOf(selfDestructionFilterAmountTextField.getText()));
         properties.setProperty("textMarkerTypeFilterCheckBox", Boolean.toString(textMarkerTypeFilterCheckBox.isSelected()));
-        properties.setProperty("showAdvancedStatisticsModeratorEventsCheckBox", Boolean.toString(showAdvancedStatisticsModeratorEventsCheckBox.isSelected()));
 
         try (FileOutputStream out = new FileOutputStream(PROPERTIES_FILE)) {
             properties.store(out, null);
