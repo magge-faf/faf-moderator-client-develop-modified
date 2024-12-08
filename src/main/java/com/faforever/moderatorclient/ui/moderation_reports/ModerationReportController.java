@@ -1021,16 +1021,6 @@ public class ModerationReportController implements Controller<Region> {
     @Getter
     private final AtomicInteger activeApiRequests = new AtomicInteger(0);
 
-    private boolean isSelectionProcessingEnabled = true;
-
-    private void disableSelectionProcessing() {
-        isSelectionProcessingEnabled = false;
-    }
-
-    private void enableSelectionProcessing() {
-        isSelectionProcessingEnabled = true;
-    }
-
     public void onRefreshInitialReports() {
         synchronized (reportLock) {
             if (isFetchingReport) {
@@ -1075,13 +1065,7 @@ public class ModerationReportController implements Controller<Region> {
         totalReportsLoaded.set(0);
         activeApiRequests.incrementAndGet();
         moderationReportService.getAllReports().thenAccept(allReports -> Platform.runLater(() -> {
-            try {
-                disableSelectionProcessing(); // Disable processing of selected item
-                itemList.setAll(allReports);
-            } finally {
-                enableSelectionProcessing(); // Re-enable processing
-            }
-
+            itemList.setAll(allReports);
             processStatisticsModerator(allReports);
             showInTableRepeatedOffenders(allReports);
             log.debug("All reports loaded. Total count: {}", allReports.size());
@@ -1278,6 +1262,7 @@ public class ModerationReportController implements Controller<Region> {
                     String formattedChatMessageTime = formatChatMessageTime(timeMillis);
 
                     // If the message involves "focus army from", inject player names
+                    // TODO ConExecute missing
                     String formattedMessage = event.message();
                     if (formattedMessage.contains("focus army from")) {
                         Pattern pattern = Pattern.compile("focus army from (\\d+) to (\\d+)");
