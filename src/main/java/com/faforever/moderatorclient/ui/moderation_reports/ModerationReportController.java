@@ -107,6 +107,7 @@ public class ModerationReportController implements Controller<Region> {
     public TableColumn lastActivity;
     @FXML
     public Button copyModeratorEventsButton;
+    @FXML
     public Button copyChatLogButtonOffenderOnly;
     @FXML
     private CheckBox enforceRatingCheckBox;
@@ -1232,11 +1233,7 @@ public class ModerationReportController implements Controller<Region> {
         new Thread(task).start();
     }
 
-    private void showModeratorEvent(List<ModeratorEvent> moderatorEvents){
-
-        Map<String, Integer> chatLineCount = new HashMap<>();
-        Map<String, Map<String, Integer>> pingCount = new HashMap<>();
-
+    private void showModeratorEvent(List<ModeratorEvent> moderatorEvents, Map<Integer, PlayerInfo> playerInfoMap) {
         boolean enforceRating = enforceRatingCheckBox.isSelected();
         boolean gameEnded = gameEndedCheckBox.isSelected();
         boolean gameResult = gameResultCheckBox.isSelected();
@@ -1249,153 +1246,74 @@ public class ModerationReportController implements Controller<Region> {
         boolean textMarkerTypeFilter = textMarkerTypeFilterCheckBox.isSelected();
 
         String textValue = selfDestructionFilterAmountTextField.getText();
-
-        int selfDestructionFilterAmount;
-
-        if (textValue.isEmpty()) {
-            selfDestructionFilterAmount = 0; // Use 0 if there is no value set by user
-        } else {
-            selfDestructionFilterAmount = Integer.parseInt(textValue);
-        }
-
-        for (ModeratorEvent event : moderatorEvents) {
-            String playerName = event.playerNameFromCommandSource();
-            String message = event.message();
-
-            // Track the number and type of pings created by each player
-            if (message.contains("Created a ping of type")) {
-                String pingType = extractPingType(message);
-                pingCount.putIfAbsent(playerName, new HashMap<>());
-                Map<String, Integer> playerPings = pingCount.get(playerName);
-                playerPings.put(pingType, playerPings.getOrDefault(pingType, 0) + 1);
-            }
-
-            // Track the number of text markers created by each player
-            if (message.contains("Created a marker with the text")) {
-                pingCount.putIfAbsent(playerName, new HashMap<>());
-                Map<String, Integer> playerPings = pingCount.get(playerName);
-                playerPings.put("TextMarker", playerPings.getOrDefault("TextMarker", 0) + 1);
-            }
-
-            // Track the number of chat lines for each player
-            chatLineCount.put(playerName, chatLineCount.getOrDefault(playerName, 0) + 1);
-        }
-
-        StringBuilder statsSummary = new StringBuilder("Statistics:\n");
-
-        statsSummary.append("Pings Created:\n");
-        statsSummary.append(String.format("%-15s | %-6s | %-4s | %-5s | %-10s\n", "Player", "Attack", "Move", "Alert", "TextMarker"));
-        statsSummary.append(String.join("", Collections.nCopies(50, "-"))).append("\n");
-
-        Set<String> players = new HashSet<>(chatLineCount.keySet());
-        players.addAll(pingCount.keySet());
-
-        for (String player : players) {
-            Map<String, Integer> pings = pingCount.getOrDefault(player, new HashMap<>());
-            statsSummary.append(String.format("%-15s | %-6d | %-4d | %-5d | %-10d\n",
-                    player,
-                    pings.getOrDefault("Attack", 0),
-                    pings.getOrDefault("Move", 0),
-                    pings.getOrDefault("Alert", 0),
-                    pings.getOrDefault("TextMarker", 0)));
-        }
-
-        // Chat Lines Table
-        statsSummary.append("\nChat Lines:\n");
-        statsSummary.append(String.format("%-15s | %-5s\n", "Player", "Lines"));
-        statsSummary.append(String.join("", Collections.nCopies(25, "-"))).append("\n");
-
-        for (Map.Entry<String, Integer> entry : chatLineCount.entrySet()) {
-            statsSummary.append(String.format("%-15s | %-5d\n", entry.getKey(), entry.getValue()));
-        }
+        int selfDestructionFilterAmount = textValue.isEmpty() ? 0 : Integer.parseInt(textValue);
 
         String moderatorEventsLog = moderatorEvents.stream()
                 .filter(event -> {
                     String message = event.message();
-                    // Define filters based on the state of the checkboxes from Settings Moderator Events
                     boolean filterOut = false;
-                    if (enforceRating) {
-                        filterOut |= message.contains("command 'EnforceRating' and data");
-                    }
-                    if (gameEnded) {
-                        filterOut |= message.contains("command 'GameEnded' and data");
-                    }
-                    if (gameResult) {
-                        filterOut |= message.contains("command 'GameResult' and data");
-                    }
-                    if (jsonStats) {
-                        filterOut |= message.contains("command 'JsonStats' and data");
-                    }
-                    if (pingOfTypeMoveFilter) {
-                        filterOut |= message.contains("Created a ping of type 'Move'");
-                    }
-                    if (pingOfTypeAttackFilter) {
-                        filterOut |= message.contains("Created a ping of type 'Attack'");
-                    }
-                    if (pingOfTypeAlertFilter) {
-                        filterOut |= message.contains("Created a ping of type 'Alert'");
-                    }
-                    if (focusArmyFromFilter) {
-                        filterOut |= message.contains("focus army from");
-                    }
-                    if (textMarkerTypeFilter){
-                        filterOut |= message.contains("Created a marker with the text");
-                    }
+                    if (enforceRating) filterOut |= message.contains("command 'EnforceRating' and data");
+                    if (gameEnded) filterOut |= message.contains("command 'GameEnded' and data");
+                    if (gameResult) filterOut |= message.contains("command 'GameResult' and data");
+                    if (jsonStats) filterOut |= message.contains("command 'JsonStats' and data");
+                    if (pingOfTypeMoveFilter) filterOut |= message.contains("Created a ping of type 'Move'");
+                    if (pingOfTypeAttackFilter) filterOut |= message.contains("Created a ping of type 'Attack'");
+                    if (pingOfTypeAlertFilter) filterOut |= message.contains("Created a ping of type 'Alert'");
+                    if (focusArmyFromFilter) filterOut |= message.contains("focus army from");
+                    if (textMarkerTypeFilter) filterOut |= message.contains("Created a marker with the text");
 
-                    if (selfDestructionFilter) {
-                        if (message.contains("Self-destructed")) {
-                            Pattern pattern = Pattern.compile("Self-destructed (\\d+) units");
-                            Matcher matcher = pattern.matcher(message);
-                            if (matcher.find()) {
-                                int unitsDestroyed = Integer.parseInt(matcher.group(1));
-                                if (unitsDestroyed < selfDestructionFilterAmount) {
-                                    filterOut = true;
-                                }
+                    if (selfDestructionFilter && message.contains("Self-destructed")) {
+                        Pattern pattern = Pattern.compile("Self-destructed (\\d+) units");
+                        Matcher matcher = pattern.matcher(message);
+                        if (matcher.find()) {
+                            int unitsDestroyed = Integer.parseInt(matcher.group(1));
+                            if (unitsDestroyed < selfDestructionFilterAmount) {
+                                filterOut = true;
                             }
                         }
                     }
-
                     return !filterOut;
                 })
                 .map(event -> {
                     long timeMillis = event.time().toMillis();
                     String formattedChatMessageTime = formatChatMessageTime(timeMillis);
 
-                    return String.format("[%s] from %s: %s",
+                    // If the message involves "focus army from", inject player names
+                    String formattedMessage = event.message();
+                    if (formattedMessage.contains("focus army from")) {
+                        Pattern pattern = Pattern.compile("focus army from (\\d+) to (\\d+)");
+                        Matcher matcher = pattern.matcher(formattedMessage);
+                        if (matcher.find()) {
+                            int fromArmy = Integer.parseInt(matcher.group(1));
+                            int toArmy = Integer.parseInt(matcher.group(2));
+                            String fromPlayer = playerInfoMap.getOrDefault(fromArmy, new PlayerInfo(-1, "Unknown Player")).getPlayerName();
+                            String toPlayer = playerInfoMap.getOrDefault(toArmy, new PlayerInfo(-1, "Unknown Player")).getPlayerName();
+
+                            formattedMessage = String.format(
+                                    "focus army from %d (%s) to %d (%s)",
+                                    fromArmy, fromPlayer, toArmy, toPlayer
+                            );
+                        }
+                    }
+
+                    return String.format("%s from %s : %s",
                             formattedChatMessageTime,
                             event.playerNameFromCommandSource(),
-                            event.message()
+                            formattedMessage
                     );
                 })
                 .collect(Collectors.joining("\n"));
 
-        if (showAdvancedStatisticsModeratorEventsCheckBox.isSelected()) {
-            Platform.runLater(() -> {
-                copyModeratorEventsButton.setId(moderatorEventsLog);
-                copyModeratorEventsButton.setText("Copy Moderator Events");
-                    //TODO make stats work with textflow statsSummary
-                moderatorEventTextFlow.getChildren().clear();
-                updateModeratorEventToColorTextFlow(moderatorEventTextFlow, moderatorEventsLog,
-                            extractName(copyReporterIdButton.getText()),
-                            extractName(copyReportedUserIdButton.getText()));
-            });
-        } else {
-            Platform.runLater(() -> {
-                copyModeratorEventsButton.setId(moderatorEventsLog);
-                copyModeratorEventsButton.setText("Copy Moderator Events");
-                moderatorEventTextFlow.getChildren().clear();
-                updateModeratorEventToColorTextFlow(moderatorEventTextFlow, moderatorEventsLog,
-                        extractName(copyReporterIdButton.getText()),
-                        extractName(copyReportedUserIdButton.getText()));
-            });
-        }
+        Platform.runLater(() -> {
+            copyModeratorEventsButton.setId(moderatorEventsLog);
+            copyModeratorEventsButton.setText("Copy Moderator Events");
+            moderatorEventTextFlow.getChildren().clear();
+            updateModeratorEventToColorTextFlow(moderatorEventTextFlow, moderatorEventsLog,
+                    extractName(copyReporterIdButton.getText()),
+                    extractName(copyReportedUserIdButton.getText()));
+        });
     }
 
-    private String extractPingType(String message) {
-        int startIndex = message.indexOf("Created a ping of type '") + "Created a ping of type '".length();
-        int endIndex = message.indexOf("'", startIndex);
-        return message.substring(startIndex, endIndex).trim();
-    }
 
     private String formatChatMessageTime(long timeMillis) {
         if (timeMillis >= 0) {
@@ -1450,25 +1368,6 @@ public class ModerationReportController implements Controller<Region> {
         });
     }
 
-    public static String getPlayerAPMs(Map<Integer, Map<Integer, AtomicInteger>> commandsPerMinuteByPlayer, double totalTimeInMinutes) {
-        StringBuilder sb = new StringBuilder();
-        for (Map.Entry<Integer, Map<Integer, AtomicInteger>> entry : commandsPerMinuteByPlayer.entrySet()) {
-            int player = entry.getKey();
-            Map<Integer, AtomicInteger> commandsPerMinute = entry.getValue();
-
-            int totalCommands = 0;
-            for (AtomicInteger commands : commandsPerMinute.values()) {
-                totalCommands += commands.get();
-            }
-
-            double apm = (double) totalCommands / totalTimeInMinutes;
-            log.debug("totalCommands: " + totalCommands);
-            log.debug("totalTimeInMinutes: " + totalTimeInMinutes);
-            sb.append("\nPlayer ").append(player).append(" has an APM of ").append(apm);
-        }
-        return sb.toString();
-    }
-
     private void processAndDisplayReplay(String header, Path tempFilePath, String promptAI) {
         try {
             ReplayDataParser replayDataParser = new ReplayDataParser(tempFilePath, objectMapper);
@@ -1486,8 +1385,16 @@ public class ModerationReportController implements Controller<Region> {
             String filteredChatLog = filterAndAppendChatLog(chatLog);
             chatLogFiltered.append(filteredChatLog);
 
+            //TODO It seems armies map/PlayerInfo are 0-based, but raw player index data from moderatorEvent is 1-based, need to debug this
+            Map<Integer, PlayerInfo> playerInfoMap = replayDataParser.getArmies().entrySet().stream()
+                    .filter(entry -> entry.getValue().containsKey("PlayerName"))
+                    .collect(Collectors.toMap(
+                            entry -> entry.getKey() + 1,
+                            entry -> new PlayerInfo(entry.getKey() + 1, (String) entry.getValue().get("PlayerName"))
+                    ));
+
             List<ModeratorEvent> moderatorEvents = replayDataParser.getModeratorEvents();
-            showModeratorEvent(moderatorEvents);
+            showModeratorEvent(moderatorEvents, playerInfoMap);
 
             chatLogFiltered.append("\n").append(promptAI);
 
@@ -1522,6 +1429,19 @@ public class ModerationReportController implements Controller<Region> {
         return fullNameWithId.trim();
     }
 
+    private void addColoredTextForPointOfInterest(String line, TextFlow textFlow) {
+        Text text = new Text(line);
+        text.setFill(Color.ORANGE);
+        textFlow.getChildren().add(text);
+    }
+
+    List<String> keywordsPointOfInterestReplay = List.of(
+            "Desynced Replay at Game Time:",
+            "does not exist in any of the team names.",
+            "Non-Default Common Army:",
+            "Cheats Enabled:"
+    );
+
     public void updateChatLogToColorTextFlow(TextFlow textFlow, String filteredLog, String reporterName, String offenderName) {
 
         String colorOffender = "LIGHTCORAL";
@@ -1539,32 +1459,48 @@ public class ModerationReportController implements Controller<Region> {
         for (String line : lines) {
             if (line == null || line.trim().isEmpty()) {
                 textFlow.getChildren().add(new Text("\n"));
-            } else {
-                if (line.contains("boundsType=LOGICAL")) {
-                    continue;
-                }
-
-                int offenderIndex = line.indexOf(offenderName);
-                int reporterIndex = line.indexOf(reporterName);
-
-                if (offenderIndex != -1 && reporterIndex != -1) {
-                    if (offenderIndex < reporterIndex) {
-                        processLineWithBothNames(textFlow, line, offenderName, reporterName, colorOffender, colorReporter);
-                    } else {
-                        processLineWithBothNames(textFlow, line, reporterName, offenderName, colorReporter, colorOffender);
-                    }
-                } else if (offenderIndex != -1) {
-                    processLineWithSingleName(textFlow, line, offenderName, colorOffender);
-                } else if (reporterIndex != -1) {
-                    processLineWithSingleName(textFlow, line, reporterName, colorReporter);
-                } else {
-                    Text text = new Text(line);
-                    text.setFill(Color.WHITE);
-                    textFlow.getChildren().add(text);
-                }
-
-                textFlow.getChildren().add(new Text("\n"));
+                continue;
             }
+
+            if (line.contains("boundsType=LOGICAL")) {
+                continue;
+            }
+
+            boolean isProcessed = false;
+
+            for (String keyword : keywordsPointOfInterestReplay) {
+                if (line.contains(keyword)) {
+                    addColoredTextForPointOfInterest(line, textFlow);
+                    isProcessed = true;
+                    break;
+                }
+            }
+
+            if (isProcessed) {
+                textFlow.getChildren().add(new Text("\n"));
+                continue;
+            }
+
+            int offenderIndex = line.indexOf(offenderName);
+            int reporterIndex = line.indexOf(reporterName);
+
+            if (offenderIndex != -1 && reporterIndex != -1) {
+                if (offenderIndex < reporterIndex) {
+                    processLineWithBothNames(textFlow, line, offenderName, reporterName, colorOffender, colorReporter);
+                } else {
+                    processLineWithBothNames(textFlow, line, reporterName, offenderName, colorReporter, colorOffender);
+                }
+            } else if (offenderIndex != -1) {
+                processLineWithSingleName(textFlow, line, offenderName, colorOffender);
+            } else if (reporterIndex != -1) {
+                processLineWithSingleName(textFlow, line, reporterName, colorReporter);
+            } else {
+                Text text = new Text(line);
+                text.setFill(Color.WHITE);
+                textFlow.getChildren().add(text);
+            }
+
+            textFlow.getChildren().add(new Text("\n"));
         }
     }
 
@@ -1622,44 +1558,52 @@ public class ModerationReportController implements Controller<Region> {
             }
         }
     }
+
     public void updateModeratorEventToColorTextFlow(TextFlow textFlow, String moderatorEvents, String reporterName, String offenderName) {
         String colorOffender = "LIGHTCORAL";
         String colorReporter = "LIGHTBLUE";
 
         if (textFlow == null) {
-            log.debug("TextFlow is not initialized in updateModeratorEventToColorTextFlow");
             return;
         }
 
         textFlow.getChildren().clear();
-
         String[] events = moderatorEvents.split("\n");
 
         for (String event : events) {
             TextFlow eventFlow = new TextFlow();
+            String[] parts = event.split("from ", 2);
 
-            String[] parts = event.split("from ");
             if (parts.length > 1) {
-                String timestamp = parts[0] + " from ";
-                String namePart = parts[1].substring(0, parts[1].indexOf(':'));
-                String eventMessage = parts[1].substring(parts[1].indexOf(':') + 1);
+                String timestamp = parts[0].trim() + " from ";
+                String rest = parts[1].trim();
+                int colonIndex = rest.indexOf(':');
 
-                Text timestampText = new Text(timestamp);
-                timestampText.setStyle("-fx-fill: white;");
+                if (colonIndex > 0) {
+                    String namePart = rest.substring(0, colonIndex).trim();
+                    String eventMessage = rest.substring(colonIndex + 1).trim();
 
-                Text nameText = new Text(namePart + ": ");
-                if (namePart.toLowerCase().contains(reporterName.toLowerCase())) {
-                    nameText.setStyle("-fx-fill: " + colorReporter + ";");
-                } else if (namePart.toLowerCase().contains(offenderName.toLowerCase())) {
-                    nameText.setStyle("-fx-fill: " + colorOffender + ";");
+                    Text timestampText = new Text(timestamp);
+                    timestampText.setStyle("-fx-fill: white;");
+
+                    Text nameText = new Text(namePart + ": ");
+                    if (namePart.equalsIgnoreCase(reporterName)) {
+                        nameText.setStyle("-fx-fill: " + colorReporter + ";");
+                    } else if (namePart.equalsIgnoreCase(offenderName)) {
+                        nameText.setStyle("-fx-fill: " + colorOffender + ";");
+                    } else {
+                        nameText.setStyle("-fx-fill: white;");
+                    }
+
+                    Text defaultMessageText = new Text(eventMessage);
+                    defaultMessageText.setStyle("-fx-fill: white;");
+
+                    eventFlow.getChildren().addAll(timestampText, nameText, defaultMessageText);
                 } else {
-                    nameText.setStyle("-fx-fill: white;");
+                    Text fallbackText = new Text(event);
+                    fallbackText.setStyle("-fx-fill: white;");
+                    eventFlow.getChildren().add(fallbackText);
                 }
-
-                Text defaultMessageText = new Text(eventMessage);
-                defaultMessageText.setStyle("-fx-fill: white;");
-
-                eventFlow.getChildren().addAll(timestampText, nameText, defaultMessageText);
             } else {
                 Text fallbackText = new Text(event);
                 fallbackText.setStyle("-fx-fill: white;");
@@ -1706,45 +1650,57 @@ public class ModerationReportController implements Controller<Region> {
         return String.format("%02d:%02d:%02d", hours, minutes, seconds);
     }
 
-    public Map<Integer, String> getPlayerIndicesWithNamesFromArmies(Map<Integer, Map<String, Object>> armies) {
-        return armies.entrySet().stream()
-                .filter(entry -> entry.getValue().containsKey("PlayerName"))
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        entry -> (String) entry.getValue().get("PlayerName")
-                ));
+    @Getter
+    @Setter
+    public class PlayerInfo {
+        private Integer index;
+        private String playerName;
+
+        public PlayerInfo(Integer index, String playerName) {
+            this.index = index;
+            this.playerName = playerName;
+        }
+
+        @Override
+        public String toString() {
+            return "PlayerInfo{index=" + index + ", playerName='" + playerName + "'}";
+        }
     }
 
-    public List<String> processReplayForTerminatedPlayers(List<Event> events, Map<Integer, Map<String, Object>> armies) {
+    public List<String> processReplayForQuitEventsPlayers(List<Event> events, Map<Integer, Map<String, Object>> armies) {
         int ticks = 0;
-        int player = -1; // TODO: -1 could represent spectators; need to double-check
+        int playerIndexFromArmiesMap = -1; // TODO: -1 could represent spectators; need to double-check
 
-        // Get player indices with names
-        Map<Integer, String> playerIndicesWithNames = getPlayerIndicesWithNamesFromArmies(armies);
+        Map<Integer, PlayerInfo> playerInfoMap = armies.entrySet().stream()
+                .filter(entry -> entry.getValue().containsKey("PlayerName"))
+                .collect(Collectors.toMap(
+                        entry -> entry.getKey(), // Adjust index
+                        entry -> new PlayerInfo(entry.getKey(), (String) entry.getValue().get("PlayerName"))
+                ));
 
-        // Prepare a list to collect the messages
-        List<String> terminatedMessages = new ArrayList<>();
+        List<String> playerQuitEventMessages = new ArrayList<>();
 
-        // Process the events
         for (Event event : events) {
             if (event instanceof Event.CommandSourceTerminated) {
-                String playerName = playerIndicesWithNames.getOrDefault(player, "Unknown Player");
+                PlayerInfo playerInfo = playerInfoMap.getOrDefault(playerIndexFromArmiesMap, new PlayerInfo(-1, "Unknown Player"));
+                String playerName = playerInfo.getPlayerName();
+
                 String message = String.format(
-                        "Player %s (Army Index %d) command source terminated at game time %s",
-                        playerName, player, formatTicksToTime(ticks)
+                        "%s quit event: %s",
+                        formatTicksToTime(ticks), playerName
                 );
-                terminatedMessages.add(message);
-            } else if (event instanceof Event.SetCommandSource setCommandSource) {
-                player = setCommandSource.playerIndex();
-            } else if (event instanceof Event.Advance advance) {
-                ticks += advance.ticksToAdvance();
+                playerQuitEventMessages.add(message);
+            } else if (event instanceof Event.SetCommandSource(int playerIndex)) {
+                playerIndexFromArmiesMap = playerIndex;
+            } else if (event instanceof Event.Advance(int ticksToAdvance)) {
+                ticks += ticksToAdvance;
             }
         }
 
-        return terminatedMessages;
+        return playerQuitEventMessages;
     }
 
-        public record DesyncResult(boolean desync, int tick) {
+    public record DesyncResult(boolean desync, int tick) {
 
     }
 
@@ -1753,18 +1709,16 @@ public class ModerationReportController implements Controller<Region> {
         int previousTick = -1;
 
         for (Event event : events) {
-            if (event instanceof Event.VerifyChecksum verifyChecksum) {
-                String currentChecksum = verifyChecksum.hash();
-                int currentTick = verifyChecksum.tick();
+            if (event instanceof Event.VerifyChecksum(String hash, int tick)) {
 
-                if (currentTick == previousTick && !Objects.equals(previousChecksum, currentChecksum)) {
+                if (tick == previousTick && !Objects.equals(previousChecksum, hash)) {
                     log.warn("Replay desynced at game time {}: expected checksum {}, got {}",
-                            formatTicksToTime(currentTick), previousChecksum, currentChecksum);
+                            formatTicksToTime(tick), previousChecksum, hash);
                     return new DesyncResult(true, previousTick);
                 }
 
-                previousChecksum = currentChecksum;
-                previousTick = currentTick;
+                previousChecksum = hash;
+                previousTick = tick;
             }
         }
 
@@ -1778,7 +1732,7 @@ public class ModerationReportController implements Controller<Region> {
         List<Event> events = replayDataParser.getEvents();
         Map<Integer, Map<String, Object>> armies = replayDataParser.getArmies();
 
-        List<String> terminatedMessages = processReplayForTerminatedPlayers(events, armies);
+        List<String> playerQuitGameMessages = processReplayForQuitEventsPlayers(events, armies);
         DesyncResult desyncResult = checkReplayEventsForDesync(events);
 
         if (desyncResult.desync()) {
@@ -1816,22 +1770,21 @@ public class ModerationReportController implements Controller<Region> {
 
         StringBuilder report = new StringBuilder();
 
-        for (String message : terminatedMessages) {
+        for (String message : playerQuitGameMessages) {
             report.append(message).append("\n");
         }
 
         if (Boolean.parseBoolean(cheatsEnabled)) {
-            report.append("\n[!] Cheats Enabled: ").append(cheatsEnabled).append("\n");
+            report.append("[!] Cheats Enabled: ").append(cheatsEnabled).append("\n");
         }
 
         if (desyncResult.desync()) {
-            report.append("\n[!] Desynced Replay at Game Time: ")
-                    .append(formatTicksToTime(desyncResult.tick()))
-                    .append("\n");
+            report.append("[!] Desynced Replay at Game Time: ")
+                    .append(formatTicksToTime(desyncResult.tick())).append("\n");
         }
 
         if (!commonArmy.equalsIgnoreCase(OFF_STRING) && !commonArmy.equalsIgnoreCase("Not Found")) {
-            report.append("\n[!] Non-Default Common Army: ").append(commonArmy).append("\n");
+            report.append("[!] Non-Default Common Army: ").append(commonArmy).append("\n");
         }
 
         String reporterLoginName = String.valueOf(currentlySelectedItemNotNull.getReporter().getLogin());
