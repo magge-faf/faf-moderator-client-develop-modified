@@ -850,6 +850,8 @@ public class ModerationReportController implements Controller<Region> {
         Text messageTextNoGame = new Text("No Game ID was reported.");
         chatLogTextFlow.getChildren().clear();
         chatLogTextFlow.getChildren().add(messageTextNoGame);
+        moderatorEventTextFlow.getChildren().clear();
+        moderatorEventTextFlow.getChildren().add(messageTextNoGame);
     }
 
     private void initializeUserTableView() {
@@ -863,9 +865,6 @@ public class ModerationReportController implements Controller<Region> {
                 updateReportDetails(newValue);
             } catch (Exception e) {
                 log.debug("Exception for selected report: ");
-                Text messageTextNoGameID = new Text("No Game ID was reported.");
-                chatLogTextFlow.getChildren().clear();
-                chatLogTextFlow.getChildren().add(messageTextNoGameID);
                 resetButtonsToInvalidState();
             }
         });
