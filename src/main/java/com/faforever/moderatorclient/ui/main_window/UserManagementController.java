@@ -824,9 +824,6 @@ public class UserManagementController implements Controller<SplitPane> {
 
         updateSmurfVillageLogTextArea("\n=== [PlayerID: " + playerID + " ===\n");
 
-        users.clear();
-        userSearchTableView.getSortOrder().clear();
-
         String propertyId = searchUserPropertyMapping.get("User ID");
         String propertyUUID = searchUserPropertyMapping.get("UUID");
         String propertyHash = searchUserPropertyMapping.get("Hash");
@@ -930,6 +927,12 @@ public class UserManagementController implements Controller<SplitPane> {
 
         searchSmurfVillageTabTextArea.setText(logOutput.toString());
         writeSmurfVillageLookup2File(logOutput);
+
+        for (Object id : foundSmurfs) {
+            if (!userSearchTableView.getItems().toString().contains((String) id)) {
+                userSearchSmurfVillageAddToUserTable((String) id);
+            }
+        }
     }
 
     private void processSet(Set<String> items, String property, int maxUniqueUsersThreshold, StringBuilder logOutput, List<Object> foundSmurfs, Set<String> alreadyCheckedSet, String type) {
@@ -1059,6 +1062,9 @@ public class UserManagementController implements Controller<SplitPane> {
 
     public void checkRecentAccountsForSmurfs() {
         boolean safeCheck = checkAndAlertExcludedItems();
+
+        users.clear();
+        userSearchTableView.getSortOrder().clear();
 
         if (safeCheck){
             return;
