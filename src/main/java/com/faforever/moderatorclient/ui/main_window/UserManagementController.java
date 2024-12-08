@@ -352,6 +352,11 @@ public class UserManagementController implements Controller<SplitPane> {
         newBanButton.setDisable(selectedUsers == null || selectedUsers.isEmpty());
     }
 
+    public void userSearchSmurfVillageAddToUserTable(String userID) {
+        List<PlayerFX> usersFound = userService.findUsersByAttribute("id", userID);
+        users.addAll(usersFound);
+    }
+
     public void onUserSearch() {
         users.clear();
         userSearchTableView.getSortOrder().clear();
@@ -897,6 +902,13 @@ public class UserManagementController implements Controller<SplitPane> {
             logOutput.append("\n\n").append(playerID).append(" is related through unique items to --> ").append(foundSmurfs).append("\n");
             updateSmurfVillageLogTextArea("\n" +  playerID + " is related through unique items to --> " + foundSmurfs);
 
+            // Add found users to the userSearchTableView
+            for (Object id : foundSmurfs) {
+                if (!userSearchTableView.getItems().toString().contains((String) id)) {
+                    userSearchSmurfVillageAddToUserTable((String) id);
+                }
+            }
+
         }
         depthCounter += 1;
         int depthThreshold = Integer.parseInt(depthScanningInputTextField.getText());
@@ -918,7 +930,6 @@ public class UserManagementController implements Controller<SplitPane> {
 
         searchSmurfVillageTabTextArea.setText(logOutput.toString());
         writeSmurfVillageLookup2File(logOutput);
-
     }
 
     private void processSet(Set<String> items, String property, int maxUniqueUsersThreshold, StringBuilder logOutput, List<Object> foundSmurfs, Set<String> alreadyCheckedSet, String type) {
