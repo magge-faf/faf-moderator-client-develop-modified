@@ -895,16 +895,22 @@ public class UserManagementController implements Controller<SplitPane> {
         processSet(manufacturers, propertyManufacturer, maxUniqueUsersThreshold, logOutput, foundSmurfs, alreadyCheckedManufacturers, "manufacturer");
         //biosVersions.stream().forEach(biosVersion -> processUsers(propertyBiosVersion, biosVersion, searchPattern, maxUniqueUsersThreshold, logOutput));
 
+        // Do not add already existing PlayerFX in the userSearchTableView
+        for (Object id : foundSmurfs) {
+            String smurfId = (String) id;
+
+            boolean exists = userSearchTableView.getItems().stream()
+                    .map(player -> player.getId())
+                    .anyMatch(playerId -> playerId.equals(smurfId));
+
+            if (!exists) {
+                userSearchSmurfVillageAddToUserTable(smurfId);
+            }
+        }
+
         if (!foundSmurfs.isEmpty()) {
             logOutput.append("\n\n").append(playerID).append(" is related through unique items to --> ").append(foundSmurfs).append("\n");
             updateSmurfVillageLogTextArea("\n" +  playerID + " is related through unique items to --> " + foundSmurfs);
-
-            // Add found users to the userSearchTableView
-            for (Object id : foundSmurfs) {
-                if (!userSearchTableView.getItems().toString().contains((String) id)) {
-                    userSearchSmurfVillageAddToUserTable((String) id);
-                }
-            }
 
         }
         depthCounter += 1;
@@ -927,12 +933,6 @@ public class UserManagementController implements Controller<SplitPane> {
 
         searchSmurfVillageTabTextArea.setText(logOutput.toString());
         writeSmurfVillageLookup2File(logOutput);
-
-        for (Object id : foundSmurfs) {
-            if (!userSearchTableView.getItems().toString().contains((String) id)) {
-                userSearchSmurfVillageAddToUserTable((String) id);
-            }
-        }
     }
 
     private void processSet(Set<String> items, String property, int maxUniqueUsersThreshold, StringBuilder logOutput, List<Object> foundSmurfs, Set<String> alreadyCheckedSet, String type) {
