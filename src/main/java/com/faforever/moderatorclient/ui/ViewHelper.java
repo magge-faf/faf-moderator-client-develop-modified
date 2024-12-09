@@ -695,6 +695,47 @@ public class ViewHelper {
         tableView.getColumns().add(emailColumn);
         extractors.put(emailColumn, PlayerFX::getEmail);
 
+        TableColumn<PlayerFX, OffsetDateTime> createTimeColumn = new TableColumn<>("Registration Date");
+        createTimeColumn.setCellFactory(col -> new TableCell<>() {
+            private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+            @Override
+            protected void updateItem(OffsetDateTime item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(formatter.format(item));
+                }
+            }
+        });
+
+        createTimeColumn.setCellValueFactory(o -> o.getValue().createTimeProperty());
+        createTimeColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
+                calculateMaxTextWidthPlayerFX(tableView.getItems(), PlayerFX::getCreateTime), tableView.getItems()));
+        tableView.getColumns().add(createTimeColumn);
+
+        TableColumn<PlayerFX, OffsetDateTime> lastLoginColumn = new TableColumn<>("Last Login");
+        lastLoginColumn.setCellValueFactory(o -> o.getValue().lastLoginProperty());
+
+        lastLoginColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
+                calculateMaxTextWidthPlayerFX(tableView.getItems(), PlayerFX::getLastLogin), tableView.getItems()));
+
+        lastLoginColumn.setCellFactory(col -> new TableCell<>() {
+            private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+            @Override
+            protected void updateItem(OffsetDateTime item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(formatter.format(item));
+                }
+            }
+        });
+        tableView.getColumns().add(lastLoginColumn);
+
         {
             {
                 if (showUidData) {
@@ -724,46 +765,7 @@ public class ViewHelper {
                     tableView.getColumns().add(ipColumn);
                     extractors.put(ipColumn, PlayerFX::getRecentIpAddress);
 
-                    TableColumn<PlayerFX, OffsetDateTime> createTimeColumn = new TableColumn<>("Registration Date");
-                    createTimeColumn.setCellFactory(col -> new TableCell<>() {
-                        private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-                        @Override
-                        protected void updateItem(OffsetDateTime item, boolean empty) {
-                            super.updateItem(item, empty);
-                            if (empty || item == null) {
-                                setText(null);
-                            } else {
-                                setText(formatter.format(item));
-                            }
-                        }
-                    });
-
-                    createTimeColumn.setCellValueFactory(o -> o.getValue().createTimeProperty());
-                    createTimeColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
-                            calculateMaxTextWidthPlayerFX(tableView.getItems(), PlayerFX::getCreateTime), tableView.getItems()));
-                    tableView.getColumns().add(createTimeColumn);
-
-                    TableColumn<PlayerFX, OffsetDateTime> lastLoginColumn = new TableColumn<>("Last Login");
-                    lastLoginColumn.setCellValueFactory(o -> o.getValue().lastLoginProperty());
-
-                    lastLoginColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
-                            calculateMaxTextWidthPlayerFX(tableView.getItems(), PlayerFX::getLastLogin), tableView.getItems()));
-
-                    lastLoginColumn.setCellFactory(col -> new TableCell<>() {
-                        private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-
-                        @Override
-                        protected void updateItem(OffsetDateTime item, boolean empty) {
-                            super.updateItem(item, empty);
-                            if (empty || item == null) {
-                                setText(null);
-                            } else {
-                                setText(formatter.format(item));
-                            }
-                        }
-                    });
-                    tableView.getColumns().add(lastLoginColumn);
 
                     TableColumn<PlayerFX, String> userAgentColumn = new TableColumn<>("User Agent");
                     userAgentColumn.setCellValueFactory(o -> o.getValue().userAgentProperty());
