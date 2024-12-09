@@ -987,6 +987,9 @@ public class UserManagementController implements Controller<SplitPane> {
     public void onLookupSmurfVillage() {
         boolean safeCheck = checkAndAlertExcludedItems();
 
+        users.clear();
+        userSearchTableView.getSortOrder().clear();
+
         if (safeCheck){
             return;
         }
