@@ -28,8 +28,10 @@
 
     <!-- Top section with VBox and TableView -->
     <SplitPane>
+        <ScrollPane maxHeight="Infinity" maxWidth="-Infinity" HBox.hgrow="ALWAYS" hbarPolicy="NEVER">
+
         <!-- VBox containing search and other controls -->
-        <VBox minWidth="220.0" maxWidth="440.0" spacing="5">
+        <VBox minWidth="220.0" maxWidth="440.0" spacing="7">
             <!-- Section for User Search -->
             <Label text="User Search" alignment="CENTER" style="-fx-font-weight: bold; -fx-font-size: 14px;" />
             <ComboBox fx:id="searchUserProperties" promptText="Search by" visibleRowCount="42"/>
@@ -80,6 +82,7 @@
                 <TextField fx:id="amountTextFieldRecentAccountsForSmurfsAmount" text="42"/>
             </VBox>
         </VBox>
+        </ScrollPane>
 
         <!-- TableView for user search results -->
         <TableView fx:id="userSearchTableView" maxWidth="Infinity" minWidth="550.0" prefHeight="200.0" HBox.hgrow="ALWAYS"/>
