@@ -31,7 +31,7 @@
         <ScrollPane maxHeight="Infinity" maxWidth="-Infinity" HBox.hgrow="ALWAYS" hbarPolicy="NEVER">
 
         <!-- VBox containing search and other controls -->
-        <VBox minWidth="220.0" maxWidth="440.0" spacing="7">
+        <VBox minWidth="220.0" maxWidth="440.0" spacing="5">
             <!-- Section for User Search -->
             <Label text="User Search" alignment="CENTER" style="-fx-font-weight: bold; -fx-font-size: 14px;" />
             <ComboBox fx:id="searchUserProperties" promptText="Search by" visibleRowCount="42"/>

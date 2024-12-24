@@ -1375,6 +1375,14 @@ public class ModerationReportController implements Controller<Region> {
                     ));
 
             List<ModeratorEvent> moderatorEvents = replayDataParser.getModeratorEvents();
+
+            StringBuilder logBuilder = new StringBuilder("moderatorEvents:\n");
+            for (ModeratorEvent event : moderatorEvents) {
+                logBuilder.append(event).append("\n");
+            }
+            log.debug(logBuilder.toString());
+
+
             showModeratorEvent(moderatorEvents, playerInfoMap);
 
             chatLogFiltered.append("\n").append(promptAI);

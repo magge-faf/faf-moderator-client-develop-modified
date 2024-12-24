@@ -298,6 +298,12 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     private void onSelectedUser() {
+        Object selectedItem = userSearchTableView.getSelectionModel().getSelectedItem();
+
+        if (selectedItem instanceof SeparatorEntry) {
+            return;
+        }
+
         // Clear previous data
         nameRecords.clear();
         userNameHistoryTableView.getSortOrder().clear();
@@ -806,6 +812,19 @@ public class UserManagementController implements Controller<SplitPane> {
         statusTextFieldProcessingPlayerID.setText("Status");
     }
 
+    public class SeparatorEntry extends PlayerFX {
+        private final String description;
+
+        public SeparatorEntry(String description) {
+            this.description = description;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+    }
+
+
     public void onSmurfVillageLookup(String playerID) {
         log.debug("Checking {}", playerID);
         AtomicReference<String> text = new AtomicReference<>(String.format("\n\n--- Checking: " + playerID));
@@ -896,16 +915,22 @@ public class UserManagementController implements Controller<SplitPane> {
         //biosVersions.stream().forEach(biosVersion -> processUsers(propertyBiosVersion, biosVersion, searchPattern, maxUniqueUsersThreshold, logOutput));
 
         // Do not add already existing PlayerFX in the userSearchTableView
+        boolean exists = false;
+
         for (Object id : foundSmurfs) {
             String smurfId = (String) id;
 
-            boolean exists = userSearchTableView.getItems().stream()
+            if (userSearchTableView.getItems().stream()
                     .map(player -> player.getId())
-                    .anyMatch(playerId -> playerId.equals(smurfId));
-
-            if (!exists) {
+                    .anyMatch(playerId -> playerId.equals(smurfId))) {
+                exists = true;
+            } else {
                 userSearchSmurfVillageAddToUserTable(smurfId);
             }
+        }
+
+        if (exists) {
+            userSearchTableView.getItems().add(new SeparatorEntry("New Dataset Separator"));
         }
 
         if (!foundSmurfs.isEmpty()) {
