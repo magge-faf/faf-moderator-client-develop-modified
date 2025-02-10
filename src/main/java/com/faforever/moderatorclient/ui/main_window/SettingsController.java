@@ -433,4 +433,19 @@ public class SettingsController implements Controller<Region> {
 
         return new String[]{username, password};
     }
+
+    public void onOpenPathToUserSettings() {
+        String path = System.getProperty("user.home") + File.separator + "AppData" + File.separator + "Roaming" + File.separator + "Mordor";
+        File directory = new File(path);
+
+        if (directory.exists() && directory.isDirectory()) {
+            try {
+                Desktop.getDesktop().open(directory);
+            } catch (IOException e) {
+                log.error(String.valueOf(e));
+            }
+        } else {
+            log.info("Directory does not exist: {}", path);
+        }
+    }
 }
