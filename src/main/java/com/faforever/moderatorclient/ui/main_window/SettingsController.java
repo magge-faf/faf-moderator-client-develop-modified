@@ -342,66 +342,6 @@ public class SettingsController implements Controller<Region> {
         }
     }
 
-    public static void CreateTableColumnsWidthSettingsJSON() {
-        String filePath = "ConfigurationModerationToolFAF/TableColumnsWidthSettings.json";
-
-        try {
-            File file = new File(filePath);
-            file.getParentFile().mkdirs();
-
-            ObjectMapper mapper = new ObjectMapper();
-            ObjectNode data = mapper.createObjectNode();
-
-            if (!file.exists()) {
-                ArrayNode columns = mapper.createArrayNode();
-
-                columns.add(mapper.createObjectNode()
-                        .put("name", "reporterColumn")
-                        .put("prefWidth", 90));
-
-                columns.add(mapper.createObjectNode()
-                        .put("name", "reportedUsersColumn")
-                        .put("prefWidth", 120));
-
-                columns.add(mapper.createObjectNode()
-                        .put("name", "reportDescriptionColumn")
-                        .put("prefWidth", 1400));
-
-                columns.add(mapper.createObjectNode()
-                        .put("name", "incidentTimeCodeColumn")
-                        .put("prefWidth", 90));
-
-                columns.add(mapper.createObjectNode()
-                        .put("name", "privateNoteColumn")
-                        .put("prefWidth", 120));
-
-                columns.add(mapper.createObjectNode()
-                        .put("name", "moderatorPrivateNoticeColumn")
-                        .put("prefWidth", 120));
-
-                columns.add(mapper.createObjectNode()
-                        .put("name", "lastModeratorColumn")
-                        .put("prefWidth", 120));
-
-                columns.add(mapper.createObjectNode()
-                        .put("name", "createTimeColumn")
-                        .put("prefWidth", 120));
-
-                data.set("columns", columns);
-
-                FileWriter writer = new FileWriter(file);
-                writer.write(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(data));
-                writer.close();
-                log.debug("TableColumnsWidthSettingsJSON was created.");
-            } else {
-                log.debug("TableColumnsWidthSettingsJSON already exists.");
-            }
-
-        } catch (IOException e) {
-            log.error("Error creating file: {}", e.getMessage());
-        }
-    }
-
     public void onOpenAiPromptButton() throws IOException {
         openFile(CONFIGURATION_FOLDER + File.separator + "templateGamingModeratorTask.txt");
     }

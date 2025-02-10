@@ -65,9 +65,6 @@ public class FafModeratorClientApplication extends Application {
 
     @Override
     public void start(Stage primaryStage) {
-        log.debug("Initializing CreateTableColumnsWidthSettingsJSON");
-        SettingsController.CreateTableColumnsWidthSettingsJSON();
-
         Font.loadFont(getClass().getResource("/style/NotoEmoji-Regular.ttf").toExternalForm(), 12);
         StageHolder.setStage(primaryStage);
         primaryStage.setTitle("magge's Mordor");
