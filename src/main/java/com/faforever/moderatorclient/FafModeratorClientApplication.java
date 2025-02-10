@@ -26,11 +26,11 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
-import java.io.IOException;
 import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicInteger;
+import com.faforever.moderatorclient.config.PreferencesConfig;
 
 @Configuration
 @EnableConfigurationProperties(ApplicationProperties.class)
@@ -45,11 +45,12 @@ public class FafModeratorClientApplication extends Application {
     }
 
     private ConfigurableApplicationContext applicationContext;
-
     @Autowired
     private UserManagementController userManagementController;
     @Autowired
     private ModerationReportController moderationReportController;
+    @Autowired
+    public PreferencesConfig preferencesConfig;
 
     public static void applicationMain(String[] args) {
         Application.launch(FafModeratorClientApplication.class, args);
@@ -82,16 +83,10 @@ public class FafModeratorClientApplication extends Application {
         primaryStage.setOnCloseRequest(e -> {
             e.consume();
             log.info("Close request received, exiting");
-            log.info("Saving Configuration.");
 
             Platform.runLater(() -> {
                 try {
-                    userManagementController.savePropertiesAmountToCheckRecentAccounts();
                     userManagementController.saveOnExitContent();
-                    userManagementController.saveOnExitSettings();
-                    moderationReportController.onSaveSettingsModeratorEvents();
-                } catch (IOException ex) {
-                    log.error("Error saving:", ex);
                 } finally {
                     Platform.exit();
                 }
@@ -165,7 +160,9 @@ public class FafModeratorClientApplication extends Application {
             counterSecondsRequestReportsFromServer[0]++;
 
             primaryStage.setTitle("magge's Mordor - Session: " + elapsedTimeStr +
-                    " | Latest 100 Reports Fetched | Requesting now all reports from the server... (" + counterSecondsRequestReportsFromServer[0] + " seconds ago)");
+                    " | Latest " + preferencesConfig.getInitialPageSize()
+                    + " Reports Fetched | Requesting now all reports from the server... (" +
+                    counterSecondsRequestReportsFromServer[0] + " seconds ago)");
         }));
 
         timeline.setCycleCount(Timeline.INDEFINITE);

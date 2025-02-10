@@ -80,14 +80,19 @@
 
             <Separator minHeight="5"/>
 
-            <Label text="Set Number for Loading Initial Newest Reports (Not editable in this version)"/>
-            <TextField fx:id="initialReportsLoadingTextField" text="100" maxWidth="150" editable="false">
+            <Label text="Set Number for Loading Initial Newest Reports"/>
+            <TextField fx:id="initialReportsLoadingTextField" text="100" maxWidth="150">
                 <TextFormatter>
                     <valueConverter>
                         <IntegerStringConverter/>
                     </valueConverter>
                 </TextFormatter>
             </TextField>
+
+            <Separator minHeight="5"/>
+
+            <Label text="Debug Mode (output metadata, events and additional information in console)"/>
+            <CheckBox fx:id="debugModeCheckBox" text="Active" />
         </VBox>
     </ScrollPane>
 </VBox>

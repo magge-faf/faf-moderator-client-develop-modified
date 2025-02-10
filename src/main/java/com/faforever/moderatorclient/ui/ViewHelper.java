@@ -6,12 +6,11 @@ import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.MessagesService;
 import com.faforever.moderatorclient.api.domain.TutorialService;
 import com.faforever.moderatorclient.api.domain.VotingService;
+import com.faforever.moderatorclient.config.PreferencesConfig;
 import com.faforever.moderatorclient.ui.caches.LargeThumbnailCache;
 import com.faforever.moderatorclient.ui.data_cells.TextAreaTableCell;
 import com.faforever.moderatorclient.ui.data_cells.UrlImageViewTableCell;
 import com.faforever.moderatorclient.ui.domain.*;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleObjectProperty;
@@ -240,26 +239,38 @@ public class ViewHelper {
         applyCopyContextMenus(tableView, extractors);
     }
 
-    public static void buildBanTableView(TableView<BanInfoFX> tableView, ObservableList<BanInfoFX> data, boolean showAffectedPlayerInfo) {
+    public static void initializeColumn(TableColumn column, String preferenceKey, double defaultPrefWidth, PreferencesConfig preferencesConfig) {
+        double savedPrefWidth = preferencesConfig.getPreference("prefColumnWidths", preferenceKey, defaultPrefWidth, Double.class);
+        column.setPrefWidth(savedPrefWidth);
+
+        column.widthProperty().addListener((obs, oldValue, newValue) -> {
+            if (newValue != null) {
+                double newWidth = newValue.doubleValue();
+                preferencesConfig.setPrefColumnWidthPreference(preferenceKey, newWidth);
+            }
+        });
+    }
+
+    public static void buildBanTableView(TableView<BanInfoFX> tableView, ObservableList<BanInfoFX> data, boolean showAffectedPlayerInfo, PreferencesConfig preferencesConfig) {
         tableView.setItems(data);
         HashMap<TableColumn<BanInfoFX, ?>, Function<BanInfoFX, ?>> extractors = new HashMap<>();
 
         TableColumn<BanInfoFX, String> idColumn = new TableColumn<>("ID");
         idColumn.setCellValueFactory(o -> o.getValue().idProperty());
         idColumn.setComparator(Comparator.comparingInt(Integer::parseInt));
-        idColumn.setMinWidth(50);
+        initializeColumn(idColumn, "idColumnMinWidth", 50, preferencesConfig);
         tableView.getColumns().add(idColumn);
         extractors.put(idColumn, BanInfoFX::getId);
 
         TableColumn<BanInfoFX, BanLevel> banLevelColumn = new TableColumn<>("Level");
         banLevelColumn.setCellValueFactory(o -> o.getValue().levelProperty());
-        banLevelColumn.setMinWidth(80);
+        initializeColumn(banLevelColumn, "banLevelColumn", 80, preferencesConfig);
         tableView.getColumns().add(banLevelColumn);
         extractors.put(banLevelColumn, BanInfoFX::getLevel);
 
         TableColumn<BanInfoFX, BanStatus> banStatusColumn = new TableColumn<>("Status");
         banStatusColumn.setCellValueFactory(o -> o.getValue().banStatusProperty());
-        banStatusColumn.setMinWidth(100);
+        initializeColumn(banStatusColumn, "banStatusColumn", 100, preferencesConfig);
         tableView.getColumns().add(banStatusColumn);
         extractors.put(banStatusColumn, BanInfoFX::getBanStatus);
 
@@ -279,7 +290,7 @@ public class ViewHelper {
                 }
             };
         }, o.getValue().durationProperty()));
-        banDurationColumn.setMinWidth(100);
+        initializeColumn(banDurationColumn, "banDurationColumn", 100, preferencesConfig);
         tableView.getColumns().add(banDurationColumn);
         extractors.put(banDurationColumn, BanInfoFX::getDuration);
 
@@ -300,26 +311,26 @@ public class ViewHelper {
                 }
             });
 
-            affectedPlayerColumn.setMinWidth(100);
+            initializeColumn(affectedPlayerColumn, "affectedPlayerColumn", 100, preferencesConfig);
             tableView.getColumns().add(affectedPlayerColumn);
             extractors.put(affectedPlayerColumn, banInfoFX -> banInfoFX.getPlayer().getLogin());
         }
 
         TableColumn<BanInfoFX, OffsetDateTime> expiresAtColumn = new TableColumn<>("Expires at");
         expiresAtColumn.setCellValueFactory(o -> o.getValue().expiresAtProperty());
-        expiresAtColumn.setMinWidth(180);
+        initializeColumn(expiresAtColumn, "expiresAtColumn", 100, preferencesConfig);
         tableView.getColumns().add(expiresAtColumn);
         extractors.put(expiresAtColumn, BanInfoFX::getExpiresAt);
 
         TableColumn<BanInfoFX, String> reasonColumn = new TableColumn<>("Reason");
         reasonColumn.setCellValueFactory(o -> o.getValue().reasonProperty());
-        reasonColumn.setMinWidth(250);
+        initializeColumn(reasonColumn, "reasonColumn", 250, preferencesConfig);
         tableView.getColumns().add(reasonColumn);
         extractors.put(reasonColumn, BanInfoFX::getReason);
 
         TableColumn<BanInfoFX, String> authorColumn = new TableColumn<>("Author");
         authorColumn.setCellValueFactory(o -> o.getValue().authorProperty().get().representationProperty());
-        authorColumn.setMinWidth(150);
+        initializeColumn(authorColumn, "authorColumn", 150, preferencesConfig);
         tableView.getColumns().add(authorColumn);
         extractors.put(authorColumn, banInfoFX -> banInfoFX.getAuthor().getLogin());
 
@@ -638,13 +649,13 @@ public class ViewHelper {
      * @param allData              The full list of data to be put in the tableView
      * @param onAddBan             If not null, shows a ban button which triggers this consumer
      * @param onForceRename        If not null, shows a force rename button which triggers this consumer
-     * @param communicationService  Communication service for interactions
+     * @param communicationService Communication service for interactions
+     * @param preferencesConfig    User preferences
      */
     public static void buildUserTableView(PlatformService platformService, TableView<PlayerFX> tableView, ObservableList<PlayerFX> allData,
                                           Consumer<PlayerFX> onAddBan, Consumer<PlayerFX> onForceRename, boolean showUidData,
-                                          FafApiCommunicationService communicationService) {
+                                          FafApiCommunicationService communicationService, PreferencesConfig preferencesConfig) {
         if ("buildModerationReportTableView".equals(tableView.getId())) {
-            // Populate the entire table with lazy loading when using buildModerationReportTableView
             addScrollListener(tableView, allData);
             tableView.setItems(FXCollections.observableArrayList());
             int initialEnd = Math.min(PAGE_SIZE, allData.size());
@@ -2233,6 +2244,7 @@ public class ViewHelper {
     }
 
     public static void buildModerationReportTableView(
+            PreferencesConfig preferencesConfig,
             TableView<ModerationReportFX> tableView,
             ObservableList<ModerationReportFX> items,
             Consumer<ModerationReportFX> onChatLog
@@ -2247,43 +2259,19 @@ public class ViewHelper {
         idColumn.setComparator(Comparator.comparingInt(Integer::parseInt));
         idColumn.setSortable(true);
         idColumn.setCellValueFactory(o -> o.getValue().idProperty());
-
-        idColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() -> {
-            double maxWidth = 15;
-            for (ModerationReportFX item : tableView.getItems()) {
-                if (item != null && item.getId() != null) {
-                    Text text = new Text(item.getId());
-                    text.applyCss();
-                    double width = text.getBoundsInLocal().getWidth();
-                    maxWidth = Math.max(maxWidth, width);
-                }
-            }
-            return maxWidth + 10;
-        }, tableView.getItems()));
-
         tableView.getColumns().add(idColumn);
         tableView.getSortOrder().add(idColumn);
         idColumn.setSortType(TableColumn.SortType.DESCENDING);
+        initializeColumn(idColumn, "idColumn", 50, preferencesConfig);
+        idColumn.setId("idColumn");
 
         tableView.sort();
 
         TableColumn<ModerationReportFX, ModerationReportStatus> statusColumn = new TableColumn<>("Status");
         statusColumn.setCellValueFactory(param -> param.getValue().reportStatusProperty());
         tableView.getColumns().add(statusColumn);
-        statusColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() -> {
-            double maxWidth = 15;
-            for (ModerationReportFX item : tableView.getItems()) {
-                if (item != null && item.getReportStatus() != null) {
-                    String shortenedStatus = getShortenedStatus(item.getReportStatus());
-
-                    Text text = new Text(shortenedStatus);
-                    text.applyCss();
-                    double width = text.getBoundsInLocal().getWidth();
-                    maxWidth = Math.max(maxWidth, width);
-                }
-            }
-            return maxWidth + 10;
-        }, tableView.getItems()));
+        initializeColumn(statusColumn, "statusColumn", 50, preferencesConfig);
+        statusColumn.setId("statusColumn");
 
         statusColumn.setCellFactory(new Callback<>() {
             @Override
@@ -2319,6 +2307,7 @@ public class ViewHelper {
             }
 
         });
+
         extractors.put(statusColumn, ModerationReportFX::getReportStatus);
 
         TableColumn<ModerationReportFX, PlayerFX> reporterColumn = new TableColumn<>("Reporter");
@@ -2337,29 +2326,8 @@ public class ViewHelper {
             }
         });
 
-        String filePath = "ConfigurationModerationToolFAF/TableColumnsWidthSettings.json";
-
-        HashMap<String, Integer> columnWidths;
-        try {
-            ObjectMapper objectMapper = new ObjectMapper();
-            JsonNode rootNode = objectMapper.readTree(new File(filePath));
-            JsonNode columnsNode = rootNode.get("columns");
-
-            columnWidths = new HashMap<>();
-
-            for (JsonNode columnNode : columnsNode) {
-                String columnName = columnNode.get("name").asText();
-                int prefWidth = columnNode.get("prefWidth").asInt();
-
-                columnWidths.put(columnName, prefWidth);
-
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        int reporterColumnWidth = columnWidths.getOrDefault("reporterColumn", 90);
-        reporterColumn.setPrefWidth(reporterColumnWidth);
+        initializeColumn(reporterColumn, "reporterColumn", 50, preferencesConfig);
+        reporterColumn.setId("reporterColumn");
 
         tableView.getColumns().add(reporterColumn);
         extractors.put(reporterColumn, reportFx -> reportFx.getReporter().getRepresentation());
@@ -2410,10 +2378,8 @@ public class ViewHelper {
             }
         });
         tableView.getColumns().add(reportedUsersColumn);
-
-        int reportedUsersColumnWidth = columnWidths.getOrDefault("reportedUsersColumn", 120);
-        reportedUsersColumn.setPrefWidth(reportedUsersColumnWidth);
-
+        initializeColumn(reportedUsersColumn, "reportedUsersColumn", 120, preferencesConfig);
+        reportedUsersColumn.setId("reportedUsersColumn");
         TableColumn<ModerationReportFX, String> reportDescriptionColumn = new TableColumn<>("Description");
 
         reportDescriptionColumn.setCellValueFactory(param -> param.getValue().reportDescriptionProperty());
@@ -2428,14 +2394,14 @@ public class ViewHelper {
             text.textProperty().bind(cell.itemProperty());
             return cell;
         });
-        int reportDescriptionColumnWidth = columnWidths.getOrDefault("reportDescriptionColumn", 870);
-        reportDescriptionColumn.setPrefWidth(reportDescriptionColumnWidth);
+        initializeColumn(reportDescriptionColumn, "reportDescriptionColumn", 800, preferencesConfig);
+        reportDescriptionColumn.setId("reportDescriptionColumn");
         tableView.getColumns().add(reportDescriptionColumn);
         extractors.put(reportDescriptionColumn, ModerationReportFX::getReportDescription);
 
         TableColumn<ModerationReportFX, String> incidentTimeCodeColumn = new TableColumn<>("Incident Timecode");
-        int incidentTimeCodeColumnWidth = columnWidths.getOrDefault("incidentTimeCodeColumn", 90);
-        incidentTimeCodeColumn.setPrefWidth(incidentTimeCodeColumnWidth);
+        initializeColumn(incidentTimeCodeColumn, "incidentTimeCodeColumn", 90, preferencesConfig);
+        incidentTimeCodeColumn.setId("incidentTimeCodeColumn");
         incidentTimeCodeColumn.setCellValueFactory(param -> param.getValue().gameIncidentTimecodeProperty());
         tableView.getColumns().add(incidentTimeCodeColumn);
         extractors.put(incidentTimeCodeColumn, ModerationReportFX::getGameIncidentTimecode);
@@ -2450,6 +2416,8 @@ public class ViewHelper {
         }, o.getValue().gameProperty()));
         tableView.getColumns().add(gameColumn);
         extractors.put(gameColumn, reportFx -> reportFx.getGame() == null ? null : reportFx.getGame().getId());
+        initializeColumn(gameColumn, "gameColumn", 50, preferencesConfig);
+        gameColumn.setId("gameColumn");
 
         /*if (onChatLog != null) {
             TableColumn<ModerationReportFX, ModerationReportFX> chatLogColumn = new TableColumn<>("Replay");
@@ -2473,8 +2441,8 @@ public class ViewHelper {
         }*/
 
         TableColumn<ModerationReportFX, String> privateNoteColumn = new TableColumn<>("Private Notice");
-        int privateNoteColumnWidth = columnWidths.getOrDefault("privateNoteColumn", 120);
-        privateNoteColumn.setPrefWidth(privateNoteColumnWidth);
+        initializeColumn(privateNoteColumn, "privateNoteColumn", 120, preferencesConfig);
+        privateNoteColumn.setId("privateNoteColumn");
         privateNoteColumn.setCellValueFactory(param -> param.getValue().moderatorPrivateNoteProperty());
         tableView.getColumns().add(privateNoteColumn);
         extractors.put(privateNoteColumn, ModerationReportFX::getModeratorPrivateNote);
@@ -2489,8 +2457,8 @@ public class ViewHelper {
         });
 
         TableColumn<ModerationReportFX, String> moderatorPrivateNoticeColumn = new TableColumn<>("Public Note");
-        int moderatorPrivateNoteColumnWidth = columnWidths.getOrDefault("moderatorPrivateNoteColumn", 120);
-        moderatorPrivateNoticeColumn.setPrefWidth(moderatorPrivateNoteColumnWidth);
+        initializeColumn(moderatorPrivateNoticeColumn, "moderatorPrivateNoticeColumn", 120, preferencesConfig);
+        moderatorPrivateNoticeColumn.setId("moderatorPrivateNoticeColumn");
         moderatorPrivateNoticeColumn.setCellValueFactory(param -> param.getValue().moderatorNoticeProperty());
         tableView.getColumns().add(moderatorPrivateNoticeColumn);
         extractors.put(moderatorPrivateNoticeColumn, ModerationReportFX::getModeratorNotice);
@@ -2512,8 +2480,8 @@ public class ViewHelper {
             }
             return lastModerator.getRepresentation();
         }, o.getValue().lastModeratorProperty()));
-        int lastModeratorColumnWidth = columnWidths.getOrDefault("lastModeratorColumn", 120);
-        lastModeratorColumn.setPrefWidth(lastModeratorColumnWidth);
+        initializeColumn(lastModeratorColumn, "lastModeratorColumn", 120, preferencesConfig);
+        lastModeratorColumn.setId("lastModeratorColumn");
         tableView.getColumns().add(lastModeratorColumn);
         extractors.put(lastModeratorColumn, reportFx -> reportFx.getLastModerator() == null ? null : reportFx.getLastModerator().getLogin());
 
@@ -2534,8 +2502,8 @@ public class ViewHelper {
         });
 
         createTimeColumn.setCellValueFactory(param -> param.getValue().createTimeProperty());
-        int createTimeColumnWidth = columnWidths.getOrDefault("createTimeColumn", 120);
-        createTimeColumn.setPrefWidth(createTimeColumnWidth);
+        initializeColumn(createTimeColumn, "createTimeColumn", 120, preferencesConfig);
+        createTimeColumn.setId("createTimeColumn");
         tableView.getColumns().add(createTimeColumn);
         extractors.put(createTimeColumn, ModerationReportFX::getCreateTime);
 

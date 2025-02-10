@@ -230,14 +230,10 @@
                     It will not search through additional layers of accounts connected to the main account.
                 </Text>
                 <Separator/>
-                <Button fx:id="saveSettingsButton" text="Save Settings" onAction="#saveOnExitSettings"/>
-                <Separator/>
-                <Text>WIP - The Following is not editable currently</Text>
-                <Separator/>
                 <Text>maxUniqueUsersThreshold:</Text>
                 <TextField fx:id="maxUniqueUsersThresholdTextField"
                            layoutX="10" layoutY="10"
-                           promptText="Enter an integer value - Default 100"/>
+                           promptText="100"/>
                 <Text>
                     If a unique hardware item has shared properties with more than X accounts, it will inform about it,
                     but not give details about each account. Default 100

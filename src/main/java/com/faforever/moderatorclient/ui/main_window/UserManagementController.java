@@ -6,6 +6,7 @@ import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.AvatarService;
 import com.faforever.moderatorclient.api.domain.PermissionService;
 import com.faforever.moderatorclient.api.domain.UserService;
+import com.faforever.moderatorclient.config.PreferencesConfig;
 import com.faforever.moderatorclient.mapstruct.GamePlayerStatsMapper;
 import com.faforever.moderatorclient.ui.*;
 import com.faforever.moderatorclient.ui.domain.*;
@@ -123,8 +124,6 @@ public class UserManagementController implements Controller<SplitPane> {
     public TextField maxUniqueUsersThresholdTextField;
 
     @FXML
-    private Button saveSettingsButton;
-    @FXML
     private CheckBox excludeItemsCheckBox;
 
     @Value("${faforever.vault.replay-download-url-format}")
@@ -170,11 +169,8 @@ public class UserManagementController implements Controller<SplitPane> {
     private Runnable loadMoreGamesRunnable;
     private int userGamesPage = 1;
 
-    private static final Path CONFIG_FILE_PATH = Paths.get(CONFIGURATION_FOLDER + File.separator + "config.properties");
-    private final Properties properties = new Properties();
-
     @Autowired
-    public SettingsController settingsController;
+    public PreferencesConfig preferencesConfig;
 
     @Override
     public SplitPane getRoot() {
@@ -185,24 +181,44 @@ public class UserManagementController implements Controller<SplitPane> {
         tab.setDisable(!communicationService.hasPermission(permissionTechnicalName));
     }
 
+    public static void saveDividerPosition(SplitPane splitPane, PreferencesConfig preferencesConfig) {
+        double[] dividerPositions = splitPane.getDividerPositions();
+
+        preferencesConfig.setPreference("splitPaneDividerPositions", "userManagementWindow", dividerPositions);
+    }
+
+    public static void loadDividerPosition(SplitPane splitPane, PreferencesConfig preferencesConfig) {
+        double[] savedPositions = preferencesConfig.getDividerPositions();
+
+        Platform.runLater(() -> {
+            if (savedPositions != null && savedPositions.length > 0) {
+                splitPane.setDividerPositions(savedPositions);
+                splitPane.requestLayout();
+            } else {
+                log.warn("No saved divider positions, using default");
+            }
+        });
+    }
+
+    public static void addDividerPositionListener(SplitPane splitPane, PreferencesConfig preferencesConfig) {
+        splitPane.getDividers().getFirst().positionProperty().addListener((obs, oldValue, newValue) -> {
+            saveDividerPosition(splitPane, preferencesConfig);
+        });
+    }
+
     @FXML
     public void initialize() {
-        loadProperties();
+        loadStateCheckBox();
+        addListeners();
         loadContent();
+        loadDividerPosition(root, preferencesConfig);
+        addDividerPositionListener(root, preferencesConfig);
         // Set last search term for userSearchTextField
         String textAreaContent = SearchHistoryTextArea.getText();
         String[] lines = textAreaContent.split("\n");
         if (lines.length > 0) {
             userSearchTextField.setText(lines[0]);
         }
-
-        saveSettingsButton.setOnAction(event -> {
-            try {
-                saveOnExitSettings();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        });
 
         disableTabOnMissingPermission(notesTab, GroupPermission.ROLE_ADMIN_ACCOUNT_NOTE);
         disableTabOnMissingPermission(bansTab, GroupPermission.ROLE_ADMIN_ACCOUNT_BAN);
@@ -211,10 +227,10 @@ public class UserManagementController implements Controller<SplitPane> {
         disableTabOnMissingPermission(userGroupsTab, GroupPermission.ROLE_READ_USER_GROUP);
 
         ViewHelper.buildUserTableView(platformService, userSearchTableView, users, null,
-                playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), true, communicationService);
+                playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), true, communicationService, preferencesConfig);
         ViewHelper.buildNotesTableView(userNoteTableView, userNotes, false);
         ViewHelper.buildNameHistoryTableView(userNameHistoryTableView, nameRecords);
-        ViewHelper.buildBanTableView(userBansTableView, bans, false);
+        ViewHelper.buildBanTableView(userBansTableView, bans, false, preferencesConfig);
         ViewHelper.buildPlayersGamesTable(userLastGamesTable, replayDownLoadFormat, platformService);
 
         addNoteButton.disableProperty().bind(userSearchTableView.getSelectionModel().selectedItemProperty().isNull());
@@ -1155,77 +1171,21 @@ public class UserManagementController implements Controller<SplitPane> {
         new Thread(task).start();
     }
 
-    private void loadProperties() {
-        if (CONFIG_FILE_PATH.toFile().exists()) {
-            try (InputStream in = new FileInputStream(CONFIG_FILE_PATH.toFile())) {
-                properties.load(in);
-            } catch (IOException e) {
-                log.warn("Error loading config file:", e);
-            }
-            String value = properties.getProperty("amount_check_recent_accounts", "42");
-            amountTextFieldRecentAccountsForSmurfsAmount.setText(value);
-            excludeItemsCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("excludeItemsCheckBox", String.valueOf(true))));
-            includeUUIDCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeUUIDCheckBox", String.valueOf(true))));
-            includeUIDHashCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeUIDHashCheckBox", String.valueOf(true))));
-            includeMemorySerialNumberCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeMemorySerialNumberCheckBox", String.valueOf(false))));
-            includeVolumeSerialNumberCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeVolumeSerialNumberCheckBox", String.valueOf(false))));
-            includeSerialNumberCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeSerialNumberCheckBox", String.valueOf(false))));
-            includeProcessorIdCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeProcessorIdCheckBox", String.valueOf(false))));
-            includeManufacturerCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeManufacturerCheckBox", String.valueOf(false))));
-            includeIPCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeIPCheckBox", String.valueOf(false))));
-            includeProcessorNameCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeProcessorNameCheckBox", String.valueOf(false))));
-            catchFirstLayerSmurfsOnlyCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("catchFirstLayerSmurfsOnlyCheckBox", String.valueOf(true))));
-            String depthScanningInput = properties.getProperty("depthScanningInputTextField", "1000");
-            depthScanningInputTextField.setText(depthScanningInput);
-            String maxUniqueUsersThreshold = properties.getProperty("maxUniqueUsersThresholdTextField", "100");
-            maxUniqueUsersThresholdTextField.setText(maxUniqueUsersThreshold);
-            String selectedBrowser = properties.getProperty("browserComboBox", "selectBrowser");
-            settingsController.setSelectedBrowser(selectedBrowser);
-            log.debug("Configuration loaded.");
-        }
-    }
-
-    @FXML
-    public void saveOnExitSettings() throws IOException {
-        if (CONFIG_FILE_PATH.toFile().exists()) {
-            try (InputStream in = new FileInputStream(CONFIG_FILE_PATH.toFile())) {
-                properties.load(in);
-                properties.setProperty("excludeItemsCheckBox", Boolean.toString(excludeItemsCheckBox.isSelected()));
-                properties.setProperty("includeProcessorNameCheckBox", Boolean.toString(includeProcessorNameCheckBox.isSelected()));
-                properties.setProperty("includeUUIDCheckBox", Boolean.toString(includeUUIDCheckBox.isSelected()));
-                properties.setProperty("includeUIDHashCheckBox", Boolean.toString(includeUIDHashCheckBox.isSelected()));
-                properties.setProperty("includeMemorySerialNumberCheckBox", Boolean.toString(includeMemorySerialNumberCheckBox.isSelected()));
-                properties.setProperty("includeVolumeSerialNumberCheckBox", Boolean.toString(includeVolumeSerialNumberCheckBox.isSelected()));
-                properties.setProperty("includeSerialNumberCheckBox", Boolean.toString(includeSerialNumberCheckBox.isSelected()));
-                properties.setProperty("includeProcessorIdCheckBox", Boolean.toString(includeProcessorIdCheckBox.isSelected()));
-                properties.setProperty("includeManufacturerCheckBox", Boolean.toString(includeManufacturerCheckBox.isSelected()));
-                properties.setProperty("includeIPCheckBox", Boolean.toString(includeIPCheckBox.isSelected()));
-                properties.setProperty("catchFirstLayerSmurfsOnlyCheckBox", Boolean.toString(catchFirstLayerSmurfsOnlyCheckBox.isSelected()));
-                properties.setProperty("depthScanningInputTextField", depthScanningInputTextField.getText());
-                properties.setProperty("maxUniqueUsersThresholdTextField", maxUniqueUsersThresholdTextField.getText());
-                String browserName = settingsController.getSelectedBrowser();
-                properties.setProperty("browserComboBox", browserName);
-                String startingTab = settingsController.getDefaultTab();
-                properties.setProperty("user.choice.tab", startingTab);
-                log.debug("Configuration saved.");
-
-                try (OutputStream out = new FileOutputStream(CONFIG_FILE_PATH.toFile())) {
-                    properties.store(out, null);
-                } catch (IOException e) {
-                    log.warn("Error saving config file:", e);
-                }
-            }
-        }
-    }
-
-    public void savePropertiesAmountToCheckRecentAccounts() throws IOException {
-        properties.setProperty("amount_check_recent_accounts", amountTextFieldRecentAccountsForSmurfsAmount.getText());
-
-        try (OutputStream out = new FileOutputStream(CONFIG_FILE_PATH.toFile())) {
-            properties.store(out, null);
-        } catch (IOException e) {
-            log.warn("Error saving config file:", e);
-        }
+    private void loadStateCheckBox() {
+        amountTextFieldRecentAccountsForSmurfsAmount.setText(preferencesConfig.getAmountTextFieldRecentAccountsForSmurfsAmount().toString());
+        includeUUIDCheckBox.setSelected(preferencesConfig.getIncludeUUIDCheckBox());
+        includeUIDHashCheckBox.setSelected(preferencesConfig.getIncludeUIDHashCheckBox());
+        includeMemorySerialNumberCheckBox.setSelected(preferencesConfig.getIncludeMemorySerialNumberCheckBox());
+        includeVolumeSerialNumberCheckBox.setSelected(preferencesConfig.getIncludeVolumeSerialNumberCheckBox());
+        includeSerialNumberCheckBox.setSelected(preferencesConfig.getIncludeSerialNumberCheckBox());
+        includeProcessorIdCheckBox.setSelected(preferencesConfig.getIncludeProcessorIdCheckBox());
+        includeManufacturerCheckBox.setSelected(preferencesConfig.getIncludeManufacturerCheckBox());
+        includeIPCheckBox.setSelected(preferencesConfig.getIncludeIPCheckBox());
+        includeProcessorNameCheckBox.setSelected(preferencesConfig.getIncludeProcessorNameCheckBox());
+        catchFirstLayerSmurfsOnlyCheckBox.setSelected(preferencesConfig.getCatchFirstLayerSmurfsOnlyCheckBox());
+        depthScanningInputTextField.setText(preferencesConfig.getDepthScanningInputTextField().toString());
+        maxUniqueUsersThresholdTextField.setText(preferencesConfig.getMaxUniqueUsersThresholdTextField().toString());
+        pagesMaxAmountGamesTextfield.setText(preferencesConfig.getPagesMaxAmountGamesTextfield());
     }
 
     public void saveOnExitContent() {
@@ -1292,7 +1252,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
         if (isValidPlayerId(playerID1) && isValidPlayerId(playerID2)) {
             userGamesPage = 1;
-            int numberOfPagesToLoad = Integer.parseInt(pagesMaxAmountGamesTextfield.getText());
+            int numberOfPagesToLoad = Integer.parseInt(preferencesConfig.getPagesMaxAmountGamesTextfield());
 
             List<GamePlayerStatsFX> allPlayer1Games = Collections.synchronizedList(new ArrayList<>());
             List<GamePlayerStatsFX> allPlayer2Games = Collections.synchronizedList(new ArrayList<>());
@@ -1352,5 +1312,63 @@ public class UserManagementController implements Controller<SplitPane> {
         } else {
             checkSharedGamesButton.setText("Check - Invalid player IDs provided.");
         }
+    }
+
+    public void addListeners() {
+        includeUUIDCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("filterSettings", "includeUUIDCheckBox", includeUUIDCheckBox.isSelected());
+        });
+
+        includeUIDHashCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("filterSettings", "includeUIDHashCheckBox", includeUIDHashCheckBox.isSelected());
+        });
+
+        includeMemorySerialNumberCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("filterSettings", "includeMemorySerialNumberCheckBox", includeMemorySerialNumberCheckBox.isSelected());
+        });
+
+        includeVolumeSerialNumberCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("filterSettings", "includeVolumeSerialNumberCheckBox", includeVolumeSerialNumberCheckBox.isSelected());
+        });
+
+        includeSerialNumberCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("filterSettings", "includeSerialNumberCheckBox", includeSerialNumberCheckBox.isSelected());
+        });
+
+        includeProcessorIdCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("filterSettings", "includeProcessorIdCheckBox", includeProcessorIdCheckBox.isSelected());
+        });
+
+        includeManufacturerCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("filterSettings", "includeManufacturerCheckBox", includeManufacturerCheckBox.isSelected());
+        });
+
+        includeIPCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("filterSettings", "includeIPCheckBox", includeIPCheckBox.isSelected());
+        });
+
+        includeProcessorNameCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("filterSettings", "includeProcessorNameCheckBox", includeProcessorNameCheckBox.isSelected());
+        });
+
+        catchFirstLayerSmurfsOnlyCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("filterSettings", "catchFirstLayerSmurfsOnlyCheckBox", catchFirstLayerSmurfsOnlyCheckBox.isSelected());
+        });
+
+        depthScanningInputTextField.textProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("filterSettings", "depthScanningInputTextField", depthScanningInputTextField.getText());
+        });
+
+        maxUniqueUsersThresholdTextField.textProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("filterSettings", "maxUniqueUsersThresholdTextField", maxUniqueUsersThresholdTextField.getText());
+        });
+
+        amountTextFieldRecentAccountsForSmurfsAmount.textProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("filterSettings", "amountTextFieldRecentAccountsForSmurfsAmount", amountTextFieldRecentAccountsForSmurfsAmount.getText());
+        });
+
+        pagesMaxAmountGamesTextfield.textProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("generalSettings", "pagesMaxAmountGamesTextfield", pagesMaxAmountGamesTextfield.getText());
+        });
     }
 }

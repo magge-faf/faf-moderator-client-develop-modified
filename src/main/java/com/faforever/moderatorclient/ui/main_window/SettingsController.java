@@ -1,5 +1,6 @@
 package com.faforever.moderatorclient.ui.main_window;
 
+import com.faforever.moderatorclient.config.PreferencesConfig;
 import com.faforever.moderatorclient.ui.Controller;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
@@ -12,6 +13,7 @@ import javafx.scene.text.Text;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -23,7 +25,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.Properties;
 import java.util.prefs.Preferences;
 
 import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
@@ -49,66 +50,50 @@ public class SettingsController implements Controller<Region> {
     public javafx.scene.control.Menu defaultStartingTabMenuBar;
     public Button openConfigurationFolderButton;
 
-    private static final Path CONFIG_FILE_PATH = Paths.get(CONFIGURATION_FOLDER + File.separator + "config.properties");
-    private final Properties properties = new Properties();
-
     @Setter
     public List<Tab> tabs;
+
+    private String defaultStartingTab;
     public Button openAiPromptButton;
     public Text excludedItemsLoadedText;
     public Text accountCredentialsText;
 
     @FXML
     public ComboBox<String> browserComboBox;
-
-    private String defaultStartingTab;
-
-    public String getDefaultTab() {
-        String text = defaultStartingTabMenuBar.getText();
-        String[] words = text.split("\\s+");
-        return words.length > 0 ? words[words.length - 1] : "";
-    }
-
-    private void setDefaultTab(Tab tab) {
-        String tabName = tab.getId();
-        if (CONFIG_FILE_PATH.toFile().exists()) {
-            try (InputStream in = new FileInputStream(CONFIG_FILE_PATH.toFile())) {
-                properties.load(in);
-
-                if (!properties.containsKey("user.choice.tab")) {
-                    properties.setProperty("user.choice.tab", tabName);
-                }
-
-                properties.setProperty("user.choice.tab", tabName);
-
-                try (OutputStream out = new FileOutputStream(CONFIG_FILE_PATH.toFile())) {
-                    properties.store(out, null);
-                }
-
-                defaultStartingTabMenuBar.setText("New Starting Default Tab is " + tabName);
-                log.debug("Current defaultStartingTab: " + defaultStartingTab);
-                defaultStartingTab = tabName;
-
-            } catch (IOException e) {
-                log.error("Error setting default tab: {}", e.getMessage());
-            }
-        }
-    }
+    public TextField initialReportsLoadingTextField;
 
 
-    public void loadConfigurationProperties() {
-        try {
-            properties.load(new FileInputStream(CONFIG_FILE_PATH.toFile()));
-            String defaultStartingTab = properties.getProperty("user.choice.tab");
-            defaultStartingTabMenuBar.setText("Default Starting Tab is " + defaultStartingTab);
-        } catch (IOException e) {log.error(e.getMessage());}
-    }
+    @FXML
+    public CheckBox debugModeCheckBox;
 
     @Override
     public VBox getRoot() {return root;}
 
+    @Autowired
+    public PreferencesConfig preferencesConfig;
+
     @FXML
     public void initialize() throws IOException {
+        debugModeCheckBox.setSelected(preferencesConfig.getDebugMode());
+        initialReportsLoadingTextField.setText(preferencesConfig.getInitialPageSize());
+        browserComboBox.setValue(preferencesConfig.getBrowser());
+        defaultStartingTab = preferencesConfig.getStartingTab();
+
+        debugModeCheckBox.setOnAction(event ->
+                preferencesConfig.setPreference("user","debugMode", debugModeCheckBox.isSelected()));
+
+        initialReportsLoadingTextField.textProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("user","initialReportsLoading", newValue);
+        });
+
+        browserComboBox.setOnAction(event -> {
+            preferencesConfig.setPreference("user","browserComboBox", browserComboBox.getValue());
+        });
+
+        defaultStartingTabMenuBar.setOnAction( event ->
+                preferencesConfig.setPreference("user","startingTab", defaultStartingTab));
+
+
         String[] credentials = SettingsController.loadCredentials();
         String username = credentials[0];
 
@@ -163,7 +148,6 @@ public class SettingsController implements Controller<Region> {
         initTemplatesAndReasons();
         initTemplatesFinishReports();
         createTemplateGamingModeratorTask();
-        loadConfigurationProperties();
     }
 
     private int countLinesInFile(File file) throws IOException {
@@ -280,17 +264,23 @@ public class SettingsController implements Controller<Region> {
     public void initTabStuff() {
         for (Tab tab : tabs) {
             MenuItem menuItem = new MenuItem(tab.getText());
-            menuItem.setId(tab.getId());
-            menuItem.setOnAction((event) -> {
-                MenuItem menItem = (MenuItem) event.getSource();
-                String string = menItem.getId();
-                for (Tab t : tabs) {
-                    if (!t.getId().equals(string)) continue;
-                    setDefaultTab(t);
-                    break;
-                }
+            menuItem.setUserData(tab);
+
+            menuItem.setOnAction(event -> {
+                MenuItem source = (MenuItem) event.getSource();
+                Tab selectedTab = (Tab) source.getUserData();
+                preferencesConfig.setPreference("user","startingTab", selectedTab.getId());
+                defaultStartingTabMenuBar.setText(selectedTab.getId());
             });
             defaultStartingTabMenuBar.getItems().add(menuItem);
+        }
+
+        String startingTab = preferencesConfig.getStartingTab();
+
+        if (startingTab == null || startingTab.isEmpty()) {
+            defaultStartingTabMenuBar.setText("Select Default Tab");
+        } else {
+            defaultStartingTabMenuBar.setText(startingTab);
         }
     }
 
@@ -443,15 +433,4 @@ public class SettingsController implements Controller<Region> {
 
         return new String[]{username, password};
     }
-
-    public String getSelectedBrowser() {
-        String selectedBrowser = browserComboBox.getValue();
-        log.debug("Selected Browser: {}", selectedBrowser);
-        return selectedBrowser;
-        }
-
-    public void setSelectedBrowser(String browserName) {
-        log.debug("Set Browser: {}", browserComboBox.getItems());
-        browserComboBox.setValue(browserName);
-        }
 }

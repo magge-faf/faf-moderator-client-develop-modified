@@ -2,8 +2,8 @@ package com.faforever.moderatorclient.ui;
 
 import com.faforever.commons.api.dto.BanStatus;
 import com.faforever.moderatorclient.api.domain.BanService;
+import com.faforever.moderatorclient.config.PreferencesConfig;
 import com.faforever.moderatorclient.ui.domain.BanInfoFX;
-import com.faforever.moderatorclient.ui.domain.UniqueIdFx;
 import javafx.application.Platform;
 import javafx.beans.InvalidationListener;
 import javafx.collections.FXCollections;
@@ -17,6 +17,7 @@ import javafx.scene.layout.HBox;
 import javafx.stage.Stage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import java.util.Collections;
 import java.util.List;
@@ -45,13 +46,16 @@ public class BansController implements Controller<HBox> {
         return root;
     }
 
+    @Autowired
+    private PreferencesConfig preferencesConfig;
+
     @FXML
     public void initialize() {
         itemList = FXCollections.observableArrayList();
         filteredList = new FilteredList<>(itemList);
         SortedList<BanInfoFX> sortedItemList = new SortedList<>(filteredList);
         sortedItemList.comparatorProperty().bind(banTableView.comparatorProperty());
-        ViewHelper.buildBanTableView(banTableView, sortedItemList, true);
+        ViewHelper.buildBanTableView(banTableView, sortedItemList, true, preferencesConfig);
         onRefreshLatestBans();
         playerRadioButton.setUserData((Supplier<List<BanInfoFX>>) () -> banService.getBanInfoByBannedPlayerNameContains(filter.getText()));
         banIdRadioButton.setUserData((Supplier<List<BanInfoFX>>) () -> Collections.singletonList(banService.getBanInfoById(filter.getText())));

@@ -6,6 +6,7 @@ import com.faforever.moderatorclient.api.event.FafApiFailGetEvent;
 import com.faforever.moderatorclient.api.event.FafApiFailModifyEvent;
 import com.faforever.moderatorclient.api.event.FafUserFailModifyEvent;
 import com.faforever.moderatorclient.api.event.TokenExpiredEvent;
+import com.faforever.moderatorclient.config.PreferencesConfig;
 import com.faforever.moderatorclient.ui.main_window.AvatarsController;
 import com.faforever.moderatorclient.ui.main_window.DomainBlacklistController;
 import com.faforever.moderatorclient.ui.main_window.LadderMapPoolController;
@@ -29,10 +30,10 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.compress.utils.Lists;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-import java.io.*;
 import java.text.MessageFormat;
 import java.util.*;
 
@@ -75,6 +76,9 @@ public class MainController implements Controller<TabPane> {
     private UserGroupsController userGroupsController;
     private RecentNotesController recentNotesController;
 
+    @Autowired
+    public PreferencesConfig preferencesConfig;
+
     @Getter
     public List<Tab> tabs = Lists.newArrayList();
     private final Map<Tab, Boolean> dataLoadingState = new HashMap<>();
@@ -83,18 +87,12 @@ public class MainController implements Controller<TabPane> {
 
     @Override
     public TabPane getRoot() {
-        Properties config = new Properties();
-        root.getSelectionModel().select(userManagementTab); // Set a default tab
-        try (InputStream input = new FileInputStream(CONFIGURATION_FOLDER + "/config.properties")) {
-            config.load(input);
-            String userChoiceDefaultTab = config.getProperty("user.choice.tab");
-            for (Tab tab : tabs) {
-                if (!tab.getId().equals(userChoiceDefaultTab)) continue;
-                root.getSelectionModel().select(tab);
-                break;
-            }
-        } catch (IOException e) {
-            log.debug(String.valueOf(e));
+        root.getSelectionModel().select(userManagementTab);
+        String userChoiceDefaultTab = preferencesConfig.getStartingTab();
+        for (Tab tab : tabs) {
+            if (!tab.getId().equals(userChoiceDefaultTab)) continue;
+            root.getSelectionModel().select(tab);
+            break;
         }
         return root;
     }
@@ -164,7 +162,6 @@ public class MainController implements Controller<TabPane> {
                 dataLoadingState.put(tab, true);
                 loadingFunction.run();
             }
-
         });
     }
 

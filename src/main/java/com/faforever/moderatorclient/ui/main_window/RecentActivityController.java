@@ -4,6 +4,7 @@ import com.faforever.commons.api.dto.GroupPermission;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.MapService;
 import com.faforever.moderatorclient.api.domain.UserService;
+import com.faforever.moderatorclient.config.PreferencesConfig;
 import com.faforever.moderatorclient.ui.*;
 import com.faforever.moderatorclient.ui.domain.*;
 import javafx.application.Platform;
@@ -18,6 +19,7 @@ import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
@@ -59,6 +61,9 @@ public class RecentActivityController implements Controller<VBox> {
     public Button refreshButton;
     public TextArea statsLatestRegistrations;
 
+    @Autowired
+    public PreferencesConfig preferencesConfig;
+
     @Override public VBox getRoot() {return root;}
 
     private boolean checkPermissionForTitledPane(String permissionTechnicalName, TitledPane titledPane) {
@@ -75,7 +80,7 @@ public class RecentActivityController implements Controller<VBox> {
     public void initialize() {
         if (checkPermissionForTitledPane(GroupPermission.ROLE_READ_ACCOUNT_PRIVATE_DETAILS, userRegistrationFeedPane)) {
             ViewHelper.buildUserTableView(platformService, userRegistrationFeedTableView, users, this::addBan,
-                    playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), true, communicationService);
+                    playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), true, communicationService, preferencesConfig);
         }
 
         if (checkPermissionForTitledPane(GroupPermission.ROLE_READ_TEAMKILL_REPORT, teamkillFeedPane)) {

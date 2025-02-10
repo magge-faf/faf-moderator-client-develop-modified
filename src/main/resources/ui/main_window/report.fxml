@@ -158,12 +158,13 @@
         </Tab>
         <Tab text="Settings Moderator Events, Replay and Chat Log">
             <VBox spacing="10">
-                <!-- Filter Following Events -->
-                <Label text="Filter Following Events:"/>
+                <!-- Informational Label -->
+                <Label text="Enabling the filters will hide these event messages."
+                       style="-fx-text-fill: red; -fx-font-size: 12px; -fx-padding: 5px 0px;"/>
                 <Separator/>
 
                 <!-- Game Data -->
-                <Label text="Game Data:"/>
+                <Label text="Filter Game Data:"/>
                 <HBox spacing="5">
                     <CheckBox fx:id="enforceRatingCheckBox" text="EnforceRating"/>
                     <CheckBox fx:id="gameResultCheckBox" text="GameResult"/>
@@ -174,7 +175,7 @@
                 <Separator/>
 
                 <!-- Ping of Type -->
-                <Label text="Ping of Type:"/>
+                <Label text="Filter Ping of Type:"/>
                 <HBox spacing="5">
                     <CheckBox fx:id="pingOfTypeMoveFilterCheckBox" text="Move"/>
                     <CheckBox fx:id="pingOfTypeAttackFilterCheckBox" text="Attack"/>
@@ -184,7 +185,7 @@
                 <Separator/>
 
                 <!-- Self-Destruction -->
-                <Label text="Self-Destruction"/>
+                <Label text="Filter Self-Destruction"/>
                 <HBox spacing="5">
                     <CheckBox fx:id="selfDestructionFilterCheckBox"
                               text="Do not show the event 'Self-destructed' for less than the following amount of units:"/>
@@ -192,15 +193,9 @@
                                promptText="0"
                                maxWidth="50"/>
                 </HBox>
-                <Separator/>
-
-                <!-- Save Button -->
-                <Button fx:id="saveSettingsModeratorEventsButton"
-                        text="Save Settings"
-                        onAction="#onSaveSettingsModeratorEvents"/>
 
                 <Separator minHeight="5"/>
-                <Label text="Replay and Chat Log (WIP - default on, can be toggled, but status is not savable in this version )"/>
+                <Label text="General Settings:"/>
                 <CheckBox fx:id="filterLogCheckBox" text="Ignore notify messages" selected="true"/>
                 <CheckBox fx:id="automaticallyLoadChatLogCheckBox" text="Auto load chat log" selected="true"/>
             </VBox>

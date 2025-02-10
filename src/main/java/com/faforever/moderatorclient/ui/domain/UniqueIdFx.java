@@ -52,12 +52,7 @@ public class UniqueIdFx extends AbstractEntityFX {
     }
 
     public String getUuid() {
-        //System.out.println("getUuid START");
-        //System.out.println(uuid.get());
-        //System.out.println("getUuid END");
-
         return uuid.get();
-
     }
 
     public void setUuid(String uuid) {

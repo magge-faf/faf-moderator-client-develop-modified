@@ -1,5 +1,6 @@
 package com.faforever.moderatorclient.ui.moderation_reports;
 
+import com.faforever.moderatorclient.config.PreferencesConfig;
 import com.faforever.commons.api.dto.ModerationReportStatus;
 import com.faforever.commons.replay.ChatMessage;
 import com.faforever.commons.replay.ModeratorEvent;
@@ -16,6 +17,7 @@ import com.faforever.moderatorclient.ui.domain.BanInfoFX;
 import com.faforever.moderatorclient.ui.domain.GameFX;
 import com.faforever.moderatorclient.ui.domain.ModerationReportFX;
 import com.faforever.moderatorclient.ui.domain.PlayerFX;
+import javafx.collections.*;
 import javafx.scene.input.Clipboard;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
@@ -28,10 +30,6 @@ import javafx.beans.property.LongProperty;
 import javafx.beans.property.SimpleLongProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
-import javafx.collections.FXCollections;
-import javafx.collections.MapChangeListener;
-import javafx.collections.ObservableList;
-import javafx.collections.ObservableMap;
 import javafx.collections.transformation.FilteredList;
 import javafx.collections.transformation.SortedList;
 import javafx.concurrent.Task;
@@ -159,6 +157,9 @@ public class ModerationReportController implements Controller<Region> {
     public Button copyReportIdButton;
     public Button copyGameIdButton;
     public Button startReplayButton;
+
+    @Autowired
+    public PreferencesConfig preferencesConfig;
 
     @Value("${faforever.vault.replay-download-url-format}")
     private String replayDownLoadFormat;
@@ -491,63 +492,6 @@ public class ModerationReportController implements Controller<Region> {
         showChatLog(fakeReport);
     }
 
-    Properties properties = new Properties();
-    String PROPERTIES_FILE = CONFIGURATION_FOLDER + "/config.properties";
-
-    private void loadSettingsModeratorEvents() {
-        File propertiesFile = new File(PROPERTIES_FILE);
-        if (propertiesFile.exists()) {
-            try (FileInputStream in = new FileInputStream(propertiesFile)) {
-                Properties properties = new Properties();
-                properties.load(in);
-                enforceRatingCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("enforceRatingCheckBox", "false")));
-                gameResultCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("gameResultCheckBox", "false")));
-                jsonStatsCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("jsonStatsCheckBox", "false")));
-                gameEndedCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("gameEndedCheckBox", "false")));
-                focusArmyFromFilterCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("focusArmyFromFilterCheckBox", "false")));
-                pingOfTypeAlertFilterCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("pingOfTypeAlertFilterCheckBox", "false")));
-                pingOfTypeMoveFilterCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("pingOfTypeMoveFilterCheckBox", "false")));
-                pingOfTypeAttackFilterCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("pingOfTypeAttackFilterCheckBox", "false")));
-                selfDestructionFilterCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("selfDestructionFilterCheckBox", "false")));
-                selfDestructionFilterAmountTextField.setText(properties.getProperty("selfDestructionFilterAmountTextField", "0"));
-                textMarkerTypeFilterCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("textMarkerTypeFilterCheckBox", "false")));
-            } catch (IOException e) {
-                log.warn(String.valueOf(e));
-            }
-        } else {
-            log.debug("Properties file does not exist.");
-        }
-    }
-
-    public void onSaveSettingsModeratorEvents() {
-        File propertiesFile = new File(PROPERTIES_FILE);
-        if (propertiesFile.exists()) {
-            try (FileInputStream in = new FileInputStream(propertiesFile)) {
-                properties.load(in);
-            } catch (IOException e) {
-                log.warn(String.valueOf(e));
-            }
-        }
-
-        properties.setProperty("enforceRatingCheckBox", Boolean.toString(enforceRatingCheckBox.isSelected()));
-        properties.setProperty("gameResultCheckBox", Boolean.toString(gameResultCheckBox.isSelected()));
-        properties.setProperty("jsonStatsCheckBox", Boolean.toString(jsonStatsCheckBox.isSelected()));
-        properties.setProperty("gameEndedCheckBox", Boolean.toString(gameEndedCheckBox.isSelected()));
-        properties.setProperty("focusArmyFromFilterCheckBox", Boolean.toString(focusArmyFromFilterCheckBox.isSelected()));
-        properties.setProperty("pingOfTypeAlertFilterCheckBox", Boolean.toString(pingOfTypeAlertFilterCheckBox.isSelected()));
-        properties.setProperty("pingOfTypeMoveFilterCheckBox", Boolean.toString(pingOfTypeMoveFilterCheckBox.isSelected()));
-        properties.setProperty("pingOfTypeAttackFilterCheckBox", Boolean.toString(pingOfTypeAttackFilterCheckBox.isSelected()));
-        properties.setProperty("selfDestructionFilterCheckBox", Boolean.toString(selfDestructionFilterCheckBox.isSelected()));
-        properties.setProperty("selfDestructionFilterAmountTextField", String.valueOf(selfDestructionFilterAmountTextField.getText()));
-        properties.setProperty("textMarkerTypeFilterCheckBox", Boolean.toString(textMarkerTypeFilterCheckBox.isSelected()));
-
-        try (FileOutputStream out = new FileOutputStream(PROPERTIES_FILE)) {
-            properties.store(out, null);
-        } catch (IOException e) {
-            log.warn(String.valueOf(e));
-        }
-    }
-
     public void handleCopyAllStatsButtonAction() {
         StringBuilder content = new StringBuilder(moderatorStatisticsTextArea.getText() + "\n\n");
         content.append("**Moderator Statistics**\n\n");
@@ -853,7 +797,36 @@ public class ModerationReportController implements Controller<Region> {
 
     private void initializeUserTableView() {
         ViewHelper.buildUserTableView(platformService, reportedPlayerTableView, reportedPlayersOfCurrentlySelectedReport, this::addBan,
-                playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), false, communicationService);
+                playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), false, communicationService, preferencesConfig);
+
+        loadDividerPosition((SplitPane) root, preferencesConfig);
+        addDividerPositionListener((SplitPane) root, preferencesConfig);
+        addListeners();
+    }
+
+    public static void saveDividerPosition(SplitPane splitPane, PreferencesConfig preferencesConfig) {
+        double[] dividerPositions = splitPane.getDividerPositions();
+
+        preferencesConfig.setPreference("splitPaneDividerPositions", "reportWindow", dividerPositions);
+    }
+
+    public static void loadDividerPosition(SplitPane splitPane, PreferencesConfig preferencesConfig) {
+        double[] savedPositions = preferencesConfig.getDividerPositions();
+
+        Platform.runLater(() -> {
+            if (savedPositions != null && savedPositions.length > 0) {
+                splitPane.setDividerPositions(savedPositions);
+                splitPane.requestLayout();
+            } else {
+                log.warn("No saved divider positions, using default");
+            }
+        });
+    }
+
+    public static void addDividerPositionListener(SplitPane splitPane, PreferencesConfig preferencesConfig) {
+        splitPane.getDividers().getFirst().positionProperty().addListener((obs, oldValue, newValue) -> {
+            saveDividerPosition(splitPane, preferencesConfig);
+        });
     }
 
     private void setupReportSelectionListener() {
@@ -892,7 +865,7 @@ public class ModerationReportController implements Controller<Region> {
             startReplayButton.setId(newValue.getGame().getId());
             startReplayButton.setText("Start Replay: " + newValue.getGame().getId());
 
-            if (automaticallyLoadChatLogCheckBox.isSelected()) {
+            if (preferencesConfig.getAutomaticallyLoadChatLogCheckBox()) {
                 showChatLog(currentlySelectedItemNotNull);
             }
         } else {
@@ -900,9 +873,25 @@ public class ModerationReportController implements Controller<Region> {
         }
     }
 
+    public void loadCheckboxStates() {
+        enforceRatingCheckBox.setSelected(preferencesConfig.getEnforceRatingCheckBox());
+        gameResultCheckBox.setSelected(preferencesConfig.getGameResultCheckBox());
+        jsonStatsCheckBox.setSelected(preferencesConfig.getJsonStatsCheckBox());
+        gameEndedCheckBox.setSelected(preferencesConfig.getGameEndedCheckBox());
+        filterLogCheckBox.setSelected(preferencesConfig.getFilterLogCheckBox());
+        automaticallyLoadChatLogCheckBox.setSelected(preferencesConfig.getAutomaticallyLoadChatLogCheckBox());
+        focusArmyFromFilterCheckBox.setSelected(preferencesConfig.getFocusArmyFromFilterCheckBox());
+        pingOfTypeAlertFilterCheckBox.setSelected(preferencesConfig.getPingOfTypeAlertFilterCheckBox());
+        pingOfTypeMoveFilterCheckBox.setSelected(preferencesConfig.getPingOfTypeMoveFilterCheckBox());
+        pingOfTypeAttackFilterCheckBox.setSelected(preferencesConfig.getPingOfTypeAttackFilterCheckBox());
+        selfDestructionFilterCheckBox.setSelected(preferencesConfig.getSelfDestructionFilterCheckBox());
+        selfDestructionFilterAmountTextField.setText(preferencesConfig.getSelfDestructionFilterAmountTextField());
+        textMarkerTypeFilterCheckBox.setSelected(preferencesConfig.getTextMarkerTypeFilterCheckBox());
+    }
+
     @FXML
     public void initialize() {
-        loadSettingsModeratorEvents();
+        loadCheckboxStates();
         setupReportSelectionListener();
         statusChoiceBox.setItems(FXCollections.observableArrayList(ChooseableStatus.values()));
         statusChoiceBox.getSelectionModel().select(ChooseableStatus.AWAITING_PROCESSING); // Set Default Selection
@@ -934,7 +923,9 @@ public class ModerationReportController implements Controller<Region> {
         renewFilter();
         SortedList<ModerationReportFX> sortedItemList = new SortedList<>(filteredItemList);
         sortedItemList.comparatorProperty().bind(reportTableView.comparatorProperty());
-        ViewHelper.buildModerationReportTableView(reportTableView, sortedItemList, this::showChatLog);
+        ViewHelper.buildModerationReportTableView(preferencesConfig, reportTableView, sortedItemList, this::showChatLog);
+        loadColumnOrder(reportTableView, preferencesConfig);
+        addColumnOrderChangeListener(reportTableView, preferencesConfig);
         statusChoiceBox.getSelectionModel().selectedItemProperty().addListener(observable -> renewFilter());
         playerNameFilterTextField.textProperty().addListener(observable -> renewFilter());
         reportTableView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
@@ -945,6 +936,55 @@ public class ModerationReportController implements Controller<Region> {
                 resetButtonsToInvalidState();
             }
         });
+    }
+
+    public static void saveColumnOrder(TableView<ModerationReportFX> tableView, PreferencesConfig preferencesConfig) {
+        List<String> columnOrder = new ArrayList<>();
+
+        for (TableColumn<ModerationReportFX, ?> column : tableView.getColumns()) {
+            String columnId = column.getId();
+            if (columnId != null) {
+                columnOrder.add(columnId);
+            }
+        }
+
+        preferencesConfig.setColumnOrderPreference(columnOrder, "Reports");
+    }
+
+    public static void addColumnOrderChangeListener(TableView<ModerationReportFX> tableView, PreferencesConfig preferencesConfig) {
+        tableView.getColumns().addListener((ListChangeListener<TableColumn<ModerationReportFX, ?>>) change -> {
+            saveColumnOrder(tableView, preferencesConfig);
+        });
+    }
+
+    public static void loadColumnOrder(TableView<ModerationReportFX> tableView, PreferencesConfig preferencesConfig) {
+        List<String> savedOrder = preferencesConfig.getColumnOrderPreference("Reports");
+
+        if (savedOrder != null && !savedOrder.isEmpty()) {
+            ObservableList<TableColumn<ModerationReportFX, ?>> columns = tableView.getColumns();
+
+            List<TableColumn<ModerationReportFX, ?>> orderedColumns = new ArrayList<>();
+
+            for (String columnId : savedOrder) {
+                for (TableColumn<ModerationReportFX, ?> column : columns) {
+                    if (columnId.equals(column.getId())) {
+                        orderedColumns.add(column);
+                        break;
+                    }
+                }
+            }
+
+            for (TableColumn<ModerationReportFX, ?> column : columns) {
+                if (!orderedColumns.contains(column)) {
+                    orderedColumns.add(column);
+                }
+            }
+
+            Platform.runLater(() -> {
+                tableView.getColumns().clear();
+                tableView.getColumns().addAll(orderedColumns);
+            });
+        }
     }
 
     public static void setSysClipboardText(String writeMe) {
@@ -1027,7 +1067,8 @@ public class ModerationReportController implements Controller<Region> {
             isFetchingReport = true;
         }
 
-        int initialPageSize = 100; // Only load the first 100 reports
+        int initialPageSize = Integer.parseInt(preferencesConfig.getInitialPageSize());
+
         activeApiRequests.incrementAndGet();
         loadInitialReports(1, initialPageSize);
     }
@@ -1214,18 +1255,18 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private void showModeratorEvent(List<ModeratorEvent> moderatorEvents, Map<Integer, PlayerInfo> playerInfoMap) {
-        boolean enforceRating = enforceRatingCheckBox.isSelected();
-        boolean gameEnded = gameEndedCheckBox.isSelected();
-        boolean gameResult = gameResultCheckBox.isSelected();
-        boolean jsonStats = jsonStatsCheckBox.isSelected();
-        boolean pingOfTypeMoveFilter = pingOfTypeMoveFilterCheckBox.isSelected();
-        boolean pingOfTypeAttackFilter = pingOfTypeAttackFilterCheckBox.isSelected();
-        boolean pingOfTypeAlertFilter = pingOfTypeAlertFilterCheckBox.isSelected();
-        boolean selfDestructionFilter = selfDestructionFilterCheckBox.isSelected();
-        boolean focusArmyFromFilter = focusArmyFromFilterCheckBox.isSelected();
-        boolean textMarkerTypeFilter = textMarkerTypeFilterCheckBox.isSelected();
+        boolean enforceRating = preferencesConfig.getEnforceRatingCheckBox();
+        boolean gameEnded = preferencesConfig.getGameEndedCheckBox();
+        boolean gameResult = preferencesConfig.getGameResultCheckBox();
+        boolean jsonStats = preferencesConfig.getJsonStatsCheckBox();
+        boolean pingOfTypeMoveFilter = preferencesConfig.getPingOfTypeMoveFilterCheckBox();
+        boolean pingOfTypeAttackFilter = preferencesConfig.getPingOfTypeAttackFilterCheckBox();
+        boolean pingOfTypeAlertFilter = preferencesConfig.getPingOfTypeAlertFilterCheckBox();
+        boolean selfDestructionFilter = preferencesConfig.getSelfDestructionFilterCheckBox();
+        boolean focusArmyFromFilter = preferencesConfig.getFocusArmyFromFilterCheckBox();
+        boolean textMarkerTypeFilter = preferencesConfig.getTextMarkerTypeFilterCheckBox();
 
-        String textValue = selfDestructionFilterAmountTextField.getText();
+        String textValue = preferencesConfig.getSelfDestructionFilterAmountTextField();
         int selfDestructionFilterAmount = textValue.isEmpty() ? 0 : Integer.parseInt(textValue);
 
         String moderatorEventsLog = moderatorEvents.stream()
@@ -1258,22 +1299,39 @@ public class ModerationReportController implements Controller<Region> {
                     long timeMillis = event.time().toMillis();
                     String formattedChatMessageTime = formatChatMessageTime(timeMillis);
 
-                    // If the message involves "focus army from", inject player names
-                    // TODO ConExecute missing
+                    // If the message involves "focus army from", inject player names and handle ConExecute
                     String formattedMessage = event.message();
                     if (formattedMessage.contains("focus army from")) {
-                        Pattern pattern = Pattern.compile("focus army from (\\d+) to (\\d+)");
-                        Matcher matcher = pattern.matcher(formattedMessage);
-                        if (matcher.find()) {
-                            int fromArmy = Integer.parseInt(matcher.group(1));
-                            int toArmy = Integer.parseInt(matcher.group(2));
-                            String fromPlayer = playerInfoMap.getOrDefault(fromArmy, new PlayerInfo(-1, "Unknown Player")).getPlayerName();
-                            String toPlayer = playerInfoMap.getOrDefault(toArmy, new PlayerInfo(-1, "Unknown Player")).getPlayerName();
+                        if (formattedMessage.contains("via ConExecute")) {
+                            // Handle the case with "via ConExecute"
+                            Pattern pattern = Pattern.compile("focus army from (\\d+) to (\\d+) via ConExecute");
+                            Matcher matcher = pattern.matcher(formattedMessage);
+                            if (matcher.find()) {
+                                int fromArmy = Integer.parseInt(matcher.group(1));
+                                int toArmy = Integer.parseInt(matcher.group(2));
+                                String fromPlayer = playerInfoMap.getOrDefault(fromArmy, new PlayerInfo(-1, "Unknown Player")).getPlayerName();
+                                String toPlayer = playerInfoMap.getOrDefault(toArmy, new PlayerInfo(-1, "Unknown Player")).getPlayerName();
 
-                            formattedMessage = String.format(
-                                    "focus army from %d (%s) to %d (%s)",
-                                    fromArmy, fromPlayer, toArmy, toPlayer
-                            );
+                                formattedMessage = String.format(
+                                        "focus army from %d (%s) to %d (%s) via ConExecute",
+                                        fromArmy, fromPlayer, toArmy, toPlayer
+                                );
+                            }
+                        } else {
+                            // Handle the case without "via ConExecute"
+                            Pattern pattern = Pattern.compile("focus army from (\\d+) to (\\d+)");
+                            Matcher matcher = pattern.matcher(formattedMessage);
+                            if (matcher.find()) {
+                                int fromArmy = Integer.parseInt(matcher.group(1));
+                                int toArmy = Integer.parseInt(matcher.group(2));
+                                String fromPlayer = playerInfoMap.getOrDefault(fromArmy, new PlayerInfo(-1, "Unknown Player")).getPlayerName();
+                                String toPlayer = playerInfoMap.getOrDefault(toArmy, new PlayerInfo(-1, "Unknown Player")).getPlayerName();
+
+                                formattedMessage = String.format(
+                                        "focus army from %d (%s) to %d (%s)",
+                                        fromArmy, fromPlayer, toArmy, toPlayer
+                                );
+                            }
                         }
                     }
 
@@ -1348,6 +1406,10 @@ public class ModerationReportController implements Controller<Region> {
             chatLogTextFlow.getChildren().addAll(headerText, messageText);
         });
     }
+
+    @Setter
+    @Getter
+    private static Map<Integer, PlayerInfo> playerInfoMap;
 
     private void processAndDisplayReplay(String header, Path tempFilePath, String promptAI) {
         try {
@@ -1655,7 +1717,7 @@ public class ModerationReportController implements Controller<Region> {
         Map<Integer, PlayerInfo> playerInfoMap = armies.entrySet().stream()
                 .filter(entry -> entry.getValue().containsKey("PlayerName"))
                 .collect(Collectors.toMap(
-                        entry -> entry.getKey(), // Adjust index
+                        entry -> entry.getKey(),
                         entry -> new PlayerInfo(entry.getKey(), (String) entry.getValue().get("PlayerName"))
                 ));
 
@@ -1681,9 +1743,7 @@ public class ModerationReportController implements Controller<Region> {
         return playerQuitEventMessages;
     }
 
-    public record DesyncResult(boolean desync, int tick) {
-
-    }
+    public record DesyncResult(boolean desync, int tick) {}
 
     public DesyncResult checkReplayEventsForDesync(List<Event> events) {
         String previousChecksum = null;
@@ -1716,17 +1776,6 @@ public class ModerationReportController implements Controller<Region> {
         List<String> playerQuitGameMessages = processReplayForQuitEventsPlayers(events, armies);
         DesyncResult desyncResult = checkReplayEventsForDesync(events);
 
-        if (desyncResult.desync()) {
-            log.debug("Replay is desynchronized.");
-        } else {
-            log.debug("Replay is synchronized.");
-        }
-
-        //log.debug("Debug Mods: {}", mods);
-        //log.debug("Debug Metadata: {}", metadata);
-        //log.debug("Debug Game Options: {}", gameOptions);
-        //log.debug("Debug Events: {}", events);
-
         final String CHEATS_ENABLED_KEY = "CheatsEnabled";
         final String VICTORY_KEY = "Victory";
         final String SHARE_KEY = "Share";
@@ -1736,13 +1785,35 @@ public class ModerationReportController implements Controller<Region> {
         final String OFF_STRING = "Off";
 
         String commonArmy = getValueForKey(gameOptions, COMMON_ARMY_KEY);
-        log.debug("commonArmy value: {}", commonArmy);
         String cheatsEnabled = getValueForKey(gameOptions, CHEATS_ENABLED_KEY);
-        log.debug("cheatsEnabled value: {}", cheatsEnabled);
         String victoryCondition = getValueForKey(gameOptions, VICTORY_KEY);
-        log.debug("victoryCondition value: {}", victoryCondition);
         String shareCondition = getValueForKey(gameOptions, SHARE_KEY);
-        log.debug("shareCondition value: {}", shareCondition);
+
+        boolean debugMode = preferencesConfig.getDebugMode();
+
+        if (debugMode) {
+            log.debug("Debug Mods: {}", mods);
+            log.debug("Debug Metadata: {}", metadata);
+            log.debug("Debug Game Options: {}", gameOptions);
+            log.debug("Debug Events: {}", events);
+
+            log.debug("commonArmy value: {}", commonArmy);
+            log.debug("cheatsEnabled value: {}", cheatsEnabled);
+            log.debug("victoryCondition value: {}", victoryCondition);
+            log.debug("shareCondition value: {}", shareCondition);
+            log.debug("PlayerInfoMap: {}", playerInfoMap);
+
+            if (desyncResult.desync()) {
+                log.debug("Replay is desynchronized.");
+            } else {
+                log.debug("Replay is synchronized.");
+            }
+
+            log.debug("PlayerInfoMap:");
+            playerInfoMap.forEach((index, playerInfo) -> {
+                log.debug("{}={}\n", index, playerInfo);
+            });
+        }
 
         double launchedAt = metadata.getLaunchedAt();
         double gameEnd = metadata.getGameEnd();
@@ -1825,7 +1896,7 @@ public class ModerationReportController implements Controller<Region> {
 
         while ((chatLine = bufReader.readLine()) != null) {
             boolean matchFound = pattern.matcher(chatLine).find();
-            if (filterLogCheckBox.isSelected() && matchFound) {
+            if (preferencesConfig.getFilterLogCheckBox() && matchFound) {
                 continue;
             }
             filteredChatLog.append(chatLine).append("\n");
@@ -1839,7 +1910,7 @@ public class ModerationReportController implements Controller<Region> {
         String url = "https://forum.faforever.com/search?term=" + reportedUserId +
                 "&in=titlesposts&matchWords=all&sortBy=relevance&sortDirection=desc&showAs=posts";
 
-        String browser = settingsController.getSelectedBrowser();
+        String browser = String.valueOf(preferencesConfig.getBrowser());
 
         if ("selectBrowser".equalsIgnoreCase(browser)) {
             Alert alert = new Alert(Alert.AlertType.WARNING);
@@ -1860,5 +1931,59 @@ public class ModerationReportController implements Controller<Region> {
         }
 
         Runtime.getRuntime().exec(cmd);
+    }
+
+    public void addListeners() {
+        enforceRatingCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("generalSettings", "enforceRatingCheckBox", enforceRatingCheckBox.isSelected());
+        });
+
+        gameResultCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("generalSettings", "gameResultCheckBox", gameResultCheckBox.isSelected());
+        });
+
+        jsonStatsCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("generalSettings", "jsonStatsCheckBox", jsonStatsCheckBox.isSelected());
+        });
+
+        gameEndedCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("generalSettings", "gameEndedCheckBox", gameEndedCheckBox.isSelected());
+        });
+
+        focusArmyFromFilterCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("filterSettings", "focusArmyFromFilterCheckBox", focusArmyFromFilterCheckBox.isSelected());
+        });
+
+        pingOfTypeAlertFilterCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("filterSettings", "pingOfTypeAlertFilterCheckBox", pingOfTypeAlertFilterCheckBox.isSelected());
+        });
+
+        pingOfTypeMoveFilterCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("filterSettings", "pingOfTypeMoveFilterCheckBox", pingOfTypeMoveFilterCheckBox.isSelected());
+        });
+
+        pingOfTypeAttackFilterCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("filterSettings", "pingOfTypeAttackFilterCheckBox", pingOfTypeAttackFilterCheckBox.isSelected());
+        });
+
+        selfDestructionFilterCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("filterSettings", "selfDestructionFilterCheckBox", selfDestructionFilterCheckBox.isSelected());
+        });
+
+        textMarkerTypeFilterCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("filterSettings", "textMarkerTypeFilterCheckBox", textMarkerTypeFilterCheckBox.isSelected());
+        });
+
+        selfDestructionFilterAmountTextField.textProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("filterSettings", "selfDestructionFilterAmountTextField", newValue);
+        });
+
+        automaticallyLoadChatLogCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("generalSettings", "automaticallyLoadChatLogCheckBox", gameEndedCheckBox.isSelected());
+        });
+
+        filterLogCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("generalSettings", "filterLogCheckBox", gameEndedCheckBox.isSelected());
+        });
     }
 }
