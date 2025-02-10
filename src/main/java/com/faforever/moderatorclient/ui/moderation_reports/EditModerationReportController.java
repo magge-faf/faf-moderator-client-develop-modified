@@ -3,6 +3,7 @@ package com.faforever.moderatorclient.ui.moderation_reports;
 import com.faforever.commons.api.dto.ModerationReport;
 import com.faforever.commons.api.dto.ModerationReportStatus;
 import com.faforever.moderatorclient.api.domain.ModerationReportService;
+import com.faforever.moderatorclient.config.PreferencesConfig;
 import com.faforever.moderatorclient.ui.Controller;
 import com.faforever.moderatorclient.ui.domain.ModerationReportFX;
 import javafx.animation.PauseTransition;
@@ -16,16 +17,14 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -45,6 +44,10 @@ public class EditModerationReportController implements Controller<Pane> {
 	public VBox dynamicButtonsContainer;
 	@Setter
 	private Runnable onSaveRunnable = () -> {};
+
+	@Autowired
+    public PreferencesConfig preferencesConfig;
+
     @FXML
 	public void initialize() throws IOException {
 		try {
@@ -52,43 +55,13 @@ public class EditModerationReportController implements Controller<Pane> {
 		} catch (IOException e) {
 			throw new IOException("Failed to initialize Buttons" + e);
 		}
+		autoApplyTemplateAndSaveCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            		preferencesConfig.setPreference("generalSettings", "autoApplyTemplateAndSaveCheckBox", autoApplyTemplateAndSaveCheckBox.isSelected());
+        });
 
-		loadAutoApplyTemplateAndSaveProperties();
+		autoApplyTemplateAndSaveCheckBox.setSelected(preferencesConfig.getAutoApplyTemplateAndSaveCheckBox());
+
 		statusChoiceBox.setItems(FXCollections.observableArrayList(ModerationReportStatus.values()));
-	}
-
-	Properties properties = new Properties();
-	String PROPERTIES_FILE = CONFIGURATION_FOLDER + File.separator + "config.properties";
-
-	public void onSaveAutoApplyTemplateAndSaveCheckBox() throws IOException {
-		File propertiesFile = new File(PROPERTIES_FILE);
-
-		if (propertiesFile.exists()) {
-			try (FileInputStream in = new FileInputStream(propertiesFile)) {
-				properties.load(in);
-			}
-		}
-
-		properties.setProperty("autoApplyTemplateAndSaveCheckBox", Boolean.toString(autoApplyTemplateAndSaveCheckBox.isSelected()));
-
-		try (FileOutputStream out = new FileOutputStream(propertiesFile)) {
-			properties.store(out, null );
-		} catch (IOException e) {
-			throw new IOException("Failed to save properties file: " + propertiesFile.getAbsolutePath(), e);
-		}
-	}
-
-	private void loadAutoApplyTemplateAndSaveProperties() throws IOException {
-		File propertiesFile = new File(PROPERTIES_FILE);
-		if (propertiesFile.exists()) {
-			try (FileInputStream in = new FileInputStream(propertiesFile)) {
-				Properties properties = new Properties();
-				properties.load(in);
-				autoApplyTemplateAndSaveCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("autoApplyTemplateAndSaveCheckBox", "false")));
-			} catch (IOException e) {
-				throw new IOException("Failed to load properties file: " + propertiesFile.getAbsolutePath(), e);
-			}
-		}
 	}
 
 	public void onSave() throws IOException {
@@ -103,7 +76,6 @@ public class EditModerationReportController implements Controller<Pane> {
 			report.setModeratorPrivateNote(privateNoteTextArea.getText());
 			report.setModeratorNotice(publicNoteTextArea.getText());
 		}
-		onSaveAutoApplyTemplateAndSaveCheckBox();
 		onSaveRunnable.run();
 		close();
 	}

@@ -253,6 +253,10 @@ public class PreferencesConfig implements DisposableBean {
         return getPreference("generalSettings", "pagesMaxAmountGamesTextfield", "10", String.class);
     }
 
+    public boolean getAutoApplyTemplateAndSaveCheckBox() {
+        return getPreference("generalSettings", "autoApplyTemplateAndSaveCheckBox", false, Boolean.class);
+    }
+
     @Override
     public void destroy() {
         writePreferences();
