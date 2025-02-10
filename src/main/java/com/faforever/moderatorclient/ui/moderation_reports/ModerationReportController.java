@@ -108,6 +108,8 @@ public class ModerationReportController implements Controller<Region> {
     @FXML
     public Button copyChatLogButtonOffenderOnly;
     @FXML
+    public Button referenceOnlyButton;
+    @FXML
     private CheckBox enforceRatingCheckBox;
     @FXML
     private CheckBox gameResultCheckBox;
@@ -586,6 +588,49 @@ public class ModerationReportController implements Controller<Region> {
                 System.out.println("Content copied to clipboard.");
             });
         });
+    }
+
+    public void onReferenceOnly() {
+            try {
+                ObservableList<ModerationReportFX> selectedItems = reportTableView.getSelectionModel().getSelectedItems();
+
+                String selectedReportIds = selectedItems.stream()
+                        .map(item -> String.valueOf(item.getId()))
+                        .collect(Collectors.joining(","));
+
+                String selectedGameIds = selectedItems.stream()
+                        .map(ModerationReportFX::getGame)
+                        .filter(Objects::nonNull)
+                        .map(game -> String.valueOf(game.getId()))
+                        .distinct()
+                        .collect(Collectors.joining(","));
+
+                removeTrailingComma(new StringBuilder(selectedReportIds));
+                removeTrailingComma(new StringBuilder(selectedGameIds));
+
+                String result;
+
+                if (selectedGameIds.isEmpty()) {
+                    result = selectedReportIds + "\n\n" + "Reference - REFERENCE_REASON";
+                } else {
+                    result = selectedReportIds + "\n\n" + "Reference - ReplayID " + selectedGameIds + " - REFERENCE_REASON";
+                }
+
+                ClipboardContent clipboardContent = new ClipboardContent();
+                clipboardContent.putString(result);
+                Clipboard.getSystemClipboard().setContent(clipboardContent);
+
+                referenceOnlyButton.setText("Copied");
+                Timer timer = new Timer();
+                timer.schedule(new TimerTask() {
+                    @Override
+                    public void run() {
+                        Platform.runLater(() -> referenceOnlyButton.setText("Reference Only"));
+                    }
+                }, 750);
+            } catch (NullPointerException e) {
+                log.debug(String.valueOf(e));
+            }
     }
 
     // TODO refactor with setter getter and use Integer

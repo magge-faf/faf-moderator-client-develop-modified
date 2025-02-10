@@ -52,6 +52,7 @@
                 <Text>Select Reports and apply:</Text>
                 <Button fx:id="useTemplateWithoutReasonsButton" text="Template No Reasons" onAction="#onUseTemplateWithoutReasonsButton" minWidth="150"/>
                 <Button fx:id="useTemplateWithReasonsButton" text="Template With Reasons" onAction="#onUseTemplateWithReasonsButton" minWidth="150"/>
+                <Button fx:id="referenceOnlyButton" text="Reference Only" onAction="#onReferenceOnly" minWidth="150"/>
 
                 <Separator minHeight="5"/>
 
