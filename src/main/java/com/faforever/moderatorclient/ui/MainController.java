@@ -19,6 +19,7 @@ import com.faforever.moderatorclient.ui.main_window.UserGroupsController;
 import com.faforever.moderatorclient.ui.main_window.UserManagementController;
 import com.faforever.moderatorclient.ui.main_window.VotingController;
 import com.faforever.moderatorclient.ui.main_window.RecentNotesController;
+import com.faforever.moderatorclient.ui.main_window.ReportStatisticsController;
 import com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -59,6 +60,7 @@ public class MainController implements Controller<TabPane> {
     public Tab permissionTab;
     public Tab settingsTab;
     public Tab recentNotesTab;
+    public Tab reportStatisticsTab;
 
     private SettingsController settingsController;
     private ModerationReportController moderationReportController;
@@ -75,6 +77,7 @@ public class MainController implements Controller<TabPane> {
     private MessagesController messagesController;
     private UserGroupsController userGroupsController;
     private RecentNotesController recentNotesController;
+    private ReportStatisticsController reportStatisticsController;
 
     @Autowired
     public PreferencesConfig preferencesConfig;
@@ -123,7 +126,8 @@ public class MainController implements Controller<TabPane> {
                 tutorialTab,
                 userManagementTab,
                 votingTab,
-                recentNotesTab
+                recentNotesTab,
+                reportStatisticsTab
         ));
 
         initAvatarTab();
@@ -141,6 +145,7 @@ public class MainController implements Controller<TabPane> {
         initUserManagementTab();
         initVotingTab();
         initRecentNotesTab();
+        initReportStatisticsTab();
     }
 
     private void initSettingsTab(List<Tab> tabs) {
@@ -148,6 +153,11 @@ public class MainController implements Controller<TabPane> {
         settingsController.setTabs(tabs);
         settingsController.initTabStuff();
         settingsTab.setContent(settingsController.getRoot());
+    }
+
+    private void initReportStatisticsTab() {
+        reportStatisticsController = uiService.loadFxml("ui/main_window/reportStatisticsTab.fxml");
+        reportStatisticsTab.setContent(reportStatisticsController.getRoot());
     }
 
     private void initRecentNotesTab() {

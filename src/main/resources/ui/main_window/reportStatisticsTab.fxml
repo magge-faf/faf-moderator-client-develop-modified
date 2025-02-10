@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.control.*?>
+
+<VBox fx:id="root" spacing="5" style="-fx-padding: 10px;" xmlns="http://javafx.com/javafx/20.0.1"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.faforever.moderatorclient.ui.main_window.ReportStatisticsController">
+
+    <HBox spacing="10">
+        <Button fx:id="updateStatisticsButtonLastYear"
+                onAction="#onUpdateStatisticsButtonLastYear"
+                text="Update Statistics (Up to Last Year)"/>
+
+        <Button fx:id="updateStatisticsAllReportsButton"
+                onAction="#onUpdateStatisticsAllReports"
+                text="Update Statistics (All Reports)"/>
+    </HBox>
+
+    <TextArea fx:id="reportStatisticsTextArea" editable="false" prefRowCount="100"/>
+
+
+
+</VBox>

@@ -1,6 +1,7 @@
 package com.faforever.moderatorclient.ui.moderation_reports;
 
 import com.faforever.moderatorclient.config.PreferencesConfig;
+import com.faforever.moderatorclient.ui.main_window.ReportStatisticsController;
 import com.faforever.commons.api.dto.ModerationReportStatus;
 import com.faforever.commons.replay.ChatMessage;
 import com.faforever.commons.replay.ModeratorEvent;
@@ -162,6 +163,9 @@ public class ModerationReportController implements Controller<Region> {
 
     @Autowired
     public PreferencesConfig preferencesConfig;
+
+    @Autowired
+    public ReportStatisticsController reportStatisticsController;
 
     @Value("${faforever.vault.replay-download-url-format}")
     private String replayDownLoadFormat;
@@ -784,6 +788,7 @@ public class ModerationReportController implements Controller<Region> {
                     lastActivity.setSortType(TableColumn.SortType.DESCENDING);
                     moderatorStatisticsTableView.sort();
                     moderatorStatisticsTextArea.setText(sb.toString());
+                    reportStatisticsController.onUpdateStatisticsButtonLastYear();
                 });
                 return null;
             }
@@ -1149,6 +1154,7 @@ public class ModerationReportController implements Controller<Region> {
         activeApiRequests.incrementAndGet();
         moderationReportService.getAllReports().thenAccept(allReports -> Platform.runLater(() -> {
             itemList.setAll(allReports);
+            cachedReports.setAll(allReports);
             processStatisticsModerator(allReports);
             showInTableRepeatedOffenders(allReports);
             log.debug("All reports loaded. Total count: {}", allReports.size());
@@ -1164,6 +1170,14 @@ public class ModerationReportController implements Controller<Region> {
             }
         });
     }
+
+    private final ObservableList<ModerationReportFX> cachedReports = FXCollections.observableArrayList();
+
+
+    public ObservableList<ModerationReportFX> getAllCachedReports() {
+        return cachedReports;
+    }
+
 
     public void onEdit() {
         ObservableList<ModerationReportFX> selectedItems = reportTableView.getSelectionModel().getSelectedItems();

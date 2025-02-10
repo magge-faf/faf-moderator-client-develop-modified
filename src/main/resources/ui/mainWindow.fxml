@@ -22,4 +22,5 @@
     <Tab fx:id="permissionTab" closable="false" text="User Groups"/>
     <Tab fx:id="settingsTab" closable="false" text="Settings"/>
     <Tab fx:id="recentNotesTab" closable="false" text="Recent Notes"/>
+    <Tab fx:id="reportStatisticsTab" closable="false" text="Report Statistics"/>
 </TabPane>
