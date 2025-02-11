@@ -257,6 +257,14 @@ public class PreferencesConfig implements DisposableBean {
         return getPreference("generalSettings", "autoApplyTemplateAndSaveCheckBox", false, Boolean.class);
     }
 
+    public boolean getSearchHistoryVisibilityState() {
+        return getPreference("generalSettings", "searchHistoryTexAreaVisibilityState", false, Boolean.class);
+    }
+
+    public boolean getUserNotesVisibilityState() {
+        return getPreference("generalSettings", "userNotesTextAreaVisibilityState", false, Boolean.class);
+    }
+
     @Override
     public void destroy() {
         writePreferences();

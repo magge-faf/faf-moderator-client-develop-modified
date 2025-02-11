@@ -42,13 +42,20 @@
             </HBox>
             <Separator/>
 
-            <!-- Search History -->
-            <Label fx:id="searchHistoryLabel" text="Search History:" alignment="CENTER" style="-fx-font-weight: bold;"/>
-            <TextArea fx:id="SearchHistoryTextArea" promptText="No history available" wrapText="true"/>
-
-            <!-- User Notes -->
-            <Label fx:id="userNotesLabel" text="User Notes:" alignment="CENTER" style="-fx-font-weight: bold;"/>
-            <TextArea fx:id="UserNotesTextArea" promptText="Add your notes here" wrapText="true"/>
+            <VBox spacing="10">
+                <!-- Search History -->
+                <HBox spacing="10" alignment="CENTER_LEFT">
+                    <Label fx:id="searchHistoryLabel" text="Search History:" style="-fx-font-weight: bold;" />
+                    <Button fx:id="minimizeSearchHistoryButton" text="Minimize" onAction="#handleMinimizeSearchHistory"/>
+                </HBox>
+                <TextArea fx:id="SearchHistoryTextArea" promptText="No history available" wrapText="true" prefHeight="100" prefWidth="400"/>
+                <!-- User Notes -->
+                <HBox spacing="10" alignment="CENTER_LEFT">
+                    <Label fx:id="userNotesLabel" text="User Notes:" style="-fx-font-weight: bold;" />
+                    <Button fx:id="minimizeUserNotesButton" text="Minimize" onAction="#handleMinimizeUserNotes"/>
+                </HBox>
+                <TextArea fx:id="UserNotesTextArea" promptText="Add your notes here" wrapText="true" prefHeight="100" prefWidth="400"/>
+            </VBox>
             <Separator/>
 
             <!-- Smurf Village Lookup -->
@@ -81,7 +88,7 @@
                 <Text text="Number of recent registered accounts to check (up to 1000)" style="-fx-font-weight: bold;"/>
                 <TextField fx:id="amountTextFieldRecentAccountsForSmurfsAmount" text="42"/>
             </VBox>
-        </VBox>
+            </VBox>
         </ScrollPane>
 
         <!-- TableView for user search results -->

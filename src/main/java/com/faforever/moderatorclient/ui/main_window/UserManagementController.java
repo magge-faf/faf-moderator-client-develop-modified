@@ -102,7 +102,9 @@ public class UserManagementController implements Controller<SplitPane> {
     private final ObservableList<GroupPermissionFX> groupPermissions = FXCollections.observableArrayList();
 
     private final Map<String, String> searchUserPropertyMapping = new LinkedHashMap<>();
+    @FXML
     public TextArea SearchHistoryTextArea;
+    @FXML
     public TextArea UserNotesTextArea;
 
     private static final String SEARCH_HISTORY_FILE = CONFIGURATION_FOLDER + File.separator +  "searchHistory.txt";
@@ -207,12 +209,31 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     @FXML
+    private Button minimizeSearchHistoryButton;
+    @FXML
+    private Button minimizeUserNotesButton;
+
+    @FXML
     public void initialize() {
         loadStateCheckBox();
         addListeners();
         loadContent();
         loadDividerPosition(root, preferencesConfig);
         addDividerPositionListener(root, preferencesConfig);
+
+        boolean isSearchHistoryVisible = preferencesConfig.getSearchHistoryVisibilityState();
+        SearchHistoryTextArea.setVisible(isSearchHistoryVisible);
+        SearchHistoryTextArea.setManaged(isSearchHistoryVisible);
+        minimizeSearchHistoryButton.setText(isSearchHistoryVisible ? "Minimize" : "Restore");
+
+        boolean isUserNotesVisible = preferencesConfig.getUserNotesVisibilityState();
+        UserNotesTextArea.setVisible(isUserNotesVisible);
+        UserNotesTextArea.setManaged(isUserNotesVisible);
+        minimizeUserNotesButton.setText(isUserNotesVisible ? "Minimize" : "Restore");
+
+        minimizeSearchHistoryButton.setOpacity(0.5);
+        minimizeUserNotesButton.setOpacity(0.5);
+
         // Set last search term for userSearchTextField
         String textAreaContent = SearchHistoryTextArea.getText();
         String[] lines = textAreaContent.split("\n");
@@ -1370,5 +1391,47 @@ public class UserManagementController implements Controller<SplitPane> {
         pagesMaxAmountGamesTextfield.textProperty().addListener((observable, oldValue, newValue) -> {
             preferencesConfig.setPreference("generalSettings", "pagesMaxAmountGamesTextfield", pagesMaxAmountGamesTextfield.getText());
         });
+
+        minimizeSearchHistoryButton.setOnAction(event -> {
+            handleMinimizeSearchHistory();
+        });
+
+        minimizeUserNotesButton.setOnAction(event -> {
+            handleMinimizeUserNotes();
+        });
+    }
+
+    @FXML
+    private void handleMinimizeSearchHistory() {
+        boolean isVisible = preferencesConfig.getSearchHistoryVisibilityState();
+
+        if (isVisible) {
+            SearchHistoryTextArea.setVisible(false);
+            SearchHistoryTextArea.setManaged(false);
+            minimizeSearchHistoryButton.setText("Restore");
+            preferencesConfig.setPreference("generalSettings", "searchHistoryTexAreaVisibilityState", false);
+        } else {
+            SearchHistoryTextArea.setVisible(true);
+            SearchHistoryTextArea.setManaged(true);
+            minimizeSearchHistoryButton.setText("Minimize");
+            preferencesConfig.setPreference("generalSettings", "searchHistoryTexAreaVisibilityState", true);
+        }
+    }
+
+    @FXML
+    public void handleMinimizeUserNotes() {
+        boolean isVisible = preferencesConfig.getUserNotesVisibilityState();
+
+        if (isVisible) {
+            UserNotesTextArea.setVisible(false);
+            UserNotesTextArea.setManaged(false);
+            minimizeUserNotesButton.setText("Restore");
+            preferencesConfig.setPreference("generalSettings", "userNotesTextAreaVisibilityState", false);
+        } else {
+            UserNotesTextArea.setVisible(true);
+            UserNotesTextArea.setManaged(true);
+            minimizeUserNotesButton.setText("Minimize");
+            preferencesConfig.setPreference("generalSettings", "userNotesTextAreaVisibilityState", true);
+        }
     }
 }
