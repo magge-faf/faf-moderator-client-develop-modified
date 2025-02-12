@@ -30,6 +30,12 @@ if (javafxPlatform == "unspecified") {
     }
 }
 
+configurations.all {
+    resolutionStrategy {
+        force 'net.minidev:json-smart:2.5.2'
+    }
+}
+
 println "Platform is: ${javafxPlatform}"
 
 dependencies {
@@ -73,6 +79,7 @@ dependencies {
     dependencies {
         implementation files('libs/faf-commons-api-1.0-SNAPSHOT.jar')
     }
+    implementation 'net.minidev:json-smart:2.5.2'
 }
 
 mainClassName = 'com.faforever.moderatorclient.Launcher'
