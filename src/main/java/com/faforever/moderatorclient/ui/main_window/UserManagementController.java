@@ -72,7 +72,9 @@ public class UserManagementController implements Controller<SplitPane> {
     public Button checkSharedGamesButton;
     public Button removeNoteButton;
     @FXML
-    public TextField pagesMaxAmountGamesTextfield;
+    public TextField checkSharedGamesComparisonTextfield;
+    @FXML
+    public TextField userGamesNumberOfPagesToLoadTextfield;
     @FXML
     private Button checkRecentAccountsForSmurfsPauseButton;
 
@@ -220,6 +222,8 @@ public class UserManagementController implements Controller<SplitPane> {
         loadContent();
         loadDividerPosition(root, preferencesConfig);
         addDividerPositionListener(root, preferencesConfig);
+        userGamesNumberOfPagesToLoadTextfield.setText(preferencesConfig.getUserGamesNumberOfPagesToLoadTextfield());
+        checkSharedGamesComparisonTextfield.setText(preferencesConfig.getCheckSharedGamesComparisonTextfield());
 
         boolean isSearchHistoryVisible = preferencesConfig.getSearchHistoryVisibilityState();
         SearchHistoryTextArea.setVisible(isSearchHistoryVisible);
@@ -274,7 +278,7 @@ public class UserManagementController implements Controller<SplitPane> {
         });
         featuredModFilterChoiceBox.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
             userLastGamesTable.getItems().clear();
-            userGamesPage = 1;
+            userGamesPage = Integer.parseInt(preferencesConfig.getUserGamesNumberOfPagesToLoadTextfield());
             if (loadMoreGamesRunnable != null) loadMoreGamesRunnable.run();
         });
 
@@ -374,7 +378,7 @@ public class UserManagementController implements Controller<SplitPane> {
                 }
 
                 userGamesPage = 1;
-                int numberOfPagesToLoad = 50; // TODO Customize value in settingsTab
+                int numberOfPagesToLoad = Integer.parseInt(preferencesConfig.getUserGamesNumberOfPagesToLoadTextfield());
 
                 for (int i = 0; i < numberOfPagesToLoad; i++) {
                     final int currentPage = userGamesPage + i;
@@ -1206,7 +1210,6 @@ public class UserManagementController implements Controller<SplitPane> {
         catchFirstLayerSmurfsOnlyCheckBox.setSelected(preferencesConfig.getCatchFirstLayerSmurfsOnlyCheckBox());
         depthScanningInputTextField.setText(preferencesConfig.getDepthScanningInputTextField().toString());
         maxUniqueUsersThresholdTextField.setText(preferencesConfig.getMaxUniqueUsersThresholdTextField().toString());
-        pagesMaxAmountGamesTextfield.setText(preferencesConfig.getPagesMaxAmountGamesTextfield());
     }
 
     public void saveOnExitContent() {
@@ -1273,7 +1276,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
         if (isValidPlayerId(playerID1) && isValidPlayerId(playerID2)) {
             userGamesPage = 1;
-            int numberOfPagesToLoad = Integer.parseInt(preferencesConfig.getPagesMaxAmountGamesTextfield());
+            int numberOfPagesToLoad = Integer.parseInt(preferencesConfig.getCheckSharedGamesComparisonTextfield());
 
             List<GamePlayerStatsFX> allPlayer1Games = Collections.synchronizedList(new ArrayList<>());
             List<GamePlayerStatsFX> allPlayer2Games = Collections.synchronizedList(new ArrayList<>());
@@ -1335,71 +1338,44 @@ public class UserManagementController implements Controller<SplitPane> {
         }
     }
 
-    public void addListeners() {
-        includeUUIDCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("filterSettings", "includeUUIDCheckBox", includeUUIDCheckBox.isSelected());
-        });
-
-        includeUIDHashCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("filterSettings", "includeUIDHashCheckBox", includeUIDHashCheckBox.isSelected());
-        });
-
-        includeMemorySerialNumberCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("filterSettings", "includeMemorySerialNumberCheckBox", includeMemorySerialNumberCheckBox.isSelected());
-        });
-
-        includeVolumeSerialNumberCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("filterSettings", "includeVolumeSerialNumberCheckBox", includeVolumeSerialNumberCheckBox.isSelected());
-        });
-
-        includeSerialNumberCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("filterSettings", "includeSerialNumberCheckBox", includeSerialNumberCheckBox.isSelected());
-        });
-
-        includeProcessorIdCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("filterSettings", "includeProcessorIdCheckBox", includeProcessorIdCheckBox.isSelected());
-        });
-
-        includeManufacturerCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("filterSettings", "includeManufacturerCheckBox", includeManufacturerCheckBox.isSelected());
-        });
-
-        includeIPCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("filterSettings", "includeIPCheckBox", includeIPCheckBox.isSelected());
-        });
-
-        includeProcessorNameCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("filterSettings", "includeProcessorNameCheckBox", includeProcessorNameCheckBox.isSelected());
-        });
-
-        catchFirstLayerSmurfsOnlyCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("filterSettings", "catchFirstLayerSmurfsOnlyCheckBox", catchFirstLayerSmurfsOnlyCheckBox.isSelected());
-        });
-
-        depthScanningInputTextField.textProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("filterSettings", "depthScanningInputTextField", depthScanningInputTextField.getText());
-        });
-
-        maxUniqueUsersThresholdTextField.textProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("filterSettings", "maxUniqueUsersThresholdTextField", maxUniqueUsersThresholdTextField.getText());
-        });
-
-        amountTextFieldRecentAccountsForSmurfsAmount.textProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("filterSettings", "amountTextFieldRecentAccountsForSmurfsAmount", amountTextFieldRecentAccountsForSmurfsAmount.getText());
-        });
-
-        pagesMaxAmountGamesTextfield.textProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("generalSettings", "pagesMaxAmountGamesTextfield", pagesMaxAmountGamesTextfield.getText());
-        });
-
-        minimizeSearchHistoryButton.setOnAction(event -> {
-            handleMinimizeSearchHistory();
-        });
-
-        minimizeUserNotesButton.setOnAction(event -> {
-            handleMinimizeUserNotes();
+    private void addCheckBoxListener(CheckBox checkBox, String preferenceKey) {
+        checkBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("generalSettings", preferenceKey, checkBox.isSelected());
         });
     }
+
+    private void addTextFieldListener(TextField textField, String preferenceKey) {
+        textField.textProperty().addListener((observable, oldValue, newValue) -> {
+            preferencesConfig.setPreference("generalSettings", preferenceKey, textField.getText());
+        });
+    }
+
+    public void addListeners() {
+    addCheckBoxListener(includeUUIDCheckBox, "includeUUIDCheckBox");
+    addCheckBoxListener(includeUIDHashCheckBox, "includeUIDHashCheckBox");
+    addCheckBoxListener(includeMemorySerialNumberCheckBox, "includeMemorySerialNumberCheckBox");
+    addCheckBoxListener(includeVolumeSerialNumberCheckBox, "includeVolumeSerialNumberCheckBox");
+    addCheckBoxListener(includeSerialNumberCheckBox, "includeSerialNumberCheckBox");
+    addCheckBoxListener(includeProcessorIdCheckBox, "includeProcessorIdCheckBox");
+    addCheckBoxListener(includeManufacturerCheckBox, "includeManufacturerCheckBox");
+    addCheckBoxListener(includeIPCheckBox, "includeIPCheckBox");
+    addCheckBoxListener(includeProcessorNameCheckBox, "includeProcessorNameCheckBox");
+    addCheckBoxListener(catchFirstLayerSmurfsOnlyCheckBox, "catchFirstLayerSmurfsOnlyCheckBox");
+
+    addTextFieldListener(depthScanningInputTextField, "depthScanningInputTextField");
+    addTextFieldListener(maxUniqueUsersThresholdTextField, "maxUniqueUsersThresholdTextField");
+    addTextFieldListener(amountTextFieldRecentAccountsForSmurfsAmount, "amountTextFieldRecentAccountsForSmurfsAmount");
+    addTextFieldListener(checkSharedGamesComparisonTextfield, "checkSharedGamesComparisonTextfield");
+    addTextFieldListener(userGamesNumberOfPagesToLoadTextfield, "userGamesNumberOfPagesToLoadTextfield");
+
+    minimizeSearchHistoryButton.setOnAction(event -> {
+        handleMinimizeSearchHistory();
+    });
+
+    minimizeUserNotesButton.setOnAction(event -> {
+        handleMinimizeUserNotes();
+    });
+}
 
     @FXML
     private void handleMinimizeSearchHistory() {

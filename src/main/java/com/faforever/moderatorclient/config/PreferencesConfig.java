@@ -101,6 +101,8 @@ public class PreferencesConfig implements DisposableBean {
         return defaultValue;
     }
 
+    //TODO refactor
+
     public Boolean getDebugMode() {
         return getPreference("user", "debugMode", false, Boolean.class);
     }
@@ -168,89 +170,85 @@ public class PreferencesConfig implements DisposableBean {
     }
 
     public boolean getFocusArmyFromFilterCheckBox() {
-        return getPreference("filterSettings", "focusArmyFromFilterCheckBox", false, Boolean.class);
+        return getPreference("generalSettings", "focusArmyFromFilterCheckBox", false, Boolean.class);
     }
 
     public boolean getPingOfTypeAlertFilterCheckBox() {
-        return getPreference("filterSettings", "pingOfTypeAlertFilterCheckBox", false, Boolean.class);
+        return getPreference("generalSettings", "pingOfTypeAlertFilterCheckBox", false, Boolean.class);
     }
 
     public boolean getPingOfTypeMoveFilterCheckBox() {
-        return getPreference("filterSettings", "pingOfTypeMoveFilterCheckBox", false, Boolean.class);
+        return getPreference("generalSettings", "pingOfTypeMoveFilterCheckBox", false, Boolean.class);
     }
 
     public boolean getPingOfTypeAttackFilterCheckBox() {
-        return getPreference("filterSettings", "pingOfTypeAttackFilterCheckBox", false, Boolean.class);
+        return getPreference("generalSettings", "pingOfTypeAttackFilterCheckBox", false, Boolean.class);
     }
 
     public boolean getSelfDestructionFilterCheckBox() {
-        return getPreference("filterSettings", "selfDestructionFilterCheckBox", false, Boolean.class);
+        return getPreference("generalSettings", "selfDestructionFilterCheckBox", false, Boolean.class);
     }
 
     public String getSelfDestructionFilterAmountTextField() {
-        return getPreference("filterSettings", "selfDestructionFilterAmountTextField", "0", String.class);
+        return getPreference("generalSettings", "selfDestructionFilterAmountTextField", "0", String.class);
     }
 
     public boolean getTextMarkerTypeFilterCheckBox() {
-        return getPreference("filterSettings", "textMarkerTypeFilterCheckBox", false, Boolean.class);
+        return getPreference("generalSettings", "textMarkerTypeFilterCheckBox", false, Boolean.class);
     }
 
     // User Management Settings
 
     public boolean getIncludeUUIDCheckBox() {
-        return getPreference("filterSettings", "includeUUIDCheckBox", false, Boolean.class);
+        return getPreference("generalSettings", "includeUUIDCheckBox", false, Boolean.class);
     }
 
     public boolean getIncludeUIDHashCheckBox() {
-        return getPreference("filterSettings", "includeUIDHashCheckBox", false, Boolean.class);
+        return getPreference("generalSettings", "includeUIDHashCheckBox", false, Boolean.class);
     }
 
     public boolean getIncludeMemorySerialNumberCheckBox() {
-        return getPreference("filterSettings", "includeMemorySerialNumberCheckBox", false, Boolean.class);
+        return getPreference("generalSettings", "includeMemorySerialNumberCheckBox", false, Boolean.class);
     }
 
     public boolean getIncludeVolumeSerialNumberCheckBox() {
-        return getPreference("filterSettings", "includeVolumeSerialNumberCheckBox", false, Boolean.class);
+        return getPreference("generalSettings", "includeVolumeSerialNumberCheckBox", false, Boolean.class);
     }
 
     public boolean getIncludeSerialNumberCheckBox() {
-        return getPreference("filterSettings", "includeSerialNumberCheckBox", false, Boolean.class);
+        return getPreference("generalSettings", "includeSerialNumberCheckBox", false, Boolean.class);
     }
 
     public boolean getIncludeProcessorIdCheckBox() {
-        return getPreference("filterSettings", "includeProcessorIdCheckBox", false, Boolean.class);
+        return getPreference("generalSettings", "includeProcessorIdCheckBox", false, Boolean.class);
     }
 
     public boolean getIncludeManufacturerCheckBox() {
-        return getPreference("filterSettings", "includeManufacturerCheckBox", false, Boolean.class);
+        return getPreference("generalSettings", "includeManufacturerCheckBox", false, Boolean.class);
     }
 
     public boolean getIncludeIPCheckBox() {
-        return getPreference("filterSettings", "includeIPCheckBox", false, Boolean.class);
+        return getPreference("generalSettings", "includeIPCheckBox", false, Boolean.class);
     }
 
     public boolean getIncludeProcessorNameCheckBox() {
-        return getPreference("filterSettings", "includeProcessorNameCheckBox", false, Boolean.class);
+        return getPreference("generalSettings", "includeProcessorNameCheckBox", false, Boolean.class);
     }
 
     public boolean getCatchFirstLayerSmurfsOnlyCheckBox() {
-        return getPreference("filterSettings", "catchFirstLayerSmurfsOnlyCheckBox", false, Boolean.class);
+        return getPreference("generalSettings", "catchFirstLayerSmurfsOnlyCheckBox", false, Boolean.class);
     }
 
     public Integer getDepthScanningInputTextField() {
-        return getPreference("filterSettings", "depthScanningInputTextField", 1000, Integer.class);
+        return getPreference("generalSettings", "depthScanningInputTextField", 1000, Integer.class);
     }
 
     public Integer getMaxUniqueUsersThresholdTextField() {
-        return getPreference("filterSettings", "maxUniqueUsersThresholdTextField", 100, Integer.class);
+        return getPreference("generalSettings", "maxUniqueUsersThresholdTextField", 100, Integer.class);
     }
 
     public Integer getAmountTextFieldRecentAccountsForSmurfsAmount() {
-        return getPreference("filterSettings", "amountTextFieldRecentAccountsForSmurfsAmount", 100, Integer.class);
-    }
-
-    public String getPagesMaxAmountGamesTextfield() {
-        return getPreference("generalSettings", "pagesMaxAmountGamesTextfield", "10", String.class);
+        return getPreference("generalSettings", "amountTextFieldRecentAccountsForSmurfsAmount", 100, Integer.class);
     }
 
     public boolean getAutoApplyTemplateAndSaveCheckBox() {
@@ -263,6 +261,14 @@ public class PreferencesConfig implements DisposableBean {
 
     public boolean getUserNotesVisibilityState() {
         return getPreference("generalSettings", "userNotesTextAreaVisibilityState", false, Boolean.class);
+    }
+
+    public String getCheckSharedGamesComparisonTextfield() {
+        return getPreference("generalSettings","checkSharedGamesComparisonTextfield", "10", String.class);
+    }
+
+    public String getUserGamesNumberOfPagesToLoadTextfield() {
+        return getPreference("generalSettings","userGamesNumberOfPagesToLoadTextfield", "10", String.class);
     }
 
     @Override
