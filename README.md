@@ -15,6 +15,13 @@ This application enables faforever.com moderators to perform administrative acti
 - Go to the bin folder and run the .bat script (Windows) or the .sh script (Linux)
 - Login with your FAF credentials
 
+Note: Make sure the following environment path exists:
+
+C:\Program Files\Common Files\Oracle\Java\javapath
+
+![image](https://github.com/user-attachments/assets/41f89aaa-6ba1-46d9-9d7a-0c3a452001ab)
+
+
 # Setting up your environment
 
 ## Recommended software
