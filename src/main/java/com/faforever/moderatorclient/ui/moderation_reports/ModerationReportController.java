@@ -959,7 +959,6 @@ public class ModerationReportController implements Controller<Region> {
         BanInfoFX ban = new BanInfoFX();
         ban.setPlayer(accountFX);
         banInfoController.setBanInfo(ban);
-        banInfoController.addPostedListener(banInfoFX -> onRefreshInitialReports());
         Stage banInfoDialog = new Stage();
         banInfoDialog.setTitle("Apply new ban");
         banInfoDialog.setScene(new Scene(banInfoController.getRoot()));
@@ -1114,8 +1113,6 @@ public class ModerationReportController implements Controller<Region> {
         try {
             EditModerationReportController editModerationReportController = uiService.loadFxml("ui/edit_moderation_report.fxml");
             editModerationReportController.setSelectedReports(new ArrayList<>(selectedItems));
-
-            editModerationReportController.setOnSaveRunnable(this::onRefreshInitialReports);
 
             Stage editDialog = new Stage();
             int numberOfReports = selectedItems.size();
