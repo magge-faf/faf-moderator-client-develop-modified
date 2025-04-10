@@ -1436,19 +1436,22 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private HttpResponse<Path> downloadReplay(GameFX game, Path tempFilePath) {
-        try {
-            String replayUrl = game.getReplayUrl(replayDownLoadFormat);
-            log.info("Downloading replay from {} to {}", replayUrl, tempFilePath);
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(replayUrl))
-                    .build();
+    try {
+        FafApiCommunicationService.checkRateLimit();
 
-            return httpClient.send(request, HttpResponse.BodyHandlers.ofFile(tempFilePath));
-        } catch (Exception e) {
-            log.error("An error occurred while downloading the replay.", e);
-            return null;
-        }
+        String replayUrl = game.getReplayUrl(replayDownLoadFormat);
+        log.info("Downloading replay from {} to {}", replayUrl, tempFilePath);
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(replayUrl))
+                .build();
+
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofFile(tempFilePath));
+    } catch (Exception e) {
+        log.error("An error occurred while downloading the replay.", e);
+        return null;
     }
+}
 
     private void updateUIUnavailable(String header, String message) {
         Platform.runLater(() -> {

@@ -1,5 +1,6 @@
 package com.faforever.moderatorclient;
 
+import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.config.ApplicationProperties;
 import com.faforever.moderatorclient.ui.MainController;
 import com.faforever.moderatorclient.ui.PlatformService;
@@ -93,52 +94,55 @@ public class FafModeratorClientApplication extends Application {
     }
 
     private void startTimerThread(Stage primaryStage) {
-        long startTime = System.currentTimeMillis();
-        Timer timer = new Timer(true);
-        TimerTask task = new TimerTask() {
-            @Override
-            public void run() {
-                Platform.runLater(() -> updateWindowTitle(primaryStage, startTime));
-            }
-        };
-        timer.scheduleAtFixedRate(task, 0, 1000);
-    }
+    long startTime = System.currentTimeMillis();
+    Timer timer = new Timer(true);
+    TimerTask task = new TimerTask() {
+        @Override
+        public void run() {
+            int requestsInLastMinute = FafApiCommunicationService.getRequestsInLastMinute();
+
+            Platform.runLater(() -> updateWindowTitle(primaryStage, startTime, requestsInLastMinute));
+        }
+    };
+    timer.scheduleAtFixedRate(task, 0, 1000);
+}
 
     private Timeline timeline;
     private Stage primaryStage;
     private long startTime;
     private boolean isFetching = false;
 
-    public void updateWindowTitle(Stage primaryStage, long startTime) {
-        this.primaryStage = primaryStage;
-        this.startTime = startTime;
+    public void updateWindowTitle(Stage primaryStage, long startTime, int requestsInLastMinute) {
+    this.primaryStage = primaryStage;
+    this.startTime = startTime;
 
-        AtomicInteger activeRequests = moderationReportController.getActiveApiRequests();
-        boolean hasActiveRequests = activeRequests.get() > 0;
+    AtomicInteger activeRequests = moderationReportController.getActiveApiRequests();
+    boolean hasActiveRequests = activeRequests.get() > 0;
 
-        if (hasActiveRequests) {
-            if (!isFetching) {
-                startFetchingPattern();
-                isFetching = true;
-                lastRefreshedTime = System.currentTimeMillis();
-            }
-        } else {
-            stopFetchingPattern();
-            isFetching = false;
-
-            long elapsedTimeMillis = System.currentTimeMillis() - startTime;
-            long elapsedTimeSeconds = elapsedTimeMillis / 1000;
-            long minutes = elapsedTimeSeconds / 60;
-            long seconds = elapsedTimeSeconds % 60;
-            String elapsedTimeStr = String.format("%02d:%02d", minutes, seconds);
-
-            String lastUpdateStr = getLastUpdateTime();
-
-            primaryStage.setTitle("magge's Mordor - Session: " + elapsedTimeStr +
-                    " | Reports Loaded: " + moderationReportController.getTotalReportsLoaded() +
-                    " | Last Refresh was " + lastUpdateStr);
+    if (hasActiveRequests) {
+        if (!isFetching) {
+            startFetchingPattern();
+            isFetching = true;
+            lastRefreshedTime = System.currentTimeMillis();
         }
+    } else {
+        stopFetchingPattern();
+        isFetching = false;
+
+        long elapsedTimeMillis = System.currentTimeMillis() - startTime;
+        long elapsedTimeSeconds = elapsedTimeMillis / 1000;
+        long minutes = elapsedTimeSeconds / 60;
+        long seconds = elapsedTimeSeconds % 60;
+        String elapsedTimeStr = String.format("%02d:%02d", minutes, seconds);
+
+        String lastUpdateStr = getLastUpdateTime();
+
+        primaryStage.setTitle("magge's Mordor - Session: " + elapsedTimeStr +
+                " | Reports Loaded: " + moderationReportController.getTotalReportsLoaded() +
+                " | Last Refresh was " + lastUpdateStr +
+                " | Requests in Last 60s: " + requestsInLastMinute);
     }
+}
 
     private void startFetchingPattern() {
         if (timeline != null && timeline.getStatus() == Timeline.Status.RUNNING) {
