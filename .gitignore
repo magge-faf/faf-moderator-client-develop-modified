@@ -9,10 +9,11 @@ build
 *.ipr
 
 # User-specific stuff:
-*.txt
-.idea/
-out/
-
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/dictionaries
+.idea/sonarIssues.xml
+client*
 
 # Sensitive or high-churn files:
 .idea/dataSources
