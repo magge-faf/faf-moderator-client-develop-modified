@@ -2,8 +2,11 @@ package com.faforever.moderatorclient.api;
 
 import com.faforever.moderatorclient.api.event.HydraAuthorizedEvent;
 import com.faforever.moderatorclient.config.EnvironmentProperties;
+import com.faforever.moderatorclient.config.local.LocalPreferencesAccessor;
+import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.ParameterizedTypeReference;
@@ -27,100 +30,103 @@ import java.util.Map;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor(onConstructor_ = @Autowired)
 public class TokenService {
-  private final ApplicationEventPublisher applicationEventPublisher;
-  private RestTemplate restTemplate;
-  private EnvironmentProperties environmentProperties;
-  private OAuth2AccessTokenResponse tokenCache;
+    private final LocalPreferencesAccessor localPreferences;
+    private final ApplicationEventPublisher applicationEventPublisher;
+    private RestTemplate restTemplate;
+    private EnvironmentProperties environmentProperties;
+    private OAuth2AccessTokenResponse tokenCache;
 
-  public TokenService(ApplicationEventPublisher applicationEventPublisher) {
-    this.applicationEventPublisher = applicationEventPublisher;
-  }
-
-  public void prepare(EnvironmentProperties environmentProperties) {
-    this.environmentProperties = environmentProperties;
-    this.restTemplate = new RestTemplateBuilder()
-            .requestFactory(JdkClientHttpRequestFactory.class)
-            .rootUri(environmentProperties.getOauthBaseUrl())
-            .build();
-  }
-
-  @SneakyThrows
-  public String getRefreshedTokenValue() {
-    if (tokenCache.getAccessToken().getExpiresAt().isBefore(Instant.now())) {
-      log.info("Token expired, requesting new with refresh token");
-      loginWithRefreshToken(tokenCache.getRefreshToken().getTokenValue(), false);
-    } else {
-      log.debug("Token still valid for {} seconds", Duration.between(Instant.now(), tokenCache.getAccessToken().getExpiresAt()));
+    public void prepare(EnvironmentProperties environmentProperties) {
+        this.environmentProperties = environmentProperties;
+        this.restTemplate = new RestTemplateBuilder()
+                .requestFactory(JdkClientHttpRequestFactory.class)
+                .rootUri(environmentProperties.getOauthBaseUrl())
+                .build();
     }
 
-    return tokenCache.getAccessToken().getTokenValue();
-  }
+    @SneakyThrows
+    public String getRefreshedTokenValue() {
+        if (tokenCache.getAccessToken().getExpiresAt().isBefore(Instant.now())) {
+            log.info("Token expired, requesting new with refresh token");
+            loginWithRefreshToken(tokenCache.getRefreshToken().getTokenValue(), false);
+        } else {
+            log.debug("Token still valid for {} seconds", Duration.between(Instant.now(), tokenCache.getAccessToken().getExpiresAt()));
+        }
 
-  public void loginWithAuthorizationCode(String code) {
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-    headers.setAccept(List.of(MediaType.APPLICATION_JSON));
-
-    MultiValueMap<String, String> map = new LinkedMultiValueMap<>();
-    map.add("code", code);
-    map.add("client_id", environmentProperties.getClientId());
-    map.add("redirect_uri", environmentProperties.getOauthRedirectUrl());
-    map.add("grant_type", "authorization_code");
-
-    Map<String, Object>  responseBody = requestToken(headers, map);
-    if (responseBody != null) {
-      parseResponse(responseBody);
-
-      applicationEventPublisher.publishEvent(new HydraAuthorizedEvent());
+        return tokenCache.getAccessToken().getTokenValue();
     }
 
-  }
+    public void loginWithAuthorizationCode(String code) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
 
-  private void parseResponse(Map<String, Object> responseBody) {
-    String accessToken = (String) responseBody.get("access_token");
-    String refreshToken = (String) responseBody.get("refresh_token");
-    Long expiresIn = Long.valueOf(responseBody.get("expires_in").toString());
+        MultiValueMap<String, String> map = new LinkedMultiValueMap<>();
+        map.add("code", code);
+        map.add("client_id", environmentProperties.getClientId());
+        map.add("redirect_uri", environmentProperties.getOauthRedirectUrl());
+        map.add("grant_type", "authorization_code");
 
-    tokenCache = OAuth2AccessTokenResponse.withToken(accessToken)
-            .tokenType(OAuth2AccessToken.TokenType.BEARER)
-            .refreshToken(refreshToken)
-            .expiresIn(expiresIn)
-            .build();
-  }
+        Map<String, Object>  responseBody = requestToken(headers, map);
+        if (responseBody != null) {
+            parseResponse(responseBody);
 
-  public void loginWithRefreshToken(String refreshToken, boolean fireEvent) {
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-    headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+            applicationEventPublisher.publishEvent(new HydraAuthorizedEvent());
+        }
 
-    MultiValueMap<String, String> map = new LinkedMultiValueMap<>();
-    map.add("refresh_token", refreshToken);
-    map.add("client_id", environmentProperties.getClientId());
-    map.add("grant_type", "refresh_token");
-
-    Map<String, Object> responseBody = requestToken(headers, map);
-
-    if (responseBody != null) {
-      parseResponse(responseBody);
-
-      if (fireEvent) {
-        applicationEventPublisher.publishEvent(new HydraAuthorizedEvent());
-      }
     }
-  }
 
-  private Map<String, Object> requestToken(HttpHeaders headers, MultiValueMap<String, String> map) {
-    HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(map, headers);
+    private void parseResponse(Map<String, Object> responseBody) {
+        String accessToken = (String) responseBody.get("access_token");
+        String refreshToken = (String) responseBody.get("refresh_token");
+        Long expiresIn = Long.valueOf(responseBody.get("expires_in").toString());
 
-    ResponseEntity<Map<String, Object>> responseEntity = restTemplate.exchange(
-            "/oauth2/token",
-            HttpMethod.POST,
-            request,
-            new ParameterizedTypeReference<>() {
+        tokenCache = OAuth2AccessTokenResponse.withToken(accessToken)
+                .tokenType(OAuth2AccessToken.TokenType.BEARER)
+                .refreshToken(refreshToken)
+                .expiresIn(expiresIn)
+                .build();
+
+        if (localPreferences.isAutoLoginEnabled()) {
+            log.info("Auto login enabled, persisting refresh token");
+            localPreferences.setRefreshToken(refreshToken);
+        }
+    }
+
+    public void loginWithRefreshToken(String refreshToken, boolean fireEvent) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+
+        MultiValueMap<String, String> map = new LinkedMultiValueMap<>();
+        map.add("refresh_token", refreshToken);
+        map.add("client_id", environmentProperties.getClientId());
+        map.add("grant_type", "refresh_token");
+
+        Map<String, Object> responseBody = requestToken(headers, map);
+
+        if (responseBody != null) {
+            parseResponse(responseBody);
+
+            if (fireEvent) {
+                applicationEventPublisher.publishEvent(new HydraAuthorizedEvent());
             }
-    );
+        }
+    }
 
-    return responseEntity.getBody();
-  }
+    private Map<String, Object> requestToken(HttpHeaders headers, MultiValueMap<String, String> map) {
+        HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(map, headers);
+
+        ResponseEntity<Map<String, Object>> responseEntity = restTemplate.exchange(
+                "/oauth2/token",
+                HttpMethod.POST,
+                request,
+                new ParameterizedTypeReference<>() {
+                }
+        );
+
+        return responseEntity.getBody();
+    }
 }
