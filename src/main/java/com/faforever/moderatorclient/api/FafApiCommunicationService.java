@@ -51,6 +51,7 @@ public class FafApiCommunicationService {
     private final ResourceConverter defaultResourceConverter;
     private final ResourceConverter updateResourceConverter;
     private final OAuthTokenInterceptor oAuthTokenInterceptor;
+    private final HmacHeaderInterceptor hmacHeaderInterceptor;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final JsonApiMessageConverter jsonApiMessageConverter;
     private final JsonApiErrorHandler jsonApiErrorHandler;
@@ -65,12 +66,13 @@ public class FafApiCommunicationService {
 
     public FafApiCommunicationService(@Qualifier("defaultResourceConverter") ResourceConverter defaultResourceConverter,
                                       @Qualifier("updateResourceConverter") ResourceConverter updateResourceConverter,
-                                      OAuthTokenInterceptor oAuthTokenInterceptor, ApplicationEventPublisher applicationEventPublisher,
+                                      OAuthTokenInterceptor oAuthTokenInterceptor, HmacHeaderInterceptor hmacHeaderInterceptor, ApplicationEventPublisher applicationEventPublisher,
                                       CycleAvoidingMappingContext cycleAvoidingMappingContext, RestTemplateBuilder restTemplateBuilder,
                                       JsonApiMessageConverter jsonApiMessageConverter,
                                       JsonApiErrorHandler jsonApiErrorHandler) {
         this.defaultResourceConverter = defaultResourceConverter;
         this.updateResourceConverter = updateResourceConverter;
+        this.hmacHeaderInterceptor = hmacHeaderInterceptor;
         this.applicationEventPublisher = applicationEventPublisher;
         this.cycleAvoidingMappingContext = cycleAvoidingMappingContext;
         this.jsonApiMessageConverter = jsonApiMessageConverter;
@@ -105,7 +107,7 @@ public class FafApiCommunicationService {
                 .readTimeout(Duration.ofMinutes(5))
                 .errorHandler(jsonApiErrorHandler)
                 .rootUri(environmentProperties.getBaseUrl())
-                .interceptors(List.of(oAuthTokenInterceptor,
+                .interceptors(List.of(oAuthTokenInterceptor, hmacHeaderInterceptor,
                         (request, body, execution) -> {
                             HttpHeaders headers = request.getHeaders();
 
