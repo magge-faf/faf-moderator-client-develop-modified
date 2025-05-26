@@ -1,6 +1,7 @@
 package com.faforever.moderatorclient;
 
 import com.faforever.moderatorclient.config.ApplicationProperties;
+import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.ui.MainController;
 import com.faforever.moderatorclient.ui.PlatformService;
 import com.faforever.moderatorclient.ui.PlatformServiceImpl;
@@ -65,9 +66,9 @@ public class FafModeratorClientApplication extends Application {
     @Override
     public void start(Stage primaryStage) {
         log.debug("Initializing CreateTableColumnsWidthSettingsJSON");
-        SettingsController.CreateTableColumnsWidthSettingsJSON();
 
         Font.loadFont(getClass().getResource("/style/NotoEmoji-Regular.ttf").toExternalForm(), 12);
+
         StageHolder.setStage(primaryStage);
         primaryStage.setTitle("magge's Mordor");
         UiService uiService = applicationContext.getBean(UiService.class);
@@ -75,7 +76,14 @@ public class FafModeratorClientApplication extends Application {
         mainController.display();
         primaryStage.getIcons().add(new Image(Objects.requireNonNull(this.getClass().getResourceAsStream("/media/favicon.png"))));
         Scene scene = new Scene(mainController.getRoot());
-        scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/style/main.css")).toExternalForm());
+
+        String stylesheet = "/style/main-light.css";
+        var localPreferences = applicationContext.getBean(LocalPreferences.class);
+        if (localPreferences.getUi().isDarkMode()) {
+            stylesheet = "/style/main-dark.css";
+        }
+
+        scene.getStylesheets().add(getClass().getResource(stylesheet).toExternalForm());
         primaryStage.setScene(scene);
         primaryStage.setMaximized(true);
         primaryStage.show();

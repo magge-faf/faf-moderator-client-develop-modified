@@ -10,7 +10,7 @@ import com.faforever.moderatorclient.api.event.FafUserFailModifyEvent;
 import com.faforever.moderatorclient.api.event.TokenExpiredEvent;
 import com.faforever.moderatorclient.config.ApplicationProperties;
 import com.faforever.moderatorclient.config.EnvironmentProperties;
-import com.faforever.moderatorclient.config.local.LocalPreferencesAccessor;
+import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.config.local.LocalPreferencesReaderWriter;
 import com.faforever.moderatorclient.ui.main_window.AvatarsController;
 import com.faforever.moderatorclient.ui.main_window.DomainBlacklistController;
@@ -41,14 +41,17 @@ import org.springframework.stereotype.Component;
 
 import java.io.*;
 import java.text.MessageFormat;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 
 @Component
 @Slf4j
 @RequiredArgsConstructor
 public class MainController implements Controller<TabPane>, DisposableBean {
     private final ApplicationProperties applicationProperties;
-    private final LocalPreferencesAccessor localPreferences;
+    private final LocalPreferences localPreferences;
     private final LocalPreferencesReaderWriter localPreferencesReaderWriter;
     private final TokenService tokenService;
     private final FafApiCommunicationService fafApiCommunicationService;
@@ -86,10 +89,9 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     private TutorialController tutorialController;
     private MessagesController messagesController;
     private UserGroupsController userGroupsController;
+    private SettingsController settingsController;
     private RecentNotesController recentNotesController;
 
-    @Getter
-    public List<Tab> tabs = Lists.newArrayList();
     private final Map<Tab, Boolean> dataLoadingState = new HashMap<>();
 
     private final FafApiCommunicationService communicationService;
@@ -116,6 +118,8 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         initMapVaultTab();
         initModVaultTab();
         initAvatarTab();
+        initRecentActivityTab();
+        initDomainBlacklistTab();
         initBanTab();
         initDomainBlacklistTab();
         initMapVaultTab();
@@ -123,25 +127,23 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         initMessagesTab();
         initModVaultTab();
         initPermissionTab();
-        initRecentActivityTab();
-        initReportTab();
-        initSettingsTab(getTabs());
-        initTutorialTab();
-        initUserManagementTab();
-        initVotingTab();
-        initRecentNotesTab();
+        initSettingsTab();
+        selectActiveTab();
     }
 
-    private void initSettingsTab(List<Tab> tabs) {
-        settingsController = uiService.loadFxml("ui/main_window/settingsTab.fxml");
-        settingsController.setTabs(tabs);
-        settingsController.initTabStuff();
-        settingsTab.setContent(settingsController.getRoot());
-    }
+    private void selectActiveTab() {
+        var startUpTab = localPreferences.getUi().getStartUpTab();
 
-    private void initRecentNotesTab() {
-        recentNotesController = uiService.loadFxml("ui/main_window/recentNotesTab.fxml");
-        recentNotesTab.setContent(recentNotesController.getRoot());
+        if (startUpTab == null) return;
+
+        try {
+            root.getTabs()
+                    .stream().filter(tab -> Objects.equals(tab.getId(), startUpTab))
+                    .findFirst()
+                    .ifPresent(tab -> root.getSelectionModel().select(tab));
+        } catch (Exception e) {
+            log.error("Error selecting active tab", e);
+        }
     }
 
     private void initLoading(Tab tab, Runnable loadingFunction) {
@@ -175,7 +177,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         if (checkPermissionForTab(reportTab, GroupPermission.ROLE_ADMIN_MODERATION_REPORT)) {
             moderationReportController = uiService.loadFxml("ui/main_window/report.fxml");
             reportTab.setContent(moderationReportController.getRoot());
-            initLoading(reportTab, moderationReportController::onRefreshInitialReports);
+            initLoading(reportTab, moderationReportController::onRefreshAllReports);
         }
     }
 
@@ -248,17 +250,24 @@ public class MainController implements Controller<TabPane>, DisposableBean {
 
     private void initPermissionTab() {
         if (checkPermissionForTab(permissionTab, GroupPermission.ROLE_READ_USER_GROUP)
-        && checkPermissionForTab(permissionTab, GroupPermission.ROLE_WRITE_USER_GROUP)) {
+                && checkPermissionForTab(permissionTab, GroupPermission.ROLE_WRITE_USER_GROUP)) {
             userGroupsController = uiService.loadFxml("ui/main_window/userGroups.fxml");
             permissionTab.setContent(userGroupsController.getRoot());
             initLoading(permissionTab, userGroupsController::onRefreshGroups);
         }
     }
 
+    private void initSettingsTab() {
+        settingsController = uiService.loadFxml("ui/main_window/settings.fxml");
+        settingsTab.setContent(settingsController.getRoot());
+    }
+
     public void display() {
-        if (localPreferences.isAutoLoginEnabled()) {
-            String environment = localPreferences.getEnvironment().orElseThrow(() -> new IllegalStateException("Environment is not set"));
-            String refreshToken = localPreferences.getRefreshToken().orElseThrow(() -> new IllegalStateException("Refresh token is not set"));
+        if (localPreferences.getAutoLogin().isEnabled()) {
+            String environment = Optional.ofNullable(localPreferences.getAutoLogin().getEnvironment())
+                    .orElseThrow(() -> new IllegalStateException("Environment is not set"));
+            String refreshToken = Optional.ofNullable(localPreferences.getAutoLogin().getRefreshToken())
+                    .orElseThrow(() -> new IllegalStateException("Environment is not set"));
 
             EnvironmentProperties environmentProperties = applicationProperties.getEnvironments().get(environment);
             fafApiCommunicationService.initialize(environmentProperties);
@@ -269,7 +278,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
                 tokenService.loginWithRefreshToken(refreshToken, true);
             } catch (Exception e) {
                 log.error("Auto login failed", e);
-                localPreferences.setAutoLoginEnabled(false);
+                localPreferences.getAutoLogin().setEnabled(false);
                 display();
             }
         } else {
@@ -280,7 +289,11 @@ public class MainController implements Controller<TabPane>, DisposableBean {
             loginDialog.setTitle("FAF Moderator Client");
             loginDialog.getIcons().add(new Image(this.getClass().getResourceAsStream("/media/favicon.png")));
             Scene scene = new Scene(loginController.getRoot());
-            scene.getStylesheets().add(getClass().getResource("/style/main.css").toExternalForm());
+            String stylesheet = "/style/main-light.css";
+            if (localPreferences.getUi().isDarkMode()) {
+                stylesheet = "/style/main-dark.css";
+            }
+            scene.getStylesheets().add(getClass().getResource(stylesheet).toExternalForm());
             loginDialog.setScene(scene);
             loginDialog.showAndWait();
         }
@@ -291,7 +304,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     @Override
     public void destroy() throws Exception {
         log.info("Saving local preferences to disk");
-        localPreferencesReaderWriter.write(localPreferences.getNode());
+        localPreferencesReaderWriter.write(localPreferences);
     }
 
     @EventListener
