@@ -22,7 +22,12 @@ if (javafxPlatform == "unspecified") {
             project.ext.javafxPlatform = "linux"
             break
         case OperatingSystem.MAC_OS:
-            project.ext.javafxPlatform = "mac"
+            String arch = System.getProperty("os.arch")
+            if (arch == "aarch64") {
+                project.ext.javafxPlatform = "mac-aarch64"
+            } else {
+                project.ext.javafxPlatform = "mac"
+            }
             break
         case OperatingSystem.WINDOWS:
             project.ext.javafxPlatform = "win"
@@ -33,9 +38,9 @@ if (javafxPlatform == "unspecified") {
 println "Platform is: ${javafxPlatform}"
 
 dependencies {
-    def springBootVersion = "3.3.4"
-    def mapStructVersion = "1.6.2"
-    def commonsVersion = "bc0a20692e599cccb618e0c4346407a13e44464a"
+    def springBootVersion = "3.4.2"
+    def mapStructVersion = "1.5.5.Final"
+    def commonsVersion = "9972c3d"
 
     annotationProcessor(platform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}"))
     implementation(platform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}"))
@@ -44,16 +49,16 @@ dependencies {
     annotationProcessor("org.projectlombok:lombok")
     annotationProcessor("org.mapstruct:mapstruct-processor:${mapStructVersion}")
     implementation("org.projectlombok:lombok")
-    implementation("org.jetbrains:annotations:26.0.0")
+    implementation("org.jetbrains:annotations:26.0.1")
     implementation("org.springframework.boot:spring-boot-starter")
     implementation("org.springframework.boot:spring-boot-starter-validation")
-    implementation("org.springframework.boot:spring-boot-starter-oauth2-client:3.3.5")
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-client:3.4.2")
     implementation("javax.inject:javax.inject:1")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8")
     implementation("com.github.jasminb:jsonapi-converter:0.14")
-    implementation("com.github.FAForever.faf-java-commons:faf-commons-data:${commonsVersion}")
-    //implementation("com.github.FAForever.faf-java-commons:faf-commons-api:${commonsVersion}")
+    implementation("com.github.FAForever.faf-java-commons:data:${commonsVersion}")
+    implementation("com.github.FAForever.faf-java-commons:api:${commonsVersion}")
     implementation("org.apache.httpcomponents:httpclient:4.5.14")
     implementation("com.github.rutledgepaulv:q-builders:1.6")
     implementation("com.google.guava:guava:33.3.1-jre")
@@ -75,22 +80,16 @@ dependencies {
     }
 }
 
-mainClassName = 'com.faforever.moderatorclient.Launcher'
+application {
+    mainClass.set('com.faforever.moderatorclient.Launcher')
+}
 
 group = 'com.faforever'
 description = 'faf-moderator-client'
 
-java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
-}
-
 tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
-}
-
-test {
-    useJUnitPlatform()
+    sourceCompatibility = '21'
 }
 
 // This fixes the "line too long" error when running the .bat with windows CLI
