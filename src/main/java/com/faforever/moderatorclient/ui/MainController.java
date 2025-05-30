@@ -31,15 +31,12 @@ import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.image.Image;
 import javafx.stage.Stage;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.compress.utils.Lists;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-import java.io.*;
 import java.text.MessageFormat;
 import java.util.HashMap;
 import java.util.Map;
@@ -89,7 +86,6 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     private TutorialController tutorialController;
     private MessagesController messagesController;
     private UserGroupsController userGroupsController;
-    private SettingsController settingsController;
     private RecentNotesController recentNotesController;
 
     private final Map<Tab, Boolean> dataLoadingState = new HashMap<>();
@@ -129,6 +125,8 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         initPermissionTab();
         initSettingsTab();
         selectActiveTab();
+        initRecentNotesTab();
+        initReportTab();
     }
 
     private void selectActiveTab() {
@@ -144,6 +142,11 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         } catch (Exception e) {
             log.error("Error selecting active tab", e);
         }
+    }
+
+    private void initRecentNotesTab() {
+        recentNotesController = uiService.loadFxml("ui/main_window/recentNotesTab.fxml");
+        recentNotesTab.setContent(recentNotesController.getRoot());
     }
 
     private void initLoading(Tab tab, Runnable loadingFunction) {
@@ -267,7 +270,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
             String environment = Optional.ofNullable(localPreferences.getAutoLogin().getEnvironment())
                     .orElseThrow(() -> new IllegalStateException("Environment is not set"));
             String refreshToken = Optional.ofNullable(localPreferences.getAutoLogin().getRefreshToken())
-                    .orElseThrow(() -> new IllegalStateException("Environment is not set"));
+                    .orElseThrow(() -> new IllegalStateException("Refresh token is not set"));
 
             EnvironmentProperties environmentProperties = applicationProperties.getEnvironments().get(environment);
             fafApiCommunicationService.initialize(environmentProperties);

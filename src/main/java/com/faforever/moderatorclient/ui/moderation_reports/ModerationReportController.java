@@ -1057,7 +1057,7 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     @FXML
-    private void onRefreshAllReports() {
+    public void onRefreshAllReports() {
         totalReportsLoaded.set(0);
         activeApiRequests.incrementAndGet();
         moderationReportService.getAllReports().thenAccept(allReports -> Platform.runLater(() -> {

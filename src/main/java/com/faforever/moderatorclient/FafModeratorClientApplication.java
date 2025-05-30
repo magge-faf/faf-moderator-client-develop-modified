@@ -173,7 +173,7 @@ public class FafModeratorClientApplication extends Application {
             counterSecondsRequestReportsFromServer[0]++;
 
             primaryStage.setTitle("magge's Mordor - Session: " + elapsedTimeStr +
-                    " | Latest 100 Reports Fetched | Requesting now all reports from the server... (" + counterSecondsRequestReportsFromServer[0] + " seconds ago)");
+                    " | Requesting now all reports from the server... (" + counterSecondsRequestReportsFromServer[0] + " seconds ago)");
         }));
 
         timeline.setCycleCount(Timeline.INDEFINITE);

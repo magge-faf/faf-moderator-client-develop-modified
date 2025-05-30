@@ -1205,8 +1205,6 @@ public class UserManagementController implements Controller<SplitPane> {
                 properties.setProperty("maxUniqueUsersThresholdTextField", maxUniqueUsersThresholdTextField.getText());
                 String browserName = settingsController.getSelectedBrowser();
                 properties.setProperty("browserComboBox", browserName);
-                String startingTab = settingsController.getDefaultTab();
-                properties.setProperty("user.choice.tab", startingTab);
                 log.debug("Configuration saved.");
 
                 try (OutputStream out = new FileOutputStream(CONFIG_FILE_PATH.toFile())) {

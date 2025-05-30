@@ -6,19 +6,14 @@
 
 <?import javafx.collections.FXCollections?>
 <?import java.lang.String?>
-<?import javafx.util.converter.IntegerStringConverter?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.geometry.Insets?>
 <VBox fx:id="root" spacing="5" style="-fx-padding: 10px;" xmlns="http://javafx.com/javafx/20.0.1"
       xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.faforever.moderatorclient.ui.main_window.SettingsController">
 
     <ScrollPane fitToWidth="true">
         <VBox spacing="5">
-            <Text fx:id="accountCredentialsText" style="-fx-font-size: 14pt;">Account Credentials:</Text>
-            <TextField fx:id="accountNameOrEmailTextField" promptText="Account name or email"/>
-            <PasswordField fx:id="accountPasswordField" promptText="Password"/>
-            <Button fx:id="saveAccountCredentialsButton" mnemonicParsing="false" onAction="#onSaveAccountButton" text="Save Account Credentials"/>
-
-            <Separator prefHeight="5"/>
 
             <Text style="-fx-font-size: 14pt;">Open Blacklisted Items:</Text>
             <Button fx:id="blacklistedHashButton" mnemonicParsing="false" onAction="#onBlacklistedHash" prefWidth="100"
@@ -51,10 +46,6 @@
             <Button fx:id="templatesFinishReportsButton" mnemonicParsing="false" onAction="#templatesFinishReportsButton"
                     prefWidth="300" text="View Templates to 'edit' reports"/>
             <Separator prefHeight="5"/>
-            <Text style="-fx-font-size: 14pt;" text="Starting Tab" textAlignment="CENTER"/>
-            <MenuBar xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml">
-                <Menu fx:id="defaultStartingTabMenuBar" text="Choose Starting Tab:"/>
-            </MenuBar>
 
             <Separator minHeight="5"/>
 
@@ -67,7 +58,7 @@
             <Separator minHeight="5"/>
 
             <Text style="-fx-font-size: 12;" text="Select Browser for 'Search Forum' Button" textAlignment="CENTER"/>
-            <ComboBox fx:id="browserComboBox" minWidth="150">
+            <ComboBox fx:id="browserComboBox" minWidth="150" value="Select Browser">
                 <items>
                     <FXCollections fx:factory="observableArrayList">
                         <String fx:value="Firefox" />
@@ -80,14 +71,30 @@
 
             <Separator minHeight="5"/>
 
-            <Label text="Set Number for Loading Initial Newest Reports (Not editable in this version)"/>
-            <TextField fx:id="initialReportsLoadingTextField" text="100" maxWidth="150" editable="false">
-                <TextFormatter>
-                    <valueConverter>
-                        <IntegerStringConverter/>
-                    </valueConverter>
-                </TextFormatter>
-            </TextField>
+            <children>
+                <CheckBox fx:id="rememberLoginCheckBox" mnemonicParsing="false" text="Remember login"/>
+                <CheckBox fx:id="darkModeCheckBox" mnemonicParsing="false" text="Dark Mode"/>
+                <HBox alignment="CENTER_LEFT">
+                    <children>
+                        <Label text="Default active tab">
+                            <HBox.margin>
+                                <Insets right="10.0"/>
+                            </HBox.margin>
+                        </Label>
+                        <ComboBox fx:id="defaultActiveTabComboBox" prefWidth="150.0" visibleRowCount="20"/>
+                    </children>
+                    <VBox.margin>
+                        <Insets/>
+                    </VBox.margin>
+                </HBox>
+                <Separator prefWidth="200.0">
+                    <VBox.margin>
+                        <Insets/>
+                    </VBox.margin>
+                </Separator>
+                <Button mnemonicParsing="false" onAction="#onSave" text="Save changes"/>
+            </children>
+
         </VBox>
     </ScrollPane>
 </VBox>
