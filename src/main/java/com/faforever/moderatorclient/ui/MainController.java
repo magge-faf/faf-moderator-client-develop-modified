@@ -127,6 +127,8 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         selectActiveTab();
         initRecentNotesTab();
         initReportTab();
+        initVotingTab();
+        initTutorialTab();
     }
 
     private void selectActiveTab() {

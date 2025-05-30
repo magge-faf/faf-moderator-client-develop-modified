@@ -913,6 +913,7 @@ public class ModerationReportController implements Controller<Region> {
         Text messageTextNoSelection = new Text("Please select a report to view details.");
         chatLogTextFlow.getChildren().clear();
         chatLogTextFlow.getChildren().add(messageTextNoSelection);
+        onRefreshInitialReports();
     }
 
     private void initializeItemMapAndListeners() {
