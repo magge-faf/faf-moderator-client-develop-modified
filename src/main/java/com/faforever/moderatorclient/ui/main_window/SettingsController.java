@@ -3,6 +3,9 @@ package com.faforever.moderatorclient.ui.main_window;
 import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.ui.Controller;
 import com.faforever.moderatorclient.ui.MainController;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Scene;
@@ -66,7 +69,7 @@ public class SettingsController implements Controller<Pane> {
     }
 
     @FXML
-    public void initialize() {
+    public void initialize() throws IOException {
         mainController.getRoot().getTabs().forEach(t -> System.out.println("Tab ID: " + t.getId()));
         if (defaultActiveTabComboBox.getSelectionModel().isEmpty() && !defaultActiveTabComboBox.getItems().isEmpty()) {
             defaultActiveTabComboBox.getSelectionModel().selectFirst();
@@ -94,30 +97,8 @@ public class SettingsController implements Controller<Pane> {
                 defaultActiveTabComboBox.getSelectionModel().select(tab);
             }
         });
-    }
 
-    public void onSave() throws IOException {
-        log.info("Saving settings");
-
-        Tab selectedTab = defaultActiveTabComboBox.getSelectionModel().getSelectedItem();
-        if (selectedTab != null) {
-            localPreferences.getUi().setStartUpTab(selectedTab.getId());
-        } else {
-            log.warn("No startup tab selected; skipping saving startUpTab.");
-        }
-
-        localPreferences.getAutoLogin().setEnabled(rememberLoginCheckBox.isSelected());
-        localPreferences.getUi().setDarkMode(darkModeCheckBox.isSelected());
-        localPreferences.getUi().setStartUpTab(defaultActiveTabComboBox.getSelectionModel().getSelectedItem().getId());
-
-        Scene scene = root.getScene();
-        String styleSheet = "/style/main-light.css";
-        if (darkModeCheckBox.isSelected()) {
-            styleSheet = "/style/main-dark.css";
-        }
-
-        scene.getStylesheets().clear();
-        scene.getStylesheets().add(getClass().getResource(styleSheet).toExternalForm());
+        CreateTableColumnsWidthSettingsJSON();
 
         log.debug("Initializing blacklistedFiles");
         String[] blacklistedFiles = { "blacklistedHash", "blacklistedIP", "blacklistedMemorySN",
@@ -164,6 +145,30 @@ public class SettingsController implements Controller<Pane> {
         initTemplatesAndReasons();
         initTemplatesFinishReports();
         createTemplateGamingModeratorTask();
+    }
+
+    public void onSave() throws IOException {
+        log.info("Saving settings");
+
+        Tab selectedTab = defaultActiveTabComboBox.getSelectionModel().getSelectedItem();
+        if (selectedTab != null) {
+            localPreferences.getUi().setStartUpTab(selectedTab.getId());
+        } else {
+            log.warn("No startup tab selected; skipping saving startUpTab.");
+        }
+
+        localPreferences.getAutoLogin().setEnabled(rememberLoginCheckBox.isSelected());
+        localPreferences.getUi().setDarkMode(darkModeCheckBox.isSelected());
+        localPreferences.getUi().setStartUpTab(defaultActiveTabComboBox.getSelectionModel().getSelectedItem().getId());
+
+        Scene scene = root.getScene();
+        String styleSheet = "/style/main-light.css";
+        if (darkModeCheckBox.isSelected()) {
+            styleSheet = "/style/main-dark.css";
+        }
+
+        scene.getStylesheets().clear();
+        scene.getStylesheets().add(getClass().getResource(styleSheet).toExternalForm());
     }
 
 
@@ -384,6 +389,66 @@ public class SettingsController implements Controller<Pane> {
             browserComboBox.setValue(selectedBrowser);
         } else {
             browserComboBox.setValue("Firefox"); // based fallback default
+        }
+    }
+
+    public static void CreateTableColumnsWidthSettingsJSON() {
+        String filePath = "ConfigurationModerationToolFAF/TableColumnsWidthSettings.json";
+
+        try {
+            File file = new File(filePath);
+            file.getParentFile().mkdirs();
+
+            ObjectMapper mapper = new ObjectMapper();
+            ObjectNode data = mapper.createObjectNode();
+
+            if (!file.exists()) {
+                ArrayNode columns = mapper.createArrayNode();
+
+                columns.add(mapper.createObjectNode()
+                        .put("name", "reporterColumn")
+                        .put("prefWidth", 90));
+
+                columns.add(mapper.createObjectNode()
+                        .put("name", "reportedUsersColumn")
+                        .put("prefWidth", 120));
+
+                columns.add(mapper.createObjectNode()
+                        .put("name", "reportDescriptionColumn")
+                        .put("prefWidth", 1400));
+
+                columns.add(mapper.createObjectNode()
+                        .put("name", "incidentTimeCodeColumn")
+                        .put("prefWidth", 90));
+
+                columns.add(mapper.createObjectNode()
+                        .put("name", "privateNoteColumn")
+                        .put("prefWidth", 120));
+
+                columns.add(mapper.createObjectNode()
+                        .put("name", "moderatorPrivateNoticeColumn")
+                        .put("prefWidth", 120));
+
+                columns.add(mapper.createObjectNode()
+                        .put("name", "lastModeratorColumn")
+                        .put("prefWidth", 120));
+
+                columns.add(mapper.createObjectNode()
+                        .put("name", "createTimeColumn")
+                        .put("prefWidth", 120));
+
+                data.set("columns", columns);
+
+                FileWriter writer = new FileWriter(file);
+                writer.write(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(data));
+                writer.close();
+                log.debug("TableColumnsWidthSettingsJSON was created.");
+            } else {
+                log.debug("TableColumnsWidthSettingsJSON already exists.");
+            }
+
+        } catch (IOException e) {
+            log.error("Error creating file: {}", e.getMessage());
         }
     }
 }
