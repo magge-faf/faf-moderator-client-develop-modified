@@ -45,9 +45,16 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
 
+import com.google.common.util.concurrent.RateLimiter;
+import java.util.Deque;
+
 @Service
 @Slf4j
 public class FafApiCommunicationService {
+    private static final Deque<Long> requestTimestamps = new LinkedList<>();
+    private static final long ONE_MINUTE_IN_MILLIS = 60 * 1000;
+    private final RateLimiter rateLimiter = RateLimiter.create(250.0 / 60.0);
+    private static final int MAX_REQUESTS = 250;
     private final ResourceConverter defaultResourceConverter;
     private final ResourceConverter updateResourceConverter;
     private final OAuthTokenInterceptor oAuthTokenInterceptor;
@@ -81,6 +88,46 @@ public class FafApiCommunicationService {
         this.restTemplateBuilder = restTemplateBuilder;
 
         authorizedLatch = new CountDownLatch(1);
+    }
+
+    public void checkRateLimit() {
+        long currentTime = System.currentTimeMillis();
+
+        while (!requestTimestamps.isEmpty()) {
+            Long firstTimestamp = requestTimestamps.peek();
+            if (firstTimestamp != null && currentTime - firstTimestamp > ONE_MINUTE_IN_MILLIS) {
+                requestTimestamps.poll();
+            } else {
+                break;
+            }
+        }
+
+        if (requestTimestamps.size() >= MAX_REQUESTS) {
+            if (!requestTimestamps.isEmpty()) {
+                Long firstTimestamp = requestTimestamps.peek();
+                if (firstTimestamp != null) {
+                    long waitTime = ONE_MINUTE_IN_MILLIS - (currentTime - firstTimestamp);
+                    try {
+                        Thread.sleep(waitTime);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }
+
+            while (!requestTimestamps.isEmpty()) {
+                Long firstTimestamp = requestTimestamps.peek();
+                if (firstTimestamp != null && currentTime - firstTimestamp > ONE_MINUTE_IN_MILLIS) {
+                    requestTimestamps.poll();
+                } else {
+                    break;
+                }
+            }
+        }
+
+        requestTimestamps.add(currentTime);
+        rateLimiter.acquire();
+        log.debug("Requests in last 60 seconds: {}", requestTimestamps.size());
     }
 
     public RestOperations getRestTemplate() {
@@ -135,6 +182,7 @@ public class FafApiCommunicationService {
     }
 
     public void forceRenameUserName(String userId, String newName) {
+        checkRateLimit();
         String path = String.format("/users/%s/forceChangeUsername", userId);
         String url = UriComponentsBuilder.fromPath(path).queryParam("newUsername", newName).toUriString();
         try {
@@ -147,6 +195,7 @@ public class FafApiCommunicationService {
 
     @SneakyThrows
     public <T extends ElideEntity> T post(ElideNavigatorOnCollection<T> navigator, T object) {
+        checkRateLimit();
         String url = navigator.build();
         HttpHeaders httpHeaders = new HttpHeaders();
         httpHeaders.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
@@ -171,6 +220,7 @@ public class FafApiCommunicationService {
 
     @SneakyThrows
     public <T extends ElideEntity> T patch(ElideNavigatorOnId<T> routeBuilder, UpdateDto<T> object) {
+        checkRateLimit();
         cycleAvoidingMappingContext.clearCache();
         String url = routeBuilder.build();
 
@@ -192,6 +242,7 @@ public class FafApiCommunicationService {
 
     @SneakyThrows
     public <T extends ElideEntity> T patch(ElideNavigatorOnId<T> routeBuilder, T object) {
+        checkRateLimit();
         cycleAvoidingMappingContext.clearCache();
         String url = routeBuilder.build();
 
@@ -205,11 +256,13 @@ public class FafApiCommunicationService {
     }
 
     public <T extends ElideEntity> void delete(T entity) {
+        checkRateLimit();
         delete(ElideNavigator.of(entity));
     }
 
     @SneakyThrows
     public void delete(ElideNavigatorOnId<?> navigator) {
+        checkRateLimit();
         String url = navigator.build();
 
         try {
@@ -223,16 +276,19 @@ public class FafApiCommunicationService {
 
     @SneakyThrows
     public <T extends ElideEntity> T getOne(ElideNavigatorOnId<T> navigator) {
+        checkRateLimit();
         return getOne(navigator.build(), navigator.getDtoClass(), Collections.emptyMap());
     }
 
     @SneakyThrows
     public <T extends ElideEntity> T getOne(String endpointPath, Class<T> type) {
+        checkRateLimit();
         return getOne(endpointPath, type, Collections.emptyMap());
     }
 
     @SneakyThrows
     public <T extends ElideEntity> T getOne(String endpointPath, Class<T> type, java.util.Map<String, Serializable> params) {
+        checkRateLimit();
         cycleAvoidingMappingContext.clearCache();
         try {
             return restTemplate.getForObject(endpointPath, type, params);
@@ -243,10 +299,12 @@ public class FafApiCommunicationService {
     }
 
     public <T extends ElideEntity> List<T> getAll(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder) {
+        checkRateLimit();
         return getAll(clazz, routeBuilder, Collections.emptyMap());
     }
 
     public <T extends ElideEntity> List<T> getAll(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder, java.util.Map<String, Serializable> params) {
+        checkRateLimit();
         return getMany(clazz, routeBuilder, environmentProperties.getMaxResultSize(), params);
     }
 
@@ -256,6 +314,7 @@ public class FafApiCommunicationService {
         List<T> current = null;
         int page = 1;
         while ((current == null || current.size() >= environmentProperties.getMaxPageSize()) && result.size() < count) {
+            checkRateLimit();
             current = getPage(clazz, routeBuilder, environmentProperties.getMaxPageSize(), page++, params);
             result.addAll(current);
         }
@@ -263,6 +322,7 @@ public class FafApiCommunicationService {
     }
 
     public <T extends ElideEntity> List<T> getPage(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder, int pageSize, int page, java.util.Map<String, Serializable> params) {
+        checkRateLimit();
         java.util.Map<String, List<String>> multiValues = params.entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> Collections.singletonList(String.valueOf(entry.getValue()))));
 
@@ -272,6 +332,7 @@ public class FafApiCommunicationService {
     @SuppressWarnings("unchecked")
     @SneakyThrows
     public <T extends ElideEntity> List<T> getPage(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder, int pageSize, int page, MultiValueMap<String, String> params) {
+        checkRateLimit();
         authorizedLatch.await();
         String route = routeBuilder
                 .pageSize(pageSize)

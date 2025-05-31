@@ -92,6 +92,8 @@ import static java.text.MessageFormat.format;
 public class ModerationReportController implements Controller<Region> {
     @Autowired
     public SettingsController settingsController;
+    @Autowired
+    private FafApiCommunicationService fafApiCommunicationService;
 
     private final ObjectMapper objectMapper;
     private final ModerationReportService moderationReportService;
@@ -1170,6 +1172,7 @@ public class ModerationReportController implements Controller<Region> {
                     }
 
                     HttpResponse<Path> response = downloadReplay(game, tempFilePath);
+                    fafApiCommunicationService.checkRateLimit();
 
                     if (response == null || response.statusCode() == 404) {
                         updateUIUnavailable(header, """

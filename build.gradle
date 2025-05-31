@@ -78,6 +78,8 @@ dependencies {
     dependencies {
         implementation files('libs/faf-commons-api-1.0-SNAPSHOT.jar')
     }
+    implementation 'org.openjfx:javafx-controls:17.0.2'
+    implementation 'com.google.guava:guava:32.1.2-jre'
 }
 
 application {
