@@ -337,7 +337,7 @@ public class UserManagementController implements Controller<SplitPane> {
                 }
 
                 userGamesPage = 1;
-                int numberOfPagesToLoad = 50; // TODO Customize value in settingsTab
+                int numberOfPagesToLoad = Integer.parseInt(pagesMaxAmountGamesTextfield.getText());
 
                 for (int i = 0; i < numberOfPagesToLoad; i++) {
                     final int currentPage = userGamesPage + i;
@@ -1288,67 +1288,82 @@ public class UserManagementController implements Controller<SplitPane> {
             }
         }
 
-        if (isValidPlayerId(playerID1) && isValidPlayerId(playerID2)) {
-            userGamesPage = 1;
-            int numberOfPagesToLoad = Integer.parseInt(pagesMaxAmountGamesTextfield.getText());
+        if (!isValidPlayerId(playerID1) || !isValidPlayerId(playerID2)) {
+            checkSharedGamesButton.setText("Check - Invalid player IDs provided.");
+            return;
+        }
 
-            List<GamePlayerStatsFX> allPlayer1Games = Collections.synchronizedList(new ArrayList<>());
-            List<GamePlayerStatsFX> allPlayer2Games = Collections.synchronizedList(new ArrayList<>());
+        checkSharedGamesButton.setText("Checking...");
+        checkSharedGamesButton.setDisable(true);
 
-            for (int i = 0; i < numberOfPagesToLoad; i++) {
-                final int currentPage = userGamesPage + i;
+        final String finalPlayerID1 = playerID1;
+        final String finalPlayerID2 = playerID2;
+        final int numberOfPagesToLoad = Integer.parseInt(pagesMaxAmountGamesTextfield.getText());
+        final FeaturedModFX featuredMod = featuredModFilterChoiceBox.getSelectionModel().getSelectedItem();
 
-                try {
-                    // Sequential API calls with a delay to respect rate limits
+        Task<Set<GamePlayerStatsFX>> task = new Task<>() {
+            @Override
+            protected Set<GamePlayerStatsFX> call() throws Exception {
+                List<GamePlayerStatsFX> allPlayer1Games = Collections.synchronizedList(new ArrayList<>());
+                List<GamePlayerStatsFX> allPlayer2Games = Collections.synchronizedList(new ArrayList<>());
+
+                for (int i = 0; i < numberOfPagesToLoad; i++) {
+                    final int currentPage = userGamesPage + i;
+
                     List<GamePlayerStatsFX> player1Games = gamePlayerStatsMapper.map(
-                            userService.getLastHundredPlayedGamesByFeaturedMod(
-                                    playerID1, currentPage, featuredModFilterChoiceBox.getSelectionModel().getSelectedItem())
+                            userService.getLastHundredPlayedGamesByFeaturedMod(finalPlayerID1, currentPage, featuredMod)
                     );
                     allPlayer1Games.addAll(player1Games);
 
-                    Thread.sleep(250);
+                    Thread.sleep(100);
 
                     List<GamePlayerStatsFX> player2Games = gamePlayerStatsMapper.map(
-                            userService.getLastHundredPlayedGamesByFeaturedMod(
-                                    playerID2, currentPage, featuredModFilterChoiceBox.getSelectionModel().getSelectedItem())
+                            userService.getLastHundredPlayedGamesByFeaturedMod(finalPlayerID2, currentPage, featuredMod)
                     );
                     allPlayer2Games.addAll(player2Games);
 
-                    Thread.sleep(250);
-                } catch (Exception e) {
-                    log.warn("Error during API request: ", e);
-                    Platform.runLater(() -> checkSharedGamesButton.setText("Check - Error during request."));
-                    return;
+                    Thread.sleep(100);
                 }
+
+                Set<GameFX> player1Games = allPlayer1Games.stream()
+                        .map(GamePlayerStatsFX::getGame)
+                        .collect(Collectors.toSet());
+
+                Set<GameFX> player2Games = allPlayer2Games.stream()
+                        .map(GamePlayerStatsFX::getGame)
+                        .collect(Collectors.toSet());
+
+                Set<GameFX> commonGames = new HashSet<>(player1Games);
+                commonGames.retainAll(player2Games);
+
+                return allPlayer1Games.stream()
+                        .filter(stats -> commonGames.contains(stats.getGame()))
+                        .collect(Collectors.toSet());
             }
 
-            Set<GameFX> player1Games = allPlayer1Games.stream()
-                    .map(GamePlayerStatsFX::getGame)
-                    .collect(Collectors.toSet());
-
-            Set<GameFX> player2Games = allPlayer2Games.stream()
-                    .map(GamePlayerStatsFX::getGame)
-                    .collect(Collectors.toSet());
-
-            Set<GameFX> commonGames = new HashSet<>(player1Games);
-            commonGames.retainAll(player2Games);
-
-            Set<GamePlayerStatsFX> commonGameStats = allPlayer1Games.stream()
-                    .filter(stats -> commonGames.contains(stats.getGame()))
-                    .collect(Collectors.toSet());
-
-            Platform.runLater(() -> {
+            @Override
+            protected void succeeded() {
+                Set<GamePlayerStatsFX> commonGameStats = getValue();
                 userLastGamesTable.getItems().clear();
-
                 if (!commonGameStats.isEmpty()) {
                     userLastGamesTable.getItems().setAll(commonGameStats);
                 } else {
                     log.info("No common games found.");
-                    checkSharedGamesButton.setText("Check");
                 }
-            });
-        } else {
-            checkSharedGamesButton.setText("Check - Invalid player IDs provided.");
-        }
+                checkSharedGamesButton.setText("Check");
+                checkSharedGamesButton.setDisable(false);
+            }
+
+            @Override
+            protected void failed() {
+                log.warn("Error during API request: ", getException());
+                checkSharedGamesButton.setText("Check - Error during request.");
+                checkSharedGamesButton.setDisable(false);
+            }
+        };
+
+        Thread thread = new Thread(task);
+        thread.setDaemon(true);
+        thread.start();
     }
 }
