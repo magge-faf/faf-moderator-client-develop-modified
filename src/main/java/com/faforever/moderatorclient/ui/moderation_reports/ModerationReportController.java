@@ -1172,7 +1172,6 @@ public class ModerationReportController implements Controller<Region> {
                     }
 
                     HttpResponse<Path> response = downloadReplay(game, tempFilePath);
-                    fafApiCommunicationService.checkRateLimit();
 
                     if (response == null || response.statusCode() == 404) {
                         updateUIUnavailable(header, """
@@ -1321,6 +1320,7 @@ public class ModerationReportController implements Controller<Region> {
 
     private HttpResponse<Path> downloadReplay(GameFX game, Path tempFilePath) {
         try {
+            fafApiCommunicationService.checkRateLimit();
             String replayUrl = game.getReplayUrl(replayDownLoadFormat);
             log.info("Downloading replay from {} to {}", replayUrl, tempFilePath);
             HttpRequest request = HttpRequest.newBuilder()
