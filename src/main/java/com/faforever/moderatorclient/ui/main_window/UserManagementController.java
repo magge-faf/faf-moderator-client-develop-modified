@@ -43,6 +43,7 @@ import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -1155,33 +1156,78 @@ public class UserManagementController implements Controller<SplitPane> {
         new Thread(task).start();
     }
 
-    private void loadProperties() {
+    void loadProperties() {
+        boolean updated = false;
+
         if (CONFIG_FILE_PATH.toFile().exists()) {
             try (InputStream in = new FileInputStream(CONFIG_FILE_PATH.toFile())) {
                 properties.load(in);
             } catch (IOException e) {
                 log.warn("Error loading config file:", e);
             }
-            String value = properties.getProperty("amount_check_recent_accounts", "42");
-            amountTextFieldRecentAccountsForSmurfsAmount.setText(value);
-            excludeItemsCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("excludeItemsCheckBox", String.valueOf(true))));
-            includeUUIDCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeUUIDCheckBox", String.valueOf(true))));
-            includeUIDHashCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeUIDHashCheckBox", String.valueOf(true))));
-            includeMemorySerialNumberCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeMemorySerialNumberCheckBox", String.valueOf(false))));
-            includeVolumeSerialNumberCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeVolumeSerialNumberCheckBox", String.valueOf(false))));
-            includeSerialNumberCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeSerialNumberCheckBox", String.valueOf(false))));
-            includeProcessorIdCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeProcessorIdCheckBox", String.valueOf(false))));
-            includeManufacturerCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeManufacturerCheckBox", String.valueOf(false))));
-            includeIPCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeIPCheckBox", String.valueOf(false))));
-            includeProcessorNameCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("includeProcessorNameCheckBox", String.valueOf(false))));
-            catchFirstLayerSmurfsOnlyCheckBox.setSelected(Boolean.parseBoolean(properties.getProperty("catchFirstLayerSmurfsOnlyCheckBox", String.valueOf(true))));
-            String depthScanningInput = properties.getProperty("depthScanningInputTextField", "1000");
-            depthScanningInputTextField.setText(depthScanningInput);
-            String maxUniqueUsersThreshold = properties.getProperty("maxUniqueUsersThresholdTextField", "100");
-            maxUniqueUsersThresholdTextField.setText(maxUniqueUsersThreshold);
-            String selectedBrowser = properties.getProperty("browserComboBox", "selectBrowser");
-            settingsController.setSelectedBrowser(selectedBrowser);
-            log.debug("Configuration loaded.");
+        }
+
+        updated |= loadWithDefault("amount_check_recent_accounts", "42", amountTextFieldRecentAccountsForSmurfsAmount::setText);
+        updated |= loadWithDefault("excludeItemsCheckBox", true, excludeItemsCheckBox::setSelected);
+        updated |= loadWithDefault("includeUUIDCheckBox", true, includeUUIDCheckBox::setSelected);
+        updated |= loadWithDefault("includeUIDHashCheckBox", true, includeUIDHashCheckBox::setSelected);
+        updated |= loadWithDefault("includeMemorySerialNumberCheckBox", false, includeMemorySerialNumberCheckBox::setSelected);
+        updated |= loadWithDefault("includeVolumeSerialNumberCheckBox", false, includeVolumeSerialNumberCheckBox::setSelected);
+        updated |= loadWithDefault("includeSerialNumberCheckBox", false, includeSerialNumberCheckBox::setSelected);
+        updated |= loadWithDefault("includeProcessorIdCheckBox", false, includeProcessorIdCheckBox::setSelected);
+        updated |= loadWithDefault("includeManufacturerCheckBox", false, includeManufacturerCheckBox::setSelected);
+        updated |= loadWithDefault("includeIPCheckBox", false, includeIPCheckBox::setSelected);
+        updated |= loadWithDefault("includeProcessorNameCheckBox", false, includeProcessorNameCheckBox::setSelected);
+        updated |= loadWithDefault("catchFirstLayerSmurfsOnlyCheckBox", true, catchFirstLayerSmurfsOnlyCheckBox::setSelected);
+        updated |= loadWithDefault("depthScanningInputTextField", "1000", depthScanningInputTextField::setText);
+        String depthScanningInput = properties.getProperty("depthScanningInputTextField", "1000");
+        depthScanningInputTextField.setText(depthScanningInput);
+        updated |= loadWithDefault("maxUniqueUsersThresholdTextField", "100", maxUniqueUsersThresholdTextField::setText);
+        String maxUniqueUsersThreshold = properties.getProperty("maxUniqueUsersThresholdTextField", "100");
+        maxUniqueUsersThresholdTextField.setText(maxUniqueUsersThreshold);
+        updated |= loadWithDefault("browserComboBox", "selectBrowser", settingsController::setSelectedBrowser);
+        String selectedBrowser = properties.getProperty("browserComboBox", "selectBrowser");
+        settingsController.setSelectedBrowser(selectedBrowser);
+
+        if (updated) {
+            File configFile = CONFIG_FILE_PATH.toFile();
+            File parentDir = configFile.getParentFile();
+            if (parentDir != null && !parentDir.exists()) {
+                parentDir.mkdirs();
+            }
+
+            try (OutputStream out = new FileOutputStream(configFile)) {
+                properties.store(out, "Defaults written");
+                log.debug("Default values saved to config.");
+            } catch (IOException e) {
+                log.warn("Error saving default config values:", e);
+            }
+        }
+
+        log.debug("Configuration loaded.");
+    }
+
+    private boolean loadWithDefault(String key, String defaultValue, Consumer<String> setter) {
+        String value = properties.getProperty(key);
+        if (value == null) {
+            properties.setProperty(key, defaultValue);
+            setter.accept(defaultValue);
+            return true;
+        } else {
+            setter.accept(value);
+            return false;
+        }
+    }
+
+    private boolean loadWithDefault(String key, boolean defaultValue, Consumer<Boolean> setter) {
+        String value = properties.getProperty(key);
+        if (value == null) {
+            properties.setProperty(key, String.valueOf(defaultValue));
+            setter.accept(defaultValue);
+            return true;
+        } else {
+            setter.accept(Boolean.parseBoolean(value));
+            return false;
         }
     }
 
