@@ -1023,7 +1023,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
             @Override
             protected void failed() {
-                Platform.runLater(() -> log.debug("Task failed"));
+                Platform.runLater(() -> log.debug("Task failed", getException()));
             }
         };
 
