@@ -1840,20 +1840,26 @@ public class ModerationReportController implements Controller<Region> {
         String url = "https://forum.faforever.com/search?term=" + reportedUserId +
                 "&in=titlesposts&matchWords=all&sortBy=relevance&sortDirection=desc&showAs=posts";
 
-        String browser = settingsController.getSelectedBrowser();
+        Properties props = new Properties();
+        File configFile = new File(CONFIGURATION_FOLDER + File.separator + "config.properties");
+
+        try (InputStream in = new FileInputStream(configFile)) {
+            props.load(in);
+        } catch (IOException e) {
+            log.error(e.getMessage());
+        }
+        String browser = props.getProperty("browserComboBox", "selectBrowser");
 
         if ("selectBrowser".equalsIgnoreCase(browser)) {
             Alert alert = new Alert(Alert.AlertType.WARNING);
             alert.setTitle("Browser Selection Required");
             alert.setHeaderText("No Browser Selected");
             alert.setContentText("Please go to the Settings tab (top right) and select a browser.");
-
             alert.showAndWait();
             return;
         }
 
         String cmd;
-
         if ("Microsoft Edge".equalsIgnoreCase(browser)) {
             cmd = "cmd /c start microsoft-edge:" + url;
         } else {
@@ -1862,4 +1868,5 @@ public class ModerationReportController implements Controller<Region> {
 
         Runtime.getRuntime().exec(cmd);
     }
+
 }

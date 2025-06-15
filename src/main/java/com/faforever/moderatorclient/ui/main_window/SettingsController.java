@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
 import javafx.fxml.FXML;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -70,6 +71,8 @@ public class SettingsController implements Controller<Pane> {
 
     @FXML
     public void initialize() throws IOException {
+        browserComboBox.setItems(FXCollections.observableArrayList("Firefox", "Chrome", "Opera", "Microsoft Edge"));
+
         mainController.getRoot().getTabs().forEach(t -> System.out.println("Tab ID: " + t.getId()));
         if (defaultActiveTabComboBox.getSelectionModel().isEmpty() && !defaultActiveTabComboBox.getItems().isEmpty()) {
             defaultActiveTabComboBox.getSelectionModel().selectFirst();
@@ -385,10 +388,9 @@ public class SettingsController implements Controller<Pane> {
             return;
         }
 
-        if (selectedBrowser != null && browserComboBox.getItems().contains(selectedBrowser)) {
+        if (selectedBrowser != null) {
             browserComboBox.setValue(selectedBrowser);
-        } else {
-            browserComboBox.setValue("Firefox"); // based fallback default
+            log.debug("value set for combobox " +  selectedBrowser);
         }
     }
 

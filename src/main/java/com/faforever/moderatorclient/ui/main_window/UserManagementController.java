@@ -1180,14 +1180,8 @@ public class UserManagementController implements Controller<SplitPane> {
         updated |= loadWithDefault("includeProcessorNameCheckBox", false, includeProcessorNameCheckBox::setSelected);
         updated |= loadWithDefault("catchFirstLayerSmurfsOnlyCheckBox", true, catchFirstLayerSmurfsOnlyCheckBox::setSelected);
         updated |= loadWithDefault("depthScanningInputTextField", "1000", depthScanningInputTextField::setText);
-        String depthScanningInput = properties.getProperty("depthScanningInputTextField", "1000");
-        depthScanningInputTextField.setText(depthScanningInput);
         updated |= loadWithDefault("maxUniqueUsersThresholdTextField", "100", maxUniqueUsersThresholdTextField::setText);
-        String maxUniqueUsersThreshold = properties.getProperty("maxUniqueUsersThresholdTextField", "100");
-        maxUniqueUsersThresholdTextField.setText(maxUniqueUsersThreshold);
         updated |= loadWithDefault("browserComboBox", "selectBrowser", settingsController::setSelectedBrowser);
-        String selectedBrowser = properties.getProperty("browserComboBox", "selectBrowser");
-        settingsController.setSelectedBrowser(selectedBrowser);
 
         if (updated) {
             File configFile = CONFIG_FILE_PATH.toFile();
