@@ -24,5 +24,16 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag $TAG
-          git push origin $TAG
+          
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists locally, deleting it"
+            git tag -d "$TAG"
+          fi
+
+          if git ls-remote --tags origin | grep "refs/tags/$TAG$" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists remotely, deleting it"
+            git push --delete origin "$TAG"
+          fi
+
+          git tag "$TAG"
+          git push origin "$TAG"
