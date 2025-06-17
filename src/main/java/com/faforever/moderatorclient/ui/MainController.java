@@ -167,6 +167,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
                 GroupPermission.ROLE_READ_TEAMKILL_REPORT, GroupPermission.ROLE_WRITE_AVATAR)) {
             userManagementController = uiService.loadFxml("ui/main_window/userManagement.fxml");
             userManagementTab.setContent(userManagementController.getRoot());
+            userManagementController.postInitialize();
         }
     }
 

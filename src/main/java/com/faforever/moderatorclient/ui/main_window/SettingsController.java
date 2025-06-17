@@ -162,7 +162,6 @@ public class SettingsController implements Controller<Pane> {
 
         localPreferences.getAutoLogin().setEnabled(rememberLoginCheckBox.isSelected());
         localPreferences.getUi().setDarkMode(darkModeCheckBox.isSelected());
-        localPreferences.getUi().setStartUpTab(defaultActiveTabComboBox.getSelectionModel().getSelectedItem().getId());
 
         Scene scene = root.getScene();
         String styleSheet = "/style/main-light.css";
@@ -374,24 +373,6 @@ public class SettingsController implements Controller<Pane> {
     public void templatesFinishReportsButton() throws IOException {
         openFile(CONFIGURATION_FOLDER + File.separator +  "templatesFinishReports.json");
 
-    }
-
-    public String getSelectedBrowser() {
-        String selectedBrowser = browserComboBox.getValue();
-        log.debug("Selected Browser: {}", selectedBrowser);
-        return selectedBrowser;
-    }
-
-    public void setSelectedBrowser(String selectedBrowser) {
-        if (browserComboBox == null) {
-            log.error("Warning: browserComboBox is not initialized.");
-            return;
-        }
-
-        if (selectedBrowser != null) {
-            browserComboBox.setValue(selectedBrowser);
-            log.debug("value set for combobox " +  selectedBrowser);
-        }
     }
 
     public static void CreateTableColumnsWidthSettingsJSON() {

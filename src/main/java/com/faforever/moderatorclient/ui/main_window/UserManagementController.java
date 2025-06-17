@@ -23,6 +23,7 @@ import javafx.scene.control.*;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import javafx.util.StringConverter;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,6 +55,7 @@ import javafx.scene.control.ButtonType;
 
 import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
 
+@Getter
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -188,7 +190,6 @@ public class UserManagementController implements Controller<SplitPane> {
 
     @FXML
     public void initialize() {
-        loadProperties();
         loadContent();
         // Set last search term for userSearchTextField
         String textAreaContent = SearchHistoryTextArea.getText();
@@ -1156,7 +1157,7 @@ public class UserManagementController implements Controller<SplitPane> {
         new Thread(task).start();
     }
 
-    void loadProperties() {
+    public void postInitialize() {
         boolean updated = false;
 
         if (CONFIG_FILE_PATH.toFile().exists()) {
@@ -1181,7 +1182,13 @@ public class UserManagementController implements Controller<SplitPane> {
         updated |= loadWithDefault("catchFirstLayerSmurfsOnlyCheckBox", true, catchFirstLayerSmurfsOnlyCheckBox::setSelected);
         updated |= loadWithDefault("depthScanningInputTextField", "1000", depthScanningInputTextField::setText);
         updated |= loadWithDefault("maxUniqueUsersThresholdTextField", "100", maxUniqueUsersThresholdTextField::setText);
-        updated |= loadWithDefault("browserComboBox", "selectBrowser", settingsController::setSelectedBrowser);
+        updated |= loadWithDefault("browserComboBox", "selectBrowser", value -> {
+            if (settingsController.browserComboBox != null
+                    && value != null
+                    && !value.equals("selectBrowser")) {
+                settingsController.browserComboBox.setValue(value);
+            }
+        });
 
         if (updated) {
             File configFile = CONFIG_FILE_PATH.toFile();
@@ -1243,8 +1250,10 @@ public class UserManagementController implements Controller<SplitPane> {
                 properties.setProperty("catchFirstLayerSmurfsOnlyCheckBox", Boolean.toString(catchFirstLayerSmurfsOnlyCheckBox.isSelected()));
                 properties.setProperty("depthScanningInputTextField", depthScanningInputTextField.getText());
                 properties.setProperty("maxUniqueUsersThresholdTextField", maxUniqueUsersThresholdTextField.getText());
-                String browserName = settingsController.getSelectedBrowser();
-                properties.setProperty("browserComboBox", browserName);
+                String browserValue = settingsController.browserComboBox.getValue();
+                if (browserValue != null && !browserValue.equals("selectBrowser")) {
+                    properties.setProperty("browserComboBox", browserValue);
+                }
                 log.debug("Configuration saved.");
 
                 try (OutputStream out = new FileOutputStream(CONFIG_FILE_PATH.toFile())) {

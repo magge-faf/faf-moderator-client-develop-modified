@@ -16,6 +16,7 @@ import com.faforever.moderatorclient.ui.domain.BanInfoFX;
 import com.faforever.moderatorclient.ui.domain.GameFX;
 import com.faforever.moderatorclient.ui.domain.ModerationReportFX;
 import com.faforever.moderatorclient.ui.domain.PlayerFX;
+import com.faforever.moderatorclient.ui.main_window.UserManagementController;
 import javafx.scene.input.Clipboard;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
@@ -90,6 +91,8 @@ import static java.text.MessageFormat.format;
 @Slf4j
 @RequiredArgsConstructor
 public class ModerationReportController implements Controller<Region> {
+    @Autowired
+    public UserManagementController userManagementController;
     @Autowired
     public SettingsController settingsController;
     @Autowired
@@ -1840,17 +1843,8 @@ public class ModerationReportController implements Controller<Region> {
         String url = "https://forum.faforever.com/search?term=" + reportedUserId +
                 "&in=titlesposts&matchWords=all&sortBy=relevance&sortDirection=desc&showAs=posts";
 
-        Properties props = new Properties();
-        File configFile = new File(CONFIGURATION_FOLDER + File.separator + "config.properties");
-
-        try (InputStream in = new FileInputStream(configFile)) {
-            props.load(in);
-        } catch (IOException e) {
-            log.error(e.getMessage());
-        }
-        String browser = props.getProperty("browserComboBox", "selectBrowser");
-
-        if ("selectBrowser".equalsIgnoreCase(browser)) {
+        String browser = userManagementController.getProperties().getProperty("browserComboBox");
+        if (browser == null || browser.isEmpty() || "selectBrowser".equalsIgnoreCase(browser)) {
             Alert alert = new Alert(Alert.AlertType.WARNING);
             alert.setTitle("Browser Selection Required");
             alert.setHeaderText("No Browser Selected");
