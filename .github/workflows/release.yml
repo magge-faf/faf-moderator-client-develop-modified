@@ -1,14 +1,9 @@
-# This workflow will build a Java project with Gradle
-# For more information see: https://help.github.com/actions/language-and-framework-guides/building-and-testing-java-with-gradle
-
 name: Release
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Release Version'
-        required: true
+  push:
+    tags:
+      - 'v*'
 
 jobs:
   release:
@@ -22,16 +17,16 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Run Checks
-        run: ./gradlew --stacktrace -PjavafxPlatform=linux
+      # - name: Run Checks
+      #   run: ./gradlew --stacktrace -PjavafxPlatform=linux
+
+      # - name: Build Linux Files
+      #   run: |
+      #     ./gradlew -Pversion="${{ github.ref_name }}" -PjavafxPlatform=linux --stacktrace distZip
 
       - name: Build Windows Files
         run: |
-          ./gradlew -Pversion="${{ github.event.inputs.version }}" -PjavafxPlatform=win --stacktrace distZip
-
-      - name: Build Linux Files
-        run: |
-          ./gradlew -Pversion="${{ github.event.inputs.version }}" -PjavafxPlatform=linux --stacktrace distZip
+          ./gradlew -Pversion="${{ github.ref_name }}" -PjavafxPlatform=win --stacktrace distZip
 
       - name: Create Draft Release
         id: create_release
@@ -39,33 +34,22 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.event.inputs.version }}
-          release_name: ${{ github.event.inputs.version }}
+          tag_name: ${{ github.ref_name }}
+          release_name: ${{ github.ref_name }}
           draft: true
           prerelease: true
 
-      - name: Get Artifact Paths
-        id: artifact_paths
-        run: |
-          LINUX_ZIP=$(ls build/distributions/faf-moderator-client-*-linux.zip | head -n 1)
-          LINUX_ZIP_NAME=$(basename $LINUX_ZIP)
-          WINDOWS_ZIP=$(ls build/distributions/faf-moderator-client-*-win.zip | head -n 1)
-          WINDOWS_ZIP_NAME=$(basename $WINDOWS_ZIP)
-          echo ::set-output name=LINUX_ZIP::${LINUX_ZIP}
-          echo ::set-output name=LINUX_ZIP_NAME::${LINUX_ZIP_NAME}
-          echo ::set-output name=WINDOWS_ZIP::${WINDOWS_ZIP}
-          echo ::set-output name=WINDOWS_ZIP_NAME::${WINDOWS_ZIP_NAME}
-
-      - name: Upload Linux Files
-        id: upload-linux
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ steps.artifact_paths.outputs.LINUX_ZIP }}
-          asset_name: ${{ steps.artifact_paths.outputs.LINUX_ZIP_NAME }}
-          asset_content_type: application/gzip
+      # - name: Get Artifact Paths
+      #   id: artifact_paths
+      #   run: |
+      #     LINUX_ZIP=$(ls build/distributions/faf-moderator-client-*-linux.zip | head -n 1)
+      #     LINUX_ZIP_NAME=$(basename $LINUX_ZIP)
+      #     WINDOWS_ZIP=$(ls build/distributions/faf-moderator-client-*-win.zip | head -n 1)
+      #     WINDOWS_ZIP_NAME=$(basename $WINDOWS_ZIP)
+      #     echo ::set-output name=LINUX_ZIP::${LINUX_ZIP}
+      #     echo ::set-output name=LINUX_ZIP_NAME::${LINUX_ZIP_NAME}
+      #     echo ::set-output name=WINDOWS_ZIP::${WINDOWS_ZIP}
+      #     echo ::set-output name=WINDOWS_ZIP_NAME::${WINDOWS_ZIP_NAME}
 
       - name: Upload Windows zip
         id: upload-zip
@@ -74,6 +58,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ steps.artifact_paths.outputs.WINDOWS_ZIP }}
-          asset_name: ${{ steps.artifact_paths.outputs.WINDOWS_ZIP_NAME }}
+          asset_path: build/distributions/faf-moderator-client-*-win.zip
+          asset_name: faf-moderator-client-${{ github.ref_name }}-win.zip
           asset_content_type: application/zip

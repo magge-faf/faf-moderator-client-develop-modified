@@ -107,3 +107,10 @@ tasks.withType(CreateStartScripts).each { task ->
 distZip {
     archiveClassifier.set(javafxPlatform)
 }
+
+def dateVersion() {
+    def now = new Date()
+    return now.format('yyyy.MM.dd')
+}
+
+version = project.hasProperty('version') ? project.property('version') : dateVersion()
