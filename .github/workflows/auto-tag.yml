@@ -10,24 +10,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
-      - name: Set up Git user
+      - name: Get date-based tag
+        id: get_tag
+        run: |
+          TAG="v$(date +'%Y.%m.%d')"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Create and push tag
+        env:
+          TAG: ${{ steps.get_tag.outputs.tag }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Create and push tag
-        id: tag
-        run: |
-          TAG="v$(date +'%Y.%m.%d')"
-          echo "Tag to create: $TAG"
-
-          # Check if tag already exists
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG already exists, skipping tag creation."
-          else
-            git tag "$TAG"
-            git push origin "$TAG"
-            echo "Tag $TAG created and pushed!"
-          fi
+          git tag $TAG
+          git push origin $TAG
