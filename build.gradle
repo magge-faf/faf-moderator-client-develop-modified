@@ -108,9 +108,9 @@ distZip {
     archiveClassifier.set(javafxPlatform)
 }
 
-def dateVersion() {
+static def dateVersion() {
     def now = new Date()
-    return now.format('yyyy.MM.dd')
+    return now.format('yyyy-MM-dd')
 }
 
 version = project.hasProperty('version') ? project.property('version') : dateVersion()

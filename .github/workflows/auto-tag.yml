@@ -1,0 +1,40 @@
+name: Auto Tag on Main Push
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  tag-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Get date-based tag
+        id: get_tag
+        run: |
+          TAG="v$(date +'%Y-%m-%d')"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Create and push tag
+        env:
+          TAG: ${{ steps.get_tag.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Delete local tag if it exists
+          if git tag | grep -q "^$TAG$"; then
+            git tag -d "$TAG"
+          fi
+
+          # Delete remote tag if it exists
+          if git ls-remote --tags origin | grep -q "refs/tags/$TAG$"; then
+            git push --delete origin "$TAG"
+          fi
+
+          # Recreate and push the new tag
+          git tag "$TAG"
+          git push origin "$TAG"

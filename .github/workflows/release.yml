@@ -1,32 +1,26 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_run:
+    workflows: ["Auto Tag on Main Push"]
+    types:
+      - completed
 
 jobs:
   release:
 
     runs-on: ubuntu-latest
-    container: eclipse-temurin:21-jdk
 
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      # - name: Run Checks
-      #   run: ./gradlew --stacktrace -PjavafxPlatform=linux
-
-      # - name: Build Linux Files
-      #   run: |
-      #     ./gradlew -Pversion="${{ github.ref_name }}" -PjavafxPlatform=linux --stacktrace distZip
-
-      - name: Build Windows Files
+      - name: Get latest tag
+        id: get_latest_tag
         run: |
-          ./gradlew -Pversion="${{ github.ref_name }}" -PjavafxPlatform=win --stacktrace distZip
+          latest_tag=$(git describe --tags --abbrev=0)
+          echo "latest_tag=$latest_tag" >> $GITHUB_OUTPUT
 
       - name: Create Draft Release
         id: create_release
@@ -34,30 +28,30 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref_name }}
-          release_name: ${{ github.ref_name }}
-          draft: true
-          prerelease: true
+          tag_name: ${{ steps.get_latest_tag.outputs.latest_tag }}
+          release_name: ${{ steps.get_latest_tag.outputs.latest_tag }}
+          draft: false
+          prerelease: false
 
-      # - name: Get Artifact Paths
-      #   id: artifact_paths
-      #   run: |
-      #     LINUX_ZIP=$(ls build/distributions/faf-moderator-client-*-linux.zip | head -n 1)
-      #     LINUX_ZIP_NAME=$(basename $LINUX_ZIP)
-      #     WINDOWS_ZIP=$(ls build/distributions/faf-moderator-client-*-win.zip | head -n 1)
-      #     WINDOWS_ZIP_NAME=$(basename $WINDOWS_ZIP)
-      #     echo ::set-output name=LINUX_ZIP::${LINUX_ZIP}
-      #     echo ::set-output name=LINUX_ZIP_NAME::${LINUX_ZIP_NAME}
-      #     echo ::set-output name=WINDOWS_ZIP::${WINDOWS_ZIP}
-      #     echo ::set-output name=WINDOWS_ZIP_NAME::${WINDOWS_ZIP_NAME}
+      - name: Build Windows Files
+        uses: docker://eclipse-temurin:21-jdk
+        with:
+          entrypoint: /bin/bash
+          args: -c "chmod +x ./gradlew && ./gradlew -Pversion=${{ steps.get_latest_tag.outputs.latest_tag }} -PjavafxPlatform=win --stacktrace distZip"
+
+      - name: Find Windows zip file
+        id: find_win_zip
+        run: |
+          FILE=$(ls build/distributions/faf-moderator-client-*-win.zip | head -n 1)
+          echo "file=$FILE" >> $GITHUB_OUTPUT
+          echo "zip_name=$(basename $FILE)" >> $GITHUB_OUTPUT
 
       - name: Upload Windows zip
-        id: upload-zip
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: build/distributions/faf-moderator-client-*-win.zip
-          asset_name: faf-moderator-client-${{ github.ref_name }}-win.zip
+          asset_path: ${{ steps.find_win_zip.outputs.file }}
+          asset_name: faf-moderator-client-${{ steps.get_latest_tag.outputs.latest_tag }}-win.zip
           asset_content_type: application/zip
