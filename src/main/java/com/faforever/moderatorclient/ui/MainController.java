@@ -2,24 +2,18 @@ package com.faforever.moderatorclient.ui;
 
 import com.faforever.commons.api.dto.GroupPermission;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
+import com.faforever.moderatorclient.api.FafUserCommunicationService;
+import com.faforever.moderatorclient.api.TokenService;
 import com.faforever.moderatorclient.api.event.FafApiFailGetEvent;
 import com.faforever.moderatorclient.api.event.FafApiFailModifyEvent;
 import com.faforever.moderatorclient.api.event.FafUserFailModifyEvent;
 import com.faforever.moderatorclient.api.event.TokenExpiredEvent;
+import com.faforever.moderatorclient.config.ApplicationProperties;
+import com.faforever.moderatorclient.config.EnvironmentProperties;
+import com.faforever.moderatorclient.config.local.LocalPreferences;
+import com.faforever.moderatorclient.config.local.LocalPreferencesReaderWriter;
 import com.faforever.moderatorclient.config.PreferencesConfig;
-import com.faforever.moderatorclient.ui.main_window.AvatarsController;
-import com.faforever.moderatorclient.ui.main_window.DomainBlacklistController;
-import com.faforever.moderatorclient.ui.main_window.LadderMapPoolController;
-import com.faforever.moderatorclient.ui.main_window.MapVaultController;
-import com.faforever.moderatorclient.ui.main_window.ModVaultController;
-import com.faforever.moderatorclient.ui.main_window.RecentActivityController;
-import com.faforever.moderatorclient.ui.main_window.SettingsController;
-import com.faforever.moderatorclient.ui.main_window.TutorialController;
-import com.faforever.moderatorclient.ui.main_window.UserGroupsController;
-import com.faforever.moderatorclient.ui.main_window.UserManagementController;
-import com.faforever.moderatorclient.ui.main_window.VotingController;
-import com.faforever.moderatorclient.ui.main_window.RecentNotesController;
-import com.faforever.moderatorclient.ui.main_window.ReportStatisticsController;
+import com.faforever.moderatorclient.ui.main_window.*;
 import com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -30,7 +24,7 @@ import javafx.stage.Stage;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.compress.utils.Lists;
+import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -41,7 +35,13 @@ import java.util.*;
 @Component
 @Slf4j
 @RequiredArgsConstructor
-public class MainController implements Controller<TabPane> {
+public class MainController implements Controller<TabPane>, DisposableBean {
+    private final ApplicationProperties applicationProperties;
+    private final LocalPreferences localPreferences;
+    private final LocalPreferencesReaderWriter localPreferencesReaderWriter;
+    private final TokenService tokenService;
+    private final FafApiCommunicationService fafApiCommunicationService;
+    private final FafUserCommunicationService fafUserCommunicationService;
     private final UiService uiService;
 
     public TabPane root;
@@ -82,21 +82,12 @@ public class MainController implements Controller<TabPane> {
     @Autowired
     public PreferencesConfig preferencesConfig;
 
-    @Getter
-    public List<Tab> tabs = Lists.newArrayList();
     private final Map<Tab, Boolean> dataLoadingState = new HashMap<>();
     private final FafApiCommunicationService communicationService;
     public static final String CONFIGURATION_FOLDER = "ConfigurationModerationToolFAF";
 
     @Override
     public TabPane getRoot() {
-        root.getSelectionModel().select(userManagementTab);
-        String userChoiceDefaultTab = preferencesConfig.getStartingTab();
-        for (Tab tab : tabs) {
-            if (!tab.getId().equals(userChoiceDefaultTab)) continue;
-            root.getSelectionModel().select(tab);
-            break;
-        }
         return root;
     }
 
@@ -111,25 +102,10 @@ public class MainController implements Controller<TabPane> {
     }
 
     private void initializeAfterLogin() {
-        tabs.addAll(Arrays.asList(
-                avatarsTab,
-                banTab,
-                domainBlacklistTab,
-                mapVaultTab,
-                matchmakerMapPoolTab,
-                messagesTab,
-                modVaultTab,
-                permissionTab,
-                recentActivityTab,
-                reportTab,
-                settingsTab,
-                tutorialTab,
-                userManagementTab,
-                votingTab,
-                recentNotesTab,
-                reportStatisticsTab
-        ));
-
+        initUserManagementTab();
+        initMatchmakerMapPoolTab();
+        initMapVaultTab();
+        initModVaultTab();
         initAvatarTab();
         initBanTab();
         initDomainBlacklistTab();
@@ -140,7 +116,7 @@ public class MainController implements Controller<TabPane> {
         initPermissionTab();
         initRecentActivityTab();
         initReportTab();
-        initSettingsTab(getTabs());
+        initSettingsTab();
         initTutorialTab();
         initUserManagementTab();
         initVotingTab();
@@ -150,8 +126,6 @@ public class MainController implements Controller<TabPane> {
 
     private void initSettingsTab(List<Tab> tabs) {
         settingsController = uiService.loadFxml("ui/main_window/settingsTab.fxml");
-        settingsController.setTabs(tabs);
-        settingsController.initTabStuff();
         settingsTab.setContent(settingsController.getRoot());
     }
 
@@ -175,6 +149,10 @@ public class MainController implements Controller<TabPane> {
         });
     }
 
+    private void initLoading(Tab tab) {
+        initLoading(tab, () -> {});
+    }
+
     private void initUserManagementTab() {
         if (checkPermissionForTab(userManagementTab, GroupPermission.ROLE_READ_ACCOUNT_PRIVATE_DETAILS,
                 GroupPermission.ROLE_ADMIN_ACCOUNT_NOTE, GroupPermission.ROLE_ADMIN_ACCOUNT_BAN,
@@ -196,7 +174,8 @@ public class MainController implements Controller<TabPane> {
         if (checkPermissionForTab(reportTab, GroupPermission.ROLE_ADMIN_MODERATION_REPORT)) {
             moderationReportController = uiService.loadFxml("ui/main_window/report.fxml");
             reportTab.setContent(moderationReportController.getRoot());
-            initLoading(reportTab, moderationReportController::onRefreshInitialReports);
+            initLoading(reportTab); //TODO
+            //initLoading(reportTab, moderationReportController::onRefreshAllReports);
         }
     }
 
@@ -269,7 +248,7 @@ public class MainController implements Controller<TabPane> {
 
     private void initPermissionTab() {
         if (checkPermissionForTab(permissionTab, GroupPermission.ROLE_READ_USER_GROUP)
-        && checkPermissionForTab(permissionTab, GroupPermission.ROLE_WRITE_USER_GROUP)) {
+                && checkPermissionForTab(permissionTab, GroupPermission.ROLE_WRITE_USER_GROUP)) {
             userGroupsController = uiService.loadFxml("ui/main_window/userGroups.fxml");
             permissionTab.setContent(userGroupsController.getRoot());
             initLoading(permissionTab, userGroupsController::onRefreshGroups);
@@ -277,17 +256,47 @@ public class MainController implements Controller<TabPane> {
     }
 
     public void display() {
-        LoginController loginController = uiService.loadFxml("ui/login.fxml");
+        if (localPreferences.getAutoLogin().isEnabled()) {
+            String environment = Optional.ofNullable(localPreferences.getAutoLogin().getEnvironment())
+                    .orElseThrow(() -> new IllegalStateException("Environment is not set"));
+            String refreshToken = Optional.ofNullable(localPreferences.getAutoLogin().getRefreshToken())
+                    .orElseThrow(() -> new IllegalStateException("Environment is not set"));
 
-        Stage loginDialog = new Stage();
-        loginDialog.setOnCloseRequest(event -> System.exit(0));
-        loginDialog.setTitle("Login - magge's Mordor");
-        loginDialog.getIcons().add(new Image(Objects.requireNonNull(this.getClass().getResourceAsStream("/media/favicon.png"))));
-        Scene scene = new Scene(loginController.getRoot());
-        scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/style/main.css")).toExternalForm());
-        loginDialog.setScene(scene);
-        loginDialog.showAndWait();
+            EnvironmentProperties environmentProperties = applicationProperties.getEnvironments().get(environment);
+            fafApiCommunicationService.initialize(environmentProperties);
+            fafUserCommunicationService.initialize(environmentProperties);
+            tokenService.prepare(environmentProperties);
+
+            try {
+                tokenService.loginWithRefreshToken(refreshToken, true);
+            } catch (Exception e) {
+                log.error("Auto login failed", e);
+                localPreferences.getAutoLogin().setEnabled(false);
+                display();
+            }
+        } else {
+            LoginController loginController = uiService.loadFxml("ui/login.fxml");
+
+            Stage loginDialog = new Stage();
+            loginDialog.setOnCloseRequest(event -> System.exit(0));
+            loginDialog.setTitle("FAF Moderator Client");
+            loginDialog.getIcons().add(new Image(this.getClass().getResourceAsStream("/media/favicon.png")));
+            Scene scene = new Scene(loginController.getRoot());
+            String stylesheet = "/style/main-light.css";
+            if (localPreferences.getUi().isDarkMode()) {
+                stylesheet = "/style/main-dark.css";
+            }
+            scene.getStylesheets().add(getClass().getResource(stylesheet).toExternalForm());
+            loginDialog.setScene(scene);
+            loginDialog.showAndWait();
+        }
         initializeAfterLogin();
+    }
+
+    @Override
+    public void destroy() throws Exception {
+        log.info("Saving local preferences to disk");
+        localPreferencesReaderWriter.write(localPreferences);
     }
 
     @EventListener
