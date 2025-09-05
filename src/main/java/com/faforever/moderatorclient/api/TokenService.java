@@ -58,7 +58,7 @@ public class TokenService {
       log.info("Token expired, requesting new with refresh token");
       loginWithRefreshToken(tokenCache.getRefreshToken().getTokenValue(), false);
     } else {
-      log.debug("Token still valid for {} seconds", Duration.between(Instant.now(), tokenCache.getAccessToken().getExpiresAt()));
+      log.trace("Token still valid for {} seconds", Duration.between(Instant.now(), tokenCache.getAccessToken().getExpiresAt()));
     }
 
         return tokenCache.getAccessToken().getTokenValue();
