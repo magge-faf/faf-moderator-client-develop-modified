@@ -21,7 +21,7 @@ public class HmacHeaderInterceptor implements ClientHttpRequestInterceptor {
     @Override
     public ClientHttpResponse intercept(HttpRequest request, byte[] body, ClientHttpRequestExecution execution) throws IOException {
         if (hmac != null) {
-            log.debug("Adding hmac header to request");
+            log.trace("Adding hmac header to request");
             request.getHeaders().add("X-HMAC", hmac);
         } else {
             log.debug("No hmac header set");
