@@ -9,6 +9,7 @@ import com.faforever.commons.api.elide.ElideEntity;
 import com.faforever.commons.api.elide.ElideNavigator;
 import com.faforever.commons.api.elide.ElideNavigatorOnCollection;
 import com.faforever.commons.api.elide.ElideNavigatorOnId;
+import com.faforever.moderatorclient.config.EnvironmentProperties;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.mapstruct.FeaturedModMapper;
 import com.faforever.moderatorclient.mapstruct.PlayerMapper;
@@ -34,6 +35,7 @@ public class UserService {
     private final FeaturedModMapper featuredModMapper;
     private final UserNoteMapper userNoteMapper;
     private final TeamkillMapper teamkillMapper;
+    private final EnvironmentProperties environmentProperties;
 
     public UserService(FafApiCommunicationService fafApi, PlayerMapper playerMapper, FeaturedModMapper featuredModMapper, UserNoteMapper userNoteMapper, TeamkillMapper teamkillMapper) {
         this.fafApi = fafApi;
@@ -65,36 +67,21 @@ public class UserService {
                 .addInclude(variablePrefix + "bans.revokeAuthor");
     }
 
-    public List<PlayerFX> findLatestRegistrations() throws InterruptedException, ExecutionException {
-        log.debug("Searching for latest registrations");
-        List<Player> allPlayers = new ArrayList<>();
-        int pageSize = 1000; // Max request
-        int totalPages = 4; // To get ~4k users
-        int threads = 4;
-        ExecutorService executor = Executors.newFixedThreadPool(threads);
-        List<Future<List<Player>>> futures = new ArrayList<>();
+    public List<PlayerFX> findLatestRegistrations() {
+    FafApiCommunicationService.checkRateLimit();
+    log.debug("Searching for latest registrations");
 
-        for (int page = 1; page <= totalPages; page++) {
-            final int currentPage = page;
-            futures.add(executor.submit(() -> {
-                ElideNavigatorOnCollection<Player> navigator = ElideNavigator.of(Player.class)
-                        .collection()
-                        .addSortingRule("id", false)
-                        .pageSize(pageSize);
-                addModeratorIncludes(navigator);
-                List<Player> result = fafApi.getPage(Player.class, navigator, pageSize, currentPage, Collections.emptyMap());
-                log.trace("found {} users on page {}", result.size(), currentPage);
-                return result;
-            }));
-        }
+    ElideNavigatorOnCollection<Player> navigator = ElideNavigator.of(Player.class)
+            .collection()
+            .addSortingRule("id", false)
+            .pageSize(environmentProperties.getMaxPageSize());
+    addModeratorIncludes(navigator);
 
-        for (Future<List<Player>> future : futures) {
-            allPlayers.addAll(future.get());
-        }
+    List<Player> allPlayers = fafApi.getPage(Player.class, navigator, environmentProperties.getMaxPageSize(), 1, Collections.emptyMap());
+    log.trace("found {} users", allPlayers.size());
 
-        executor.shutdown();
-        return playerMapper.mapToFx(allPlayers);
-    }
+    return playerMapper.mapToFx(allPlayers);
+}
 
     public List<PlayerFX> findUsersByAttribute(@NotNull String attribute, @NotNull String pattern) {
 

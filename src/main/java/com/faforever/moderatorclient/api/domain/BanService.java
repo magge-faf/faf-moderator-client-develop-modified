@@ -7,6 +7,7 @@ import com.faforever.commons.api.elide.ElideNavigatorOnId;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.FafUserCommunicationService;
 import com.faforever.moderatorclient.api.dto.hydra.RevokeRefreshTokenRequest;
+import com.faforever.moderatorclient.config.EnvironmentProperties;
 import com.faforever.moderatorclient.mapstruct.BanInfoMapper;
 import com.faforever.moderatorclient.ui.domain.BanInfoFX;
 import com.google.common.collect.ImmutableMap;
@@ -28,6 +29,7 @@ public class BanService {
     private final BanInfoMapper banInfoMapper;
     private final FafApiCommunicationService fafApi;
     private final FafUserCommunicationService fafUser;
+    private final EnvironmentProperties environmentProperties;
 
     public BanInfo patchBanInfo(@NotNull BanInfoFX banInfoFX) {
         BanInfo banInfo = banInfoMapper.map(banInfoFX);
@@ -67,7 +69,7 @@ public class BanService {
                                 .addInclude("author")
                                 .addInclude("revokeAuthor")
                                 .addSortingRule("createTime", false),
-                        10000,
+                        environmentProperties.getMaxPageSize(),
                         currentPage,
                         ImmutableMap.of()
                 );
@@ -79,7 +81,7 @@ public class BanService {
 
                 currentPage++;
                 log.info("Current page: {}", currentPage);
-            } while (banInfos.size() == 10000);
+            } while (banInfos.size() == environmentProperties.getMaxPageSize());
 
             return allBanInfos;
         });
