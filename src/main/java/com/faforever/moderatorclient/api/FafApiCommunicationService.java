@@ -297,6 +297,15 @@ public class FafApiCommunicationService {
         }
     }
 
+    public <T extends ElideEntity> List<T> getFirstPageOnlyForFindUsersByAttribute(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder, int pageSize) {
+        // By default, getAll will always make a second request after the first page,
+        // even if all results were already returned.
+        // In practice, no user is expected to have more than 10k HWID attributes,
+        // so this method effectively cuts the number of server requests in half.
+        routeBuilder.pageSize(pageSize).pageNumber(1);
+        return getPage(clazz, routeBuilder, pageSize, 1, Collections.emptyMap());
+    }
+
     public <T extends ElideEntity> List<T> getAll(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder) {
         checkRateLimit();
         return getAll(clazz, routeBuilder, Collections.emptyMap());

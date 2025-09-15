@@ -37,12 +37,13 @@ public class UserService {
     private final TeamkillMapper teamkillMapper;
     private final EnvironmentProperties environmentProperties;
 
-    public UserService(FafApiCommunicationService fafApi, PlayerMapper playerMapper, FeaturedModMapper featuredModMapper, UserNoteMapper userNoteMapper, TeamkillMapper teamkillMapper) {
+    public UserService(FafApiCommunicationService fafApi, PlayerMapper playerMapper, FeaturedModMapper featuredModMapper, UserNoteMapper userNoteMapper, TeamkillMapper teamkillMapper, EnvironmentProperties environmentProperties) {
         this.fafApi = fafApi;
         this.playerMapper = playerMapper;
         this.featuredModMapper = featuredModMapper;
         this.userNoteMapper = userNoteMapper;
         this.teamkillMapper = teamkillMapper;
+        this.environmentProperties = environmentProperties;
     }
 
     private <T extends ElideEntity> ElideNavigatorOnCollection<T> addModeratorIncludes(@NotNull ElideNavigatorOnCollection<T> builder) {
@@ -90,9 +91,15 @@ public class UserService {
                 .collection()
                 .setFilter(ElideNavigator.qBuilder().string(attribute).eq(pattern));
         addModeratorIncludes(navigator);
-        List<Player> result = fafApi.getAll(Player.class, navigator);
+        List<Player> firstPage = fafApi.getFirstPageOnlyForFindUsersByAttribute(Player.class, navigator, environmentProperties.getMaxPageSize());
 
-        return playerMapper.mapToFx(result);
+        if (firstPage.size() < environmentProperties.getMaxPageSize()) {
+            return playerMapper.mapToFx(firstPage);
+        }
+
+        // Otherwise, fetch all pages
+        List<Player> allPlayers = fafApi.getAll(Player.class, navigator);
+        return playerMapper.mapToFx(allPlayers);
     }
 
     public List<TeamkillFX> findLatestTeamkills() {
