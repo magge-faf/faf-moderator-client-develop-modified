@@ -27,4 +27,5 @@ public class EnvironmentProperties {
 
     private int maxPageSize = 10_000;
     private int maxResultSize = 10_000_000;
+    private int maxResultPageSizeAvatars = 100;
 }

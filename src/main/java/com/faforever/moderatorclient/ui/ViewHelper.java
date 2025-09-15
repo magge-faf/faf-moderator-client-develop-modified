@@ -12,6 +12,7 @@ import com.faforever.moderatorclient.ui.data_cells.TextAreaTableCell;
 import com.faforever.moderatorclient.ui.data_cells.UrlImageViewTableCell;
 import com.faforever.moderatorclient.ui.domain.*;
 import javafx.beans.binding.Bindings;
+import javafx.beans.property.ReadOnlyIntegerWrapper;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -123,7 +124,12 @@ public class ViewHelper {
         tableView.setItems(data);
         HashMap<TableColumn<AvatarFX, ?>, Function<AvatarFX, ?>> extractors = new HashMap<>();
 
-        TableColumn<AvatarFX, String> idColumn = new TableColumn<>("ID");
+        TableColumn<AvatarFX, Number> numberColumn = new TableColumn<>("#");
+        numberColumn.setCellValueFactory(o -> new ReadOnlyIntegerWrapper(tableView.getItems().indexOf(o.getValue()) + 1));
+        numberColumn.setMinWidth(25);
+        tableView.getColumns().add(numberColumn);
+
+        TableColumn<AvatarFX, String> idColumn = new TableColumn<>("Avatar ID");
         idColumn.setCellValueFactory(o -> o.getValue().idProperty());
         idColumn.setComparator(Comparator.comparingInt(Integer::parseInt));
         idColumn.setMinWidth(50);

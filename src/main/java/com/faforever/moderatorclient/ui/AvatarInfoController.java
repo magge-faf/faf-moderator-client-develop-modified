@@ -48,8 +48,8 @@ public class AvatarInfoController implements Controller<Pane> {
     public void setAvatar(AvatarFX avatarFX) {
         this.avatarFX = avatarFX;
         tooltipTextField.setText(avatarFX.getTooltip());
-        if (avatarFX.getUrl() != null && avatarFX.getUrl().length() > 0) {
-            imageView.setImage(new Image(avatarFX.getUrl()));
+        if (avatarFX.getUrl() != null && !avatarFX.getUrl().isEmpty()) {
+            imageView.setImage(new Image(avatarFX.getUrl(), true));
             hyperlink.setText(avatarFX.getUrl());
         } else {
             hyperlink.setText("");
@@ -68,7 +68,7 @@ public class AvatarInfoController implements Controller<Pane> {
             validationErrors.add("No image file selected");
         }
 
-        if (validationErrors.size() > 0) {
+        if (!validationErrors.isEmpty()) {
             ViewHelper.errorDialog("Validation failed",
                     String.join("\n", validationErrors)
             );

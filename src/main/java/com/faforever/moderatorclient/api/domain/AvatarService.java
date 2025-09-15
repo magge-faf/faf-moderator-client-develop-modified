@@ -8,10 +8,12 @@ import com.faforever.commons.api.elide.ElideNavigatorOnId;
 import com.faforever.commons.api.update.AvatarAssignmentUpdate;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.dto.update.AvatarMetadata;
+import com.faforever.moderatorclient.config.EnvironmentProperties;
 import com.faforever.moderatorclient.mapstruct.AvatarAssignmentMapper;
 import com.faforever.moderatorclient.ui.domain.AvatarAssignmentFX;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -21,8 +23,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 @Service
 @Slf4j
@@ -30,21 +33,34 @@ public class AvatarService {
     private final FafApiCommunicationService fafApi;
     private final AvatarAssignmentMapper avatarAssignmentMapper;
 
-    public AvatarService(FafApiCommunicationService fafApi, AvatarAssignmentMapper avatarAssignmentMapper) {
+    @Autowired
+    private final EnvironmentProperties environmentProperties;
+
+    public AvatarService(FafApiCommunicationService fafApi, AvatarAssignmentMapper avatarAssignmentMapper, EnvironmentProperties environmentProperties) {
         this.fafApi = fafApi;
         this.avatarAssignmentMapper = avatarAssignmentMapper;
+        this.environmentProperties = environmentProperties;
     }
 
-    public CompletableFuture<List<Avatar>> getAll() {
-        return CompletableFuture.supplyAsync(() -> {
-            log.debug("Retrieving all avatars");
-            List<Avatar> result = fafApi.getAll(Avatar.class, ElideNavigator.of(Avatar.class)
-                    .collection()
-                    .addInclude("assignments")
-                    .addInclude("assignments.player"));
-            log.trace("found {} avatars", result.size());
-            return result;
-        });
+    public List<Avatar> getAllAvatars() {
+        log.trace("Retrieving all avatars");
+        ElideNavigatorOnCollection<Avatar> navigator = ElideNavigator.of(Avatar.class)
+                .collection()
+                .addInclude("assignments")
+                .addInclude("assignments.player");
+
+        List<Avatar> allAvatars = new ArrayList<>();
+        int page = 1;
+        int pageSize = environmentProperties.getMaxResultPageSizeAvatars();
+        List<Avatar> currentPage;
+
+        do {
+            currentPage = fafApi.getPage(Avatar.class, navigator, pageSize, page++, Collections.emptyMap());
+            allAvatars.addAll(currentPage);
+        } while (currentPage.size() == pageSize); // stop when the last page has fewer items
+
+        log.trace("Found {} avatars", allAvatars.size());
+        return allAvatars;
     }
 
     private List<Avatar> findAvatarsByAttribute(@NotNull String attribute, @NotNull String pattern) {
@@ -68,24 +84,23 @@ public class AvatarService {
         return findAvatarsByAttribute("tooltip", pattern);
     }
 
-    public CompletableFuture<List<Avatar>> findAvatarsByAssignedUser(@NotNull String pattern) {
-        return CompletableFuture.supplyAsync(() -> {
-            log.debug("Searching for avatars by assigned player with pattern: {}", pattern);
-            boolean isNumeric = pattern.matches("^[0-9]+$");
+    public List<Avatar> findAvatarsByAssignedUser(@NotNull String pattern) {
+        log.debug("Searching for avatars by assigned player with pattern: {}", pattern);
+        boolean isNumeric = pattern.matches("^[0-9]+$");
 
-            ElideNavigatorOnCollection<Avatar> navigator = ElideNavigator.of(Avatar.class)
-                    .collection()
-                    .addInclude("assignments")
-                    .addInclude("assignments.player")
-                    .setFilter(ElideNavigator.qBuilder().string(isNumeric ? "assignments.player.id" : "assignments.player.login").eq(pattern));
+        ElideNavigatorOnCollection<Avatar> navigator = ElideNavigator.of(Avatar.class)
+                .collection()
+                .addInclude("assignments")
+                .addInclude("assignments.player")
+                .setFilter(ElideNavigator.qBuilder().string(isNumeric ? "assignments.player.id" : "assignments.player.login").eq(pattern));
 
-            List<Avatar> result = fafApi.getAll(Avatar.class, navigator);
-            log.trace("found {} avatars", result.size());
-            return result;
-        });
+        List<Avatar> result = fafApi.getAll(Avatar.class, navigator);
+        log.trace("found {} avatars", result.size());
+        return result;
     }
 
     public void uploadAvatar(String name, File avatarImageFile) {
+        FafApiCommunicationService.checkRateLimit();
         HttpEntity<LinkedMultiValueMap<String, Object>> requestEntity = createAvatarMultipartRequest(name, avatarImageFile);
         final String route = "/avatars/upload";
         log.debug("Sending API request: {}", route);
@@ -98,6 +113,7 @@ public class AvatarService {
     }
 
     public void reuploadAvatar(String avatarId, String name, File avatarImageFile) {
+        FafApiCommunicationService.checkRateLimit();
         HttpEntity<LinkedMultiValueMap<String, Object>> requestEntity = createAvatarMultipartRequest(name, avatarImageFile);
         final String route = "/avatars/{0}/upload";
         log.debug("Sending API request: {}", route);
@@ -111,6 +127,7 @@ public class AvatarService {
     }
 
     public void deleteAvatar(String avatarId) {
+        FafApiCommunicationService.checkRateLimit();
         final String route = "/avatars/{0}";
         log.debug("Sending API request: {}", route);
         fafApi.getRestTemplate().delete(route, avatarId);
@@ -174,5 +191,15 @@ public class AvatarService {
         ElideNavigatorOnId<AvatarAssignment> navigator = ElideNavigator.of(AvatarAssignment.class)
                 .id(avatarAssignment.getId());
         fafApi.delete(navigator);
+    }
+
+    public List<Avatar> getAllAvatarsPage(int page, int pageSize) {
+        log.trace("Retrieving avatar page {} ({} items per page)", page, pageSize);
+        ElideNavigatorOnCollection<Avatar> navigator = ElideNavigator.of(Avatar.class)
+                .collection()
+                .addInclude("assignments")
+                .addInclude("assignments.player");
+
+        return fafApi.getPage(Avatar.class, navigator, pageSize, page, Collections.emptyMap());
     }
 }

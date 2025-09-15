@@ -11,6 +11,11 @@
                     <children>
                         <VBox maxHeight="1.7976931348623157E308">
                             <children>
+                                <Label fx:id="avatarLoadProgressLabel">
+                                    <VBox.margin>
+                                        <Insets top="5" left="5" right="5" bottom="5"/>
+                                    </VBox.margin>
+                                </Label>
                                 <RadioButton fx:id="showAllAvatarsRadioButton" mnemonicParsing="false" selected="true" text="show all">
                                     <VBox.margin>
                                         <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
