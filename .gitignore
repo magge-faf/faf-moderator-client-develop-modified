@@ -1,27 +1,19 @@
+# Build directories
 target/
-build
+build/
+
+# Gradle files
 .gradle
+
+# Maven wrapper
 !.mvn/wrapper/maven-wrapper.jar
 
 ### IntelliJ IDEA ###
 *.iws
 *.iml
 *.ipr
-
-# User-specific stuff:
-*.txt
 .idea/
 
-
-# Sensitive or high-churn files:
-.idea/dataSources
-.idea/dataSources*
-.idea/shelf
-.idea/dataSources.ids
-.idea/dataSources.xml
-.idea/sqlDataSources.xml
-.idea/dynamic.xml
-.idea/uiDesigner.xml
-.idea/inspectionProfiles/
-.idea/libraries
-.idea/libraries-with-intellij-classes.xml
+# Ignore zip and gzip files
+*.zip
+*.gz
