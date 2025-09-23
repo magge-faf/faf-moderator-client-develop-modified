@@ -69,20 +69,17 @@ public class UserService {
     }
 
     public List<PlayerFX> findLatestRegistrations() {
-    FafApiCommunicationService.checkRateLimit();
-    log.debug("Searching for latest registrations");
+        FafApiCommunicationService.checkRateLimit();
+        ElideNavigatorOnCollection<Player> navigator = ElideNavigator.of(Player.class)
+                .collection()
+                .addSortingRule("id", false)
+                .pageSize(environmentProperties.getMaxPageSize());
+        addModeratorIncludes(navigator);
 
-    ElideNavigatorOnCollection<Player> navigator = ElideNavigator.of(Player.class)
-            .collection()
-            .addSortingRule("id", false)
-            .pageSize(environmentProperties.getMaxPageSize());
-    addModeratorIncludes(navigator);
+        List<Player> allPlayers = fafApi.getPage(Player.class, navigator, environmentProperties.getMaxPageSize(), 1, Collections.emptyMap());
 
-    List<Player> allPlayers = fafApi.getPage(Player.class, navigator, environmentProperties.getMaxPageSize(), 1, Collections.emptyMap());
-    log.trace("found {} users", allPlayers.size());
-
-    return playerMapper.mapToFx(allPlayers);
-}
+        return playerMapper.mapToFx(allPlayers);
+    }
 
     public List<PlayerFX> findUsersByAttribute(@NotNull String attribute, @NotNull String pattern) {
 
