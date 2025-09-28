@@ -122,31 +122,6 @@ public class RecentActivityController implements Controller<VBox> {
             // Resetting UI element
             suspiciousUserTextArea.setText("");
 
-            // Initialize data structures
-            Map<String, List<String>> blacklistedData = new HashMap<>();
-            List<String> whitelistUserID = new ArrayList<>();
-
-            // Define FILE_NAMES constants
-            final String[] FILE_NAMES = {"excludedItems", "blacklistedHash", "blacklistedIP", "blacklistedMemorySN",
-                    "blacklistedSN", "blacklistedUUID", "blacklistedVolumeSN", "whitelistedUserID"};
-
-            // Load data from files
-            for (String fileName : FILE_NAMES) {
-                File file = new File(CONFIGURATION_FOLDER + File.separator + fileName + ".txt");
-                List<String> list = new ArrayList<>();
-                if ("whitelistedUserID".equals(fileName)) {
-                    loadList(file, whitelistUserID);
-                } else {
-                    loadList(file, list);
-                    blacklistedData.put(fileName, list);
-                }
-            }
-
-            // Filter blacklisted items
-            Map<String, List<String>> filteredBlacklistedData = new HashMap<>();
-            for (Map.Entry<String, List<String>> entry : blacklistedData.entrySet()) {
-                filteredBlacklistedData.put(entry.getKey(), filterList(entry.getValue(), blacklistedData.get("excludedItems")));
-            }
 
             // Load recent registrations and loop through accounts
             try {
@@ -157,9 +132,6 @@ public class RecentActivityController implements Controller<VBox> {
 
             userRegistrationFeedTableView.getSortOrder().clear();
 
-            for (PlayerFX user : users) {
-                checkAccountAgainstBlacklists(user, whitelistUserID, filteredBlacklistedData);
-            }
 
             // Stats about user registrations and logins in the last 30 days
             int totalRegistrations = 0;
@@ -197,53 +169,5 @@ public class RecentActivityController implements Controller<VBox> {
             statsLatestRegistrations.setText(stats.toString());
 
         });
-    }
-
-    private void loadList(File file, List<String> list) {
-        int itemCount = 0;
-        try (Scanner scanner = new Scanner(file)) {
-            while (scanner.hasNextLine()) {
-                list.add(scanner.nextLine());
-                itemCount++;
-            }
-            log.debug("[info] " + file + " loaded with " + itemCount + " items.");
-        } catch (Exception e) {
-            log.debug(String.valueOf(e));
-        }
-    }
-
-    private void checkAccountAgainstBlacklists(PlayerFX account, List<String> whitelistUserID, Map<String, List<String>> filteredBlacklistedData) {
-        Boolean includeBannedUserGlobally = includeGlobalBannedUserCheckBox.isSelected();
-
-        if (includeBannedUserGlobally.equals(account.isBannedGlobally())) {
-            ObservableSet<UniqueIdFx> accountUniqueIds = account.getUniqueIds();
-
-            // Check against whitelist and ignore userID
-            for (String userID : whitelistUserID) {
-                if (account.getId().equals(userID)) {
-                    log.debug("[whitelisted userID] " + userID);
-                    return;
-                }
-            }
-
-            // Check against blacklists
-            for (UniqueIdFx item : accountUniqueIds) {
-                checkBlacklistedItem("blacklistedHash", filteredBlacklistedData.get("blacklistedHash"), item.getHash(), account);
-                checkBlacklistedItem("blacklistedIP", filteredBlacklistedData.get("blacklistedIP"), account.getRecentIpAddress(), account);
-                checkBlacklistedItem("blacklistedMemorySN", filteredBlacklistedData.get("blacklistedMemorySN"), item.getMemorySerialNumber(), account);
-                checkBlacklistedItem("blacklistedSN", filteredBlacklistedData.get("blacklistedSN"), item.getSerialNumber(), account);
-                checkBlacklistedItem("blacklistedUUID", filteredBlacklistedData.get("blacklistedUUID"), item.getUuid(), account);
-                checkBlacklistedItem("blacklistedVolumeSN", filteredBlacklistedData.get("blacklistedVolumeSN"), item.getVolumeSerialNumber(), account);
-            }
-        }
-    }
-
-    private void checkBlacklistedItem(String fileName, List<String> blacklistedItems, String item, PlayerFX account) {
-        for (String blacklistedItem : blacklistedItems) {
-            if (blacklistedItem.equals(item)) {
-                log.debug("[!] " + fileName + " [" + blacklistedItem + "] for " + account.getRepresentation());
-                suspiciousUserTextArea.setText(suspiciousUserTextArea.getText() + "[!] " + fileName + " [" + blacklistedItem + "] for " + account.getRepresentation() + "\n");
-            }
-        }
     }
 }

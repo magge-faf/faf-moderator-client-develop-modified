@@ -850,35 +850,35 @@ public class UserManagementController implements Controller<SplitPane> {
         Set<String> biosVersions = new HashSet<>();
         Set<String> manufacturers = new HashSet<>();
 
-        userFound.forEach(user -> user.getUniqueIds().forEach(item -> {
+        userFound.forEach(user -> user.getUniqueIdAssignments().forEach(item -> {
             if (includeProcessorNameCheckBox.isSelected()) {
-                cpuNames.add(item.getUuid());
+                cpuNames.add(item.getUniqueId().getName());
             }
             if (includeUUIDCheckBox.isSelected()) {
-                uuids.add(item.getUuid());
+                uuids.add(item.getUniqueId().getUuid());
             }
             if (includeUIDHashCheckBox.isSelected()) {
-                hashes.add(item.getHash());
+                hashes.add(item.getUniqueId().getHash());
             }
             if (includeIPCheckBox.isSelected()) {
                 ips.add(user.getRecentIpAddress());
             }
             if (includeMemorySerialNumberCheckBox.isSelected()) {
-                memorySerialNumbers.add(item.getMemorySerialNumber());
+                memorySerialNumbers.add(item.getUniqueId().getMemorySerialNumber());
             }
             if (includeVolumeSerialNumberCheckBox.isSelected()) {
-                volumeSerialNumbers.add(item.getVolumeSerialNumber());
+                volumeSerialNumbers.add(item.getUniqueId().getVolumeSerialNumber());
             }
             if (includeSerialNumberCheckBox.isSelected()) {
-                serialNumbers.add(item.getSerialNumber());
+                serialNumbers.add(item.getUniqueId().getSerialNumber());
             }
             if (includeProcessorIdCheckBox.isSelected()) {
-                processorIds.add(item.getProcessorId());
+                processorIds.add(item.getUniqueId().getProcessorId());
             }
             //biosVersions.add(item.getSMBIOSBIOSVersion());
             //if (includeManufacturerCheckBox.isSelected())
             if (includeManufacturerCheckBox.isSelected()) {
-                manufacturers.add(item.getManufacturer());
+                manufacturers.add(item.getUniqueId().getManufacturer());
             }
         }));
 
@@ -902,7 +902,7 @@ public class UserManagementController implements Controller<SplitPane> {
             String smurfId = (String) id;
 
             boolean exists = userSearchTableView.getItems().stream()
-                    .map(player -> player.getId())
+                    .map(AbstractEntityFX::getId)
                     .anyMatch(playerId -> playerId.equals(smurfId));
 
             if (!exists) {

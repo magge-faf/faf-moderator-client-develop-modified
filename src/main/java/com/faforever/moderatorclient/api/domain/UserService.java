@@ -60,7 +60,8 @@ public class UserService {
                 .addInclude(variablePrefix + "names")
                 .addInclude(variablePrefix + "avatarAssignments")
                 .addInclude(variablePrefix + "avatarAssignments.avatar")
-                .addInclude(variablePrefix + "uniqueIds")
+                .addInclude(variablePrefix + "uniqueIdAssignments")
+                .addInclude(variablePrefix + "uniqueIdAssignments.uniqueId")
                 .addInclude(variablePrefix + "accountLinks")
                 .addInclude(variablePrefix + "bans")
                 .addInclude(variablePrefix + "bans.author")
@@ -70,9 +71,9 @@ public class UserService {
     public List<PlayerFX> findLatestRegistrations() throws InterruptedException, ExecutionException {
         log.debug("Searching for latest registrations");
         List<Player> allPlayers = new ArrayList<>();
-        int pageSize = environmentProperties.getMaxPageSize();
-        int totalPages = 4; // 10*pageSize users
-        int threads = 2;
+        int pageSize = 4000;
+        int totalPages = 1; // 10*pageSize users
+        int threads = 1;
         ExecutorService executor = Executors.newFixedThreadPool(threads);
         List<Future<List<Player>>> futures = new ArrayList<>();
 
