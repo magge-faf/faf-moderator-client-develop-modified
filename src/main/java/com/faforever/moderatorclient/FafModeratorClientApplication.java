@@ -8,7 +8,6 @@ import com.faforever.moderatorclient.ui.PlatformService;
 import com.faforever.moderatorclient.ui.PlatformServiceImpl;
 import com.faforever.moderatorclient.ui.StageHolder;
 import com.faforever.moderatorclient.ui.UiService;
-import com.faforever.moderatorclient.ui.main_window.SettingsController;
 import com.faforever.moderatorclient.ui.main_window.UserManagementController;
 import com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController;
 import javafx.animation.KeyFrame;
@@ -102,25 +101,26 @@ public class FafModeratorClientApplication extends Application {
     }
 
     private void startTimerThread(Stage primaryStage) {
-    long startTime = System.currentTimeMillis();
-    Timer timer = new Timer(true);
-    TimerTask task = new TimerTask() {
-        @Override
-        public void run() {
-            int requestsInLastMinute = FafApiCommunicationService.getRequestsInLastMinute();
+        long startTime = System.currentTimeMillis();
+        Timer timer = new Timer(true);
+        TimerTask task = new TimerTask() {
+            @Override
+            public void run() {
+                int requestsInLastMinute = FafApiCommunicationService.getRequestsInLastMinute();
+                double requestsPerSecond = FafApiCommunicationService.getRequestsPerSecondRolling(3);
 
-            Platform.runLater(() -> updateWindowTitle(primaryStage, startTime, requestsInLastMinute));
-        }
-    };
-    timer.scheduleAtFixedRate(task, 0, 1000);
-}
+                Platform.runLater(() -> updateWindowTitle(primaryStage, startTime, requestsInLastMinute, requestsPerSecond));
+            }
+        };
+        timer.scheduleAtFixedRate(task, 0, 1000);
+    }
 
     private Timeline timeline;
     private Stage primaryStage;
     private long startTime;
     private boolean isFetching = false;
 
-    public void updateWindowTitle(Stage primaryStage, long startTime, int requestsInLastMinute) {
+    public void updateWindowTitle(Stage primaryStage, long startTime, int requestsInLastMinute, double requestsPerSecond) {
     this.primaryStage = primaryStage;
     this.startTime = startTime;
 
@@ -131,26 +131,43 @@ public class FafModeratorClientApplication extends Application {
         if (!isFetching) {
             startFetchingPattern();
             isFetching = true;
-            lastRefreshedTime = System.currentTimeMillis();
         }
     } else {
         stopFetchingPattern();
         isFetching = false;
 
+        if (hasFetchedReports) {
+            lastRefreshedTime = System.currentTimeMillis();
+        }
+
         long elapsedTimeMillis = System.currentTimeMillis() - startTime;
         long elapsedTimeSeconds = elapsedTimeMillis / 1000;
-        long minutes = elapsedTimeSeconds / 60;
+        long hours = elapsedTimeSeconds / 3600;
+        long minutes = (elapsedTimeSeconds % 3600) / 60;
         long seconds = elapsedTimeSeconds % 60;
-        String elapsedTimeStr = String.format("%02d:%02d", minutes, seconds);
+        String elapsedTimeStr = String.format("%02d:%02d:%02d", hours, minutes, seconds); // HH:mm:ss
+
+        String fetchingDurationStr = "";
+        if (fetchingDurationMillis > 0) {
+            long fetchingDurationSeconds = fetchingDurationMillis / 1000;
+            long minutesFetched = fetchingDurationSeconds / 60;
+            long secondsFetched = fetchingDurationSeconds % 60;
+            fetchingDurationStr = String.format(" (Took %02d:%02d)", minutesFetched, secondsFetched);
+        }
 
         String lastUpdateStr = getLastUpdateTime();
 
-        primaryStage.setTitle("magge's Mordor - Session: " + elapsedTimeStr +
+        primaryStage.setTitle("MM - Session: " + elapsedTimeStr +
                 " | Reports Loaded: " + moderationReportController.getTotalReportsLoaded() +
                 " | Last Refresh was " + lastUpdateStr +
-                " | Requests in Last 60s: " + requestsInLastMinute);
+                fetchingDurationStr +
+                " | Requests in Last 60s: " + requestsInLastMinute +
+                String.format(" | RPS (3s): %.2f", requestsPerSecond));
     }
 }
+
+    private long fetchingDurationMillis = 0;
+    private boolean hasFetchedReports = false;
 
     private void startFetchingPattern() {
         if (timeline != null && timeline.getStatus() == Timeline.Status.RUNNING) {
@@ -158,20 +175,28 @@ public class FafModeratorClientApplication extends Application {
         }
 
         final long[] counterSecondsRequestReportsFromServer = {0};
+        lastRefreshedTime = System.currentTimeMillis();
+        hasFetchedReports = true;
 
         timeline = new Timeline(new KeyFrame(Duration.seconds(1), event -> {
             long elapsedTimeMillis = System.currentTimeMillis() - startTime;
             long elapsedTimeSeconds = elapsedTimeMillis / 1000;
-            long minutes = elapsedTimeSeconds / 60;
+            long hours = elapsedTimeSeconds / 3600;
+            long minutes = (elapsedTimeSeconds % 3600) / 60;
             long seconds = elapsedTimeSeconds % 60;
-            String elapsedTimeStr = String.format("%02d:%02d", minutes, seconds);
+            String elapsedTimeStr = String.format("%02d:%02d:%02d", hours, minutes, seconds); // HH:mm:ss
 
             counterSecondsRequestReportsFromServer[0]++;
 
-            primaryStage.setTitle("magge's Mordor - Session: " + elapsedTimeStr +
-                    " | Latest " + preferencesConfig.getInitialPageSize()
-                    + " Reports Fetched | Requesting now all reports from the server... (" +
-                    counterSecondsRequestReportsFromServer[0] + " seconds ago)");
+            int requestsInLastMinute = FafApiCommunicationService.getRequestsInLastMinute();
+            double requestsPerSecond = FafApiCommunicationService.getRequestsPerSecondRolling(3);
+
+            primaryStage.setTitle("MM: Session: " + elapsedTimeStr +
+                    " | Latest " + preferencesConfig.getInitialPageSize() +
+                    " Reports Fetched | Requesting now all reports from the server... (" +
+                    counterSecondsRequestReportsFromServer[0] + " seconds ago)" +
+                    " | Requests in Last 60s: " + requestsInLastMinute +
+                    String.format(" | RPS (3s): %.2f", requestsPerSecond));
         }));
 
         timeline.setCycleCount(Timeline.INDEFINITE);
@@ -182,6 +207,12 @@ public class FafModeratorClientApplication extends Application {
         if (timeline != null) {
             timeline.stop();
             timeline = null;
+        }
+
+        if (hasFetchedReports) {
+            long fetchingEndTime = System.currentTimeMillis();
+            fetchingDurationMillis = fetchingEndTime - lastRefreshedTime;
+            hasFetchedReports = false;
         }
     }
 

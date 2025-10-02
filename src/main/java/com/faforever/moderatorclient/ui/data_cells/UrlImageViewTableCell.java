@@ -49,7 +49,22 @@ public class UrlImageViewTableCell<T> extends TableCell<T, String> {
             return;
         }
 
-        AvatarFX avatar = (AvatarFX) getTableRow().getItem();
+        Object rowItem = getTableRow().getItem();
+        AvatarFX avatar;
+
+        if (rowItem instanceof AvatarAssignmentFX assignmentFX) {
+            avatar = assignmentFX.getAvatar(); // <-- method to get AvatarFX from AvatarAssignmentFX
+        } else if (rowItem instanceof AvatarFX avatarFX) {
+            avatar = avatarFX;
+        } else {
+            avatar = null;
+        }
+
+        if (avatar == null) {
+            setGraphic(null);
+            return;
+        }
+
         imageView.imageProperty().unbind();
         imageView.imageProperty().bind(avatar.imageProperty());
         setGraphic(imageView);
@@ -58,7 +73,7 @@ public class UrlImageViewTableCell<T> extends TableCell<T, String> {
             return;
         }
 
-        String cacheKey = cacheKeyFrom(item, avatar);
+        String cacheKey = cacheKeyFrom(item, rowItem);
 
         if (loadingUrls.add(cacheKey)) {
             totalRequested++;

@@ -31,24 +31,26 @@ public class BanService {
     private final FafUserCommunicationService fafUser;
     private final EnvironmentProperties environmentProperties;
 
-    public BanInfo patchBanInfo(@NotNull BanInfoFX banInfoFX) {
+    public void patchBanInfo(@NotNull BanInfoFX banInfoFX) {
+        fafApi.checkRateLimit();
         BanInfo banInfo = banInfoMapper.map(banInfoFX);
         log.debug("Patching BanInfo of id: {}", banInfo.getId());
         fafUser.post(REVOKE_ENDPOINT, RevokeRefreshTokenRequest.allClientsOf(banInfo.getPlayer().getId()));
         banInfo.setAuthor(null);
         banInfo.setPlayer(null);
-        return fafApi.patch(ElideNavigator.of(BanInfo.class).id(banInfo.getId()), banInfo);
+        fafApi.patch(ElideNavigator.of(BanInfo.class).id(banInfo.getId()), banInfo);
     }
 
     public String createBan(@NotNull BanInfoFX banInfoFX) {
+        fafApi.checkRateLimit();
         BanInfo banInfo = banInfoMapper.map(banInfoFX);
-        log.debug("Creating ban");
         fafUser.post(REVOKE_ENDPOINT, RevokeRefreshTokenRequest.allClientsOf(banInfo.getPlayer().getId()));
         return fafApi.post(ElideNavigator.of(BanInfo.class).collection(), banInfo).getId();
     }
 
     public void updateBan(BanInfo banInfoUpdate) {
-        log.debug("Update for ban id: " + banInfoUpdate.getId());
+        fafApi.checkRateLimit();
+        log.debug("Update for ban id: {}", banInfoUpdate.getId());
         ElideNavigatorOnId<BanInfo> navigator = ElideNavigator.of(BanInfo.class)
                 .id(banInfoUpdate.getId());
 
@@ -63,13 +65,14 @@ public class BanService {
             List<BanInfo> banInfos;
 
             do {
+                fafApi.checkRateLimit();
                 banInfos = fafApi.getPage(BanInfo.class, ElideNavigator.of(BanInfo.class)
                                 .collection()
                                 .addInclude("player")
                                 .addInclude("author")
                                 .addInclude("revokeAuthor")
                                 .addSortingRule("createTime", false),
-                        environmentProperties.getMaxPageSize(),
+                        environmentProperties.getMaxPageSizeBans(),
                         currentPage,
                         ImmutableMap.of()
                 );
@@ -80,15 +83,15 @@ public class BanService {
                 allBanInfos.addAll(mappedBanInfos);
 
                 currentPage++;
-                log.info("Current page: {}", currentPage);
-            } while (banInfos.size() == environmentProperties.getMaxPageSize());
+            } while (banInfos.size() == environmentProperties.getMaxPageSizeBans());
 
             return allBanInfos;
         });
     }
 
     public BanInfoFX getBanInfoById(String banInfoId) {
-        log.debug("Search for ban id: " + banInfoId);
+        fafApi.checkRateLimit();
+        log.debug("Search for ban id: {}", banInfoId);
         ElideNavigatorOnId<BanInfo> navigator = ElideNavigator.of(BanInfo.class)
                 .id(banInfoId)
                 .addInclude("player")
@@ -97,6 +100,7 @@ public class BanService {
     }
 
     public List<BanInfoFX> getBanInfoByBannedPlayerNameContains(String name) {
+        fafApi.checkRateLimit();
         ElideNavigatorOnCollection<BanInfo> navigator = ElideNavigator.of(BanInfo.class)
                 .collection()
                 .setFilter(ElideNavigator.qBuilder().string("player.login").eq("*" + name + "*"))

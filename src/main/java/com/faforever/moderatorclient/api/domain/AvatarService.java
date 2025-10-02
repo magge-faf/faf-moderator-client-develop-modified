@@ -100,7 +100,7 @@ public class AvatarService {
     }
 
     public void uploadAvatar(String name, File avatarImageFile) {
-        FafApiCommunicationService.checkRateLimit();
+        fafApi.checkRateLimit();
         HttpEntity<LinkedMultiValueMap<String, Object>> requestEntity = createAvatarMultipartRequest(name, avatarImageFile);
         final String route = "/avatars/upload";
         log.debug("Sending API request: {}", route);
@@ -113,7 +113,7 @@ public class AvatarService {
     }
 
     public void reuploadAvatar(String avatarId, String name, File avatarImageFile) {
-        FafApiCommunicationService.checkRateLimit();
+        fafApi.checkRateLimit();
         HttpEntity<LinkedMultiValueMap<String, Object>> requestEntity = createAvatarMultipartRequest(name, avatarImageFile);
         final String route = "/avatars/{0}/upload";
         log.debug("Sending API request: {}", route);
@@ -127,7 +127,7 @@ public class AvatarService {
     }
 
     public void deleteAvatar(String avatarId) {
-        FafApiCommunicationService.checkRateLimit();
+        fafApi.checkRateLimit();
         final String route = "/avatars/{0}";
         log.debug("Sending API request: {}", route);
         fafApi.getRestTemplate().delete(route, avatarId);

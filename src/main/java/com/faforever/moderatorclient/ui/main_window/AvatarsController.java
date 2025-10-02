@@ -60,6 +60,9 @@ public class AvatarsController implements Controller<SplitPane> {
     @Autowired
     private final EnvironmentProperties environmentProperties;
 
+    @Autowired
+    private final FafApiCommunicationService fafApiCommunicationService;
+
     @Override
     public SplitPane getRoot() {
         return root;
@@ -159,7 +162,7 @@ public class AvatarsController implements Controller<SplitPane> {
                     UrlImageViewTableCell.runningTasks.put(cacheKey,
                             UrlImageViewTableCell.imageLoadExecutor.submit(() -> {
                                 try {
-                                    FafApiCommunicationService.checkRateLimit();
+                                    fafApiCommunicationService.checkRateLimit();
                                     Image img = new Image(url, true);
                                     AvatarCache.getInstance().put(cacheKey, img);
 

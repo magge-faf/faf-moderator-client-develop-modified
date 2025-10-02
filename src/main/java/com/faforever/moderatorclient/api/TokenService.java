@@ -52,14 +52,14 @@ public class TokenService {
                 .build();
     }
 
-  @SneakyThrows
-  public String getRefreshedTokenValue() {
-    if (tokenCache.getAccessToken().getExpiresAt().isBefore(Instant.now())) {
-      log.info("Token expired, requesting new with refresh token");
-      loginWithRefreshToken(tokenCache.getRefreshToken().getTokenValue(), false);
-    } else {
-      log.trace("Token still valid for {} seconds", Duration.between(Instant.now(), tokenCache.getAccessToken().getExpiresAt()));
-    }
+    @SneakyThrows
+    public String getRefreshedTokenValue() {
+        if (tokenCache.getAccessToken().getExpiresAt().isBefore(Instant.now())) {
+            log.info("Token expired, requesting new with refresh token");
+            loginWithRefreshToken(tokenCache.getRefreshToken().getTokenValue(), false);
+        } else {
+            log.trace("Token still valid for {} seconds", Duration.between(Instant.now(), tokenCache.getAccessToken().getExpiresAt()).getSeconds());
+        }
 
         return tokenCache.getAccessToken().getTokenValue();
     }
@@ -91,7 +91,7 @@ public class TokenService {
         map.add("grant_type", "authorization_code");
         map.add("code_verifier", values.codeVerifier());
 
-        Map<String, Object>  responseBody = requestToken(headers, map);
+        Map<String, Object> responseBody = requestToken(headers, map);
         if (responseBody != null) {
             parseResponse(responseBody);
 

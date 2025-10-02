@@ -42,17 +42,16 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
 
 import com.google.common.util.concurrent.RateLimiter;
 
-import java.util.Deque;
-
 @Service
 @Slf4j
 public class FafApiCommunicationService {
-    private static final Deque<Long> requestTimestamps = new LinkedList<>();
+    private static final ConcurrentLinkedDeque<Long> requestTimestamps = new ConcurrentLinkedDeque<>();
     private static final long ONE_MINUTE_IN_MILLIS = 60 * 1000;
     private final ResourceConverter defaultResourceConverter;
     private final ResourceConverter updateResourceConverter;
@@ -63,20 +62,26 @@ public class FafApiCommunicationService {
     private final JsonApiErrorHandler jsonApiErrorHandler;
     private final CycleAvoidingMappingContext cycleAvoidingMappingContext;
     private final RestTemplateBuilder restTemplateBuilder;
+    private EnvironmentProperties environmentProperties;
     private final CountDownLatch authorizedLatch;
     @Getter
     private MeResult meResult;
     private RestTemplate restTemplate;
-    private EnvironmentProperties environmentProperties;
-    private final RateLimiter rateLimiter = RateLimiter.create(250.0 / 60.0);
-    private static final int MAX_REQUESTS = 250;
+    private int maxRequests;
 
-    public FafApiCommunicationService(@Qualifier("defaultResourceConverter") ResourceConverter defaultResourceConverter,
-                                      @Qualifier("updateResourceConverter") ResourceConverter updateResourceConverter,
-                                      OAuthTokenInterceptor oAuthTokenInterceptor, HmacHeaderInterceptor hmacHeaderInterceptor, ApplicationEventPublisher applicationEventPublisher,
-                                      CycleAvoidingMappingContext cycleAvoidingMappingContext, RestTemplateBuilder restTemplateBuilder,
-                                      JsonApiMessageConverter jsonApiMessageConverter,
-                                      JsonApiErrorHandler jsonApiErrorHandler) {
+    private static final RateLimiter rateLimiter = RateLimiter.create(50);
+
+    public FafApiCommunicationService(
+            @Qualifier("defaultResourceConverter") ResourceConverter defaultResourceConverter,
+            @Qualifier("updateResourceConverter") ResourceConverter updateResourceConverter,
+            OAuthTokenInterceptor oAuthTokenInterceptor,
+            HmacHeaderInterceptor hmacHeaderInterceptor,
+            ApplicationEventPublisher applicationEventPublisher,
+            CycleAvoidingMappingContext cycleAvoidingMappingContext,
+            RestTemplateBuilder restTemplateBuilder,
+            JsonApiMessageConverter jsonApiMessageConverter,
+            JsonApiErrorHandler jsonApiErrorHandler,
+            EnvironmentProperties environmentProperties) {
         this.defaultResourceConverter = defaultResourceConverter;
         this.updateResourceConverter = updateResourceConverter;
         this.hmacHeaderInterceptor = hmacHeaderInterceptor;
@@ -86,6 +91,7 @@ public class FafApiCommunicationService {
         this.jsonApiErrorHandler = jsonApiErrorHandler;
         this.oAuthTokenInterceptor = oAuthTokenInterceptor;
         this.restTemplateBuilder = restTemplateBuilder;
+        this.environmentProperties = environmentProperties;
 
         authorizedLatch = new CountDownLatch(1);
     }
@@ -96,6 +102,9 @@ public class FafApiCommunicationService {
 
     public void initialize(EnvironmentProperties environmentProperties) {
         this.environmentProperties = environmentProperties;
+        maxRequests = environmentProperties.getMaxRequestsToServerPerMinute();
+        log.debug("Setting max requests to server per minute to {}", maxRequests);
+        rateLimiter.setRate(maxRequests / 60.0);
     }
 
     public boolean hasPermission(String... permissionTechnicalName) {
@@ -110,8 +119,7 @@ public class FafApiCommunicationService {
 
         restTemplate = restTemplateBuilder
                 .requestFactory(JdkClientHttpRequestFactory.class)
-                .additionalMessageConverters(jsonApiMessageConverter)
-                .setReadTimeout(Duration.ofMinutes(5))
+                .additionalMessageConverters(jsonApiMessageConverter).readTimeout(Duration.ofMinutes(5))
                 .errorHandler(jsonApiErrorHandler)
                 .rootUri(environmentProperties.getBaseUrl())
                 .interceptors(List.of(oAuthTokenInterceptor, hmacHeaderInterceptor,
@@ -133,31 +141,23 @@ public class FafApiCommunicationService {
         try {
             meResult = getOne("/me", MeResult.class);
         } catch (Exception e) {
-            log.error("login failed", e);
-            return;
+            log.error("Fetching /me failed", e);
         }
 
         authorizedLatch.countDown();
         applicationEventPublisher.publishEvent(new ApiAuthorizedEvent());
     }
 
-    private void checkRateLimit() {
-    long currentTime = System.currentTimeMillis();
+    public static void checkRateLimit() {
+        long currentTime = System.currentTimeMillis();
 
-    while (!requestTimestamps.isEmpty()) {
-        Long firstTimestamp = requestTimestamps.peek();
-        if (firstTimestamp != null && currentTime - firstTimestamp > ONE_MINUTE_IN_MILLIS) {
+        while (!requestTimestamps.isEmpty() && currentTime - requestTimestamps.peek() > ONE_MINUTE_IN_MILLIS) {
             requestTimestamps.poll();
-        } else {
-            break;
         }
-    }
 
-    if (requestTimestamps.size() >= MAX_REQUESTS) {
-        if (!requestTimestamps.isEmpty()) {
-            Long firstTimestamp = requestTimestamps.peek();
-            if (firstTimestamp != null) {
-                long waitTime = ONE_MINUTE_IN_MILLIS - (currentTime - firstTimestamp);
+        if (requestTimestamps.size() >= 100) {
+            long waitTime = requestTimestamps.peek() + ONE_MINUTE_IN_MILLIS - currentTime;
+            if (waitTime > 0) {
                 try {
                     Thread.sleep(waitTime);
                 } catch (InterruptedException e) {
@@ -166,20 +166,10 @@ public class FafApiCommunicationService {
             }
         }
 
-        while (!requestTimestamps.isEmpty()) {
-            Long firstTimestamp = requestTimestamps.peek();
-            if (firstTimestamp != null && currentTime - firstTimestamp > ONE_MINUTE_IN_MILLIS) {
-                requestTimestamps.poll();
-            } else {
-                break;
-            }
-        }
-    }
+        requestTimestamps.add(System.currentTimeMillis());
 
-    requestTimestamps.add(currentTime);
-    rateLimiter.acquire();
-    log.debug("Requests in last 60 seconds: {}", requestTimestamps.size());
-}
+        rateLimiter.acquire();
+    }
 
     public void forceRenameUserName(String userId, String newName) {
         checkRateLimit();
@@ -298,10 +288,8 @@ public class FafApiCommunicationService {
     }
 
     public <T extends ElideEntity> List<T> getFirstPageOnlyForFindUsersByAttribute(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder, int pageSize) {
-        // By default, getAll will always make a second request after the first page,
-        // even if all results were already returned.
-        // In practice, no user is expected to have more than 10k HWID attributes,
-        // so this method effectively cuts the number of server requests in half.
+        // If the total number of results is lower than the max page size, no additional requests are made.
+        checkRateLimit();
         routeBuilder.pageSize(pageSize).pageNumber(1);
         return getPage(clazz, routeBuilder, pageSize, 1, Collections.emptyMap());
     }
@@ -313,19 +301,26 @@ public class FafApiCommunicationService {
 
     public <T extends ElideEntity> List<T> getAll(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder, java.util.Map<String, Serializable> params) {
         checkRateLimit();
-        return getMany(clazz, routeBuilder, environmentProperties.getMaxResultSize(), params);
+        return getMany(clazz, routeBuilder, environmentProperties.getDefaultResultSize(), params);
     }
 
     @SneakyThrows
-    public <T extends ElideEntity> List<T> getMany(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder, int count, java.util.Map<String, Serializable> params) {
+    public <T extends ElideEntity> List<T> getMany(
+            Class<T> clazz,
+            ElideNavigatorOnCollection<T> routeBuilder,
+            int count,
+            Map<String, Serializable> params) {
+
         checkRateLimit();
         List<T> result = new LinkedList<>();
-        List<T> current = null;
         int page = 1;
-        while ((current == null || current.size() >= environmentProperties.getMaxPageSize()) && result.size() < count) {
-            current = getPage(clazz, routeBuilder, environmentProperties.getMaxPageSize(), page++, params);
+        List<T> current;
+
+        do {
+            current = getPage(clazz, routeBuilder, environmentProperties.getDefaultResultSize(), page++, params);
             result.addAll(current);
-        }
+        } while (!current.isEmpty() && result.size() < count);
+
         return result;
     }
 
@@ -365,5 +360,14 @@ public class FafApiCommunicationService {
         long currentTime = System.currentTimeMillis();
         requestTimestamps.removeIf(timestamp -> currentTime - timestamp > ONE_MINUTE_IN_MILLIS);
         return requestTimestamps.size();
+    }
+
+    public static double getRequestsPerSecondRolling(int windowInSeconds) {
+        long currentTime = System.currentTimeMillis();
+        long windowMillis = windowInSeconds * 1000L;
+        long count = requestTimestamps.stream()
+                .filter(timestamp -> currentTime - timestamp <= windowMillis)
+                .count();
+        return count / (double) windowInSeconds;
     }
 }
