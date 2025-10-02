@@ -24,9 +24,6 @@ import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
 
-import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -38,9 +35,6 @@ import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
-
 
 @Component
 @Scope(BeanDefinition.SCOPE_PROTOTYPE)
@@ -72,7 +66,6 @@ public class BanInfoController implements Controller<Pane> {
     public VBox revokeOptions;
     public TextField reportIdTextField;
     public ToggleGroup banDuration;
-    public Button templateButtonPermanentBan;
 
     @Getter
     private BanInfoFX banInfo;
@@ -144,9 +137,9 @@ public class BanInfoController implements Controller<Pane> {
             } else {
                 revocationTimeTextField.setText(OffsetDateTime.now().atZoneSameInstant(ZoneOffset.UTC).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
             }
-            // chat ban is not working since ages
+            // chat ban is not supported
             //chatOnlyBanRadioButton.setSelected(banInfo.getLevel() == BanLevel.CHAT);
-            //vaultBanRadioButton.setSelected(banInfo.getLevel() == BanLevel.VAULT);
+            vaultBanRadioButton.setSelected(banInfo.getLevel() == BanLevel.VAULT);
             globalBanRadioButton.setSelected(banInfo.getLevel() == BanLevel.GLOBAL);
             ModerationReportFX moderationReportFx = banInfo.getModerationReport();
             if (moderationReportFx != null) {
@@ -265,7 +258,7 @@ public class BanInfoController implements Controller<Pane> {
             }
         }
 
-        if (validationErrors.size() > 0) {
+        if (!validationErrors.isEmpty()) {
             ViewHelper.errorDialog("Validation failed",
                     String.join("\n", validationErrors)
             );
@@ -329,7 +322,7 @@ public class BanInfoController implements Controller<Pane> {
     }
 
     public void onDurationTextChange() {
-        if (untilTextField.getText().length() == 0) {
+        if (untilTextField.getText().isEmpty()) {
             untilDateTimeValidateLabel.setText("");
             return;
         }
