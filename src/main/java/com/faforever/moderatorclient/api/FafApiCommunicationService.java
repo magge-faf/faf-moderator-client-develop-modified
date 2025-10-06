@@ -54,7 +54,7 @@ public class FafApiCommunicationService {
     private static final Deque<Long> requestTimestamps = new LinkedList<>();
     private static final long ONE_MINUTE_IN_MILLIS = 60 * 1000;
     private final RateLimiter rateLimiter = RateLimiter.create(250.0 / 60.0);
-    private static final int MAX_REQUESTS = 250;
+    private static final int MAX_REQUESTS = 90;
     private final ResourceConverter defaultResourceConverter;
     private final ResourceConverter updateResourceConverter;
     private final OAuthTokenInterceptor oAuthTokenInterceptor;

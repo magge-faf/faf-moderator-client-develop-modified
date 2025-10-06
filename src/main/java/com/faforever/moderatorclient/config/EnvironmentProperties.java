@@ -2,8 +2,10 @@ package com.faforever.moderatorclient.config;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
+import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
 
+@Component
 @Validated
 @Data
 public class EnvironmentProperties {
@@ -23,6 +25,6 @@ public class EnvironmentProperties {
     @NotBlank
     private String userBaseUrl;
 
-    private int maxPageSize = 10_000; // Server allows 10k max
+    private int maxPageSize = 10_000;
     private int maxResultSize = 10_000_000;
 }

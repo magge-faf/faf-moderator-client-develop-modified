@@ -10,6 +10,7 @@ import com.faforever.commons.replay.body.Event;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.BanService;
 import com.faforever.moderatorclient.api.domain.ModerationReportService;
+import com.faforever.moderatorclient.config.EnvironmentProperties;
 import com.faforever.moderatorclient.config.TemplateAndReasonConfig;
 import com.faforever.moderatorclient.ui.*;
 import com.faforever.moderatorclient.ui.domain.BanInfoFX;
@@ -97,6 +98,8 @@ public class ModerationReportController implements Controller<Region> {
     public SettingsController settingsController;
     @Autowired
     private FafApiCommunicationService fafApiCommunicationService;
+
+    private final EnvironmentProperties environmentProperties;
 
     private final ObjectMapper objectMapper;
     private final ModerationReportService moderationReportService;
@@ -1032,7 +1035,7 @@ public class ModerationReportController implements Controller<Region> {
             isFetchingReport = true;
         }
 
-        int initialPageSize = 100; // Only load the first 100 reports
+        int initialPageSize = 100; // Initial load of the first 100 reports
         activeApiRequests.incrementAndGet();
         loadInitialReports(1, initialPageSize);
     }

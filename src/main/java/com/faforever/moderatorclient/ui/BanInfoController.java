@@ -146,7 +146,7 @@ public class BanInfoController implements Controller<Pane> {
             }
             // chat ban is not working since ages
             //chatOnlyBanRadioButton.setSelected(banInfo.getLevel() == BanLevel.CHAT);
-            //vaultBanRadioButton.setSelected(banInfo.getLevel() == BanLevel.VAULT);
+            vaultBanRadioButton.setSelected(banInfo.getLevel() == BanLevel.VAULT);
             globalBanRadioButton.setSelected(banInfo.getLevel() == BanLevel.GLOBAL);
             ModerationReportFX moderationReportFx = banInfo.getModerationReport();
             if (moderationReportFx != null) {

@@ -10,6 +10,7 @@ import com.faforever.commons.api.elide.ElideNavigator;
 import com.faforever.commons.api.elide.ElideNavigatorOnCollection;
 import com.faforever.commons.api.elide.ElideNavigatorOnId;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
+import com.faforever.moderatorclient.config.EnvironmentProperties;
 import com.faforever.moderatorclient.mapstruct.FeaturedModMapper;
 import com.faforever.moderatorclient.mapstruct.PlayerMapper;
 import com.faforever.moderatorclient.mapstruct.TeamkillMapper;
@@ -34,6 +35,7 @@ public class UserService {
     private final FeaturedModMapper featuredModMapper;
     private final UserNoteMapper userNoteMapper;
     private final TeamkillMapper teamkillMapper;
+    private EnvironmentProperties environmentProperties;
 
     public UserService(FafApiCommunicationService fafApi, PlayerMapper playerMapper, FeaturedModMapper featuredModMapper, UserNoteMapper userNoteMapper, TeamkillMapper teamkillMapper) {
         this.fafApi = fafApi;
@@ -68,9 +70,9 @@ public class UserService {
     public List<PlayerFX> findLatestRegistrations() throws InterruptedException, ExecutionException {
         log.debug("Searching for latest registrations");
         List<Player> allPlayers = new ArrayList<>();
-        int pageSize = 1000; // Max request
-        int totalPages = 4; // To get ~4k users
-        int threads = 4;
+        int pageSize = environmentProperties.getMaxPageSize();
+        int totalPages = 4; // 10*pageSize users
+        int threads = 2;
         ExecutorService executor = Executors.newFixedThreadPool(threads);
         List<Future<List<Player>>> futures = new ArrayList<>();
 
@@ -153,7 +155,7 @@ public class UserService {
         } else {
             navigator.setFilter(ElideNavigator.qBuilder().string("player.id").eq(userId));
         }
-        return fafApi.getPage(GamePlayerStats.class, navigator, 100, page, Collections.emptyMap());
+        return fafApi.getPage(GamePlayerStats.class, navigator, environmentProperties.getMaxPageSize(), page, Collections.emptyMap());
     }
 
     public List<GamePlayerStats> getLastHundredPlayedGames(@NotNull String userId, int page) {
