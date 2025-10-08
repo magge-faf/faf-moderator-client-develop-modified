@@ -27,7 +27,7 @@ public class PlayerFX extends AbstractEntityFX {
     private final StringProperty recentIpAddress;
     private final StringProperty representation;
     private final ObjectProperty<OffsetDateTime> lastLogin;
-    private final ObservableSet<UniqueIdFx> uniqueIds;
+    private final ObservableSet<UniqueIdAssignmentFx> uniqueIdAssignments;
     private final ObservableSet<AccountLinkFx> accountLinks;
     private final ObservableList<NameRecordFX> names;
     private final ObservableList<BanInfoFX> bans;
@@ -46,7 +46,7 @@ public class PlayerFX extends AbstractEntityFX {
         names = FXCollections.observableArrayList();
         bans = FXCollections.observableArrayList();
         avatarAssignments = FXCollections.observableArrayList();
-        uniqueIds = FXCollections.observableSet();
+        uniqueIdAssignments = FXCollections.observableSet();
         accountLinks = FXCollections.observableSet();
     }
 
@@ -119,15 +119,15 @@ public class PlayerFX extends AbstractEntityFX {
         }
     }
 
-    public ObservableSet<UniqueIdFx> getUniqueIds() {
-        return uniqueIds;
+    public ObservableSet<UniqueIdAssignmentFx> getUniqueIdAssignments() {
+        return uniqueIdAssignments;
     }
 
-    public void setUniqueIds(ObservableSet<UniqueIdFx> uniqueIdFxObservableList) {
-        uniqueIds.clear();
+    public void setUniqueIdAssignments(ObservableSet<UniqueIdAssignmentFx> uniqueIdAssignmentsList) {
+        uniqueIdAssignments.clear();
 
-        if (uniqueIdFxObservableList != null) {
-            uniqueIds.addAll(uniqueIdFxObservableList);
+        if (uniqueIdAssignmentsList != null) {
+            uniqueIdAssignments.addAll(uniqueIdAssignmentsList);
         }
     }
 
