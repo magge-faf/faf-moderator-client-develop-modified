@@ -6,18 +6,18 @@ import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.MessagesService;
 import com.faforever.moderatorclient.api.domain.TutorialService;
 import com.faforever.moderatorclient.api.domain.VotingService;
-import com.faforever.moderatorclient.config.PreferencesConfig;
+import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.ui.caches.LargeThumbnailCache;
 import com.faforever.moderatorclient.ui.data_cells.TextAreaTableCell;
 import com.faforever.moderatorclient.ui.data_cells.UrlImageViewTableCell;
 import com.faforever.moderatorclient.ui.domain.*;
+import com.faforever.moderatorclient.ui.main_window.SmurfManagementController;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.faforever.moderatorclient.ui.domain.UniqueIdAssignmentFx;
 
-import javafx.animation.PauseTransition;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.ReadOnlyIntegerWrapper;
 import javafx.beans.property.SimpleIntegerProperty;
@@ -37,6 +37,7 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
+import java.time.Duration;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
 import javafx.util.Callback;
@@ -52,8 +53,9 @@ import org.springframework.stereotype.Component;
 
 import java.io.*;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.text.MessageFormat;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
@@ -73,6 +75,13 @@ public class ViewHelper {
 
     @Autowired
     private static LargeThumbnailCache largeThumbnailCache;
+
+    private static SmurfManagementController smurfManagementController;
+
+    @Autowired
+    public ViewHelper(SmurfManagementController smurfManagementController) {
+        ViewHelper.smurfManagementController = smurfManagementController;
+    }
 
     /**
      * Adds a context menu to a table view for predefined columns (with extractors for the columns)
@@ -96,8 +105,6 @@ public class ViewHelper {
 
                 contextMenu.getItems().add(menuItem);
             }
-
-
         }
 
         tableView.setContextMenu(contextMenu);
@@ -252,38 +259,23 @@ public class ViewHelper {
         applyCopyContextMenus(tableView, extractors);
     }
 
-    public static void initializeColumn(TableColumn column, String preferenceKey, double defaultPrefWidth, PreferencesConfig preferencesConfig) {
-        double savedPrefWidth = preferencesConfig.getPreference("prefColumnWidths", preferenceKey, defaultPrefWidth, Double.class);
-        column.setPrefWidth(savedPrefWidth);
-
-        column.widthProperty().addListener((obs, oldValue, newValue) -> {
-            if (newValue != null) {
-                double newWidth = newValue.doubleValue();
-                preferencesConfig.setPrefColumnWidthPreference(preferenceKey, newWidth);
-            }
-        });
-    }
-
-    public static void buildBanTableView(TableView<BanInfoFX> tableView, ObservableList<BanInfoFX> data, boolean showAffectedPlayerInfo, PreferencesConfig preferencesConfig) {
+    public static void buildBanTableView(TableView<BanInfoFX> tableView, ObservableList<BanInfoFX> data, boolean showAffectedPlayerInfo, LocalPreferences localPreferences) {
         tableView.setItems(data);
         HashMap<TableColumn<BanInfoFX, ?>, Function<BanInfoFX, ?>> extractors = new HashMap<>();
 
         TableColumn<BanInfoFX, String> idColumn = new TableColumn<>("ID");
         idColumn.setCellValueFactory(o -> o.getValue().idProperty());
         idColumn.setComparator(Comparator.comparingInt(Integer::parseInt));
-        initializeColumn(idColumn, "idColumnMinWidth", 50, preferencesConfig);
         tableView.getColumns().add(idColumn);
         extractors.put(idColumn, BanInfoFX::getId);
 
         TableColumn<BanInfoFX, BanLevel> banLevelColumn = new TableColumn<>("Level");
         banLevelColumn.setCellValueFactory(o -> o.getValue().levelProperty());
-        initializeColumn(banLevelColumn, "banLevelColumn", 80, preferencesConfig);
         tableView.getColumns().add(banLevelColumn);
         extractors.put(banLevelColumn, BanInfoFX::getLevel);
 
         TableColumn<BanInfoFX, BanStatus> banStatusColumn = new TableColumn<>("Status");
         banStatusColumn.setCellValueFactory(o -> o.getValue().banStatusProperty());
-        initializeColumn(banStatusColumn, "banStatusColumn", 100, preferencesConfig);
         tableView.getColumns().add(banStatusColumn);
         extractors.put(banStatusColumn, BanInfoFX::getBanStatus);
 
@@ -303,7 +295,6 @@ public class ViewHelper {
                 }
             };
         }, o.getValue().durationProperty()));
-        initializeColumn(banDurationColumn, "banDurationColumn", 100, preferencesConfig);
         tableView.getColumns().add(banDurationColumn);
         extractors.put(banDurationColumn, BanInfoFX::getDuration);
 
@@ -324,26 +315,22 @@ public class ViewHelper {
                 }
             });
 
-            initializeColumn(affectedPlayerColumn, "affectedPlayerColumn", 100, preferencesConfig);
             tableView.getColumns().add(affectedPlayerColumn);
             extractors.put(affectedPlayerColumn, banInfoFX -> banInfoFX.getPlayer().getLogin());
         }
 
         TableColumn<BanInfoFX, OffsetDateTime> expiresAtColumn = new TableColumn<>("Expires at");
         expiresAtColumn.setCellValueFactory(o -> o.getValue().expiresAtProperty());
-        initializeColumn(expiresAtColumn, "expiresAtColumn", 100, preferencesConfig);
         tableView.getColumns().add(expiresAtColumn);
         extractors.put(expiresAtColumn, BanInfoFX::getExpiresAt);
 
         TableColumn<BanInfoFX, String> reasonColumn = new TableColumn<>("Reason");
         reasonColumn.setCellValueFactory(o -> o.getValue().reasonProperty());
-        initializeColumn(reasonColumn, "reasonColumn", 250, preferencesConfig);
         tableView.getColumns().add(reasonColumn);
         extractors.put(reasonColumn, BanInfoFX::getReason);
 
         TableColumn<BanInfoFX, String> authorColumn = new TableColumn<>("Author");
         authorColumn.setCellValueFactory(o -> o.getValue().authorProperty().get().representationProperty());
-        initializeColumn(authorColumn, "authorColumn", 150, preferencesConfig);
         tableView.getColumns().add(authorColumn);
         extractors.put(authorColumn, banInfoFX -> banInfoFX.getAuthor().getLogin());
 
@@ -447,9 +434,8 @@ public class ViewHelper {
      * @param tableView  The tableView to be populated
      * @param data       data to be put in the tableView
      * @param showKiller whether to show the killer
-     * @param onAddBan   if not null shows a ban button which triggers this consumer
      */
-    public static void buildTeamkillTableView(@NotNull TableView<TeamkillFX> tableView, @NotNull ObservableList<TeamkillFX> data, boolean showKiller, @Nullable Consumer<PlayerFX> onAddBan) {
+    public static void buildTeamkillTableView(@NotNull TableView<TeamkillFX> tableView, @NotNull ObservableList<TeamkillFX> data, boolean showKiller) {
         tableView.setItems(data);
         HashMap<TableColumn<TeamkillFX, ?>, Function<TeamkillFX, ?>> extractors = new HashMap<>();
 
@@ -492,30 +478,6 @@ public class ViewHelper {
         reportedAtColumn.setMinWidth(180);
         tableView.getColumns().add(reportedAtColumn);
         extractors.put(reportedAtColumn, TeamkillFX::getReportedAt);
-
-        if (onAddBan != null) {
-            TableColumn<TeamkillFX, TeamkillFX> banOptionColumn = new TableColumn<>("Ban");
-            banOptionColumn.setMinWidth(150);
-            banOptionColumn.setCellValueFactory(param -> new SimpleObjectProperty<>(param.getValue()));
-            banOptionColumn.setCellFactory(param -> new TableCell<TeamkillFX, TeamkillFX>() {
-
-                @Override
-                protected void updateItem(TeamkillFX item, boolean empty) {
-                    super.updateItem(item, empty);
-                    if (!empty) {
-                        PlayerFX teamkiller = item.getTeamkiller();
-                        if (!teamkiller.isBannedGlobally()) {
-                            Button button = new Button("Add ban to killer");
-                            button.setOnMouseClicked(event -> onAddBan.accept(teamkiller));
-                            setGraphic(button);
-                            return;
-                        }
-                    }
-                    setGraphic(null);
-                }
-            });
-            tableView.getColumns().add(banOptionColumn);
-        }
 
         applyCopyContextMenus(tableView, extractors);
     }
@@ -663,11 +625,10 @@ public class ViewHelper {
      * @param onAddBan             If not null, shows a ban button which triggers this consumer
      * @param onForceRename        If not null, shows a force rename button which triggers this consumer
      * @param communicationService Communication service for interactions
-     * @param preferencesConfig    User preferences
      */
     public static void buildUserTableView(PlatformService platformService, TableView<PlayerFX> tableView, ObservableList<PlayerFX> allData,
                                           Consumer<PlayerFX> onAddBan, Consumer<PlayerFX> onForceRename, boolean showUidData,
-                                          FafApiCommunicationService communicationService, PreferencesConfig preferencesConfig) {
+                                          FafApiCommunicationService communicationService) {
         if ("buildModerationReportTableView".equals(tableView.getId())) {
             addScrollListener(tableView, allData);
             tableView.setItems(FXCollections.observableArrayList());
@@ -763,19 +724,19 @@ public class ViewHelper {
         {
             {
                 if (showUidData) {
-                        TableColumn<PlayerFX, String> uidCreatedAt = new TableColumn<>("UID created");
-                        uidCreatedAt.setCellValueFactory(o -> Bindings.createStringBinding(() ->
-                                        o.getValue().getUniqueIdAssignments().stream()
-                                                .map(UniqueIdAssignmentFx::getCreateTime)
-                                                .map(DateTimeFormatter.ISO_LOCAL_DATE_TIME::format)
-                                                .collect(Collectors.joining("\n")),
-                                o.getValue().getUniqueIdAssignments()));
-                        uidCreatedAt.setMinWidth(200);
-                        tableView.getColumns().add(uidCreatedAt);
-                        extractors.put(uidCreatedAt, playerFX -> playerFX.getUniqueIdAssignments().stream()
-                                .map(UniqueIdAssignmentFx::getCreateTime)
-                                .map(DateTimeFormatter.ISO_LOCAL_DATE_TIME::format)
-                                .collect(Collectors.toList()));
+                    TableColumn<PlayerFX, String> uidCreatedAt = new TableColumn<>("UID created");
+                    uidCreatedAt.setCellValueFactory(o -> Bindings.createStringBinding(() ->
+                                    o.getValue().getUniqueIdAssignments().stream()
+                                            .map(UniqueIdAssignmentFx::getCreateTime)
+                                            .map(DateTimeFormatter.ISO_LOCAL_DATE_TIME::format)
+                                            .collect(Collectors.joining("\n")),
+                            o.getValue().getUniqueIdAssignments()));
+                    uidCreatedAt.setMinWidth(40);
+                    tableView.getColumns().add(uidCreatedAt);
+                    extractors.put(uidCreatedAt, playerFX -> playerFX.getUniqueIdAssignments().stream()
+                            .map(UniqueIdAssignmentFx::getCreateTime)
+                            .map(DateTimeFormatter.ISO_LOCAL_DATE_TIME::format)
+                            .collect(Collectors.toList()));
 
                     TableColumn<PlayerFX, String> uidLastUsedAt = new TableColumn<>("UID last used");
                     uidLastUsedAt.setCellValueFactory(o -> Bindings.createStringBinding(() ->
@@ -784,7 +745,7 @@ public class ViewHelper {
                                             .map(DateTimeFormatter.ISO_LOCAL_DATE_TIME::format)
                                             .collect(Collectors.joining("\n")),
                             o.getValue().getUniqueIdAssignments()));
-                    uidLastUsedAt.setMinWidth(200);
+                    uidLastUsedAt.setMinWidth(40);
                     tableView.getColumns().add(uidLastUsedAt);
                     extractors.put(uidLastUsedAt, playerFX -> playerFX.getUniqueIdAssignments().stream()
                             .map(UniqueIdAssignmentFx::getUpdateTime)
@@ -804,7 +765,7 @@ public class ViewHelper {
                                                     .max(Comparator.comparingInt(String::length))
                                                     .orElse("")),
                             tableView.getItems()));
-
+                    accountLinkColumn.setMinWidth(40);
                     tableView.getColumns().add(accountLinkColumn);
                     extractors.put(accountLinkColumn, playerFX -> playerFX.getAccountLinks().stream().map(AccountLinkFx::getServiceId).collect(Collectors.toList()));
 
@@ -812,7 +773,7 @@ public class ViewHelper {
                     ipColumn.setCellValueFactory(o -> o.getValue().recentIpAddressProperty());
                     ipColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
                             calculateMaxTextWidthPlayerFX(tableView.getItems(), PlayerFX::getRecentIpAddress), tableView.getItems()));
-
+                    ipColumn.setMinWidth(40);
                     tableView.getColumns().add(ipColumn);
                     extractors.put(ipColumn, PlayerFX::getRecentIpAddress);
 
@@ -821,7 +782,7 @@ public class ViewHelper {
 
                     userAgentColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
                             calculateMaxTextWidthPlayerFX(tableView.getItems(), PlayerFX::getUserAgent), tableView.getItems()));
-
+                    userAgentColumn.setMinWidth(40);
                     tableView.getColumns().add(userAgentColumn);
                     extractors.put(userAgentColumn, PlayerFX::getUserAgent);
 
@@ -833,7 +794,7 @@ public class ViewHelper {
                                             .map(UniqueIdFx::getHash)
                                             .collect(Collectors.joining("\n")),
                             o.getValue().getUniqueIdAssignments()));
-                    hashColumn.setMinWidth(200);
+                    hashColumn.setMinWidth(40);
                     tableView.getColumns().add(hashColumn);
                     extractors.put(hashColumn, playerFX -> playerFX.getUniqueIdAssignments().stream()
                             .map(UniqueIdAssignmentFx::getUniqueId)
@@ -846,7 +807,7 @@ public class ViewHelper {
                                             .map(UniqueIdFx::getUuid)
                                             .collect(Collectors.joining("\n")),
                             o.getValue().getUniqueIdAssignments()));
-                    uuidColumn.setMinWidth(200);
+                    uuidColumn.setMinWidth(40);
                     tableView.getColumns().add(uuidColumn);
                     extractors.put(uuidColumn, playerFX -> playerFX.getUniqueIdAssignments().stream()
                             .map(UniqueIdAssignmentFx::getUniqueId)
@@ -859,7 +820,7 @@ public class ViewHelper {
                                             .map(UniqueIdFx::getMemorySerialNumber)
                                             .collect(Collectors.joining("\n")),
                             o.getValue().getUniqueIdAssignments()));
-                    memorySerialColumn.setMinWidth(200);
+                    memorySerialColumn.setMinWidth(40);
                     tableView.getColumns().add(memorySerialColumn);
                     extractors.put(memorySerialColumn, playerFX -> playerFX.getUniqueIdAssignments().stream()
                             .map(UniqueIdAssignmentFx::getUniqueId)
@@ -872,7 +833,7 @@ public class ViewHelper {
                                             .map(UniqueIdFx::getDeviceId)
                                             .collect(Collectors.joining("\n")),
                             o.getValue().getUniqueIdAssignments()));
-                    deviceIdColumn.setMinWidth(200);
+                    deviceIdColumn.setMinWidth(40);
                     tableView.getColumns().add(deviceIdColumn);
                     extractors.put(deviceIdColumn, playerFX -> playerFX.getUniqueIdAssignments().stream()
                             .map(UniqueIdAssignmentFx::getUniqueId)
@@ -885,7 +846,7 @@ public class ViewHelper {
                                             .map(UniqueIdFx::getManufacturer)
                                             .collect(Collectors.joining("\n")),
                             o.getValue().getUniqueIdAssignments()));
-                    manufacturerColumn.setMinWidth(200);
+                    manufacturerColumn.setMinWidth(40);
                     tableView.getColumns().add(manufacturerColumn);
                     extractors.put(manufacturerColumn, playerFX -> playerFX.getUniqueIdAssignments().stream()
                             .map(UniqueIdAssignmentFx::getUniqueId)
@@ -898,7 +859,7 @@ public class ViewHelper {
                                             .map(UniqueIdFx::getName)
                                             .collect(Collectors.joining("\n")),
                             o.getValue().getUniqueIdAssignments()));
-                    cpuNameColumn.setMinWidth(200);
+                    cpuNameColumn.setMinWidth(40);
                     tableView.getColumns().add(cpuNameColumn);
                     extractors.put(cpuNameColumn, playerFX -> playerFX.getUniqueIdAssignments().stream()
                             .map(UniqueIdAssignmentFx::getUniqueId)
@@ -911,7 +872,7 @@ public class ViewHelper {
                                             .map(UniqueIdFx::getProcessorId)
                                             .collect(Collectors.joining("\n")),
                             o.getValue().getUniqueIdAssignments()));
-                    processorIdColumn.setMinWidth(200);
+                    processorIdColumn.setMinWidth(40);
                     tableView.getColumns().add(processorIdColumn);
                     extractors.put(processorIdColumn, playerFX -> playerFX.getUniqueIdAssignments().stream()
                             .map(UniqueIdAssignmentFx::getUniqueId)
@@ -937,7 +898,7 @@ public class ViewHelper {
                                             .map(UniqueIdFx::getVolumeSerialNumber)
                                             .collect(Collectors.joining("\n")),
                             o.getValue().getUniqueIdAssignments()));
-                    volumeSerialNumber.setMinWidth(200);
+                    volumeSerialNumber.setMinWidth(40);
                     tableView.getColumns().add(volumeSerialNumber);
                     extractors.put(volumeSerialNumber, playerFX -> playerFX.getUniqueIdAssignments().stream()
                             .map(UniqueIdAssignmentFx::getUniqueId)
@@ -982,45 +943,10 @@ public class ViewHelper {
             );
         });
 
-        MenuItem menuItemAddToBanPermanentList = new MenuItem("Add to blacklist");
-
-        menuItemAddToBanPermanentList.disableProperty().bind(Bindings.createBooleanBinding(() -> {
-            PlayerFX selectedPlayer = tableView.getSelectionModel().getSelectedItem();
-            return selectedPlayer == null || selectedPlayer.getAccountLinks() == null;
-        }, tableView.getSelectionModel().selectedItemProperty()));
-
-        menuItemAddToBanPermanentList.setOnAction(action -> {
-            PlayerFX playerFX = tableView.getSelectionModel().getSelectedItem();
-            log.debug("[Add to blacklist] Adding: " + playerFX.getRepresentation());
-
-            writeToFile(CONFIGURATION_FOLDER + File.separator + "BlacklistedIP.txt", playerFX.getRecentIpAddress());
-
-            List<String> ListHash = playerFX.getUniqueIds().stream().map(UniqueIdFx::getHash).toList();
-
-            for (String element : ListHash) {
-                log.debug("checking for hash " + element);
-                writeToFile(CONFIGURATION_FOLDER + File.separator + "BlacklistedHash.txt", element);
-            }
-
-            List<String> ListUUID = playerFX.getUniqueIds().stream().map(UniqueIdFx::getUuid).toList();
-
-            for (String element : ListUUID) {
-                log.debug("checking for UUID " + element);
-                writeToFile(CONFIGURATION_FOLDER + File.separator + "BlacklistedUUID.txt", element);
-            }
-
-            List<String> ListMemorySN = playerFX.getUniqueIds().stream().map(UniqueIdFx::getMemorySerialNumber).toList();
-
-            for (String element : ListMemorySN) {
-                log.debug("checking for Memory S/N " + element);
-                writeToFile(CONFIGURATION_FOLDER + File.separator + "BlacklistedMemorySN.txt", element);
-            }
-
-            List<String> VolumeSerialNumber = playerFX.getUniqueIds().stream().map(UniqueIdFx::getVolumeSerialNumber).toList();
-
-            for (String element : VolumeSerialNumber) {
-                log.debug("checking for Volume S/N " + element);
-                writeToFile(CONFIGURATION_FOLDER + File.separator + "BlacklistedVolumeSN.txt", element);
+        MenuItem menuItemAddToSmurfManagement = new MenuItem("Add to Smurf Management");
+        menuItemAddToSmurfManagement.setOnAction(action -> {
+            for (PlayerFX playerFX : tableView.getSelectionModel().getSelectedItems()) {
+                saveUserToJsonFile(playerFX, SmurfManagementController.SMURF_MANAGEMENT_USERS_JSON_PATH, "Manually added via right-click");
             }
         });
 
@@ -1046,8 +972,416 @@ public class ViewHelper {
             });
             contextMenu.getItems().add(forceRenameMenuItem);
             contextMenu.getItems().add(gogLookupMenuItem);
-            contextMenu.getItems().add(menuItemAddToBanPermanentList);
         }
+
+        contextMenu.getItems().add(menuItemAddToSmurfManagement);
+    }
+
+    static ObjectMapper objectMapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS) // Ensures ISO-8601 format
+            .enable(SerializationFeature.INDENT_OUTPUT); // Pretty-print JSON
+
+    private static List<UserDataController> readUsersFromJsonFile(Path jsonFilePath) {
+        if (!Files.exists(jsonFilePath)) {
+            try {
+                Files.createDirectories(jsonFilePath.getParent());
+                Files.createFile(jsonFilePath.toAbsolutePath());
+                objectMapper.writeValue(jsonFilePath.toFile(), new ArrayList<>());
+            } catch (IOException e) {
+                log.error("Error creating JSON file: {}", jsonFilePath, e);
+            }
+        }
+
+        try {
+            if (Files.size(jsonFilePath) == 0) {
+                log.warn("The JSON file is empty: {}", jsonFilePath);
+                return new ArrayList<>();
+            }
+
+            return objectMapper.readValue(jsonFilePath.toFile(), new TypeReference<List<UserDataController>>() {});
+        } catch (IOException e) {
+            log.error("Error reading JSON file: {}", jsonFilePath, e);
+        }
+        return new ArrayList<>();
+    }
+
+    public static UserDataController buildUserDataFromPlayer(PlayerFX playerFX, String sourceEvent) {
+        Instant now = Instant.now();
+        String timestamp = now.toString();
+
+        UserDataController user = new UserDataController();
+
+        // --- User Info ---
+        UserDataController.UserInfo userInfo = new UserDataController.UserInfo();
+        userInfo.setUserId(playerFX.getId());
+        userInfo.setUserName(playerFX.getLogin());
+        userInfo.setAddedOn(timestamp);
+        userInfo.setLastEdit("Never");
+
+        // Email
+        List<UserDataController.EmailEntry> emailList = new ArrayList<>();
+        if (playerFX.getEmail() != null) {
+            UserDataController.EmailEntry email = new UserDataController.EmailEntry();
+            email.setEmail(playerFX.getEmail());
+            email.setAddedOn(timestamp);
+            emailList.add(email);
+        }
+        userInfo.setEmail(emailList);
+
+        // User agent
+        List<UserDataController.UserAgentEntry> userAgentList = new ArrayList<>();
+        if (playerFX.getUserAgent() != null) {
+            UserDataController.UserAgentEntry ua = new UserDataController.UserAgentEntry();
+            ua.setUserAgent(playerFX.getUserAgent());
+            ua.setAddedOn(timestamp);
+            userAgentList.add(ua);
+        }
+        userInfo.setUserAgent(userAgentList);
+
+        // Bans
+        List<UserDataController.BanInfo> banList = new ArrayList<>();
+        for (BanInfoFX item : playerFX.getBans()) {
+            UserDataController.BanInfo ban = new UserDataController.BanInfo();
+            ban.setBanId(item.getId());
+            ban.setBanStatus(SafeAccess.getOrNull(item.getBanStatus(), Object::toString));
+            ban.setBanExpiresAt(SafeAccess.getOrNull(item.getExpiresAt(), Object::toString));
+            ban.setBanDuration(SafeAccess.getOrNull(item.getDuration(), Object::toString));
+            ban.setBanCreatedAt(SafeAccess.getOrNull(item.getCreateTime(), Object::toString));
+            ban.setBanReason(item.getReason());
+            ban.setBanAuthor(SafeAccess.getOrNull(item.getAuthor().getRepresentation(), Object::toString));
+            ban.setBanRevocationReason(item.getRevokeReason());
+            ban.setBanRevocationAuthor(SafeAccess.getOrNull(item.getRevokeAuthor(), PlayerFX::getRepresentation));
+            ban.setBanRevocationAt(SafeAccess.getOrNull(item.getRevokeTime(), Object::toString));
+            banList.add(ban);
+        }
+        userInfo.setBans(banList);
+
+        // --- Account history ---
+        UserDataController.AccountHistory accountHistory = new UserDataController.AccountHistory();
+        accountHistory.setPreviousNames(playerFX.getNames().stream()
+                .map(NameRecordFX::getName)
+                .toList());
+
+        // History
+        List<UserDataController.HistoryEntry> historyList = new ArrayList<>();
+        UserDataController.HistoryEntry historyEntry = new UserDataController.HistoryEntry();
+        historyEntry.setAction("User Added");
+        historyEntry.setTimestamp(timestamp);
+        historyEntry.setDescription(sourceEvent);
+        historyList.add(historyEntry);
+        accountHistory.setHistory(historyList);
+
+        // Logins
+        List<UserDataController.LoginEntry> loginList = new ArrayList<>();
+        UserDataController.LoginEntry login = new UserDataController.LoginEntry();
+        login.setIp(playerFX.getRecentIpAddress());
+        login.setAddedOn(String.valueOf(playerFX.getLastLogin()));
+        loginList.add(login);
+        accountHistory.setLastLogins(loginList);
+
+        user.setAccountHistory(accountHistory);
+
+        // --- Hardware info ---
+        UserDataController.HardwareInfo hardware = new UserDataController.HardwareInfo();
+
+        // IP
+        List<UserDataController.IpAddressEntry> ipList = new ArrayList<>();
+        if (playerFX.getRecentIpAddress() != null) {
+            UserDataController.IpAddressEntry ip = new UserDataController.IpAddressEntry();
+            ip.setIp(playerFX.getRecentIpAddress());
+            ip.setAddedOn(timestamp);
+            ipList.add(ip);
+        }
+        hardware.setIpAddresses(ipList);
+
+        // Unique IDs
+        List<UserDataController.UuidEntry> uuidList = new ArrayList<>();
+        List<UserDataController.DeviceIdEntry> deviceIdList = new ArrayList<>();
+        List<UserDataController.SerialNumberEntry> serialList = new ArrayList<>();
+        List<UserDataController.ProcessorIdEntry> processorList = new ArrayList<>();
+        List<UserDataController.CpuNameEntry> cpuList = new ArrayList<>();
+        List<UserDataController.BiosVersionEntry> biosList = new ArrayList<>();
+        List<UserDataController.ManufacturerEntry> manufacturerList = new ArrayList<>();
+        List<UserDataController.HashEntry> hashList = new ArrayList<>();
+        List<UserDataController.MemorySerialNumberEntry> memoryList = new ArrayList<>();
+        List<UserDataController.VolumeSerialNumberEntry> volumeList = new ArrayList<>();
+
+        for (UniqueIdAssignmentFx item : playerFX.getUniqueIdAssignments()) {
+            if (item.getUniqueId().getUuid() != null && !item.getUniqueId().getUuid().isEmpty()) {
+                UserDataController.UuidEntry e = new UserDataController.UuidEntry();
+                e.setUuid(item.getUniqueId().getUuid());
+                e.setAddedOn(timestamp);
+                uuidList.add(e);
+            }
+            if (item.getUniqueId().getDeviceId() != null && !item.getUniqueId().getDeviceId().isEmpty()) {
+                UserDataController.DeviceIdEntry e = new UserDataController.DeviceIdEntry();
+                e.setDeviceId(item.getUniqueId().getDeviceId());
+                e.setAddedOn(timestamp);
+                deviceIdList.add(e);
+            }
+            if (item.getUniqueId().getSerialNumber() != null && !item.getUniqueId().getSerialNumber().isEmpty()) {
+                UserDataController.SerialNumberEntry e = new UserDataController.SerialNumberEntry();
+                e.setSerialNumber(item.getUniqueId().getSerialNumber());
+                e.setAddedOn(timestamp);
+                serialList.add(e);
+            }
+            if (item.getUniqueId().getProcessorId() != null && !item.getUniqueId().getProcessorId().isEmpty()) {
+                UserDataController.ProcessorIdEntry e = new UserDataController.ProcessorIdEntry();
+                e.setProcessorId(item.getUniqueId().getProcessorId());
+                e.setAddedOn(timestamp);
+                processorList.add(e);
+            }
+            if (item.getUniqueId().getName() != null && !item.getUniqueId().getName().isEmpty()) {
+                UserDataController.CpuNameEntry e = new UserDataController.CpuNameEntry();
+                e.setCpuName(item.getUniqueId().getName());
+                e.setAddedOn(timestamp);
+                cpuList.add(e);
+            }
+            if (item.getUniqueId().getSMBIOSBIOSVersion() != null && !item.getUniqueId().getSMBIOSBIOSVersion().isEmpty()) {
+                UserDataController.BiosVersionEntry e = new UserDataController.BiosVersionEntry();
+                e.setBiosVersion(item.getUniqueId().getSMBIOSBIOSVersion());
+                e.setAddedOn(timestamp);
+                biosList.add(e);
+            }
+            if (item.getUniqueId().getManufacturer() != null && !item.getUniqueId().getManufacturer().isEmpty()) {
+                UserDataController.ManufacturerEntry e = new UserDataController.ManufacturerEntry();
+                e.setManufacturer(item.getUniqueId().getManufacturer());
+                e.setAddedOn(timestamp);
+                manufacturerList.add(e);
+            }
+            if (item.getUniqueId().getHash() != null && !item.getUniqueId().getHash().isEmpty()) {
+                UserDataController.HashEntry e = new UserDataController.HashEntry();
+                e.setHash(item.getUniqueId().getHash());
+                e.setAddedOn(timestamp);
+                hashList.add(e);
+            }
+            if (item.getUniqueId().getMemorySerialNumber() != null && !item.getUniqueId().getMemorySerialNumber().isEmpty()) {
+                UserDataController.MemorySerialNumberEntry e = new UserDataController.MemorySerialNumberEntry();
+                e.setMemorySerialNumber(item.getUniqueId().getMemorySerialNumber());
+                e.setAddedOn(timestamp);
+                memoryList.add(e);
+            }
+            if (item.getUniqueId().getVolumeSerialNumber() != null && !item.getUniqueId().getVolumeSerialNumber().isEmpty()) {
+                UserDataController.VolumeSerialNumberEntry e = new UserDataController.VolumeSerialNumberEntry();
+                e.setVolumeSerialNumber(item.getUniqueId().getVolumeSerialNumber());
+                e.setAddedOn(timestamp);
+                volumeList.add(e);
+            }
+        }
+
+        hardware.setUuidEntries(uuidList);
+        hardware.setDeviceIdEntries(deviceIdList);
+        hardware.setSerialNumberEntries(serialList);
+        hardware.setProcessorIdEntries(processorList);
+        hardware.setCpuNameEntries(cpuList);
+        hardware.setBiosVersionEntries(biosList);
+        hardware.setManufacturerEntries(manufacturerList);
+        hardware.setHashEntries(hashList);
+        hardware.setMemorySerialNumberEntries(memoryList);
+        hardware.setVolumeSerialNumberEntries(volumeList);
+
+        user.setHardwareInfo(hardware);
+
+        // --- Linked accounts ---
+        for (AccountLinkFx item : playerFX.getAccountLinks()) {
+            if (item.getServiceType() != null && item.getServiceId() != null && !item.getServiceId().isEmpty()) {
+                userInfo.setLinkedAccount(item.getServiceType() + ":" + item.getServiceId());
+            }
+        }
+
+        user.setUserInfo(userInfo);
+        return user;
+    }
+
+    /**
+     * Adds a value to a list only if an entry with the same key does not already exist.
+     *
+     * @param list         the list to add the value to
+     * @param value        the value to add
+     * @param keyExtractor a function that extracts the property used to determine uniqueness
+     * @param <T>          the type of elements in the list
+     * @param <K>          the type of the key used for uniqueness comparison
+     * @return true if the value was added, false if it was already present
+     */
+    private static <T, K> boolean appendIfMissing(List<T> list, T value, Function<T, K> keyExtractor) {
+        if (value == null) return false;
+
+        // Extract the key from the value to compare against existing entries
+        K key = keyExtractor.apply(value);
+
+        boolean exists = list.stream().anyMatch(e -> Objects.equals(keyExtractor.apply(e), key));
+
+        if (!exists) {
+            list.add(value);
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Saves or updates a user's data in a JSON file.
+     *
+     * @param playerFX    The PlayerFX object containing the player data to be saved or updated.
+     * @param pathJson    The path to the JSON file where user data is stored.
+     * @param sourceEvent The event or action that triggered saving or updating the user.
+     */
+    public static void saveUserToJsonFile(PlayerFX playerFX, Path pathJson, String sourceEvent) {
+        ObjectMapper objectMapper = new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .enable(SerializationFeature.INDENT_OUTPUT);
+
+        try {
+            // Read existing users
+            List<UserDataController> jsonUsers = readUsersFromJsonFile(pathJson);
+            if (jsonUsers == null) {
+                jsonUsers = new ArrayList<>();
+            }
+
+            Optional<UserDataController> existingUserOpt = jsonUsers.stream()
+                    .filter(u -> u.getUserInfo().getUserId().equals(playerFX.getId()))
+                    .findFirst();
+
+            String timestamp = Instant.now().toString();
+            boolean updated = false;
+
+            if (existingUserOpt.isPresent()) {
+                UserDataController existingUser = existingUserOpt.get();
+
+                // --- Update IPs ---
+                String ip = playerFX.getRecentIpAddress();
+                if (ip != null && !ip.isEmpty()) {
+                    boolean exists = existingUser.getHardwareInfo().getIpAddresses().stream()
+                            .anyMatch(e -> e.getIp().equals(ip));
+                    if (!exists) {
+                        UserDataController.IpAddressEntry ipEntry = new UserDataController.IpAddressEntry();
+                        ipEntry.setIp(ip);
+                        ipEntry.setAddedOn(timestamp);
+                        existingUser.getHardwareInfo().getIpAddresses().add(ipEntry);
+
+                        existingUser.getAccountHistory().getHistory().add(
+                                new UserDataController.HistoryEntry()
+                                        .setAction("New IP detected")
+                                        .setDescription(ip)
+                                        .setTimestamp(timestamp)
+                        );
+                        updated = true;
+                    }
+                }
+
+                // --- Update emails ---
+                String email = playerFX.getEmail();
+                if (email != null && !email.isEmpty()) {
+                    boolean exists = existingUser.getUserInfo().getEmail().stream()
+                            .anyMatch(e -> e.getEmail().equals(email));
+                    if (!exists) {
+                        UserDataController.EmailEntry emailEntry = new UserDataController.EmailEntry();
+                        emailEntry.setEmail(email);
+                        emailEntry.setAddedOn(timestamp);
+                        existingUser.getUserInfo().getEmail().add(emailEntry);
+
+                        existingUser.getAccountHistory().getHistory().add(
+                                new UserDataController.HistoryEntry()
+                                        .setAction("New Email detected")
+                                        .setDescription(email)
+                                        .setTimestamp(timestamp)
+                        );
+                        updated = true;
+                    }
+                }
+
+                // --- Update hardware UUIDs ---
+                if (playerFX.getUniqueIdAssignments() != null) {
+                    for (UniqueIdAssignmentFx item : playerFX.getUniqueIdAssignments()) {
+                        String uuid = item.getUniqueId().getUuid();
+                        boolean exists = existingUser.getHardwareInfo().getUuidEntries().stream()
+                                .anyMatch(e -> e.getUuid().equals(uuid));
+                        if (!exists) {
+                            UserDataController.UuidEntry uuidEntry = new UserDataController.UuidEntry();
+                            uuidEntry.setUuid(uuid);
+                            uuidEntry.setAddedOn(timestamp);
+                            existingUser.getHardwareInfo().getUuidEntries().add(uuidEntry);
+
+                            existingUser.getAccountHistory().getHistory().add(
+                                    new UserDataController.HistoryEntry()
+                                            .setAction("New UUID detected")
+                                            .setDescription(uuid)
+                                            .setTimestamp(timestamp)
+                            );
+                            updated = true;
+                        }
+                    }
+                }
+
+                // --- Update last login only if IP changed ---
+                List<UserDataController.LoginEntry> lastLogins = existingUser.getAccountHistory().getLastLogins();
+                if (lastLogins == null) {
+                    lastLogins = new ArrayList<>();
+                    existingUser.getAccountHistory().setLastLogins(lastLogins);
+                }
+
+                String lastLoginIp = lastLogins.isEmpty() ? null : lastLogins.get(lastLogins.size() - 1).getIp();
+                String lastLoginTime = String.valueOf(playerFX.getLastLogin());
+
+                if (!Objects.equals(lastLoginIp, ip)) {
+                    UserDataController.LoginEntry loginEntry = new UserDataController.LoginEntry();
+                    loginEntry.setIp(ip);
+                    loginEntry.setAddedOn(lastLoginTime);
+                    lastLogins.add(loginEntry);
+                }
+
+                // --- Update lastEdit timestamp only if new items were added ---
+                if (updated) {
+                    existingUser.getUserInfo().setLastEdit(timestamp);
+                }
+
+                log.debug("Updated existing userID {}", existingUser.getUserInfo().getUserId());
+
+            } else {
+                // New user
+                UserDataController newUser = buildUserDataFromPlayer(playerFX, sourceEvent);
+                jsonUsers.add(newUser);
+            }
+
+            objectMapper.writeValue(pathJson.toFile(), jsonUsers);
+
+            // Reload JSON and refresh table
+            smurfManagementController.loadSmurfManagementUsers();
+            smurfManagementController.createSmurfManagementTable();
+
+        } catch (IOException e) {
+            log.error(e.getMessage(), e);
+        }
+    }
+
+    // Utility class for safe property access on potentially null objects.
+    public static class SafeAccess {
+        /**
+         * @param obj The object to access.
+         * @param mapper A lambda expression to extract a nested property.
+         * @param <T> Type of the input object.
+         * @param <R> Type of the result.
+         * @return The result of mapper.apply(obj), or null if obj is null or if a NullPointerException occurs.
+         */
+        public static <T, R> R getOrNull(T obj, Function<T, R> mapper) {
+            try {
+                return (obj != null) ? mapper.apply(obj) : null;
+            } catch (NullPointerException e) {
+                return null;
+            }
+        }
+    }
+
+    private static @NotNull List<java.util.Map<String, Object>> getList(PlayerFX playerFX, String currentTimestampFormatted) {
+        java.util.Map<String, Object> lastLoginEntry = new HashMap<>();
+        Instant lastLoginInstant = playerFX.getLastLogin().toInstant();
+        String lastLoginFormatted = lastLoginInstant.toString();
+        lastLoginEntry.put("lastLogin", lastLoginFormatted);
+        lastLoginEntry.put("timestampInserted", currentTimestampFormatted);
+        List<java.util.Map<String, Object>> loginList = new ArrayList<>();
+        loginList.add(lastLoginEntry);
+        return loginList;
     }
 
     public static void buildUserAvatarsTableView(TableView<AvatarAssignmentFX> tableView, ObservableList<AvatarAssignmentFX> data) {
@@ -1153,13 +1487,13 @@ public class ViewHelper {
         idColumn.setCellValueFactory(param -> new SimpleObjectProperty<>(param.getValue()));
         idColumn.setCellFactory(tableColumn -> ViewHelper.playerFXCellFactory(tableColumn, PlayerFX::getId));
         idColumn.setComparator(Comparator.comparingInt(o -> Integer.parseInt(o.getId())));
-        idColumn.setMinWidth(70);
+        idColumn.setMinWidth(40);
         tableView.getColumns().add(idColumn);
         extractors.put(idColumn, PlayerFX::getId);
 
         TableColumn<PlayerFX, String> nameColumn = new TableColumn<>("Name");
         nameColumn.setCellValueFactory(o -> o.getValue().loginProperty());
-        nameColumn.setMinWidth(150);
+        nameColumn.setMinWidth(40);
         tableView.getColumns().add(nameColumn);
         extractors.put(nameColumn, PlayerFX::getLogin);
 
@@ -2174,7 +2508,7 @@ public class ViewHelper {
         applyCopyContextMenus(tableView, extractors);
     }
 
-    private static String getShortenedStatus(ModerationReportStatus status) {
+    private static String Long2ShortenedStatusDescription(ModerationReportStatus status) {
         return switch (status) {
             case AWAITING -> "A";
             case PROCESSING -> "P";
@@ -2184,7 +2518,6 @@ public class ViewHelper {
     }
 
     public static void buildModerationReportTableView(
-            PreferencesConfig preferencesConfig,
             TableView<ModerationReportFX> tableView,
             ObservableList<ModerationReportFX> items,
             Consumer<ModerationReportFX> onChatLog
@@ -2202,50 +2535,41 @@ public class ViewHelper {
         tableView.getColumns().add(idColumn);
         tableView.getSortOrder().add(idColumn);
         idColumn.setSortType(TableColumn.SortType.DESCENDING);
-        initializeColumn(idColumn, "idColumn", 50, preferencesConfig);
         idColumn.setId("idColumn");
-
         tableView.sort();
 
         TableColumn<ModerationReportFX, ModerationReportStatus> statusColumn = new TableColumn<>("Status");
         statusColumn.setCellValueFactory(param -> param.getValue().reportStatusProperty());
         tableView.getColumns().add(statusColumn);
-        initializeColumn(statusColumn, "statusColumn", 50, preferencesConfig);
         statusColumn.setId("statusColumn");
 
-        statusColumn.setCellFactory(new Callback<>() {
+        statusColumn.setCellFactory(param -> new TableCell<>() {
             @Override
-            public TableCell<ModerationReportFX, ModerationReportStatus> call(TableColumn<ModerationReportFX, ModerationReportStatus> param) {
-                return new TableCell<>() {
-                    @Override
-                    public void updateItem(ModerationReportStatus item, boolean empty) {
-                        super.updateItem(item, empty);
+            public void updateItem(ModerationReportStatus item, boolean empty) {
+                super.updateItem(item, empty);
 
-                        if (isEmpty()) {
-                            setText("");
-                            setStyle("-fx-background-color: transparent;");
-                        } else {
-                            switch (item) {
-                                case AWAITING:
-                                    setStyle("-fx-background-color: #dcc414;");
-                                    break;
-                                case DISCARDED:
-                                    setStyle("-fx-background-color: #9cabab;");
-                                    break;
-                                case PROCESSING:
-                                    setStyle("-fx-background-color: rgba(56, 56, 255, 0.85);");
-                                    break;
-                                case COMPLETED:
-                                    setStyle("-fx-background-color: #5aad58;");
-                                    break;
-                            }
-
-                            setText(item.name());
-                        }
+                if (isEmpty()) {
+                    setText("");
+                    setStyle("-fx-background-color: transparent;");
+                } else {
+                    switch (item) {
+                        case AWAITING:
+                            setStyle("-fx-background-color: #dcc414;");
+                            break;
+                        case DISCARDED:
+                            setStyle("-fx-background-color: #9cabab;");
+                            break;
+                        case PROCESSING:
+                            setStyle("-fx-background-color: rgba(56, 56, 255, 0.85);");
+                            break;
+                        case COMPLETED:
+                            setStyle("-fx-background-color: #5aad58;");
+                            break;
                     }
-                };
-            }
 
+                    setText(Long2ShortenedStatusDescription(item));
+                }
+            }
         });
 
         extractors.put(statusColumn, ModerationReportFX::getReportStatus);
@@ -2266,7 +2590,6 @@ public class ViewHelper {
             }
         });
 
-        initializeColumn(reporterColumn, "reporterColumn", 50, preferencesConfig);
         reporterColumn.setId("reporterColumn");
 
         tableView.getColumns().add(reporterColumn);
@@ -2318,7 +2641,6 @@ public class ViewHelper {
             }
         });
         tableView.getColumns().add(reportedUsersColumn);
-        initializeColumn(reportedUsersColumn, "reportedUsersColumn", 120, preferencesConfig);
         reportedUsersColumn.setId("reportedUsersColumn");
         TableColumn<ModerationReportFX, String> reportDescriptionColumn = new TableColumn<>("Description");
 
@@ -2334,13 +2656,11 @@ public class ViewHelper {
             text.textProperty().bind(cell.itemProperty());
             return cell;
         });
-        initializeColumn(reportDescriptionColumn, "reportDescriptionColumn", 800, preferencesConfig);
         reportDescriptionColumn.setId("reportDescriptionColumn");
         tableView.getColumns().add(reportDescriptionColumn);
         extractors.put(reportDescriptionColumn, ModerationReportFX::getReportDescription);
 
         TableColumn<ModerationReportFX, String> incidentTimeCodeColumn = new TableColumn<>("Incident Timecode");
-        initializeColumn(incidentTimeCodeColumn, "incidentTimeCodeColumn", 90, preferencesConfig);
         incidentTimeCodeColumn.setId("incidentTimeCodeColumn");
         incidentTimeCodeColumn.setCellValueFactory(param -> param.getValue().gameIncidentTimecodeProperty());
         tableView.getColumns().add(incidentTimeCodeColumn);
@@ -2356,7 +2676,6 @@ public class ViewHelper {
         }, o.getValue().gameProperty()));
         tableView.getColumns().add(gameColumn);
         extractors.put(gameColumn, reportFx -> reportFx.getGame() == null ? null : reportFx.getGame().getId());
-        initializeColumn(gameColumn, "gameColumn", 50, preferencesConfig);
         gameColumn.setId("gameColumn");
 
         /*if (onChatLog != null) {
@@ -2381,7 +2700,6 @@ public class ViewHelper {
         }*/
 
         TableColumn<ModerationReportFX, String> privateNoteColumn = new TableColumn<>("Private Notice");
-        initializeColumn(privateNoteColumn, "privateNoteColumn", 120, preferencesConfig);
         privateNoteColumn.setId("privateNoteColumn");
         privateNoteColumn.setCellValueFactory(param -> param.getValue().moderatorPrivateNoteProperty());
         tableView.getColumns().add(privateNoteColumn);
@@ -2397,7 +2715,6 @@ public class ViewHelper {
         });
 
         TableColumn<ModerationReportFX, String> moderatorPrivateNoticeColumn = new TableColumn<>("Public Note");
-        initializeColumn(moderatorPrivateNoticeColumn, "moderatorPrivateNoticeColumn", 120, preferencesConfig);
         moderatorPrivateNoticeColumn.setId("moderatorPrivateNoticeColumn");
         moderatorPrivateNoticeColumn.setCellValueFactory(param -> param.getValue().moderatorNoticeProperty());
         tableView.getColumns().add(moderatorPrivateNoticeColumn);
@@ -2420,7 +2737,6 @@ public class ViewHelper {
             }
             return lastModerator.getRepresentation();
         }, o.getValue().lastModeratorProperty()));
-        initializeColumn(lastModeratorColumn, "lastModeratorColumn", 120, preferencesConfig);
         lastModeratorColumn.setId("lastModeratorColumn");
         tableView.getColumns().add(lastModeratorColumn);
         extractors.put(lastModeratorColumn, reportFx -> reportFx.getLastModerator() == null ? null : reportFx.getLastModerator().getLogin());
@@ -2442,7 +2758,6 @@ public class ViewHelper {
         });
 
         createTimeColumn.setCellValueFactory(param -> param.getValue().createTimeProperty());
-        initializeColumn(createTimeColumn, "createTimeColumn", 120, preferencesConfig);
         createTimeColumn.setId("createTimeColumn");
         tableView.getColumns().add(createTimeColumn);
         extractors.put(createTimeColumn, ModerationReportFX::getCreateTime);
@@ -2802,5 +3117,4 @@ public class ViewHelper {
         return color;
     }
 
-    public static final String CONFIGURATION_FOLDER = "ConfigurationModerationToolFAF";
 }

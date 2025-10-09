@@ -3,7 +3,7 @@ package com.faforever.moderatorclient.ui.moderation_reports;
 import com.faforever.commons.api.dto.ModerationReport;
 import com.faforever.commons.api.dto.ModerationReportStatus;
 import com.faforever.moderatorclient.api.domain.ModerationReportService;
-import com.faforever.moderatorclient.config.PreferencesConfig;
+import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.ui.Controller;
 import com.faforever.moderatorclient.ui.domain.ModerationReportFX;
 import javafx.animation.PauseTransition;
@@ -17,7 +17,6 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import java.io.File;
 import java.io.IOException;
@@ -38,15 +37,16 @@ public class EditModerationReportController implements Controller<Pane> {
 	public TextArea privateNoteTextArea;
 	public TextArea publicNoteTextArea;
 	public ChoiceBox<ModerationReportStatus> statusChoiceBox;
+	private final LocalPreferences localPreferences;
+
+	@FXML
 	public Pane root;
-    public CheckBox autoApplyTemplateAndSaveCheckBox;
+	@FXML
+	public CheckBox applyTemplateAndAutoSaveCheckBox;
 	@FXML
 	public VBox dynamicButtonsContainer;
 	@Setter
 	private Runnable onSaveRunnable = () -> {};
-
-	@Autowired
-    public PreferencesConfig preferencesConfig;
 
     @FXML
 	public void initialize() throws IOException {
@@ -55,11 +55,8 @@ public class EditModerationReportController implements Controller<Pane> {
 		} catch (IOException e) {
 			throw new IOException("Failed to initialize Buttons" + e);
 		}
-		autoApplyTemplateAndSaveCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            		preferencesConfig.setPreference("generalSettings", "autoApplyTemplateAndSaveCheckBox", autoApplyTemplateAndSaveCheckBox.isSelected());
-        });
 
-		autoApplyTemplateAndSaveCheckBox.setSelected(preferencesConfig.getAutoApplyTemplateAndSaveCheckBox());
+		applyTemplateAndAutoSaveCheckBox.setSelected(localPreferences.getTabEditModerationReport().isApplyTemplateAndAutoSaveCheckBox());
 
 		statusChoiceBox.setItems(FXCollections.observableArrayList(ModerationReportStatus.values()));
 	}
@@ -76,6 +73,8 @@ public class EditModerationReportController implements Controller<Pane> {
 			report.setModeratorPrivateNote(privateNoteTextArea.getText());
 			report.setModeratorNotice(publicNoteTextArea.getText());
 		}
+		localPreferences.getTabEditModerationReport().setApplyTemplateAndAutoSaveCheckBox(
+				applyTemplateAndAutoSaveCheckBox.isSelected());
 		onSaveRunnable.run();
 		close();
 	}
@@ -134,7 +133,7 @@ public class EditModerationReportController implements Controller<Pane> {
 	private void handleButtonAction(String setReportStatusTo, String descriptionPublicNote) throws IOException {
 		publicNoteTextArea.setText(descriptionPublicNote);
 		statusChoiceBox.getSelectionModel().select(ModerationReportStatus.valueOf(setReportStatusTo));
-		if (autoApplyTemplateAndSaveCheckBox.isSelected()) {
+		if (applyTemplateAndAutoSaveCheckBox.isSelected()) {
 			onSave();
 		}
 	}

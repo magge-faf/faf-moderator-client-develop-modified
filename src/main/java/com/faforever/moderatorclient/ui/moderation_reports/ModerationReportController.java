@@ -1,6 +1,5 @@
 package com.faforever.moderatorclient.ui.moderation_reports;
 
-import com.faforever.moderatorclient.config.PreferencesConfig;
 import com.faforever.moderatorclient.ui.main_window.ReportStatisticsController;
 import com.faforever.commons.api.dto.ModerationReportStatus;
 import com.faforever.commons.replay.ChatMessage;
@@ -18,12 +17,15 @@ import com.faforever.moderatorclient.ui.domain.BanInfoFX;
 import com.faforever.moderatorclient.ui.domain.GameFX;
 import com.faforever.moderatorclient.ui.domain.ModerationReportFX;
 import com.faforever.moderatorclient.ui.domain.PlayerFX;
+import com.faforever.moderatorclient.config.local.LocalPreferences;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.collections.*;
 import javafx.scene.input.Clipboard;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
+import javafx.util.Duration;
 import org.springframework.beans.factory.annotation.Autowired;
-import com.faforever.moderatorclient.ui.main_window.SettingsController;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import javafx.application.Platform;
@@ -59,16 +61,15 @@ import org.springframework.stereotype.Component;
 
 import java.awt.*;
 import java.awt.datatransfer.StringSelection;
-import java.awt.datatransfer.Transferable;
 import java.io.*;
+import java.lang.reflect.Field;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.*;
@@ -89,13 +90,10 @@ import static java.text.MessageFormat.format;
 @Slf4j
 @RequiredArgsConstructor
 public class ModerationReportController implements Controller<Region> {
-    @Autowired
-    public SettingsController settingsController;
-
     private final ObjectMapper objectMapper;
     private final ModerationReportService moderationReportService;
     private final UiService uiService;
-    private final FafApiCommunicationService communicationService;
+    private final FafApiCommunicationService fafApiCommunicationService;
     private final PlatformService platformService;
     private final ObservableList<PlayerFX> reportedPlayersOfCurrentlySelectedReport = FXCollections.observableArrayList();
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -111,47 +109,80 @@ public class ModerationReportController implements Controller<Region> {
     @FXML
     public Button referenceOnlyButton;
     @FXML
-    private CheckBox enforceRatingCheckBox;
+    public Text moderatorStatisticsLastWeekText;
     @FXML
-    private CheckBox gameResultCheckBox;
+    public Text moderatorStatisticsThisWeekText;
     @FXML
-    private CheckBox jsonStatsCheckBox;
+    public Text moderatorStatisticsLastMonthText;
     @FXML
-    private CheckBox gameEndedCheckBox;
-
+    public Text moderatorStatisticsThisMonthText;
+    @FXML
+    public TextField quotaUserInputTextField;
+    @FXML
+    public Text quotaResultModeratorsText;
+    @FXML
+    public Button calculateQuotaButton;
+    @FXML
+    public TextField initialReportsLoadingTextField;
+    @FXML
+    public CheckBox fetchReportsOnStartupCheckBox;
+    @FXML
+    private CheckBox showEnforceRatingCheckBox;
+    @FXML
+    private CheckBox showGameResultCheckBox;
+    @FXML
+    private CheckBox showJsonStatsCheckBox;
+    @FXML
+    private CheckBox showGameEndedCheckBox;
+    @FXML
     private FilteredList<ModerationReportFX> filteredItemList;
+    @FXML
     private ObservableMap<Integer, ModerationReportFX> itemMap;
+    @FXML
     private ObservableList<ModerationReportFX> itemList;
     private ModerationReportFX currentlySelectedItemNotNull;
 
     public Button copyReporterIdButton;
     @FXML
     public TableView<Offender> mostReportedAccountsTableView;
+    @FXML
     public TextArea moderatorStatisticsTextArea;
-    public CheckBox filterLogCheckBox;
-    public CheckBox automaticallyLoadChatLogCheckBox;
+    @FXML
+    public CheckBox showNotifyChatMessages;
+    @FXML
+    public CheckBox autoLoadChatLogCheckBox;
     public Button useTemplateWithoutReasonsButton;
     public TableView<ModeratorStatistics> moderatorStatisticsTableView;
     public Button useTemplateWithReasonsButton;
     @FXML
     public TextFlow moderatorEventTextFlow;
+    @FXML
     public TextField getModeratorEventsForReplayIdTextField;
     @FXML
     public Button getModeratorEventsReplayIdButton;
-    public CheckBox pingOfTypeMoveFilterCheckBox;
-    public CheckBox pingOfTypeAttackFilterCheckBox;
-    public CheckBox pingOfTypeAlertFilterCheckBox;
-    public CheckBox selfDestructionFilterCheckBox;
-    public TextField selfDestructionFilterAmountTextField;
+    public CheckBox showPingMoveCheckBox;
     @FXML
-    public CheckBox focusArmyFromFilterCheckBox;
-    public CheckBox textMarkerTypeFilterCheckBox;
-    public Button saveSettingsModeratorEventsButton;
-    public Region root;
+    public CheckBox showPingAttackCheckBox;
+    @FXML
+    public CheckBox showPingAlertCheckBox;
+    @FXML
+    public CheckBox showSelfDestructionUnitsCheckBox;
+    @FXML
+    public TextField thresholdToShowSelfDestructionUnitsEventTextField;
+    @FXML
+    public CheckBox showFocusArmyFromCheckBox;
+    @FXML
+    public CheckBox showTextMarkersCheckBox;
     public ChoiceBox<ChooseableStatus> statusChoiceBox;
+    @FXML
+    public SplitPane root;
+    @FXML
     public TextField playerNameFilterTextField;
+    @FXML
     public TableView<ModerationReportFX> reportTableView;
+    @FXML
     public Button editReportButton;
+    @FXML
     public TableView<PlayerFX> reportedPlayerTableView;
     @FXML
     public TextFlow chatLogTextFlow;
@@ -161,8 +192,7 @@ public class ModerationReportController implements Controller<Region> {
     public Button copyGameIdButton;
     public Button startReplayButton;
 
-    @Autowired
-    public PreferencesConfig preferencesConfig;
+    private final LocalPreferences localPreferences;
 
     @Autowired
     public ReportStatisticsController reportStatisticsController;
@@ -172,7 +202,7 @@ public class ModerationReportController implements Controller<Region> {
 
     @Override
     public SplitPane getRoot() {
-        return (SplitPane) root;
+        return root;
     }
 
     public void onCopyReportedUserID() {
@@ -451,18 +481,31 @@ public class ModerationReportController implements Controller<Region> {
                             }
                         }).filter(Objects::nonNull)
                         .collect(Collectors.toList());
-                Platform.runLater(() -> mostReportedAccountsTableView.setItems(FXCollections.observableArrayList(offenders)));
 
-                mostReportedAccountsTableView.setOnKeyPressed(event -> {
-                    if (event.isControlDown() && event.getCode() == KeyCode.C) {
-                        Offender selectedOffender = mostReportedAccountsTableView.getSelectionModel().getSelectedItem();
-                        if (selectedOffender != null) {
-                            StringSelection stringSelection = new StringSelection(selectedOffender.getPlayer());
-                            java.awt.datatransfer.Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
-                            clipboard.setContents(stringSelection, null);
+                Platform.runLater(() -> {
+                    mostReportedAccountsTableView.setItems(FXCollections.observableArrayList(offenders));
+
+                    mostReportedAccountsTableView.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
+                        if (newSelection != null) {
+                            String fullPlayer = newSelection.getPlayer();
+                            String playerNameOnly = fullPlayer.split("\\s*\\[")[0];
+                            playerNameFilterTextField.setText(playerNameOnly);
                         }
-                    }
+                    });
+
+                    // Ctrl + C copy functionality
+                    mostReportedAccountsTableView.setOnKeyPressed(event -> {
+                        if (event.isControlDown() && event.getCode() == KeyCode.C) {
+                            Offender selectedOffender = mostReportedAccountsTableView.getSelectionModel().getSelectedItem();
+                            if (selectedOffender != null) {
+                                StringSelection stringSelection = new StringSelection(selectedOffender.getPlayer());
+                                java.awt.datatransfer.Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+                                clipboard.setContents(stringSelection, null);
+                            }
+                        }
+                    });
                 });
+
                 return null;
             }
         };
@@ -515,7 +558,9 @@ public class ModerationReportController implements Controller<Region> {
 
         content.append("\n\n");
 
-        banService.getLatestBans().thenAccept(banInfos -> {
+        // TODO u call getlatest ban here and on initial = twice server requets. use cached bans from first ban
+
+        /*banService.getLatestBans().thenAccept(banInfos -> {
             if (banInfos.isEmpty()) {
                 log.warn("No ban information retrieved.");
                 return;
@@ -591,50 +636,50 @@ public class ModerationReportController implements Controller<Region> {
                 clipboard.setContent(clipboardContent);
                 System.out.println("Content copied to clipboard.");
             });
-        });
+        })*/;
     }
 
     public void onReferenceOnly() {
-            try {
-                ObservableList<ModerationReportFX> selectedItems = reportTableView.getSelectionModel().getSelectedItems();
+        try {
+            ObservableList<ModerationReportFX> selectedItems = reportTableView.getSelectionModel().getSelectedItems();
 
-                String selectedReportIds = selectedItems.stream()
-                        .map(item -> String.valueOf(item.getId()))
-                        .collect(Collectors.joining(","));
+            String selectedReportIds = selectedItems.stream()
+                    .map(item -> String.valueOf(item.getId()))
+                    .collect(Collectors.joining(","));
 
-                String selectedGameIds = selectedItems.stream()
-                        .map(ModerationReportFX::getGame)
-                        .filter(Objects::nonNull)
-                        .map(game -> String.valueOf(game.getId()))
-                        .distinct()
-                        .collect(Collectors.joining(","));
+            String selectedGameIds = selectedItems.stream()
+                    .map(ModerationReportFX::getGame)
+                    .filter(Objects::nonNull)
+                    .map(game -> String.valueOf(game.getId()))
+                    .distinct()
+                    .collect(Collectors.joining(","));
 
-                removeTrailingComma(new StringBuilder(selectedReportIds));
-                removeTrailingComma(new StringBuilder(selectedGameIds));
+            removeTrailingComma(new StringBuilder(selectedReportIds));
+            removeTrailingComma(new StringBuilder(selectedGameIds));
 
-                String result;
+            String result;
 
-                if (selectedGameIds.isEmpty()) {
-                    result = selectedReportIds + "\n\n" + "Reference - REFERENCE_REASON";
-                } else {
-                    result = selectedReportIds + "\n\n" + "Reference - ReplayID " + selectedGameIds + " - REFERENCE_REASON";
-                }
-
-                ClipboardContent clipboardContent = new ClipboardContent();
-                clipboardContent.putString(result);
-                Clipboard.getSystemClipboard().setContent(clipboardContent);
-
-                referenceOnlyButton.setText("Copied");
-                Timer timer = new Timer();
-                timer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        Platform.runLater(() -> referenceOnlyButton.setText("Reference Only"));
-                    }
-                }, 750);
-            } catch (NullPointerException e) {
-                log.debug(String.valueOf(e));
+            if (selectedGameIds.isEmpty()) {
+                result = selectedReportIds + "\n\n" + "Reference - REFERENCE_REASON";
+            } else {
+                result = selectedReportIds + "\n\n" + "Reference - ReplayID " + selectedGameIds + " - REFERENCE_REASON";
             }
+
+            ClipboardContent clipboardContent = new ClipboardContent();
+            clipboardContent.putString(result);
+            Clipboard.getSystemClipboard().setContent(clipboardContent);
+
+            referenceOnlyButton.setText("Copied");
+            Timer timer = new Timer();
+            timer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    Platform.runLater(() -> referenceOnlyButton.setText("Reference Only"));
+                }
+            }, 750);
+        } catch (NullPointerException e) {
+            log.debug(String.valueOf(e));
+        }
     }
 
     // TODO refactor with setter getter and use Integer
@@ -703,11 +748,22 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private void processStatisticsModerator(List<ModerationReportFX> reps) {
-        Task<Void> task = new Task<Void>() {
+        Task<Void> task = new Task<>() {
             @Override
             protected Void call() {
-                //TODO ref readable
                 ArrayList<ModerationReportFX> reports = Lists.newArrayList(reps.iterator());
+                updateModeratorStatistics();
+
+
+                //moderatorStatisticsLastWeekTextArea.appendText("**Moderator Statistics**\n\n");
+                //List list;
+                //list = getModeratorActivityReport(ModeratorActivityPeriod.valueOf("LAST_WEEK"));
+                //moderatorStatisticsLastWeekTextArea.appendText(list.toString());
+
+                if (reports.isEmpty()) {
+                    log.debug("processStatisticsModerator List is Empty");
+                    return null;
+                }
 
                 Map<PlayerFX, Map<ModerationReportStatus, Integer>> moderatorReportCounts = new HashMap<>();
                 for (ModerationReportFX report : reports) {
@@ -782,12 +838,17 @@ public class ModerationReportController implements Controller<Region> {
                 for (ModeratorStatistics moderatorStat : data) {
                     moderatorStat.setLastActivity(maxLastActivityByModerator.get(moderatorStat.getModerator()).toLocalDateTime());
                 }
+
                 Platform.runLater(() -> {
                     moderatorStatisticsTableView.setItems(data);
                     moderatorStatisticsTableView.getSortOrder().add(lastActivity);
                     lastActivity.setSortType(TableColumn.SortType.DESCENDING);
                     moderatorStatisticsTableView.sort();
-                    moderatorStatisticsTextArea.setText(sb.toString());
+                    if (moderatorStatisticsTextArea != null) {
+                        if (moderatorStatisticsTextArea.getText() != null) {
+                            moderatorStatisticsTextArea.setText(sb.toString());
+                        }
+                    }
                     reportStatisticsController.onUpdateStatisticsButtonLastYear();
                 });
                 return null;
@@ -847,37 +908,94 @@ public class ModerationReportController implements Controller<Region> {
 
     private void initializeUserTableView() {
         ViewHelper.buildUserTableView(platformService, reportedPlayerTableView, reportedPlayersOfCurrentlySelectedReport, this::addBan,
-                playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), false, communicationService, preferencesConfig);
-
-        loadDividerPosition((SplitPane) root, preferencesConfig);
-        addDividerPositionListener((SplitPane) root, preferencesConfig);
-        addListeners();
-    }
-
-    public static void saveDividerPosition(SplitPane splitPane, PreferencesConfig preferencesConfig) {
-        double[] dividerPositions = splitPane.getDividerPositions();
-
-        preferencesConfig.setPreference("splitPaneDividerPositions", "reportWindow", dividerPositions);
-    }
-
-    public static void loadDividerPosition(SplitPane splitPane, PreferencesConfig preferencesConfig) {
-        double[] savedPositions = preferencesConfig.getDividerPositions();
-
+                playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), false, fafApiCommunicationService);
         Platform.runLater(() -> {
-            if (savedPositions != null && savedPositions.length > 0) {
-                splitPane.setDividerPositions(savedPositions);
-                splitPane.requestLayout();
-            } else {
-                log.warn("No saved divider positions, using default");
-            }
+            loadColumnLayout(reportTableView, localPreferences);
+            loadSplitPanePositions(root, localPreferences);
         });
     }
 
-    public static void addDividerPositionListener(SplitPane splitPane, PreferencesConfig preferencesConfig) {
-        splitPane.getDividers().getFirst().positionProperty().addListener((obs, oldValue, newValue) -> {
-            saveDividerPosition(splitPane, preferencesConfig);
-        });
+    public void onSave() {
+        saveColumnLayout(reportTableView, localPreferences);
+        saveSplitPanePositions(root, localPreferences);
     }
+
+    private static void saveColumnRecursive(TableColumn<?, ?> column, Map<String, Double> widths, List<String> order) {
+        String id = column.getId();
+        if (id != null) {
+            widths.put(id, column.getWidth());
+            order.add(id);
+            log.debug("Added column: id={}, width={}", id, column.getWidth());
+        } else {
+            log.debug("Skipped column with no ID. Text={}, width={}", column.getText(), column.getWidth());
+        }
+
+        for (TableColumn<?, ?> subColumn : column.getColumns()) {
+            saveColumnRecursive(subColumn, widths, order);
+        }
+    }
+
+    public static void saveColumnLayout(TableView<?> tableView, LocalPreferences localPreferences) {
+        if (tableView == null || localPreferences == null) return;
+
+        Map<String, Double> widths = new HashMap<>();
+        List<String> order = new ArrayList<>();
+
+        log.debug("Starting to save column layout. Total top-level columns: {}", tableView.getColumns().size());
+
+        for (TableColumn<?, ?> column : tableView.getColumns()) {
+            saveColumnRecursive(column, widths, order);
+        }
+
+        log.debug("Final column order list: {}", order);
+        log.debug("Final column width map: {}", widths);
+
+        localPreferences.getTabReports().setReportTableColumnWidthsTabReports(widths);
+        localPreferences.getTabReports().setReportTableColumnOrderTabReports(order);
+
+        log.debug("Saved column layout to localPreferences.");
+    }
+
+    public static void loadColumnLayout(TableView<?> tableView, LocalPreferences localPreferences) {
+        if (tableView == null) {
+            log.debug("TableView is null, cannot load layout.");
+            return;
+        }
+        if (localPreferences == null) {
+            log.debug("LocalPreferences is null, cannot load layout.");
+            return;
+        }
+
+        Map<String, Double> widths = localPreferences.getTabReports().getReportTableColumnWidthsTabReports();
+        List<String> order = localPreferences.getTabReports().getReportTableColumnOrderTabReports();
+
+        log.debug("Loading column layout. Saved widths: {}, saved order: {}", widths, order);
+
+        if (order != null && !order.isEmpty()) {
+            tableView.getColumns().sort(Comparator.comparingInt(col -> {
+                int index = order.indexOf(col.getId());
+                if (index == -1) {
+                    log.debug("Column {} not found in saved order, placing at end", col.getId());
+                }
+                return index >= 0 ? index : Integer.MAX_VALUE;
+            }));
+            log.debug("Applied column order to TableView.");
+        }
+
+        for (TableColumn<?, ?> column : tableView.getColumns()) {
+            if (column.getId() != null && widths != null && widths.containsKey(column.getId())) {
+                double width = widths.get(column.getId());
+                column.setPrefWidth(width);
+                log.debug("Set width for column {}: {}", column.getId(), width);
+            } else {
+                log.debug("Skipping column {}: no saved width", column.getId());
+            }
+        }
+
+        log.debug("Finished loading column layout.");
+    }
+
+
 
     private void setupReportSelectionListener() {
         reportTableView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
@@ -915,7 +1033,7 @@ public class ModerationReportController implements Controller<Region> {
             startReplayButton.setId(newValue.getGame().getId());
             startReplayButton.setText("Start Replay: " + newValue.getGame().getId());
 
-            if (preferencesConfig.getAutomaticallyLoadChatLogCheckBox()) {
+            if (localPreferences.getTabReports().isAutoLoadChatLogCheckBox()) {
                 showChatLog(currentlySelectedItemNotNull);
             }
         } else {
@@ -924,19 +1042,22 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     public void loadCheckboxStates() {
-        enforceRatingCheckBox.setSelected(preferencesConfig.getEnforceRatingCheckBox());
-        gameResultCheckBox.setSelected(preferencesConfig.getGameResultCheckBox());
-        jsonStatsCheckBox.setSelected(preferencesConfig.getJsonStatsCheckBox());
-        gameEndedCheckBox.setSelected(preferencesConfig.getGameEndedCheckBox());
-        filterLogCheckBox.setSelected(preferencesConfig.getFilterLogCheckBox());
-        automaticallyLoadChatLogCheckBox.setSelected(preferencesConfig.getAutomaticallyLoadChatLogCheckBox());
-        focusArmyFromFilterCheckBox.setSelected(preferencesConfig.getFocusArmyFromFilterCheckBox());
-        pingOfTypeAlertFilterCheckBox.setSelected(preferencesConfig.getPingOfTypeAlertFilterCheckBox());
-        pingOfTypeMoveFilterCheckBox.setSelected(preferencesConfig.getPingOfTypeMoveFilterCheckBox());
-        pingOfTypeAttackFilterCheckBox.setSelected(preferencesConfig.getPingOfTypeAttackFilterCheckBox());
-        selfDestructionFilterCheckBox.setSelected(preferencesConfig.getSelfDestructionFilterCheckBox());
-        selfDestructionFilterAmountTextField.setText(preferencesConfig.getSelfDestructionFilterAmountTextField());
-        textMarkerTypeFilterCheckBox.setSelected(preferencesConfig.getTextMarkerTypeFilterCheckBox());
+        LocalPreferences.TabReports tabReports = localPreferences.getTabReports();
+
+        showEnforceRatingCheckBox.setSelected(tabReports.isShowEnforceRatingCheckBox());
+        showGameResultCheckBox.setSelected(tabReports.isShowGameResultCheckBox());
+        showJsonStatsCheckBox.setSelected(tabReports.isShowJsonStatsCheckBox());
+        showGameEndedCheckBox.setSelected(tabReports.isShowGameEndedCheckBox());
+        showNotifyChatMessages.setSelected(tabReports.isAutoLoadChatLogCheckBox());
+        autoLoadChatLogCheckBox.setSelected(tabReports.isAutoLoadChatLogCheckBox());
+        showFocusArmyFromCheckBox.setSelected(tabReports.isShowFocusArmyFromCheckBox());
+        showPingAlertCheckBox.setSelected(tabReports.isPingOfTypeAlertFilterCheckBox());
+        showPingMoveCheckBox.setSelected(tabReports.isPingOfTypeMoveFilterCheckBox());
+        showPingAttackCheckBox.setSelected(tabReports.isPingOfTypeAttackFilterCheckBox());
+        showSelfDestructionUnitsCheckBox.setSelected(tabReports.isShowSelfDestructionUnitsCheckBox());
+        showTextMarkersCheckBox.setSelected(tabReports.isTextMarkerTypeFilterCheckBox());
+        thresholdToShowSelfDestructionUnitsEventTextField.setText(tabReports.getThresholdToShowSelfDestructionUnitsEventTextField());
+        fetchReportsOnStartupCheckBox.setSelected(tabReports.isFetchReportsOnStartupCheckBox());
     }
 
     @FXML
@@ -952,6 +1073,17 @@ public class ModerationReportController implements Controller<Region> {
         Text messageTextNoSelection = new Text("Please select a report to view details.");
         chatLogTextFlow.getChildren().clear();
         chatLogTextFlow.getChildren().add(messageTextNoSelection);
+        bindUIElementsToPreferences();
+
+        if (fetchReportsOnStartupCheckBox.isSelected()) {
+            onRefreshInitialReports();
+        }
+
+        reportedPlayerTableView.getColumns().forEach(column -> {
+            if (column.getId() == null) {
+                column.setId(column.getText().replaceAll("\\s+", "")); // e.g., "Last Login" -> "LastLogin"
+            }
+        });
     }
 
     private void initializeItemMapAndListeners() {
@@ -973,9 +1105,7 @@ public class ModerationReportController implements Controller<Region> {
         renewFilter();
         SortedList<ModerationReportFX> sortedItemList = new SortedList<>(filteredItemList);
         sortedItemList.comparatorProperty().bind(reportTableView.comparatorProperty());
-        ViewHelper.buildModerationReportTableView(preferencesConfig, reportTableView, sortedItemList, this::showChatLog);
-        loadColumnOrder(reportTableView, preferencesConfig);
-        addColumnOrderChangeListener(reportTableView, preferencesConfig);
+        ViewHelper.buildModerationReportTableView(reportTableView, sortedItemList, this::showChatLog);
         statusChoiceBox.getSelectionModel().selectedItemProperty().addListener(observable -> renewFilter());
         playerNameFilterTextField.textProperty().addListener(observable -> renewFilter());
         reportTableView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
@@ -988,60 +1118,11 @@ public class ModerationReportController implements Controller<Region> {
         });
     }
 
-    public static void saveColumnOrder(TableView<ModerationReportFX> tableView, PreferencesConfig preferencesConfig) {
-        List<String> columnOrder = new ArrayList<>();
-
-        for (TableColumn<ModerationReportFX, ?> column : tableView.getColumns()) {
-            String columnId = column.getId();
-            if (columnId != null) {
-                columnOrder.add(columnId);
-            }
-        }
-
-        preferencesConfig.setColumnOrderPreference(columnOrder, "Reports");
-    }
-
-    public static void addColumnOrderChangeListener(TableView<ModerationReportFX> tableView, PreferencesConfig preferencesConfig) {
-        tableView.getColumns().addListener((ListChangeListener<TableColumn<ModerationReportFX, ?>>) change -> {
-            saveColumnOrder(tableView, preferencesConfig);
-        });
-    }
-
-    public static void loadColumnOrder(TableView<ModerationReportFX> tableView, PreferencesConfig preferencesConfig) {
-        List<String> savedOrder = preferencesConfig.getColumnOrderPreference("Reports");
-
-        if (savedOrder != null && !savedOrder.isEmpty()) {
-            ObservableList<TableColumn<ModerationReportFX, ?>> columns = tableView.getColumns();
-
-            List<TableColumn<ModerationReportFX, ?>> orderedColumns = new ArrayList<>();
-
-            for (String columnId : savedOrder) {
-                for (TableColumn<ModerationReportFX, ?> column : columns) {
-                    if (columnId.equals(column.getId())) {
-                        orderedColumns.add(column);
-                        break;
-                    }
-                }
-            }
-
-            for (TableColumn<ModerationReportFX, ?> column : columns) {
-                if (!orderedColumns.contains(column)) {
-                    orderedColumns.add(column);
-                }
-            }
-
-            Platform.runLater(() -> {
-                tableView.getColumns().clear();
-                tableView.getColumns().addAll(orderedColumns);
-            });
-        }
-    }
-
     public static void setSysClipboardText(String writeMe) {
-        System.setProperty("java.awt.headless", "false");
-        java.awt.datatransfer.Clipboard clip = Toolkit.getDefaultToolkit().getSystemClipboard();
-        Transferable tText = new StringSelection(writeMe);
-        clip.setContents(tText, null);
+        Clipboard clipboard = Clipboard.getSystemClipboard();
+        ClipboardContent content = new ClipboardContent();
+        content.putString(writeMe);
+        clipboard.setContent(content);
     }
 
     private void addBan(PlayerFX accountFX) {
@@ -1049,7 +1130,8 @@ public class ModerationReportController implements Controller<Region> {
         BanInfoFX ban = new BanInfoFX();
         ban.setPlayer(accountFX);
         banInfoController.setBanInfo(ban);
-        banInfoController.addPostedListener(banInfoFX -> onRefreshInitialReports());
+        // Dont refresh reports, when ban was applied
+        //banInfoController.addPostedListener(banInfoFX -> onRefreshInitialReports());
         Stage banInfoDialog = new Stage();
         banInfoDialog.setTitle("Apply new ban");
         banInfoDialog.setScene(new Scene(banInfoController.getRoot()));
@@ -1093,7 +1175,7 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private Optional<String> extractReportId(String filterText) {
-        // Extract report ID from text if it starts with "rid" for searching
+        // Extract report ID from a text if it starts with "rid" for searching
         Pattern pattern = Pattern.compile("rid(\\w+)");
         Matcher matcher = pattern.matcher(filterText);
         if (matcher.find()) {
@@ -1104,80 +1186,69 @@ public class ModerationReportController implements Controller<Region> {
 
     @Getter
     @Setter
-    private AtomicInteger totalReportsLoaded = new AtomicInteger(0);
+    private AtomicInteger totalReportsLoaded = new AtomicInteger(0); // Needed for number in window title
     @Getter
     private final AtomicInteger activeApiRequests = new AtomicInteger(0);
 
     public void onRefreshInitialReports() {
         synchronized (reportLock) {
             if (isFetchingReport) {
-                log.debug("Initial reports are already being fetched.");
+                log.debug("Reports are already being fetched.");
                 return;
             }
             isFetchingReport = true;
         }
 
-        int initialPageSize = Integer.parseInt(preferencesConfig.getInitialPageSize());
+        int initialPageSize = Integer.parseInt(localPreferences.getTabReports().getInitialReportsLoadingTextField());
+        int fullPageSize = 10_000;
+        int batchSize = 2;
 
         activeApiRequests.incrementAndGet();
-        loadInitialReports(1, initialPageSize);
-    }
 
-    private void loadInitialReports(int currentPage, int pageSize) {
-        moderationReportService.getPageOfReports(currentPage, pageSize).thenAccept(reportFxes -> {
+        // Step 1: Load initial reports quickly
+        moderationReportService.getPageOfReports(1, initialPageSize).thenAccept(reportFxes -> {
             Platform.runLater(() -> {
-                itemList.setAll(reportFxes); // Display only the initial reports
+                itemList.setAll(reportFxes);
                 showInTableRepeatedOffenders(reportFxes);
-
-                log.debug("Initial reports loaded. Total count: {}", reportFxes.size());
                 totalReportsLoaded.set(reportFxes.size());
-                log.debug("totalReportsLoaded: Total count: {}", totalReportsLoaded.get());
-
-                // After the initial load burst, fetch all reports in one swoop
-                onRefreshAllReports();
             });
+
+            // Step 2: Load all reports in background
+            moderationReportService.getAllReportsPaged(fullPageSize, batchSize)
+                    .thenAccept(allReports -> Platform.runLater(() -> {
+                        itemList.clear();
+                        itemList.addAll(allReports);
+
+                        cachedReports.setAll(allReports);
+                        processStatisticsModerator(allReports);
+                        showInTableRepeatedOffenders(allReports);
+
+                        totalReportsLoaded.set(allReports.size());
+                        log.debug("All reports loaded. Total count: {}", allReports.size());
+                    }))
+                    .exceptionally(throwable -> {
+                        log.error("Error loading all reports", throwable);
+                        return null;
+                    })
+                    .whenComplete((result, throwable) -> {
+                        if (activeApiRequests.decrementAndGet() == 0) {
+                            synchronized (reportLock) {
+                                isFetchingReport = false;
+                            }
+                        }
+                    });
+
         }).exceptionally(throwable -> {
             log.error("Error loading initial reports", throwable);
             return null;
-        }).whenComplete((result, throwable) -> {
-            if (activeApiRequests.decrementAndGet() == 0) {
-                synchronized (reportLock) {
-                    isFetchingReport = false;
-                }
-            }
-        });
-    }
-
-    @FXML
-    private void onRefreshAllReports() {
-        totalReportsLoaded.set(0);
-        activeApiRequests.incrementAndGet();
-        moderationReportService.getAllReports().thenAccept(allReports -> Platform.runLater(() -> {
-            itemList.setAll(allReports);
-            cachedReports.setAll(allReports);
-            processStatisticsModerator(allReports);
-            showInTableRepeatedOffenders(allReports);
-            log.debug("All reports loaded. Total count: {}", allReports.size());
-            totalReportsLoaded.set(allReports.size());
-        })).exceptionally(throwable -> {
-            log.error("Error loading all reports", throwable);
-            return null;
-        }).whenComplete((result, throwable) -> {
-            if (activeApiRequests.decrementAndGet() == 0) {
-                synchronized (reportLock) {
-                    isFetchingReport = false;
-                }
-            }
         });
     }
 
     private final ObservableList<ModerationReportFX> cachedReports = FXCollections.observableArrayList();
 
-
     public ObservableList<ModerationReportFX> getAllCachedReports() {
         return cachedReports;
     }
-
 
     public void onEdit() {
         ObservableList<ModerationReportFX> selectedItems = reportTableView.getSelectionModel().getSelectedItems();
@@ -1199,23 +1270,49 @@ public class ModerationReportController implements Controller<Region> {
         Alert confirmationDialog = new Alert(Alert.AlertType.CONFIRMATION);
         confirmationDialog.setTitle("Confirm Bulk Action");
         confirmationDialog.setHeaderText("Apply Changes to Multiple Reports");
-        confirmationDialog.setContentText(String.format("You are about to apply changes to %d reports. Are you really sure you want to proceed?",
+        confirmationDialog.setContentText(String.format(
+                "You are about to apply changes to %d reports. Are you really sure you want to proceed?",
                 numberOfReports));
 
-        ButtonType confirmButton = new ButtonType("Confirm", ButtonBar.ButtonData.OK_DONE);
-        ButtonType cancelButton = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
-        confirmationDialog.getButtonTypes().setAll(confirmButton, cancelButton);
+        ButtonType confirmButtonType = new ButtonType("Confirm", ButtonBar.ButtonData.OK_DONE);
+        ButtonType cancelButtonType = new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE);
+        confirmationDialog.getButtonTypes().setAll(confirmButtonType, cancelButtonType);
+
+        // Get the buttons
+        Button confirmButton = (Button) confirmationDialog.getDialogPane().lookupButton(confirmButtonType);
+        Button cancelButton = (Button) confirmationDialog.getDialogPane().lookupButton(cancelButtonType);
+
+        // Style cancel button as red
+        cancelButton.setStyle("-fx-background-color: #d9534f; -fx-text-fill: white;");
+
+        // Countdown for confirm button
+        final int[] secondsLeft = {3};
+        confirmButton.setDisable(true);
+        confirmButton.setText("Confirm (" + secondsLeft[0] + ")");
+        confirmButton.setStyle("-fx-background-color: lightgray; -fx-text-fill: black;");
+
+        Timeline countdown = new Timeline(new KeyFrame(Duration.seconds(1), event -> {
+            secondsLeft[0]--;
+            if (secondsLeft[0] > 0) {
+                confirmButton.setText("Confirm (" + secondsLeft[0] + ")");
+            } else {
+                confirmButton.setText("Confirm");
+                confirmButton.setDisable(false);
+                // Change color to green
+                confirmButton.setStyle("-fx-background-color: #5cb85c; -fx-text-fill: white;");
+            }
+        }));
+        countdown.setCycleCount(3);
+        countdown.play();
 
         Optional<ButtonType> result = confirmationDialog.showAndWait();
-        return result.isPresent() && result.get() == confirmButton;
+        return result.isPresent() && result.get() == confirmButtonType;
     }
 
     private void openEditDialog(ObservableList<ModerationReportFX> selectedItems) {
         try {
             EditModerationReportController editModerationReportController = uiService.loadFxml("ui/edit_moderation_report.fxml");
             editModerationReportController.setSelectedReports(new ArrayList<>(selectedItems));
-
-            editModerationReportController.setOnSaveRunnable(this::onRefreshInitialReports);
 
             Stage editDialog = new Stage();
             int numberOfReports = selectedItems.size();
@@ -1226,6 +1323,18 @@ public class ModerationReportController implements Controller<Region> {
 
         } catch (Exception e) {
             log.error("Error while editing reports", e);
+        }
+    }
+
+    @Getter
+    private enum ModeratorActivityPeriod {
+        LAST_WEEK(7),
+        LAST_MONTH(30);
+
+        private final int days;
+
+        ModeratorActivityPeriod(int days) {
+            this.days = days;
         }
     }
 
@@ -1314,55 +1423,58 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private void showModeratorEvent(List<ModeratorEvent> moderatorEvents, Map<Integer, PlayerInfo> playerInfoMap) {
-        boolean enforceRating = preferencesConfig.getEnforceRatingCheckBox();
-        boolean gameEnded = preferencesConfig.getGameEndedCheckBox();
-        boolean gameResult = preferencesConfig.getGameResultCheckBox();
-        boolean jsonStats = preferencesConfig.getJsonStatsCheckBox();
-        boolean pingOfTypeMoveFilter = preferencesConfig.getPingOfTypeMoveFilterCheckBox();
-        boolean pingOfTypeAttackFilter = preferencesConfig.getPingOfTypeAttackFilterCheckBox();
-        boolean pingOfTypeAlertFilter = preferencesConfig.getPingOfTypeAlertFilterCheckBox();
-        boolean selfDestructionFilter = preferencesConfig.getSelfDestructionFilterCheckBox();
-        boolean focusArmyFromFilter = preferencesConfig.getFocusArmyFromFilterCheckBox();
-        boolean textMarkerTypeFilter = preferencesConfig.getTextMarkerTypeFilterCheckBox();
+        LocalPreferences.TabReports settings = localPreferences.getTabReports();
 
-        String textValue = preferencesConfig.getSelfDestructionFilterAmountTextField();
-        int selfDestructionFilterAmount = textValue.isEmpty() ? 0 : Integer.parseInt(textValue);
+        boolean enforceRating = settings.isShowEnforceRatingCheckBox();
+        boolean gameEnded = settings.isShowGameEndedCheckBox();
+        boolean gameResult = settings.isShowGameResultCheckBox();
+        boolean jsonStats = settings.isShowJsonStatsCheckBox();
+        boolean pingOfTypeMoveFilter = settings.isPingOfTypeMoveFilterCheckBox();
+        boolean pingOfTypeAttackFilter = settings.isPingOfTypeAttackFilterCheckBox();
+        boolean pingOfTypeAlertFilter = settings.isPingOfTypeAlertFilterCheckBox();
+        boolean selfDestructionFilter = settings.isShowSelfDestructionUnitsCheckBox();
+        boolean focusArmyFromFilter = settings.isShowFocusArmyFromCheckBox();
+        boolean textMarkerTypeFilter = settings.isTextMarkerTypeFilterCheckBox();
+        int thresholdToShowSelfDestructionUnitsEvent = Integer.parseInt(settings.getThresholdToShowSelfDestructionUnitsEventTextField());
 
         String moderatorEventsLog = moderatorEvents.stream()
                 .filter(event -> {
+                    if (event.playerNameFromCommandSource() == null) return false;
+
                     String message = event.message();
                     boolean filterOut = false;
-                    if (enforceRating) filterOut |= message.contains("command 'EnforceRating' and data");
-                    if (gameEnded) filterOut |= message.contains("command 'GameEnded' and data");
-                    if (gameResult) filterOut |= message.contains("command 'GameResult' and data");
-                    if (jsonStats) filterOut |= message.contains("command 'JsonStats' and data");
-                    if (pingOfTypeMoveFilter) filterOut |= message.contains("Created a ping of type 'Move'");
-                    if (pingOfTypeAttackFilter) filterOut |= message.contains("Created a ping of type 'Attack'");
-                    if (pingOfTypeAlertFilter) filterOut |= message.contains("Created a ping of type 'Alert'");
-                    if (focusArmyFromFilter) filterOut |= message.contains("focus army from");
-                    if (textMarkerTypeFilter) filterOut |= message.contains("Created a marker with the text");
 
-                    if (selfDestructionFilter && message.contains("Self-destructed")) {
+                    if (!enforceRating && message.contains("command 'EnforceRating' and data")) filterOut = true;
+                    if (!gameEnded && message.contains("command 'GameEnded' and data")) filterOut = true;
+                    if (!gameResult && message.contains("command 'GameResult' and data")) filterOut = true;
+                    if (!jsonStats && message.contains("command 'JsonStats' and data")) filterOut = true;
+                    if (!pingOfTypeMoveFilter && message.contains("Created a ping of type 'Move'")) filterOut = true;
+                    if (!pingOfTypeAttackFilter && message.contains("Created a ping of type 'Attack'"))
+                        filterOut = true;
+                    if (!pingOfTypeAlertFilter && message.contains("Created a ping of type 'Alert'")) filterOut = true;
+                    if (!focusArmyFromFilter && message.contains("focus army from")) filterOut = true;
+                    if (!textMarkerTypeFilter && message.contains("Created a marker with the text")) filterOut = true;
+
+                    if (!selfDestructionFilter && message.contains("Self-destructed")) {
                         Pattern pattern = Pattern.compile("Self-destructed (\\d+) units");
                         Matcher matcher = pattern.matcher(message);
                         if (matcher.find()) {
                             int unitsDestroyed = Integer.parseInt(matcher.group(1));
-                            if (unitsDestroyed < selfDestructionFilterAmount) {
+                            if (unitsDestroyed < thresholdToShowSelfDestructionUnitsEvent) {
                                 filterOut = true;
                             }
                         }
                     }
+
                     return !filterOut;
                 })
                 .map(event -> {
                     long timeMillis = event.time().toMillis();
                     String formattedChatMessageTime = formatChatMessageTime(timeMillis);
 
-                    // If the message involves "focus army from", inject player names and handle ConExecute
                     String formattedMessage = event.message();
                     if (formattedMessage.contains("focus army from")) {
                         if (formattedMessage.contains("via ConExecute")) {
-                            // Handle the case with "via ConExecute"
                             Pattern pattern = Pattern.compile("focus army from (\\d+) to (\\d+) via ConExecute");
                             Matcher matcher = pattern.matcher(formattedMessage);
                             if (matcher.find()) {
@@ -1371,13 +1483,14 @@ public class ModerationReportController implements Controller<Region> {
                                 String fromPlayer = playerInfoMap.getOrDefault(fromArmy, new PlayerInfo(-1, "Unknown Player")).getPlayerName();
                                 String toPlayer = playerInfoMap.getOrDefault(toArmy, new PlayerInfo(-1, "Unknown Player")).getPlayerName();
 
+                                if (fromPlayer == null) return null; // Filter out events with null source TODO Fallback Value (Spectator Slot Probably)
+
                                 formattedMessage = String.format(
                                         "focus army from %d (%s) to %d (%s) via ConExecute",
                                         fromArmy, fromPlayer, toArmy, toPlayer
                                 );
                             }
                         } else {
-                            // Handle the case without "via ConExecute"
                             Pattern pattern = Pattern.compile("focus army from (\\d+) to (\\d+)");
                             Matcher matcher = pattern.matcher(formattedMessage);
                             if (matcher.find()) {
@@ -1385,6 +1498,8 @@ public class ModerationReportController implements Controller<Region> {
                                 int toArmy = Integer.parseInt(matcher.group(2));
                                 String fromPlayer = playerInfoMap.getOrDefault(fromArmy, new PlayerInfo(-1, "Unknown Player")).getPlayerName();
                                 String toPlayer = playerInfoMap.getOrDefault(toArmy, new PlayerInfo(-1, "Unknown Player")).getPlayerName();
+
+                                if ("null".equals(fromPlayer)) return null;
 
                                 formattedMessage = String.format(
                                         "focus army from %d (%s) to %d (%s)",
@@ -1400,6 +1515,7 @@ public class ModerationReportController implements Controller<Region> {
                             formattedMessage
                     );
                 })
+                .filter(Objects::nonNull)
                 .collect(Collectors.joining("\n"));
 
         Platform.runLater(() -> {
@@ -1411,7 +1527,6 @@ public class ModerationReportController implements Controller<Region> {
                     extractName(copyReportedUserIdButton.getText()));
         });
     }
-
 
     private String formatChatMessageTime(long timeMillis) {
         if (timeMillis >= 0) {
@@ -1436,22 +1551,22 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private HttpResponse<Path> downloadReplay(GameFX game, Path tempFilePath) {
-    try {
-        FafApiCommunicationService.checkRateLimit();
+        try {
+            FafApiCommunicationService.checkRateLimit();
 
-        String replayUrl = game.getReplayUrl(replayDownLoadFormat);
-        log.info("Downloading replay from {} to {}", replayUrl, tempFilePath);
+            String replayUrl = game.getReplayUrl(replayDownLoadFormat);
+            log.info("Downloading replay from {} to {}", replayUrl, tempFilePath);
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(replayUrl))
-                .build();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(replayUrl))
+                    .build();
 
-        return httpClient.send(request, HttpResponse.BodyHandlers.ofFile(tempFilePath));
-    } catch (Exception e) {
-        log.error("An error occurred while downloading the replay.", e);
-        return null;
+            return httpClient.send(request, HttpResponse.BodyHandlers.ofFile(tempFilePath));
+        } catch (Exception e) {
+            log.error("An error occurred while downloading the replay.", e);
+            return null;
+        }
     }
-}
 
     private void updateUIUnavailable(String header, String message) {
         Platform.runLater(() -> {
@@ -1757,7 +1872,7 @@ public class ModerationReportController implements Controller<Region> {
 
     @Getter
     @Setter
-    public class PlayerInfo {
+    public static class PlayerInfo {
         private Integer index;
         private String playerName;
 
@@ -1779,7 +1894,7 @@ public class ModerationReportController implements Controller<Region> {
         Map<Integer, PlayerInfo> playerInfoMap = armies.entrySet().stream()
                 .filter(entry -> entry.getValue().containsKey("PlayerName"))
                 .collect(Collectors.toMap(
-                        entry -> entry.getKey(),
+                        Map.Entry::getKey,
                         entry -> new PlayerInfo(entry.getKey(), (String) entry.getValue().get("PlayerName"))
                 ));
 
@@ -1851,32 +1966,6 @@ public class ModerationReportController implements Controller<Region> {
         String victoryCondition = getValueForKey(gameOptions, VICTORY_KEY);
         String shareCondition = getValueForKey(gameOptions, SHARE_KEY);
 
-        boolean debugMode = preferencesConfig.getDebugMode();
-
-        if (debugMode) {
-            log.debug("Debug Mods: {}", mods);
-            log.debug("Debug Metadata: {}", metadata);
-            log.debug("Debug Game Options: {}", gameOptions);
-            log.debug("Debug Events: {}", events);
-
-            log.debug("commonArmy value: {}", commonArmy);
-            log.debug("cheatsEnabled value: {}", cheatsEnabled);
-            log.debug("victoryCondition value: {}", victoryCondition);
-            log.debug("shareCondition value: {}", shareCondition);
-            log.debug("PlayerInfoMap: {}", playerInfoMap);
-
-            if (desyncResult.desync()) {
-                log.debug("Replay is desynchronized.");
-            } else {
-                log.debug("Replay is synchronized.");
-            }
-
-            log.debug("PlayerInfoMap:");
-            playerInfoMap.forEach((index, playerInfo) -> {
-                log.debug("{}={}\n", index, playerInfo);
-            });
-        }
-
         double launchedAt = metadata.getLaunchedAt();
         double gameEnd = metadata.getGameEnd();
         double totalTime = gameEnd - launchedAt;
@@ -1917,7 +2006,7 @@ public class ModerationReportController implements Controller<Region> {
         }
 
         report.append("\nHost: ").append(metadata.getHost()).append("\n")
-                .append("Victory Condition: ").append(DEMORALIZATION.equalsIgnoreCase(victoryCondition) ? ASSASSINATION : victoryCondition).append("\n")
+                .append("Victory Condition: ").append(DEMORALIZATION.equalsIgnoreCase(String.valueOf(victoryCondition)) ? ASSASSINATION : victoryCondition).append("\n")
                 .append("Share Condition: ").append(shareCondition).append("\n")
                 .append("Number of Players: ").append(metadata.getNumPlayers()).append("\n")
                 .append("Teams:\n").append(formatTeams(metadata.getTeams())).append("\n")
@@ -1958,7 +2047,8 @@ public class ModerationReportController implements Controller<Region> {
 
         while ((chatLine = bufReader.readLine()) != null) {
             boolean matchFound = pattern.matcher(chatLine).find();
-            if (preferencesConfig.getFilterLogCheckBox() && matchFound) {
+            if (!localPreferences.getTabReports().isShowNotifyChatMessages() && matchFound) {
+                // Skip notify chat messages
                 continue;
             }
             filteredChatLog.append(chatLine).append("\n");
@@ -1972,7 +2062,7 @@ public class ModerationReportController implements Controller<Region> {
         String url = "https://forum.faforever.com/search?term=" + reportedUserId +
                 "&in=titlesposts&matchWords=all&sortBy=relevance&sortDirection=desc&showAs=posts";
 
-        String browser = String.valueOf(preferencesConfig.getBrowser());
+        String browser = String.valueOf(localPreferences.getUi().getBrowserComboBox());
 
         if ("selectBrowser".equalsIgnoreCase(browser)) {
             Alert alert = new Alert(Alert.AlertType.WARNING);
@@ -1995,57 +2085,266 @@ public class ModerationReportController implements Controller<Region> {
         Runtime.getRuntime().exec(cmd);
     }
 
-    public void addListeners() {
-        enforceRatingCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("generalSettings", "enforceRatingCheckBox", enforceRatingCheckBox.isSelected());
-        });
-
-        gameResultCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("generalSettings", "gameResultCheckBox", gameResultCheckBox.isSelected());
-        });
-
-        jsonStatsCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("generalSettings", "jsonStatsCheckBox", jsonStatsCheckBox.isSelected());
-        });
-
-        gameEndedCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("generalSettings", "gameEndedCheckBox", gameEndedCheckBox.isSelected());
-        });
-
-        focusArmyFromFilterCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("filterSettings", "focusArmyFromFilterCheckBox", focusArmyFromFilterCheckBox.isSelected());
-        });
-
-        pingOfTypeAlertFilterCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("filterSettings", "pingOfTypeAlertFilterCheckBox", pingOfTypeAlertFilterCheckBox.isSelected());
-        });
-
-        pingOfTypeMoveFilterCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("filterSettings", "pingOfTypeMoveFilterCheckBox", pingOfTypeMoveFilterCheckBox.isSelected());
-        });
-
-        pingOfTypeAttackFilterCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("filterSettings", "pingOfTypeAttackFilterCheckBox", pingOfTypeAttackFilterCheckBox.isSelected());
-        });
-
-        selfDestructionFilterCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("filterSettings", "selfDestructionFilterCheckBox", selfDestructionFilterCheckBox.isSelected());
-        });
-
-        textMarkerTypeFilterCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("filterSettings", "textMarkerTypeFilterCheckBox", textMarkerTypeFilterCheckBox.isSelected());
-        });
-
-        selfDestructionFilterAmountTextField.textProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("filterSettings", "selfDestructionFilterAmountTextField", newValue);
-        });
-
-        automaticallyLoadChatLogCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("generalSettings", "automaticallyLoadChatLogCheckBox", gameEndedCheckBox.isSelected());
-        });
-
-        filterLogCheckBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("generalSettings", "filterLogCheckBox", gameEndedCheckBox.isSelected());
-        });
+    public record ModeratorActivity(String moderator, long completedReports, long discardedReports) {
     }
+
+    private record DateRange(OffsetDateTime start, OffsetDateTime end) {
+    }
+
+    private DateRange getDateRange(String period) {
+        LocalDate now = LocalDate.now();
+        OffsetDateTime start;
+        OffsetDateTime end;
+
+        switch (period) {
+            case "THIS_WEEK" -> {
+                start = now.with(DayOfWeek.MONDAY).atStartOfDay().atOffset(ZoneOffset.UTC);
+                end = now.with(DayOfWeek.SUNDAY).atTime(23, 59, 59).atOffset(ZoneOffset.UTC);
+            }
+            case "LAST_WEEK" -> {
+                start = now.minusWeeks(1).with(DayOfWeek.MONDAY).atStartOfDay().atOffset(ZoneOffset.UTC);
+                end = now.minusWeeks(1).with(DayOfWeek.SUNDAY).atTime(23, 59, 59).atOffset(ZoneOffset.UTC);
+            }
+            case "THIS_MONTH" -> {
+                start = now.withDayOfMonth(1).atStartOfDay().atOffset(ZoneOffset.UTC);
+                end = now.withDayOfMonth(now.lengthOfMonth()).atTime(23, 59, 59).atOffset(ZoneOffset.UTC);
+            }
+            case "LAST_MONTH" -> {
+                LocalDate lastMonth = now.minusMonths(1);
+                start = lastMonth.withDayOfMonth(1).atStartOfDay().atOffset(ZoneOffset.UTC);
+                end = lastMonth.withDayOfMonth(lastMonth.lengthOfMonth()).atTime(23, 59, 59).atOffset(ZoneOffset.UTC);
+            }
+            default -> throw new IllegalArgumentException("Invalid period: " + period);
+        }
+        return new DateRange(start, end);
+    }
+
+    private void updateModeratorStatistics() {
+        log.trace("Updating moderator statistics...");
+        DateRange lastWeek = getDateRange("LAST_WEEK");
+        DateRange thisWeek = getDateRange("THIS_WEEK");
+        DateRange lastMonth = getDateRange("LAST_MONTH");
+        DateRange thisMonth = getDateRange("THIS_MONTH");
+
+        List<ModeratorActivity> lastWeekActivity = getModeratorActivityForDateRange(lastWeek.start(), lastWeek.end());
+        List<ModeratorActivity> thisWeekActivity = getModeratorActivityForDateRange(thisWeek.start(), thisWeek.end());
+        List<ModeratorActivity> lastMonthActivity = getModeratorActivityForDateRange(lastMonth.start(), lastMonth.end());
+        List<ModeratorActivity> thisMonthActivity = getModeratorActivityForDateRange(thisMonth.start(), thisMonth.end());
+
+        updateText(moderatorStatisticsLastWeekText, "Last Week", lastWeekActivity);
+        updateText(moderatorStatisticsThisWeekText, "This Week", thisWeekActivity);
+        updateText(moderatorStatisticsLastMonthText, "Last Month", lastMonthActivity);
+        updateText(moderatorStatisticsThisMonthText, "This Month", thisMonthActivity);
+    }
+
+    private void updateText(Text textPane, String period, List<ModeratorActivity> activities) {
+        log.trace("Updating {} moderator statistics...", period);
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("Moderator Statistics for " + period));
+        sb.append("\n\n");
+
+        long totalCompleted = activities.stream().mapToLong(ModeratorActivity::completedReports).sum();
+        long totalDiscarded = activities.stream().mapToLong(ModeratorActivity::discardedReports).sum();
+        long grandTotal = totalCompleted + totalDiscarded;
+
+        activities.stream()
+                .sorted((a1, a2) -> Long.compare(
+                        a2.completedReports() + a2.discardedReports(),
+                        a1.completedReports() + a1.discardedReports()))
+                .forEach(activity -> {
+                    long individualTotal = activity.completedReports() + activity.discardedReports();
+                    sb.append(String.format("%-15s - Completed: %3d, Discarded: %3d, Total: %4d\n",
+                            activity.moderator(),
+                            activity.completedReports(),
+                            activity.discardedReports(),
+                            individualTotal));
+                });
+
+        sb.append("\n");
+        sb.append(String.format("Overall - Completed: %3d, Discarded: %3d, Total: %4d\n",
+                totalCompleted, totalDiscarded, grandTotal));
+
+        textPane.setText(sb.toString());
+    }
+
+    private List<ModeratorActivity> getModeratorActivityForDateRange(OffsetDateTime start, OffsetDateTime end) {
+        Map<String, Long> completedReports = cachedReports.stream()
+                .filter(report -> report.getUpdateTime() != null &&
+                        report.getUpdateTime().isAfter(start) &&
+                        report.getUpdateTime().isBefore(end) &&
+                        report.getReportStatus() == ModerationReportStatus.COMPLETED &&
+                        report.getLastModerator() != null)
+                .collect(Collectors.groupingBy(
+                        report -> report.getLastModerator().getRepresentation(),
+                        Collectors.counting()
+                ));
+
+        Map<String, Long> discardedReports = cachedReports.stream()
+                .filter(report -> report.getUpdateTime() != null &&
+                        report.getUpdateTime().isAfter(start) &&
+                        report.getUpdateTime().isBefore(end) &&
+                        report.getReportStatus() == ModerationReportStatus.DISCARDED &&
+                        report.getLastModerator() != null)
+                .collect(Collectors.groupingBy(
+                        report -> report.getLastModerator().getRepresentation(),
+                        Collectors.counting()
+                ));
+
+        Set<String> allModerators = new HashSet<>();
+        allModerators.addAll(completedReports.keySet());
+        allModerators.addAll(discardedReports.keySet());
+
+        return allModerators.stream()
+                .map(moderator -> new ModeratorActivity(
+                        moderator,
+                        completedReports.getOrDefault(moderator, 0L),
+                        discardedReports.getOrDefault(moderator, 0L)
+                ))
+                .collect(Collectors.toList());
+    }
+
+    @FXML
+    private void updateModeratorQuotas() {
+        DateRange lastWeek = getDateRange("LAST_WEEK");
+        DateRange thisWeek = getDateRange("THIS_WEEK");
+        String quotaInput = quotaUserInputTextField.getText();
+        int quota;
+        try {
+            quota = Integer.parseInt(quotaInput);
+        } catch (NumberFormatException e) {
+            quotaResultModeratorsText.setText("Please enter a valid number for the quota.");
+            return;
+        }
+
+        List<ModeratorActivity> lastWeekActivity = getModeratorActivityForDateRange(lastWeek.start(), lastWeek.end());
+        List<ModeratorActivity> thisWeekActivity = getModeratorActivityForDateRange(thisWeek.start(), thisWeek.end());
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("Moderator Quotas\n");
+        sb.append("------------------------------------\n\n");
+
+        Map<String, ModeratorQuotaStatus> moderatorStatus = new HashMap<>();
+
+        sb.append("Last Week Activity:\n\n");
+        lastWeekActivity.stream()
+                .sorted(Comparator.comparing(ModeratorActivity::moderator))
+                .forEach(activity -> {
+                    long totalReports = activity.completedReports() + activity.discardedReports();
+                    boolean quotaReached = totalReports >= quota;
+                    String statusSymbol = quotaReached ? "✅" : "❌";
+                    sb.append(String.format("%-15s - Total Reports: %4d %s\n",
+                            activity.moderator(),
+                            totalReports,
+                            statusSymbol));
+                    moderatorStatus.put(activity.moderator(), new ModeratorQuotaStatus(totalReports, quotaReached));
+                });
+        sb.append("\n");
+
+        sb.append("This Week Activity:\n\n");
+        thisWeekActivity.stream()
+                .sorted(Comparator.comparing(ModeratorActivity::moderator))
+                .forEach(activity -> {
+                    long totalReports = activity.completedReports() + activity.discardedReports();
+                    boolean quotaReached = totalReports >= quota;
+                    String statusSymbol = quotaReached ? "✅" : "❌";
+                    String lastWeekStatus = moderatorStatus.containsKey(activity.moderator()) ?
+                            (moderatorStatus.get(activity.moderator()).quotaReached() ? "✅" : "❌") : "N/A";
+                    sb.append(String.format("%-15s - Total Reports: %4d %s (Last Week: %s)\n",
+                            activity.moderator(),
+                            totalReports,
+                            statusSymbol,
+                            lastWeekStatus));
+                });
+
+        sb.append("\n------------------------------------\n");
+        sb.append(String.format("Required Quota: %d\n", quota));
+
+        quotaResultModeratorsText.setText(sb.toString());
+    }
+
+    private record ModeratorQuotaStatus(long totalReports, boolean quotaReached) {}
+
+    private void bindUIElementsToPreferences() {
+        LocalPreferences.TabReports tabReports = localPreferences.getTabReports();
+
+        for (Field fxField : this.getClass().getDeclaredFields()) {
+            fxField.setAccessible(true);
+            String fieldName = fxField.getName();
+
+            try {
+                // Try to find a matching field in TabReports
+                Field prefField = LocalPreferences.TabReports.class.getDeclaredField(fieldName);
+                prefField.setAccessible(true);
+
+                Object node = fxField.get(this);
+                Object value = prefField.get(tabReports);
+
+                if (node instanceof TextField textField && value instanceof String) {
+                    textField.setText((String) value);
+                    textField.textProperty().addListener((obs, oldVal, newVal) -> {
+                        try {
+                            prefField.set(tabReports, newVal);
+                        } catch (IllegalAccessException ignored) {
+                        }
+                    });
+                } else if (node instanceof TextArea textArea && value instanceof String) {
+                    textArea.setText((String) value);
+                    textArea.textProperty().addListener((obs, oldVal, newVal) -> {
+                        try {
+                            prefField.set(tabReports, newVal);
+                        } catch (IllegalAccessException ignored) {
+                        }
+                    });
+                } else if (node instanceof CheckBox checkBox && value instanceof Boolean) {
+                    checkBox.setSelected((Boolean) value);
+                    checkBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+                        try {
+                            prefField.set(tabReports, newVal);
+                        } catch (IllegalAccessException ignored) {
+                        }
+                    });
+                } else if (node instanceof TitledPane titledPane && value instanceof Boolean) {
+                    titledPane.setExpanded((Boolean) value);
+                    titledPane.expandedProperty().addListener((obs, oldVal, newVal) -> {
+                        try {
+                            prefField.set(tabReports, newVal);
+                        } catch (IllegalAccessException ignored) {
+                        }
+                    });
+                }
+
+            } catch (NoSuchFieldException e) {
+                // Controller field has no matching preference field, skip it
+            } catch (IllegalAccessException e) {
+                log.warn("Cannot access field {}", fieldName, e);
+            }
+        }
+    }
+
+    public static void saveSplitPanePositions(SplitPane splitPane, LocalPreferences localPreferences) {
+        if (splitPane == null || localPreferences == null) return;
+
+        List<Double> positions = splitPane.getDividers().stream()
+                .map(SplitPane.Divider::getPosition)
+                .collect(Collectors.toList());
+
+        localPreferences.getTabReports().setRootSplitPaneDividerPositionsTabReports(positions);
+        log.debug("Saved SplitPane positions: {}", positions);
+    }
+
+    public static void loadSplitPanePositions(SplitPane splitPane, LocalPreferences localPreferences) {
+        if (splitPane == null || localPreferences == null) return;
+
+        List<Double> positions = localPreferences.getTabReports().getRootSplitPaneDividerPositionsTabReports();
+        if (positions != null && !positions.isEmpty()) {
+            ObservableList<SplitPane.Divider> dividers = splitPane.getDividers();
+            for (int i = 0; i < Math.min(dividers.size(), positions.size()); i++) {
+                dividers.get(i).setPosition(positions.get(i));
+            }
+            log.debug("Loaded SplitPane positions: {}", positions);
+        } else {
+            log.debug("No saved SplitPane positions to load.");
+        }
+    }
+
 }

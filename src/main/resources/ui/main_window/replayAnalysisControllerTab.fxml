@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox fx:id="root" spacing="5" style="-fx-padding: 10px;" xmlns="http://javafx.com/javafx/20.0.1"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.faforever.moderatorclient.ui.main_window.ReplayAnalysisController">
+
+    <VBox layoutX="14.0" layoutY="14.0" spacing="10.0" prefWidth="576.0">
+        <HBox spacing="5.0">
+            <TextField fx:id="numberOfReplaysTextField" promptText="Replay Limit" text="100" prefWidth="200.0"/>
+            <Button fx:id="checkLatestReplaysButton" text="Check Latest Replays" onAction="#handleCheckLatestReplaysButton"/>
+        </HBox>
+        <Button fx:id="checkReplaysInFolder" text="Check Replays in Folder" onAction="#handleReplaysInFolderButton"/>
+        <TextArea fx:id="replayAnalysisTextArea" prefHeight="350.0" prefWidth="576.0" editable="false" wrapText="true"/>
+
+        <HBox spacing="5.0">
+            <TextField fx:id="replayIDTextField" promptText="Enter ReplayID" text="24343940" prefWidth="100.0"/>
+            <Button fx:id="replayIdCheckButton" text="Check Replay" onAction="#handleReplayIdCheckButton"/>
+        </HBox>
+    </VBox>
+
+</VBox>

@@ -37,11 +37,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.io.Serializable;
 import java.lang.reflect.Array;
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
@@ -51,8 +47,6 @@ import com.google.common.util.concurrent.RateLimiter;
 @Service
 @Slf4j
 public class FafApiCommunicationService {
-    private static final ConcurrentLinkedDeque<Long> requestTimestamps = new ConcurrentLinkedDeque<>();
-    private static final long ONE_MINUTE_IN_MILLIS = 60 * 1000;
     private final ResourceConverter defaultResourceConverter;
     private final ResourceConverter updateResourceConverter;
     private final OAuthTokenInterceptor oAuthTokenInterceptor;
@@ -103,7 +97,7 @@ public class FafApiCommunicationService {
     public void initialize(EnvironmentProperties environmentProperties) {
         this.environmentProperties = environmentProperties;
         maxRequests = environmentProperties.getMaxRequestsToServerPerMinute();
-        log.debug("Setting max requests to server per minute to {}", maxRequests);
+        log.info("Setting max requests to server per minute to {}", maxRequests);
         rateLimiter.setRate(maxRequests / 60.0);
     }
 
@@ -148,14 +142,20 @@ public class FafApiCommunicationService {
         applicationEventPublisher.publishEvent(new ApiAuthorizedEvent());
     }
 
-    public static void checkRateLimit() {
+    private static final Deque<Long> requestTimestamps = new ConcurrentLinkedDeque<>();
+    private static final long ONE_MINUTE_IN_MILLIS = 60_000;
+    private static final int MAX_REQUESTS_PER_MINUTE = 90;
+
+    public static synchronized void checkRateLimit() {
         long currentTime = System.currentTimeMillis();
 
+        // Remove timestamps older than one minute
         while (!requestTimestamps.isEmpty() && currentTime - requestTimestamps.peek() > ONE_MINUTE_IN_MILLIS) {
             requestTimestamps.poll();
         }
 
-        if (requestTimestamps.size() >= 100) {
+        // If we hit the limit, wait until at least one slot frees up
+        if (requestTimestamps.size() >= MAX_REQUESTS_PER_MINUTE) {
             long waitTime = requestTimestamps.peek() + ONE_MINUTE_IN_MILLIS - currentTime;
             if (waitTime > 0) {
                 try {
@@ -164,11 +164,24 @@ public class FafApiCommunicationService {
                     Thread.currentThread().interrupt();
                 }
             }
+
+            // Clean up again after sleeping
+            currentTime = System.currentTimeMillis();
+            while (!requestTimestamps.isEmpty() && currentTime - requestTimestamps.peek() > ONE_MINUTE_IN_MILLIS) {
+                requestTimestamps.poll();
+            }
         }
 
+        // Register this request
         requestTimestamps.add(System.currentTimeMillis());
+    }
 
-        rateLimiter.acquire();
+    public static long getCooldownRemainingMillis() {
+        long now = System.currentTimeMillis();
+        if (requestTimestamps.size() < MAX_REQUESTS_PER_MINUTE) {
+            return 0;
+        }
+        return Math.max(0, (requestTimestamps.peek() + ONE_MINUTE_IN_MILLIS) - now);
     }
 
     public void forceRenameUserName(String userId, String newName) {
@@ -294,14 +307,32 @@ public class FafApiCommunicationService {
         return getPage(clazz, routeBuilder, pageSize, 1, Collections.emptyMap());
     }
 
+    @SneakyThrows
     public <T extends ElideEntity> List<T> getAll(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder) {
         checkRateLimit();
-        return getAll(clazz, routeBuilder, Collections.emptyMap());
+
+        int page = 1;
+        int pageSize = environmentProperties.getMaxPageSize();
+        List<T> result = new LinkedList<>();
+
+        List<T> current;
+        do {
+            current = getPage(clazz, routeBuilder, pageSize, page++, Collections.emptyMap());
+            result.addAll(current);
+
+            // Stop early if the returned page has fewer elements than the page size
+            if (current.size() < pageSize) {
+                break;
+            }
+
+        } while (!current.isEmpty());
+
+        return result;
     }
 
     public <T extends ElideEntity> List<T> getAll(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder, java.util.Map<String, Serializable> params) {
         checkRateLimit();
-        return getMany(clazz, routeBuilder, environmentProperties.getDefaultResultSize(), params);
+        return getMany(clazz, routeBuilder, environmentProperties.getMaxPageSize(), params);
     }
 
     @SneakyThrows
@@ -314,11 +345,18 @@ public class FafApiCommunicationService {
         checkRateLimit();
         List<T> result = new LinkedList<>();
         int page = 1;
+        int pageSize = environmentProperties.getMaxPageSize();
         List<T> current;
 
         do {
-            current = getPage(clazz, routeBuilder, environmentProperties.getDefaultResultSize(), page++, params);
+            current = getPage(clazz, routeBuilder, pageSize, page++, params);
             result.addAll(current);
+
+            // Stop early if fewer results than a full page were returned
+            if (current.size() < pageSize) {
+                break;
+            }
+
         } while (!current.isEmpty() && result.size() < count);
 
         return result;
@@ -351,6 +389,41 @@ public class FafApiCommunicationService {
                     params);
         } catch (Throwable t) {
             log.error("API returned error on getPage for route ''{}''", route, t);
+            applicationEventPublisher.publishEvent(new FafApiFailGetEvent(t, route, routeBuilder.getDtoClass()));
+            return Collections.emptyList();
+        }
+    }
+
+    //TODO check if worth it to save API requests
+    @SuppressWarnings("unchecked")
+    @SneakyThrows
+    public <T extends ElideEntity> List<T> getPageForSmurfVillageLookup(Class<T> clazz,
+                                                                        ElideNavigatorOnCollection<T> routeBuilder,
+                                                                        int pageSize,
+                                                                        int page,
+                                                                        MultiValueMap<String, String> params) {
+        checkRateLimit();
+        authorizedLatch.await();
+
+        // Build route without unnecessary includes
+        String route = routeBuilder
+                .addInclude("uniqueIdAssignments")
+                .addInclude("uniqueIdAssignments.uniqueId")
+                .addInclude("accountLinks")
+                .pageSize(pageSize)
+                .pageNumber(page)
+                .build();
+
+        cycleAvoidingMappingContext.clearCache();
+        log.debug("Sending API request (Smurf Village Lookup): {}", route);
+
+        try {
+            return (List<T>) restTemplate.getForObject(
+                    route,
+                    Array.newInstance(clazz, 0).getClass(),
+                    params);
+        } catch (Throwable t) {
+            log.error("API returned error on Smurf Village Lookup for route '{}'", route, t);
             applicationEventPublisher.publishEvent(new FafApiFailGetEvent(t, route, routeBuilder.getDtoClass()));
             return Collections.emptyList();
         }

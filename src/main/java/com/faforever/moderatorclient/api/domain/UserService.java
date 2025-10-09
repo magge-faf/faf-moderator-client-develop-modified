@@ -19,13 +19,10 @@ import com.faforever.moderatorclient.ui.domain.*;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
-import java.util.ArrayList;
+import org.springframework.util.LinkedMultiValueMap;
+
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 @Service
 @Slf4j
@@ -70,7 +67,7 @@ public class UserService {
     }
 
     public List<PlayerFX> findLatestRegistrations() {
-        FafApiCommunicationService.checkRateLimit();
+        fafApi.checkRateLimit();
         ElideNavigatorOnCollection<Player> navigator = ElideNavigator.of(Player.class)
                 .collection()
                 .addSortingRule("id", false)
@@ -83,15 +80,15 @@ public class UserService {
     }
 
     public List<PlayerFX> findUsersByAttribute(@NotNull String attribute, @NotNull String pattern) {
-
+        fafApi.checkRateLimit();
         log.debug("Searching for player by attribute '{}' with pattern: {}", attribute, pattern);
         ElideNavigatorOnCollection<Player> navigator = ElideNavigator.of(Player.class)
                 .collection()
                 .setFilter(ElideNavigator.qBuilder().string(attribute).eq(pattern));
         addModeratorIncludes(navigator);
-        List<Player> firstPage = fafApi.getFirstPageOnlyForFindUsersByAttribute(Player.class, navigator, environmentProperties.getMaxPageSize());
+        List<Player> firstPage = fafApi.getFirstPageOnlyForFindUsersByAttribute(Player.class, navigator, environmentProperties.getMaxPageSizeSmurfVillageLookup());
 
-        if (firstPage.size() < environmentProperties.getMaxPageSize()) {
+        if (firstPage.size() < environmentProperties.getMaxPageSizeSmurfVillageLookup()) {
             return playerMapper.mapToFx(firstPage);
         }
 
@@ -101,7 +98,7 @@ public class UserService {
     }
 
     public List<TeamkillFX> findLatestTeamkills() {
-        log.debug("Searching for latest teamkills ");
+        fafApi.checkRateLimit();
         ElideNavigatorOnCollection<Teamkill> navigator = ElideNavigator.of(Teamkill.class)
                 .collection()
                 .addInclude("teamkiller")
@@ -110,11 +107,12 @@ public class UserService {
                 .addSortingRule("id", false);
 
         List<Teamkill> result = fafApi.getPage(Teamkill.class, navigator, 100, 1, Collections.emptyMap());
-        log.trace("found {} teamkills", result.size());
+        log.trace("findLatestTeamkills: found {} teamkills", result.size());
         return teamkillMapper.map(result);
     }
 
     public List<TeamkillFX> findTeamkillsByUserId(@NotNull String userId) {
+        fafApi.checkRateLimit();
         log.debug("Searching for teamkills invoked by player id: {}", userId);
         ElideNavigatorOnCollection<Teamkill> navigator = ElideNavigator.of(Teamkill.class)
                 .collection()
@@ -123,11 +121,11 @@ public class UserService {
                 .setFilter(ElideNavigator.qBuilder().string("teamkiller.id").eq(userId));
 
         List<Teamkill> result = fafApi.getAll(Teamkill.class, navigator);
-        log.trace("found {} teamkills", result.size());
         return teamkillMapper.map(result);
     }
 
-    public List<GamePlayerStats> getLastHundredPlayedGamesByFeaturedMod(@NotNull String userId, int page, FeaturedModFX featuredModFX) {
+    public List<GamePlayerStats> getLastThousandPlayedGamesByFeaturedMod(@NotNull String userId, int page, FeaturedModFX featuredModFX) {
+        fafApi.checkRateLimit();
         log.debug("Searching for games played by player id: {}", userId);
         ElideNavigatorOnCollection<GamePlayerStats> navigator = ElideNavigator.of(GamePlayerStats.class)
                 .collection()
@@ -145,21 +143,23 @@ public class UserService {
         } else {
             navigator.setFilter(ElideNavigator.qBuilder().string("player.id").eq(userId));
         }
-        return fafApi.getPage(GamePlayerStats.class, navigator, 100, page, Collections.emptyMap());
+        return fafApi.getPage(GamePlayerStats.class, navigator, 1000, page, Collections.emptyMap());
     }
 
     public List<GamePlayerStats> getLastHundredPlayedGames(@NotNull String userId, int page) {
-        return getLastHundredPlayedGamesByFeaturedMod(userId, page, null);
+        return getLastThousandPlayedGamesByFeaturedMod(userId, page, null);
     }
 
     public List<FeaturedModFX> getFeaturedMods() {
+        fafApi.checkRateLimit();
         ElideNavigatorOnCollection<FeaturedMod> navigator = ElideNavigator.of(FeaturedMod.class)
                 .collection();
         return featuredModMapper.map(fafApi.getAll(FeaturedMod.class, navigator));
     }
 
     public UserNoteFX getUserNoteById(@NotNull String userNoteId) {
-        log.debug("Search for player note id: " + userNoteId);
+        fafApi.checkRateLimit();
+        log.debug("Search for player note id: {}", userNoteId);
         ElideNavigatorOnId<UserNote> navigator = ElideNavigator.of(UserNote.class)
                 .id(userNoteId)
                 .addInclude("player")
@@ -168,7 +168,8 @@ public class UserService {
     }
 
     public List<UserNoteFX> getUserNotes(@NotNull String userId) {
-        log.debug("Search for all note of player id: " + userId);
+        fafApi.checkRateLimit();
+        log.debug("Search for all note of player id: {}", userId);
         ElideNavigatorOnCollection<UserNote> navigator = ElideNavigator.of(UserNote.class)
                 .collection()
                 .setFilter(ElideNavigator.qBuilder().string("player.id").eq(userId))
@@ -178,27 +179,32 @@ public class UserService {
     }
 
     public String createUserNote(UserNote userNote) {
+        fafApi.checkRateLimit();
         log.debug("Creating userNote: {}", userNote);
         return fafApi.post(ElideNavigator.of(UserNote.class).collection(), userNote).getId();
     }
 
     public void deleteUserNote(@NotNull String userNoteId) {
+        fafApi.checkRateLimit();
         log.debug("Deleting user note with id: {}", userNoteId);
         ElideNavigatorOnId<UserNote> navigator = ElideNavigator.of(UserNote.class).id(userNoteId);
         fafApi.delete(navigator);
     }
 
     public UserNoteFX patchUserNote(UserNote userNote) {
-        log.debug("Patching UserNote of id: " + userNote.getId());
+        fafApi.checkRateLimit();
+        log.debug("Patching UserNote of id: {}", userNote.getId());
         return userNoteMapper.map(fafApi.patch(ElideNavigator.of(UserNote.class).id(userNote.getId()), userNote));
     }
 
     public void updatePlayer(String id, String newName) {
+        fafApi.checkRateLimit();
         log.debug("Update of player of player id: " + id);
         fafApi.forceRenameUserName(id, newName);
     }
 
-    public List<UserNoteFX> getAllUserNotes() {
+    public List<UserNoteFX> getAllUserNotesForRecentNotesTab() {
+        fafApi.checkRateLimit();
         log.debug("Searching for all user notes");
         ElideNavigatorOnCollection<UserNote> navigator = ElideNavigator.of(UserNote.class)
                 .collection()

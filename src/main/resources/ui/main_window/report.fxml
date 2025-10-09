@@ -7,7 +7,6 @@
 <?import javafx.scene.control.Tab?>
 <?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TabPane?>
-<?import javafx.scene.control.TextArea?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
@@ -18,6 +17,8 @@
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.text.TextFlow?>
 <?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.TitledPane?>
+<?import javafx.scene.control.TextFormatter?>
 <SplitPane fx:id="root" dividerPositions="0.25" orientation="VERTICAL" xmlns="http://javafx.com/javafx/11.0.1"
            xmlns:fx="http://javafx.com/fxml/1"
            fx:controller="com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController">
@@ -25,7 +26,7 @@
         <ScrollPane maxHeight="Infinity" maxWidth="-Infinity" HBox.hgrow="ALWAYS" hbarPolicy="NEVER">
             <VBox spacing="3">
                 <ChoiceBox fx:id="statusChoiceBox"/>
-                <TextField fx:id="playerNameFilterTextField" promptText="Enter player name to search" minWidth="150"/>
+                <TextField fx:id="playerNameFilterTextField" promptText="RID1234 / user name" minWidth="150"/>
                 <Button fx:id="editReportButton" text="Edit" onAction="#onEdit" minWidth="150"/>
                 <Button text="Refresh" onAction="#onRefreshInitialReports" minWidth="150"/>
 
@@ -42,8 +43,10 @@
                 <Button fx:id="copyChatLogButton" text="Chat Log" onAction="#onCopyChatLog" minWidth="150"/>
                 <Button fx:id="copyChatLogButtonOffenderOnly" text="Chat Log Offender" onAction="#onCopyChatLogButtonOffenderOnly" minWidth="150"/>
                 <Button fx:id="copyModeratorEventsButton" text="Moderator Events" onAction="#onCopyModeratorEvents" minWidth="150"/>
-                <Button fx:id="startReplayButton" text="Start Replay" onAction="#onStartReplay" minWidth="150"/>
 
+                <Separator minHeight="5"/>
+
+                <Button fx:id="startReplayButton" text="Start Replay" onAction="#onStartReplay" minWidth="150"/>
                 <TextField fx:id="getModeratorEventsForReplayIdTextField" promptText="Enter Replay ID" minWidth="150"/>
                 <Button fx:id="getModeratorEventsReplayIdButton" text="Get Chat/Events" onAction="#onModeratorEventsReplayIdButton" minWidth="150"/>
 
@@ -62,7 +65,7 @@
         </ScrollPane>
         <TableView fx:id="reportTableView" maxHeight="Infinity" maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
     </SplitPane>
-    <TabPane tabClosingPolicy="UNAVAILABLE" prefHeight="300">
+    <TabPane tabClosingPolicy="UNAVAILABLE">
         <Tab text="Chat Log">
             <ScrollPane prefHeight="200.0" prefWidth="200.0">
                 <TextFlow fx:id="chatLogTextFlow" />
@@ -115,90 +118,130 @@
             </TableView>
         </Tab>
         <Tab text="Moderator Statistics">
-            <VBox>
-                <TextArea fx:id="moderatorStatisticsTextArea" editable="false" prefHeight="30" maxHeight="30" minHeight="30" prefRowCount="1"/>
-                <TableView fx:id="moderatorStatisticsTableView" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
-                           VBox.vgrow="ALWAYS">
-                    <columns>
-                        <TableColumn text="Moderator" prefWidth="200">
-                            <cellValueFactory>
-                                <PropertyValueFactory property="moderator"/>
-                            </cellValueFactory>
-                        </TableColumn>
-                        <TableColumn text="All Reports" prefWidth="100">
-                            <cellValueFactory>
-                                <PropertyValueFactory property="allReports"/>
-                            </cellValueFactory>
-                        </TableColumn>
-                        <TableColumn text="Completed Reports" prefWidth="100">
-                            <cellValueFactory>
-                                <PropertyValueFactory property="completedReports"/>
-                            </cellValueFactory>
-                        </TableColumn>
-                        <TableColumn text="Discarded Reports" prefWidth="100">
-                            <cellValueFactory>
-                                <PropertyValueFactory property="discardedReports"/>
-                            </cellValueFactory>
-                        </TableColumn>
-                        <TableColumn text="Processing Reports" prefWidth="100">
-                            <cellValueFactory>
-                                <PropertyValueFactory property="processingReports"/>
-                            </cellValueFactory>
-                        </TableColumn>
-                        <TableColumn fx:id="lastActivity" text="Last Activity" prefWidth="200">
-                            <cellValueFactory>
-                                <PropertyValueFactory property="lastActivity"/>
-                            </cellValueFactory>
-                        </TableColumn>
-                    </columns>
-                </TableView>
-                <HBox alignment="CENTER">
-                    <Button text="Copy All Stats Data to Clipboard (takes a few seconds)" onAction="#handleCopyAllStatsButtonAction"/>
-                </HBox>
-            </VBox>
+            <ScrollPane fitToWidth="true" fitToHeight="true">
+                <content>
+                    <VBox>
+                        <TitledPane text="Quotas" expanded="false">
+                            <content>
+                                <VBox>
+                                    <HBox spacing="10">
+                                        <Label text="The quota the moderator is expected to fulfill each week:"/>
+                                        <TextField fx:id="quotaUserInputTextField" style="-fx-fill: white;" />
+                                        <Button text="Calculate Quota" fx:id="calculateQuotaButton" onAction="#updateModeratorQuotas"/>
+                                    </HBox>
+                                    <Text fx:id="quotaResultModeratorsText" style="-fx-fill: white;" />
+                                </VBox>
+                            </content>
+                        </TitledPane>
+
+                        <TitledPane text="Weekly and Monthly Statistics" expanded="false">
+                            <content>
+                                <VBox>
+                                    <Text fx:id="moderatorStatisticsThisWeekText" style="-fx-fill: white;"/>
+                                    <Text fx:id="moderatorStatisticsLastWeekText" style="-fx-fill: white;"/>
+                                    <Separator/>
+                                    <Text fx:id="moderatorStatisticsThisMonthText" style="-fx-fill: white;"/>
+                                    <Text fx:id="moderatorStatisticsLastMonthText" style="-fx-fill: white;"/>
+                                </VBox>
+                            </content>
+                        </TitledPane>
+                        <TitledPane text="Moderator All-Time Statistics" expanded="false">
+                            <TableView fx:id="moderatorStatisticsTableView" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
+                                       VBox.vgrow="ALWAYS">
+                                <columns>
+                                    <TableColumn text="Moderator" prefWidth="200">
+                                        <cellValueFactory>
+                                            <PropertyValueFactory property="moderator"/>
+                                        </cellValueFactory>
+                                    </TableColumn>
+                                    <TableColumn text="All Reports" prefWidth="100">
+                                        <cellValueFactory>
+                                            <PropertyValueFactory property="allReports"/>
+                                        </cellValueFactory>
+                                    </TableColumn>
+                                    <TableColumn text="Completed Reports" prefWidth="100">
+                                        <cellValueFactory>
+                                            <PropertyValueFactory property="completedReports"/>
+                                        </cellValueFactory>
+                                    </TableColumn>
+                                    <TableColumn text="Discarded Reports" prefWidth="100">
+                                        <cellValueFactory>
+                                            <PropertyValueFactory property="discardedReports"/>
+                                        </cellValueFactory>
+                                    </TableColumn>
+                                    <TableColumn text="Processing Reports" prefWidth="100">
+                                        <cellValueFactory>
+                                            <PropertyValueFactory property="processingReports"/>
+                                        </cellValueFactory>
+                                    </TableColumn>
+                                    <TableColumn fx:id="lastActivity" text="Last Activity" prefWidth="200">
+                                        <cellValueFactory>
+                                            <PropertyValueFactory property="lastActivity"/>
+                                        </cellValueFactory>
+                                    </TableColumn>
+                                </columns>
+                            </TableView>
+                        </TitledPane>
+                        <HBox alignment="CENTER">
+                            <Button text="Copy All Stats Data to Clipboard (takes a few seconds)" onAction="#handleCopyAllStatsButtonAction"/>
+                        </HBox>
+                    </VBox>
+                </content>
+            </ScrollPane>
         </Tab>
         <Tab text="Settings Moderator Events, Replay and Chat Log">
             <VBox spacing="10">
-                <!-- Informational Label -->
-                <Label text="Enabling the filters will hide these event messages."
-                       style="-fx-text-fill: red; -fx-font-size: 12px; -fx-padding: 5px 0px;"/>
-                <Separator/>
 
                 <!-- Game Data -->
-                <Label text="Filter Game Data:"/>
+                <Label text="Show Game Data Events:"/>
                 <HBox spacing="5">
-                    <CheckBox fx:id="enforceRatingCheckBox" text="EnforceRating"/>
-                    <CheckBox fx:id="gameResultCheckBox" text="GameResult"/>
-                    <CheckBox fx:id="jsonStatsCheckBox" text="JsonStats"/>
-                    <CheckBox fx:id="gameEndedCheckBox" text="GameEnded"/>
-                    <CheckBox fx:id="focusArmyFromFilterCheckBox" text="focusArmyFrom"/>
+                    <CheckBox fx:id="showEnforceRatingCheckBox" text="EnforceRating"/>
+                    <CheckBox fx:id="showGameResultCheckBox" text="GameResult"/>
+                    <CheckBox fx:id="showJsonStatsCheckBox" text="JsonStats"/>
+                    <CheckBox fx:id="showGameEndedCheckBox" text="GameEnded"/>
+                    <CheckBox fx:id="showFocusArmyFromCheckBox" text="focusArmyFrom"/>
                 </HBox>
                 <Separator/>
 
                 <!-- Ping of Type -->
-                <Label text="Filter Ping of Type:"/>
+                <Label text="Show Ping of Type Events:"/>
                 <HBox spacing="5">
-                    <CheckBox fx:id="pingOfTypeMoveFilterCheckBox" text="Move"/>
-                    <CheckBox fx:id="pingOfTypeAttackFilterCheckBox" text="Attack"/>
-                    <CheckBox fx:id="pingOfTypeAlertFilterCheckBox" text="Alert"/>
-                    <CheckBox fx:id="textMarkerTypeFilterCheckBox" text="Text Markers"/>
+                    <CheckBox fx:id="showPingMoveCheckBox" text="Move"/>
+                    <CheckBox fx:id="showPingAttackCheckBox" text="Attack"/>
+                    <CheckBox fx:id="showPingAlertCheckBox" text="Alert"/>
+                    <CheckBox fx:id="showTextMarkersCheckBox" text="Text Markers"/>
                 </HBox>
                 <Separator/>
 
                 <!-- Self-Destruction -->
-                <Label text="Filter Self-Destruction"/>
+                <Label text="Show Self-Destruction Events"/>
                 <HBox spacing="5">
-                    <CheckBox fx:id="selfDestructionFilterCheckBox"
-                              text="Do not show the event 'Self-destructed' for less than the following amount of units:"/>
-                    <TextField fx:id="selfDestructionFilterAmountTextField"
+                    <CheckBox fx:id="showSelfDestructionUnitsCheckBox"
+                              text="Show the event 'Self-destructed' for more than the following amount of units:"/>
+                    <TextField fx:id="thresholdToShowSelfDestructionUnitsEventTextField"
                                promptText="0"
                                maxWidth="50"/>
                 </HBox>
 
                 <Separator minHeight="5"/>
                 <Label text="General Settings:"/>
-                <CheckBox fx:id="filterLogCheckBox" text="Ignore notify messages" selected="true"/>
-                <CheckBox fx:id="automaticallyLoadChatLogCheckBox" text="Auto load chat log" selected="true"/>
+                <CheckBox fx:id="showNotifyChatMessages" text="Show Notify Chat Messages" selected="true"/>
+                <CheckBox fx:id="autoLoadChatLogCheckBox" text="Auto load chat log" selected="true"/>
+
+                <VBox spacing="5">
+                    <Label text="Set Number for Loading Initial Newest Reports"/>
+                    <TextField fx:id="initialReportsLoadingTextField" text="100" maxWidth="150" promptText="Default: 100">
+                        <TextFormatter>
+                            <valueConverter>
+                                <javafx.util.converter.IntegerStringConverter/>
+                            </valueConverter>
+                        </TextFormatter>
+                    </TextField>
+                </VBox>
+                <VBox spacing="5">
+                    <CheckBox fx:id="fetchReportsOnStartupCheckBox"
+                              text="Enable fetching reports at startup"/>
+                </VBox>
             </VBox>
         </Tab>
     </TabPane>

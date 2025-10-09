@@ -42,6 +42,7 @@ public class ReportStatisticsController implements Controller<Region> {
 
     public void processStatistics(List<ModerationReportFX> reports, boolean showAllTime) {
         YearMonth lastMonth = YearMonth.now().minusMonths(1);
+        YearMonth currentMonth = YearMonth.now();  // Current month to exclude
 
         Map<String, Long> reportsPerDay = reports.stream()
                 .collect(Collectors.groupingBy(r -> r.getCreateTime().toLocalDate().toString(), Collectors.counting()));
@@ -50,12 +51,12 @@ public class ReportStatisticsController implements Controller<Region> {
                 .collect(Collectors.groupingBy(r -> r.getCreateTime().getYear() + "-W" + r.getCreateTime().get(WeekFields.of(Locale.getDefault()).weekOfWeekBasedYear()), Collectors.counting()));
 
         Map<String, Long> reportsPerMonth = reports.stream()
+                .filter(r -> !YearMonth.from(r.getCreateTime()).equals(currentMonth))  // Exclude the current month
                 .collect(Collectors.groupingBy(r -> r.getCreateTime().getYear() + "-" + String.format("%02d", r.getCreateTime().getMonthValue()), Collectors.counting()));
 
         Map<String, Long> reportsLastMonth = reports.stream()
                 .filter(r -> YearMonth.from(r.getCreateTime()).equals(lastMonth))
                 .collect(Collectors.groupingBy(r -> r.getCreateTime().toLocalDate().toString(), Collectors.counting()));
-
 
         List<Map.Entry<String, Long>> sortedReportsPerDay;
         List<Map.Entry<String, Long>> sortedReportsPerWeek;
@@ -75,6 +76,7 @@ public class ReportStatisticsController implements Controller<Region> {
             sortedReportsPerMonth = reportsPerMonth.entrySet().stream()
                     .sorted(Map.Entry.<String, Long>comparingByKey().reversed())
                     .toList();
+
             sortedReportsLastMonth = reportsLastMonth.entrySet().stream()
                     .sorted(Map.Entry.<String, Long>comparingByKey().reversed())
                     .toList();
@@ -84,7 +86,7 @@ public class ReportStatisticsController implements Controller<Region> {
                     .filter(entry -> LocalDate.parse(entry.getKey()).isBefore(today))
                     .sorted(Map.Entry.<String, Long>comparingByKey().reversed())
                     .limit(7)
-                    .toList();;
+                    .toList();
 
             sortedReportsPerWeek = reportsPerWeek.entrySet().stream()
                     .sorted(Map.Entry.<String, Long>comparingByKey().reversed())
@@ -93,8 +95,9 @@ public class ReportStatisticsController implements Controller<Region> {
 
             sortedReportsPerMonth = reportsPerMonth.entrySet().stream()
                     .sorted(Map.Entry.<String, Long>comparingByKey().reversed())
-                    .limit(12)
+                    .limit(12)  // Only take the last 12 months, excluding the current month
                     .toList();
+
             sortedReportsLastMonth = reportsLastMonth.entrySet().stream()
                     .sorted(Map.Entry.<String, Long>comparingByKey().reversed())
                     .limit(31)
@@ -122,7 +125,6 @@ public class ReportStatisticsController implements Controller<Region> {
                 .map(entry -> String.format("📅 %s → %d reports%s", entry.getKey(), entry.getValue(), isMonday(entry.getKey()) ? " (Monday)" : ""))
                 .collect(Collectors.joining(System.lineSeparator()));
 
-
         reportStatisticsTextArea.setText("");
         StringBuilder reportLog = new StringBuilder();
 
@@ -146,7 +148,6 @@ public class ReportStatisticsController implements Controller<Region> {
         reportLog.append(String.format("📅 Reports Per Day (Last Month - %s):%n%s%n", lastMonth, formattedLastMonthReports));
 
         reportStatisticsTextArea.setText(reportLog.toString());
-
     }
 
     private boolean isMonday(String date) {
@@ -162,11 +163,11 @@ public class ReportStatisticsController implements Controller<Region> {
     public void onUpdateStatisticsButtonLastYear() {
         List<ModerationReportFX> allReports = moderationReportController.getAllCachedReports();
 
-        YearMonth cutoff = YearMonth.now().minusMonths(12);
-        List<ModerationReportFX> lastYearReports = allReports.stream()
+        YearMonth cutoff = YearMonth.now().minusMonths(24);
+        List<ModerationReportFX> lastTwoYearsReports = allReports.stream()
                 .filter(r -> YearMonth.from(r.getCreateTime()).isAfter(cutoff) || YearMonth.from(r.getCreateTime()).equals(cutoff))
                 .toList();
 
-        processStatistics(lastYearReports, false);
+        processStatistics(lastTwoYearsReports, false);
     }
 }

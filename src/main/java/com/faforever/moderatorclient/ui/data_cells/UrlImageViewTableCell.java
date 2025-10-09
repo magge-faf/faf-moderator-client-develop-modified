@@ -86,7 +86,6 @@ public class UrlImageViewTableCell<T> extends TableCell<T, String> {
 
             Future<?> future = imageLoadExecutor.submit(() -> {
                 try {
-                    FafApiCommunicationService.checkRateLimit();
                     Image img = new Image(item, true);
                     AvatarCache.getInstance().put(cacheKey, img);
 

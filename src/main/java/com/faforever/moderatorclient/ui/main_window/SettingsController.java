@@ -1,166 +1,169 @@
 package com.faforever.moderatorclient.ui.main_window;
 
-import com.faforever.moderatorclient.config.PreferencesConfig;
+import com.faforever.moderatorclient.config.local.LocalPreferences;
+import com.faforever.moderatorclient.config.local.LocalPreferencesReaderWriter;
 import com.faforever.moderatorclient.ui.Controller;
+import com.faforever.moderatorclient.ui.MainController;
 import javafx.fxml.FXML;
-import javafx.scene.control.Button;
-import javafx.scene.control.MenuItem;
-import javafx.scene.control.TextField;
 import javafx.scene.control.*;
-import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import javafx.scene.text.Text;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-
-import java.awt.*;
+import javafx.scene.Scene;
+import javafx.scene.layout.Pane;
+import javafx.util.StringConverter;
 import java.io.*;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.List;
-import java.util.prefs.Preferences;
+import java.util.Objects;
 
 import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
 
 @Component
 @Slf4j
 @RequiredArgsConstructor
-public class SettingsController implements Controller<Region> {
+public class SettingsController implements Controller<Pane> {
+    private final LocalPreferences localPreferences;
+    private final MainController mainController;
 
     public VBox root;
-    public TextField accountNameOrEmailTextField;
-    public TextField accountPasswordField;
     @FXML
-    public static Button saveAccountCredentialsButton;
-    public Button blacklistedHashButton;
-    public Button blacklistedIPButton;
-    public Button blacklistedMemorySNButton;
-    public Button blacklistedSNButton;
-    public Button blacklistedUUIDButton;
-    public Button blacklistedVolumeSNButton;
-    public Button excludedItemsButton;
-    public TextField genericJunkButton;
-    public javafx.scene.control.Menu defaultStartingTabMenuBar;
+    public CheckBox rememberLoginCheckBox;
+    @FXML
+    public CheckBox darkModeCheckBox;
+    @FXML
+    public ComboBox<Tab> defaultActiveTabComboBox;
+    @FXML
     public Button openConfigurationFolderButton;
 
-    @Setter
-    public List<Tab> tabs;
-
-    private String defaultStartingTab;
+    @FXML
     public Button openAiPromptButton;
-    public Text excludedItemsLoadedText;
-    public Text accountCredentialsText;
 
     @FXML
     public ComboBox<String> browserComboBox;
-    public TextField initialReportsLoadingTextField;
-
-
     @FXML
-    public CheckBox debugModeCheckBox;
+    public CheckBox syncTemporaryBansBeforeSearchCheckbox;
+    @FXML
+    public CheckBox syncPermanentBansBeforeSearchCheckbox;
+    @FXML
+    public CheckBox syncPermanentBansAtStartupCheckbox;
+    @FXML
+    public CheckBox syncTemporaryBansAtStartupCheckbox;
+
 
     @Override
     public VBox getRoot() {return root;}
 
-    @Autowired
-    public PreferencesConfig preferencesConfig;
-
     @FXML
     public void initialize() throws IOException {
-        debugModeCheckBox.setSelected(preferencesConfig.getDebugMode());
-        initialReportsLoadingTextField.setText(preferencesConfig.getInitialPageSize());
-        browserComboBox.setValue(preferencesConfig.getBrowser());
-        defaultStartingTab = preferencesConfig.getStartingTab();
+        defaultActiveTabComboBox.setConverter(new StringConverter<>() {
+            @Override
+            public String toString(Tab tab) {
+                if (tab == null) return "";
+                else return tab.getText();
+            }
 
-        debugModeCheckBox.setOnAction(event ->
-                preferencesConfig.setPreference("user","debugMode", debugModeCheckBox.isSelected()));
+            @Override
+            public Tab fromString(String s) {
+                return null;
+            }
+        });
+        log.debug(defaultActiveTabComboBox.getSelectionModel().toString());
 
-        initialReportsLoadingTextField.textProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("user","initialReportsLoading", newValue);
+        rememberLoginCheckBox.setSelected(localPreferences.getAutoLogin().isEnabled());
+        darkModeCheckBox.setSelected(localPreferences.getTabSettings().isDarkModeCheckBox());
+
+        mainController.getRoot().getTabs().forEach(tab -> {
+            defaultActiveTabComboBox.getItems().add(tab);
+            if (Objects.equals(tab.getId(), localPreferences.getUi().getStartUpTab())) {
+                defaultActiveTabComboBox.getSelectionModel().select(tab);
+                log.debug(tab.getText());
+            }
         });
 
-        browserComboBox.setOnAction(event -> {
-            preferencesConfig.setPreference("user","browserComboBox", browserComboBox.getValue());
+        syncTemporaryBansAtStartupCheckbox.setSelected(localPreferences.getTabSettings().isSyncTemporaryBansAtStartupCheckbox());
+        syncTemporaryBansBeforeSearchCheckbox.setSelected(localPreferences.getTabSettings().isSyncTemporaryBansBeforeSearchCheckbox());
+        syncPermanentBansAtStartupCheckbox.setSelected(localPreferences.getTabSettings().isSyncPermanentBansAtStartupCheckbox());
+        syncPermanentBansBeforeSearchCheckbox.setSelected(localPreferences.getTabSettings().isSyncPermanentBansBeforeSearchCheckbox());
+
+        if (browserComboBox.getValue() == null) {
+            browserComboBox.setValue(localPreferences.getUi().getBrowserComboBox());
+            log.debug("BrowserComboBox value: {}", browserComboBox.getValue());
+        }
+
+        browserComboBox.valueProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal != null) {
+                localPreferences.getUi().setBrowserComboBox(newVal);
+            }
         });
 
-        defaultStartingTabMenuBar.setOnAction( event ->
-                preferencesConfig.setPreference("user","startingTab", defaultStartingTab));
-
-
-        String[] credentials = SettingsController.loadCredentials();
-        String username = credentials[0];
-
-        if (username == null) {
-            accountCredentialsText.setText("Account Credentials (no profile active)");
-        } else {
-            accountCredentialsText.setText("Account Credentials (profile " + username + " active)");
-        }
-
-        log.debug("Initializing blacklistedFiles");
-        String[] blacklistedFiles = { "blacklistedHash", "blacklistedIP", "blacklistedMemorySN",
-                "blacklistedSN", "blacklistedUUID", "blacklistedVolumeSN", "excludedItems" };
-
-        // create default blacklisted files if they do not exist
-        File directory = new File(CONFIGURATION_FOLDER);
-        if (!directory.exists()) {
-            if (directory.mkdirs()) {
-                log.debug("Configuration directory created: {}", directory.getAbsolutePath());
-            } else {
-                log.error("Failed to create configuration directory: {}", directory.getAbsolutePath());
-            }
-        } else {
-            log.debug("Configuration directory already exists: {}", directory.getAbsolutePath());
-        }
-
-        for (String file : blacklistedFiles) {
-            File f = new File(CONFIGURATION_FOLDER + File.separator + file + ".txt");
-            try {
-                if (!f.exists()) {
-                    if (f.createNewFile()) {
-                        log.info("[info] {} was successfully created.", f);
-                    } else {
-                        log.info("[info] {} already exists.", f);
-                    }
-                }
-            } catch (IOException e) {
-                log.debug(e.getMessage());
-            }
-        }
-
-        int lineCount = countLinesInFile(new File(CONFIGURATION_FOLDER + File.separator + "excludedItems.txt"));
-        excludedItemsLoadedText.setText("Total Excluded Items Loaded " + lineCount + ":");
-
-        File configFile = new File(CONFIGURATION_FOLDER + File.separator + "config.properties");
-        try {
-            configFile.createNewFile();
-            log.debug("{} was created.", configFile);
-        } catch (IOException e) {
-            log.error("[error] Failed to create {}", configFile, e);
-        }
-
+        // Initialize templates and bind UI fields
         initTemplatesAndReasons();
         initTemplatesFinishReports();
         createTemplateGamingModeratorTask();
+        bindUIElementsToPreferences();
+    }
+    private void bindUIElementsToPreferences() {
+        LocalPreferences.TabReports tabReports = localPreferences.getTabReports();
+
+        for (Field fxField : this.getClass().getDeclaredFields()) {
+            fxField.setAccessible(true);
+            String fieldName = fxField.getName();
+
+            try {
+                // Try to find a matching field in TabReports
+                Field prefField = LocalPreferences.TabReports.class.getDeclaredField(fieldName);
+                prefField.setAccessible(true);
+
+                Object node = fxField.get(this);
+                Object value = prefField.get(tabReports);
+
+                if (node instanceof TextField textField && value instanceof String) {
+                    textField.setText((String) value);
+                    textField.textProperty().addListener((obs, oldVal, newVal) -> {
+                        try {
+                            prefField.set(tabReports, newVal);
+                        } catch (IllegalAccessException ignored) {
+                        }
+                    });
+                } else if (node instanceof TextArea textArea && value instanceof String) {
+                    textArea.setText((String) value);
+                    textArea.textProperty().addListener((obs, oldVal, newVal) -> {
+                        try {
+                            prefField.set(tabReports, newVal);
+                        } catch (IllegalAccessException ignored) {
+                        }
+                    });
+                } else if (node instanceof CheckBox checkBox && value instanceof Boolean) {
+                    checkBox.setSelected((Boolean) value);
+                    checkBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+                        try {
+                            prefField.set(tabReports, newVal);
+                        } catch (IllegalAccessException ignored) {
+                        }
+                    });
+                } else if (node instanceof TitledPane titledPane && value instanceof Boolean) {
+                    titledPane.setExpanded((Boolean) value);
+                    titledPane.expandedProperty().addListener((obs, oldVal, newVal) -> {
+                        try {
+                            prefField.set(tabReports, newVal);
+                        } catch (IllegalAccessException ignored) {
+                        }
+                    });
+                }
+
+            } catch (NoSuchFieldException e) {
+                // Controller field has no matching preference field, skip it
+            } catch (IllegalAccessException e) {
+                log.warn("Cannot access field {}", fieldName, e);
+            }
+        }
     }
 
-    private int countLinesInFile(File file) throws IOException {
-        int lines = 0;
-        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-            while (reader.readLine() != null) {
-                lines++;
-            }
-        } catch (IOException e) {
-            throw new IOException();
-        }
-        return lines;
-    }
 
     private static final String jsonFileTemplatesAndReasons = CONFIGURATION_FOLDER + File.separator + "templatesAndReasons.json";
     private static final String JSON_CONTENT_templatesAndReasons = """
@@ -219,7 +222,7 @@ public class SettingsController implements Controller<Region> {
             	{
             	  "setReportStatusTo": "COMPLETED",
                   "buttonName": "Completed - Replay Desync",
-                  "descriptionPublicNote": "Thank you for bringing this to our attention. Unfortunately, the game desyncs. I have made a note for the player in case it becomes a pattern. Please report any further violations."
+                  "descriptionPublicNote": "Thank you for bringing this to our attention. Unfortunately, the game desyncs. We have made a note for the player in case it becomes a pattern. Please report any further violations."
                 },
                 {
             	  "setReportStatusTo": "DISCARDED",
@@ -257,30 +260,7 @@ public class SettingsController implements Controller<Region> {
                 log.warn(String.valueOf(e));
             }
         } else {
-            log.info(jsonFileTemplatesFinishReports +" already exists.");
-        }
-    }
-
-    public void initTabStuff() {
-        for (Tab tab : tabs) {
-            MenuItem menuItem = new MenuItem(tab.getText());
-            menuItem.setUserData(tab);
-
-            menuItem.setOnAction(event -> {
-                MenuItem source = (MenuItem) event.getSource();
-                Tab selectedTab = (Tab) source.getUserData();
-                preferencesConfig.setPreference("user","startingTab", selectedTab.getId());
-                defaultStartingTabMenuBar.setText(selectedTab.getId());
-            });
-            defaultStartingTabMenuBar.getItems().add(menuItem);
-        }
-
-        String startingTab = preferencesConfig.getStartingTab();
-
-        if (startingTab == null || startingTab.isEmpty()) {
-            defaultStartingTabMenuBar.setText("Select Default Tab");
-        } else {
-            defaultStartingTabMenuBar.setText(startingTab);
+            log.info("{} already exists.", jsonFileTemplatesFinishReports);
         }
     }
 
@@ -302,43 +282,29 @@ public class SettingsController implements Controller<Region> {
         }
     }
 
-    public void onSaveAccountButton() {
-        String accountNameOrEmail = accountNameOrEmailTextField.getText();
-        String accountPassword = accountPasswordField.getText();
-        accountCredentialsText.setText("Account Credentials (profile " + accountNameOrEmail + " active)");
-        accountNameOrEmailTextField.setText("");
-        accountPasswordField.setText("");
-
-        saveCredentials(accountNameOrEmail, accountPassword);
-    }
-
     public void openFile(String fileName) throws IOException {
-            Path notepadPlusPlus = Paths.get("C:\\Program Files\\Notepad++\\notepad++.exe");
-            Path notepad = Paths.get("C:\\Windows\\System32\\notepad.exe");
+        Path notepadPlusPlus = Paths.get("C:\\Program Files\\Notepad++\\notepad++.exe");
+        Path notepad = Paths.get("C:\\Windows\\System32\\notepad.exe");
 
-            if (Files.exists(notepadPlusPlus)) {
-                ProcessBuilder pb = new ProcessBuilder(notepadPlusPlus.toString(), fileName);
-                pb.start();
-            } else {
-                ProcessBuilder pb = new ProcessBuilder(notepad.toString(), fileName);
-                pb.start();
-            }
+        if (Files.exists(notepadPlusPlus)) {
+            ProcessBuilder pb = new ProcessBuilder(notepadPlusPlus.toString(), fileName);
+            pb.start();
+        } else {
+            ProcessBuilder pb = new ProcessBuilder(notepad.toString(), fileName);
+            pb.start();
         }
-
-    public void onBlacklistedHash() throws IOException {openFile(CONFIGURATION_FOLDER + "/blacklistedHash.txt");}
-    public void onBlacklistedIP() throws IOException {openFile(CONFIGURATION_FOLDER + "/blacklistedIP.txt");}
-    public void onBlacklistedSN() throws IOException {openFile(CONFIGURATION_FOLDER + "/blacklistedSN.txt");}
-    public void onBlacklistedUUID() throws IOException {openFile(CONFIGURATION_FOLDER + "/blacklistedUUID.txt");}
-    public void onBlacklistedVolumeSN() throws IOException {openFile(CONFIGURATION_FOLDER + "/blacklistedVolumeSN.txt");}
-    public void onBlacklistedMemorySN() throws IOException {openFile(CONFIGURATION_FOLDER + "/blacklistedMemorySN.txt");}
-    public void onExcludedItems() throws IOException {openFile(CONFIGURATION_FOLDER + "/excludedItems.txt");}
+    }
 
     public void onOpenConfigurationFolder() {
         File folder = new File(CONFIGURATION_FOLDER);
-        try {
-            Desktop.getDesktop().open(folder);
-        } catch (IOException e) {
-            log.error(e.getMessage());
+        if (folder.exists() && folder.isDirectory()) {
+            try {
+                new ProcessBuilder("explorer", folder.getAbsolutePath()).start();
+            } catch (IOException e) {
+                log.error("Failed to open configuration folder: {}", e.toString());
+            }
+        } else {
+            log.warn("Configuration folder does not exist or is invalid: {}", folder.getAbsolutePath());
         }
     }
 
@@ -356,36 +322,47 @@ public class SettingsController implements Controller<Region> {
 
     }
 
-    private static final String PREF_NODE = "com.faforever.moderatorclient.credentials";
-    private static final String USERNAME_KEY = "username";
-    private static final String PASSWORD_KEY = "password";
-
-    public static void saveCredentials(String username, String password) {
-        Preferences prefs = Preferences.userRoot().node(PREF_NODE);
-        prefs.put(USERNAME_KEY, username);
-        prefs.put(PASSWORD_KEY, password);
-    }
-
-    public static String[] loadCredentials() {
-        Preferences prefs = Preferences.userRoot().node(PREF_NODE);
-        String username = prefs.get(USERNAME_KEY, null);
-        String password = prefs.get(PASSWORD_KEY, null);
-
-        return new String[]{username, password};
-    }
-
     public void onOpenPathToUserSettings() {
         String path = System.getProperty("user.home") + File.separator + "AppData" + File.separator + "Roaming" + File.separator + "Mordor";
         File directory = new File(path);
 
         if (directory.exists() && directory.isDirectory()) {
             try {
-                Desktop.getDesktop().open(directory);
+                new ProcessBuilder("explorer", directory.getAbsolutePath()).start();
             } catch (IOException e) {
-                log.error(String.valueOf(e));
+                log.error("Failed to open directory: {}", e.toString());
             }
         } else {
             log.info("Directory does not exist: {}", path);
         }
+    }
+
+    @Autowired
+    private LocalPreferencesReaderWriter localPreferencesReaderWriter;
+
+    public void onSave() {
+        log.info("onSave from SettingsController.java");
+
+        // Save preferences from UI
+        localPreferences.getAutoLogin().setEnabled(rememberLoginCheckBox.isSelected());
+        localPreferences.getUi().setDarkMode(darkModeCheckBox.isSelected());
+
+        localPreferences.getTabSettings().setSyncPermanentBansAtStartupCheckbox(syncPermanentBansAtStartupCheckbox.isSelected());
+        localPreferences.getTabSettings().setSyncPermanentBansBeforeSearchCheckbox(syncPermanentBansBeforeSearchCheckbox.isSelected());
+
+        localPreferences.getTabSettings().setSyncTemporaryBansAtStartupCheckbox(syncTemporaryBansAtStartupCheckbox.isSelected());
+        localPreferences.getTabSettings().setSyncTemporaryBansBeforeSearchCheckbox(syncTemporaryBansBeforeSearchCheckbox.isSelected());
+
+        Tab selectedTab = defaultActiveTabComboBox.getSelectionModel().getSelectedItem();
+        if (selectedTab != null) {
+            localPreferences.getUi().setStartUpTab(selectedTab.getId());
+        }
+
+        localPreferencesReaderWriter.write(localPreferences);
+        Scene scene = root.getScene();
+        String styleSheet = darkModeCheckBox.isSelected() ? "/style/main-dark.css" : "/style/main-light.css";
+
+        scene.getStylesheets().clear();
+        scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource(styleSheet)).toExternalForm());
     }
 }

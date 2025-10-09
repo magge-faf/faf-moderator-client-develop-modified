@@ -6,101 +6,110 @@
 
 <?import javafx.collections.FXCollections?>
 <?import java.lang.String?>
-<?import javafx.util.converter.IntegerStringConverter?>
 <?import javafx.scene.layout.HBox?>
-<?import javafx.scene.layout.Region?>
-<VBox fx:id="root" spacing="5" style="-fx-padding: 10px;" xmlns="http://javafx.com/javafx/20.0.1"
+<?import javafx.geometry.Insets?>
+<VBox fx:id="root" spacing="10" style="-fx-padding: 15px;" xmlns="http://javafx.com/javafx/20.0.1"
       xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.faforever.moderatorclient.ui.main_window.SettingsController">
 
+    <Label style="-fx-font-size: 16pt; -fx-font-weight: bold;" text="Settings"/>
+
     <ScrollPane fitToWidth="true">
-        <VBox spacing="5">
-            <Text fx:id="accountCredentialsText" style="-fx-font-size: 14pt;">Account Credentials:</Text>
-            <TextField fx:id="accountNameOrEmailTextField" promptText="Account name or email"/>
-            <PasswordField fx:id="accountPasswordField" promptText="Password"/>
-            <Button fx:id="saveAccountCredentialsButton" mnemonicParsing="false" onAction="#onSaveAccountButton" text="Save Account Credentials"/>
+        <VBox spacing="15">
+            <VBox spacing="5">
+                <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="Templates" textAlignment="CENTER"/>
+                <Button fx:id="templatesAndReasonsReportButton" mnemonicParsing="false"
+                        onAction="#templatesAndReasonsReportButton" prefWidth="350"
+                        text="View Templates for FAF Forum and Ban Reasons"/>
+                <Button fx:id="templatesFinishReportsButton" mnemonicParsing="false"
+                        onAction="#templatesFinishReportsButton" prefWidth="350"
+                        text="View Templates to 'edit' reports"/>
+            </VBox>
 
-            <Separator prefHeight="5"/>
+            <Separator/>
 
-            <Text style="-fx-font-size: 14pt;">Open Blacklisted Items:</Text>
-            <Button fx:id="blacklistedHashButton" mnemonicParsing="false" onAction="#onBlacklistedHash" prefWidth="100"
-                    text="Hash"/>
-            <Button fx:id="blacklistedIPButton" mnemonicParsing="false" onAction="#onBlacklistedIP" prefWidth="100"
-                    text="IP"/>
-            <Button fx:id="blacklistedMemorySNButton" mnemonicParsing="false" onAction="#onBlacklistedMemorySN"
-                    prefWidth="100" text="MemorySN"/>
-            <Button fx:id="blacklistedSNButton" mnemonicParsing="false" onAction="#onBlacklistedSN" prefWidth="100"
-                    text="SN"/>
-            <Button fx:id="blacklistedUUIDButton" mnemonicParsing="false" onAction="#onBlacklistedUUID" prefWidth="100"
-                    text="UUID"/>
-            <Button fx:id="blacklistedVolumeSNButton" mnemonicParsing="false" onAction="#onBlacklistedVolumeSN"
-                    prefWidth="100" text="VolumeSN"/>
+            <VBox spacing="5">
+                <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="Default Starting Tab" textAlignment="CENTER"/>
+                <HBox alignment="CENTER_LEFT">
+                    <children>
+                        <ComboBox fx:id="defaultActiveTabComboBox" prefWidth="150.0" visibleRowCount="20"/>
+                    </children>
+                </HBox>
+            </VBox>
 
-            <Separator prefHeight="5"/>
+            <Separator/>
 
-            <Text fx:id="excludedItemsLoadedText" style="-fx-font-size: 14pt;">Excluded Items Loaded:</Text>
-            <Button fx:id="excludedItemsButton" mnemonicParsing="false" onAction="#onExcludedItems" prefWidth="70"
-                    text="Excluded"/>
-            <Text text="IMPORTANT: Check link for latest ExcludedItems.txt (Restart Required)" textAlignment="CENTER"/>
-            <TextField fx:id="genericJunkButton" minWidth="200"
-                       text="https://faforever.zulipchat.com/#narrow/stream/203851-moderators/topic/AntiSmurfForce.20-.20ExcludedItems"/>
+            <VBox spacing="5">
+                <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="Misc"/>
+                <HBox spacing="10">
+                    <Button fx:id="openConfigurationFolderButton" mnemonicParsing="false"
+                            onAction="#onOpenConfigurationFolder" text="Open Config Folder"/>
+                    <Button fx:id="openPathToUserSettings" mnemonicParsing="false"
+                            onAction="#onOpenPathToUserSettings" text="Open User Settings Folder"/>
+                    <Button fx:id="openAiPromptButton" mnemonicParsing="false" onAction="#onOpenAiPromptButton"
+                            text="View AI Prompt"/>
+                </HBox>
+            </VBox>
 
-            <Separator prefHeight="5"/>
+            <Separator/>
 
-            <Text style="-fx-font-size: 14pt;" text="Templates" textAlignment="CENTER"/>
-            <Button fx:id="templatesAndReasonsReportButton" mnemonicParsing="false" onAction="#templatesAndReasonsReportButton"
-                    prefWidth="300" text="View Templates for FAF Forum and Ban Reasons"/>
-            <Button fx:id="templatesFinishReportsButton" mnemonicParsing="false" onAction="#templatesFinishReportsButton"
-                    prefWidth="300" text="View Templates to 'edit' reports"/>
-            <Separator prefHeight="5"/>
-            <Text style="-fx-font-size: 14pt;" text="Starting Tab" textAlignment="CENTER"/>
-            <MenuBar xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml">
-                <Menu fx:id="defaultStartingTabMenuBar" text="Choose Starting Tab:"/>
-            </MenuBar>
+            <VBox spacing="5">
+                <Text style="-fx-font-size: 12pt; -fx-font-weight: bold;"
+                      text="Select Browser for 'Search Forum' Button" textAlignment="CENTER"/>
+                <ComboBox fx:id="browserComboBox" minWidth="200">
+                    <items>
+                        <FXCollections fx:factory="observableArrayList">
+                            <String fx:value="Firefox"/>
+                            <String fx:value="Chrome"/>
+                            <String fx:value="Opera"/>
+                            <String fx:value="Microsoft Edge"/>
+                        </FXCollections>
+                    </items>
+                </ComboBox>
+            </VBox>
 
-            <Separator minHeight="5"/>
+            <Separator/>
 
-            <Text style="-fx-font-size: 14pt;" text="Misc"/>
-            <HBox spacing="5">
-                <Button fx:id="openConfigurationFolderButton" mnemonicParsing="false" onAction="#onOpenConfigurationFolder"
-                        text="Open Folder for Configuration Files"/>
-                <Region prefWidth="10"/>
-                <Button fx:id="openPathToUserSettings" mnemonicParsing="false" onAction="#onOpenPathToUserSettings"
-                        text="Open Folder for 'user.prefs'"/>
-                <Region prefWidth="10"/>
-                <Button fx:id="openAiPromptButton" mnemonicParsing="false" onAction="#onOpenAiPromptButton"
-                        text="View AI Prompt"/>
-            </HBox>
+            <Label text="WIP - Disabled in this build"/>
 
-            <Separator minHeight="5"/>
+            <VBox spacing="10" disable="true">
+                <Label text="Configure how bans are synchronized from the FAF server (producer) to your local JSON file (consumer)." style="-fx-font-style: italic; -fx-font-size: 0.9em;"/>
+                <TitledPane text="Permanent Bans">
+                    <content>
+                        <VBox spacing="5">
+                            <CheckBox fx:id="syncPermanentBansAtStartupCheckbox"
+                                      text="Enable syncing of permanent bans at startup"/>
+                            <CheckBox fx:id="syncPermanentBansBeforeSearchCheckbox"
+                                      text="Enable synchronization of permanent bans when the 'Check Permanent Bans' button is pressed."/>
+                        </VBox>
+                    </content>
+                </TitledPane>
 
-            <Text style="-fx-font-size: 12;" text="Select Browser for 'Search Forum' Button" textAlignment="CENTER"/>
-            <ComboBox fx:id="browserComboBox" minWidth="150">
-                <items>
-                    <FXCollections fx:factory="observableArrayList">
-                        <String fx:value="Firefox" />
-                        <String fx:value="Chrome" />
-                        <String fx:value="Opera" />
-                        <String fx:value="Microsoft Edge" />
-                    </FXCollections>
-                </items>
-            </ComboBox>
+                <TitledPane text="Temporary Bans">
+                    <content>
+                        <VBox spacing="5">
+                            <CheckBox fx:id="syncTemporaryBansAtStartupCheckbox"
+                                      text="Enable syncing of temporary bans at startup"/>
+                            <CheckBox fx:id="syncTemporaryBansBeforeSearchCheckbox"
+                                      text="Enable synchronization of temporary bans when the 'Check Temporary Bans' button is pressed."/>
+                        </VBox>
+                    </content>
+                </TitledPane>
+            </VBox>
 
-            <Separator minHeight="5"/>
+            <Separator/>
 
-            <Label text="Set Number for Loading Initial Newest Reports"/>
-            <TextField fx:id="initialReportsLoadingTextField" text="100" maxWidth="150">
-                <TextFormatter>
-                    <valueConverter>
-                        <IntegerStringConverter/>
-                    </valueConverter>
-                </TextFormatter>
-            </TextField>
+            <children>
+                <CheckBox fx:id="rememberLoginCheckBox" mnemonicParsing="false" text="Remember login"/>
+                <CheckBox fx:id="darkModeCheckBox" mnemonicParsing="false" text="Dark Mode"/>
 
-            <Separator minHeight="5"/>
+                <Separator prefWidth="200.0">
+                    <VBox.margin>
+                        <Insets/>
+                    </VBox.margin>
+                </Separator>
+            </children>
 
-            <Label text="Debug Mode (output metadata, events and additional information in console)"/>
-            <CheckBox fx:id="debugModeCheckBox" text="Active" />
         </VBox>
     </ScrollPane>
 </VBox>

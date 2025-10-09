@@ -23,4 +23,7 @@
     <Tab fx:id="settingsTab" closable="false" text="Settings"/>
     <Tab fx:id="recentNotesTab" closable="false" text="Recent Notes"/>
     <Tab fx:id="reportStatisticsTab" closable="false" text="Report Statistics"/>
+    <Tab fx:id="smurfManagementControllerTab" closable="false" text="Smurf Management"/>
+    <Tab fx:id="replayAnalysisControllerTab" closable="false" text="Replay Analysis"/>
+    <Tab fx:id="excludedHardwareItemsTab" closable="false" text="Manage Excluded Items"/>
 </TabPane>

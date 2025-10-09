@@ -2,6 +2,7 @@ package com.faforever.moderatorclient;
 
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.config.ApplicationProperties;
+import com.faforever.moderatorclient.config.ApplicationVersion;
 import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.ui.MainController;
 import com.faforever.moderatorclient.ui.PlatformService;
@@ -31,13 +32,11 @@ import java.util.Objects;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicInteger;
-import com.faforever.moderatorclient.config.PreferencesConfig;
 
 @Configuration
 @EnableConfigurationProperties(ApplicationProperties.class)
 @ComponentScan
 @Slf4j
-
 public class FafModeratorClientApplication extends Application {
 
     @Bean
@@ -50,8 +49,13 @@ public class FafModeratorClientApplication extends Application {
     private UserManagementController userManagementController;
     @Autowired
     private ModerationReportController moderationReportController;
-    @Autowired
-    public PreferencesConfig preferencesConfig;
+
+    private Timeline timeline;
+    private Stage primaryStage;
+    private boolean isFetching = false;
+    private long fetchingDurationMillis = 0;
+    private boolean hasFetchedReports = false;
+    private long lastRefreshedTime = -1;
 
     public static void applicationMain(String[] args) {
         Application.launch(FafModeratorClientApplication.class, args);
@@ -77,18 +81,18 @@ public class FafModeratorClientApplication extends Application {
 
         String stylesheet = "/style/main-light.css";
         var localPreferences = applicationContext.getBean(LocalPreferences.class);
-        if (localPreferences.getUi().isDarkMode()) {
+        if (localPreferences.getTabSettings().isDarkModeCheckBox()) {
             stylesheet = "/style/main-dark.css";
         }
 
-        scene.getStylesheets().add(getClass().getResource(stylesheet).toExternalForm());
+        scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource(stylesheet)).toExternalForm());
         primaryStage.setScene(scene);
         primaryStage.setMaximized(true);
         primaryStage.show();
+
         primaryStage.setOnCloseRequest(e -> {
             e.consume();
             log.info("Close request received, exiting");
-
             Platform.runLater(() -> {
                 try {
                     userManagementController.saveOnExitContent();
@@ -97,6 +101,7 @@ public class FafModeratorClientApplication extends Application {
                 }
             });
         });
+
         startTimerThread(primaryStage);
     }
 
@@ -108,97 +113,78 @@ public class FafModeratorClientApplication extends Application {
             public void run() {
                 int requestsInLastMinute = FafApiCommunicationService.getRequestsInLastMinute();
                 double requestsPerSecond = FafApiCommunicationService.getRequestsPerSecondRolling(3);
+                long cooldownRemaining = FafApiCommunicationService.getCooldownRemainingMillis();
 
-                Platform.runLater(() -> updateWindowTitle(primaryStage, startTime, requestsInLastMinute, requestsPerSecond));
+                Platform.runLater(() ->
+                        updateWindowTitle(primaryStage, startTime, requestsInLastMinute, requestsPerSecond, cooldownRemaining));
             }
         };
         timer.scheduleAtFixedRate(task, 0, 1000);
     }
 
-    private Timeline timeline;
-    private Stage primaryStage;
-    private long startTime;
-    private boolean isFetching = false;
+    public void updateWindowTitle(Stage primaryStage, long startTime, int requestsInLastMinute,
+                                  double requestsPerSecond, long cooldownRemaining) {
+        this.primaryStage = primaryStage;
 
-    public void updateWindowTitle(Stage primaryStage, long startTime, int requestsInLastMinute, double requestsPerSecond) {
-    this.primaryStage = primaryStage;
-    this.startTime = startTime;
+        AtomicInteger activeRequests = moderationReportController.getActiveApiRequests();
+        boolean hasActiveRequests = activeRequests.get() > 0;
 
-    AtomicInteger activeRequests = moderationReportController.getActiveApiRequests();
-    boolean hasActiveRequests = activeRequests.get() > 0;
-
-    if (hasActiveRequests) {
-        if (!isFetching) {
-            startFetchingPattern();
-            isFetching = true;
-        }
-    } else {
-        stopFetchingPattern();
-        isFetching = false;
-
-        if (hasFetchedReports) {
-            lastRefreshedTime = System.currentTimeMillis();
-        }
-
-        long elapsedTimeMillis = System.currentTimeMillis() - startTime;
-        long elapsedTimeSeconds = elapsedTimeMillis / 1000;
-        long hours = elapsedTimeSeconds / 3600;
-        long minutes = (elapsedTimeSeconds % 3600) / 60;
-        long seconds = elapsedTimeSeconds % 60;
-        String elapsedTimeStr = String.format("%02d:%02d:%02d", hours, minutes, seconds); // HH:mm:ss
+        long now = System.currentTimeMillis();
+        long elapsedTimeMillis = now - startTime;
+        long elapsedSeconds = elapsedTimeMillis / 1000;
+        long hours = elapsedSeconds / 3600;
+        long minutes = (elapsedSeconds % 3600) / 60;
+        long seconds = elapsedSeconds % 60;
+        String elapsedTimeStr = String.format("%02d:%02d:%02d", hours, minutes, seconds);
 
         String fetchingDurationStr = "";
         if (fetchingDurationMillis > 0) {
-            long fetchingDurationSeconds = fetchingDurationMillis / 1000;
-            long minutesFetched = fetchingDurationSeconds / 60;
-            long secondsFetched = fetchingDurationSeconds % 60;
-            fetchingDurationStr = String.format(" (Took %02d:%02d)", minutesFetched, secondsFetched);
+            long fetchingSeconds = fetchingDurationMillis / 1000;
+            long minFetched = fetchingSeconds / 60;
+            long secFetched = fetchingSeconds % 60;
+            fetchingDurationStr = String.format(" (Took %02d:%02d)", minFetched, secFetched);
         }
 
         String lastUpdateStr = getLastUpdateTime();
 
-        primaryStage.setTitle("MM - Session: " + elapsedTimeStr +
+        String cooldownText = cooldownRemaining > 0
+                ? String.format(" | Cooldown: %ds", (int) (cooldownRemaining / 1000))
+                : "";
+
+        String title = ApplicationVersion.CURRENT_VERSION + " | MM Session: " + elapsedTimeStr +
                 " | Reports Loaded: " + moderationReportController.getTotalReportsLoaded() +
-                " | Last Refresh was " + lastUpdateStr +
+                " | Last Refresh: " + lastUpdateStr +
                 fetchingDurationStr +
                 " | Requests in Last 60s: " + requestsInLastMinute +
-                String.format(" | RPS (3s): %.2f", requestsPerSecond));
-    }
-}
+                cooldownText;
 
-    private long fetchingDurationMillis = 0;
-    private boolean hasFetchedReports = false;
+        if (hasActiveRequests) {
+            if (!isFetching) startFetchingPattern();
+            title += " | Fetching reports...";
+        } else {
+            stopFetchingPattern();
+        }
+
+        primaryStage.setTitle(title);
+    }
 
     private void startFetchingPattern() {
         if (timeline != null && timeline.getStatus() == Timeline.Status.RUNNING) {
             return;
         }
 
-        final long[] counterSecondsRequestReportsFromServer = {0};
+        final long[] counterSeconds = {0};
         lastRefreshedTime = System.currentTimeMillis();
         hasFetchedReports = true;
 
         timeline = new Timeline(new KeyFrame(Duration.seconds(1), event -> {
-            long elapsedTimeMillis = System.currentTimeMillis() - startTime;
-            long elapsedTimeSeconds = elapsedTimeMillis / 1000;
-            long hours = elapsedTimeSeconds / 3600;
-            long minutes = (elapsedTimeSeconds % 3600) / 60;
-            long seconds = elapsedTimeSeconds % 60;
-            String elapsedTimeStr = String.format("%02d:%02d:%02d", hours, minutes, seconds); // HH:mm:ss
-
-            counterSecondsRequestReportsFromServer[0]++;
-
-            int requestsInLastMinute = FafApiCommunicationService.getRequestsInLastMinute();
-            double requestsPerSecond = FafApiCommunicationService.getRequestsPerSecondRolling(3);
-
-            primaryStage.setTitle("MM: Session: " + elapsedTimeStr +
-                    " | Latest " + preferencesConfig.getInitialPageSize() +
-                    " Reports Fetched | Requesting now all reports from the server... (" +
-                    counterSecondsRequestReportsFromServer[0] + " seconds ago)" +
-                    " | Requests in Last 60s: " + requestsInLastMinute +
-                    String.format(" | RPS (3s): %.2f", requestsPerSecond));
+            counterSeconds[0]++;
+            updateWindowTitle(primaryStage,
+                    System.currentTimeMillis() - counterSeconds[0] * 1000,
+                    FafApiCommunicationService.getRequestsInLastMinute(),
+                    FafApiCommunicationService.getRequestsPerSecondRolling(3),
+                    FafApiCommunicationService.getCooldownRemainingMillis());
         }));
-
         timeline.setCycleCount(Timeline.INDEFINITE);
         timeline.play();
     }
@@ -208,33 +194,20 @@ public class FafModeratorClientApplication extends Application {
             timeline.stop();
             timeline = null;
         }
-
         if (hasFetchedReports) {
-            long fetchingEndTime = System.currentTimeMillis();
-            fetchingDurationMillis = fetchingEndTime - lastRefreshedTime;
+            fetchingDurationMillis = System.currentTimeMillis() - lastRefreshedTime;
             hasFetchedReports = false;
         }
     }
-
-    private long lastRefreshedTime = -1;
 
     private String getLastUpdateTime() {
         if (lastRefreshedTime < 0) {
             return "Never";
         }
-        long now = System.currentTimeMillis();
-        long elapsedMillis = now - lastRefreshedTime;
-        long elapsedSeconds = elapsedMillis / 1000;
-
-        if (elapsedSeconds < 60) {
-            return "a few seconds ago";
-        } else if (elapsedSeconds < 3600) {
-            long minutes = elapsedSeconds / 60;
-            return minutes + (minutes == 1 ? " minute ago" : " minutes ago");
-        } else {
-            long hours = elapsedSeconds / 3600;
-            return hours + (hours == 1 ? " hour ago" : " hours ago");
-        }
+        long elapsedSeconds = (System.currentTimeMillis() - lastRefreshedTime) / 1000;
+        if (elapsedSeconds < 60) return "a few seconds ago";
+        if (elapsedSeconds < 3600)
+            return (elapsedSeconds / 60) + (elapsedSeconds / 60 == 1 ? " minute ago" : " minutes ago");
+        return (elapsedSeconds / 3600) + (elapsedSeconds / 3600 == 1 ? " hour ago" : " hours ago");
     }
-
 }

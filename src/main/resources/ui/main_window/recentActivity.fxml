@@ -6,16 +6,10 @@
 <?import javafx.scene.layout.HBox?>
 <VBox xmlns:fx="http://javafx.com/fxml/1" fx:id="root" alignment="TOP_CENTER" xmlns="http://javafx.com/javafx/8.0.111"
       fx:controller="com.faforever.moderatorclient.ui.main_window.RecentActivityController"
-      spacing="5">
-
+      spacing="10" style="-fx-padding: 20 0 0 0;">
     <HBox spacing="10" alignment="CENTER_LEFT">
-        <Button fx:id="refreshButton" text="Refresh Latest Registrations"/>
-        <CheckBox fx:id="includeGlobalBannedUserCheckBox" text="Include already banned users"/>
+        <Button fx:id="refreshLatestRegistrationsButton" text="Refresh Latest 10k Registrations"/>
     </HBox>
-
-    <TextArea fx:id="statsLatestRegistrations" editable="false"/>
-    <Text fx:id="excludedItemsText" text="junk/malformed items are filtered from file (see Settings)"/>
-    <TextArea fx:id="suspiciousUserTextArea" editable="false"/>
 
     <TabPane fx:id="recentActivityTabPane" tabClosingPolicy="UNAVAILABLE" VBox.vgrow="ALWAYS">
         <Tab fx:id="latestRegistrationsTab" text="Latest Registrations">
@@ -28,6 +22,11 @@
 
         <Tab fx:id="latestMapUploadsTab" text="Latest Map Uploads">
             <TableView fx:id="mapUploadFeedTableView" VBox.vgrow="ALWAYS"/>
+        </Tab>
+
+        <Tab fx:id="statsRegistrationsTab" text="Stats Registrations">
+            <TableView fx:id="statsRegistrationsTableView" VBox.vgrow="ALWAYS"/>
+            <TextArea fx:id="statsLatestRegistrations" editable="false"/>
         </Tab>
     </TabPane>
 </VBox>

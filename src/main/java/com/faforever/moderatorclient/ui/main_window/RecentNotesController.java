@@ -20,7 +20,7 @@ import javafx.scene.input.ClipboardContent;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
-import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 @Component
 @Slf4j
@@ -48,16 +48,14 @@ public class RecentNotesController implements Controller<Region> {
 
     @Override
     public VBox getRoot() {
-        loadUserNotes();
+        CompletableFuture.supplyAsync(() -> userService.getAllUserNotesForRecentNotesTab()).thenAccept(userNotes -> {
+            Platform.runLater(() -> {
+                ObservableList<UserNoteFX> notesData = FXCollections.observableArrayList(userNotes);
+                notesTable.setItems(notesData);
+            });
+        });
+
         return root;
-    }
-
-    private void loadUserNotes() {
-        log.debug("Loading all user notes.");
-        List<UserNoteFX> userNotes = userService.getAllUserNotes();
-
-        ObservableList<UserNoteFX> notesData = FXCollections.observableArrayList(userNotes);
-        notesTable.setItems(notesData);
     }
 
     @FXML

@@ -1,27 +1,42 @@
 package com.faforever.moderatorclient.ui.main_window;
 
+import com.faforever.commons.api.dto.BanStatus;
 import com.faforever.commons.api.dto.GroupPermission;
 import com.faforever.commons.api.update.AvatarAssignmentUpdate;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.AvatarService;
 import com.faforever.moderatorclient.api.domain.PermissionService;
 import com.faforever.moderatorclient.api.domain.UserService;
-import com.faforever.moderatorclient.config.PreferencesConfig;
+import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.mapstruct.GamePlayerStatsMapper;
 import com.faforever.moderatorclient.ui.*;
 import com.faforever.moderatorclient.ui.domain.*;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import javafx.animation.Animation;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
+import javafx.event.Event;
 import javafx.fxml.FXML;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.util.StringConverter;
 import lombok.RequiredArgsConstructor;
@@ -33,12 +48,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
 
 import java.io.*;
+import java.lang.reflect.Field;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
@@ -51,40 +67,84 @@ import java.util.stream.Collectors;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.ButtonType;
+import org.springframework.web.client.HttpClientErrorException;
 
+import static com.faforever.moderatorclient.api.FafApiCommunicationService.checkRateLimit;
 import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class UserManagementController implements Controller<SplitPane> {
-    public CheckBox includeProcessorNameCheckBox;
-    public TextField statusTextFieldProcessingPlayerID;
-    public TextField statusTextFieldProcessingItem;
-    public Tab logSmurfVillageTab;
-    public TextArea logSmurfVillageTabTextArea;
+    @FXML
+    public Button checkPermanentBansButton;
+    @FXML
+    public Button checkTemporaryBansButton;
+    @FXML
+    public Button checkSmurfManagementAccountsButton;
+    public Label userNotesLabel;
+    @FXML
+    public TextField maxMatchesBeforePromptSmurfVillageLookupTextField;
+    @FXML
+    public CheckBox promptUserOnThresholdExceededSmurfVillageLookupCheckBox;
+    @FXML
+    public TitledPane searchHistoryTitledPane;
+    @FXML
+    public TitledPane smurfVillageLookupSettingsTitledPane;
+    @FXML
+    public TitledPane smurfVillageLookupTitledPane;
+    @FXML
+    public TitledPane banCheckerSmurfManagementTitledPane;
+    @FXML
+    public TitledPane latestRegistrationsTitledPane;
+    @FXML
+    public Button toggleAllAdvancedIdentificationButton;
+    @FXML
+    public TextField daysToCheckRecentAccountsTextField;
+    @FXML
+    public Label ProgressLabelRecentAccountsSmurfCheck;
+    public Label searchHistoryLabel;
+    @FXML
+    private volatile boolean cancelRequestedByUser = false;
+    @FXML
+    public Tab smurfOutputTab;
+    @FXML
+    public TextArea smurfOutputTextArea;
+    @FXML
     public Button checkRecentAccountsForSmurfsButton;
+    @FXML
     public Text statusTextRecentAccountsForSmurfs;
-    public TextField amountTextFieldRecentAccountsForSmurfsAmount;
-    public CheckBox catchFirstLayerSmurfsOnlyCheckBox;
-    public TextField playerIDField1SharedGamesTextfield;
-    public TextField playerIDField2SharedGamesTextfield;
+    @FXML
     public Button checkSharedGamesButton;
     public Button removeNoteButton;
     @FXML
-    public TextField checkSharedGamesComparisonTextfield;
+    public TextField
+            statusTextFieldProcessingPlayerID,
+            statusTextFieldProcessingItem,
+            playerIDField1SharedGamesTextfield,
+            playerIDField2SharedGamesTextfield;
+
     @FXML
-    public TextField userGamesNumberOfPagesToLoadTextfield;
+    public CheckBox
+            catchFirstLayerSmurfsOnlyCheckBox,
+            includeProcessorNameCheckBox;
+
+    @FXML
+    public Label
+            temporaryBanProgressLabel,
+            permanentBanProgressLabel,
+            smurfManagementProgressLabel,
+            progressLabelSharedGames;
+
     @FXML
     private Button checkRecentAccountsForSmurfsPauseButton;
 
     private volatile boolean isPaused = false;
     private volatile boolean isStopped = false;
-    private final Object pauseLock = new Object(); // Monitor object for synchronization
+    private final Object pauseLock = new Object(); // Monitor an object for synchronization
 
     @FXML
     public Button checkRecentAccountsForSmurfsStopButton;
-    private int depthCounter = 0;
     private final StringBuilder logOutput = new StringBuilder();
     private final UiService uiService;
     private final PlatformService platformService;
@@ -105,17 +165,14 @@ public class UserManagementController implements Controller<SplitPane> {
 
     private final Map<String, String> searchUserPropertyMapping = new LinkedHashMap<>();
     @FXML
-    public TextArea SearchHistoryTextArea;
+    public TextArea searchHistoryTextArea;
     @FXML
-    public TextArea UserNotesTextArea;
+    public TextArea userNotesTextArea;
 
     private static final String SEARCH_HISTORY_FILE = CONFIGURATION_FOLDER + File.separator +  "searchHistory.txt";
     private static final String USER_NOTES_FILE = CONFIGURATION_FOLDER + File.separator + "userNotes.txt";
-
+    @FXML
     public TextField smurfVillageLookupTextField;
-    public Tab searchSmurfVillageLookupTab;
-    public TextArea searchSmurfVillageTabTextArea;
-    public Tab settingsSmurfVillageLookupTab;
     public CheckBox includeUUIDCheckBox;
     public CheckBox includeUIDHashCheckBox;
     public CheckBox includeMemorySerialNumberCheckBox;
@@ -123,17 +180,12 @@ public class UserManagementController implements Controller<SplitPane> {
     public CheckBox includeSerialNumberCheckBox;
     public CheckBox includeProcessorIdCheckBox;
     public CheckBox includeManufacturerCheckBox;
-    public TextField depthScanningInputTextField;
     public CheckBox includeIPCheckBox;
-    public TextField maxUniqueUsersThresholdTextField;
-
-    @FXML
-    private CheckBox excludeItemsCheckBox;
 
     @Value("${faforever.vault.replay-download-url-format}")
     private String replayDownLoadFormat;
     private final FafApiCommunicationService communicationService;
-
+    @FXML
     public SplitPane root;
 
     public Tab notesTab;
@@ -169,12 +221,12 @@ public class UserManagementController implements Controller<SplitPane> {
 
     public TableView<GamePlayerStatsFX> userLastGamesTable;
     public ChoiceBox<FeaturedModFX> featuredModFilterChoiceBox;
-    public Button loadMoreGamesButton;
-    private Runnable loadMoreGamesRunnable;
-    private int userGamesPage = 1;
 
     @Autowired
-    public PreferencesConfig preferencesConfig;
+    public BansController bansController;
+
+    @Autowired
+    ExcludedHardwareItemsController excludedHardwareItemsController;
 
     @Override
     public SplitPane getRoot() {
@@ -185,86 +237,202 @@ public class UserManagementController implements Controller<SplitPane> {
         tab.setDisable(!communicationService.hasPermission(permissionTechnicalName));
     }
 
-    public static void saveDividerPosition(SplitPane splitPane, PreferencesConfig preferencesConfig) {
-        double[] dividerPositions = splitPane.getDividerPositions();
-
-        preferencesConfig.setPreference("splitPaneDividerPositions", "userManagementWindow", dividerPositions);
-    }
-
-    public static void loadDividerPosition(SplitPane splitPane, PreferencesConfig preferencesConfig) {
-        double[] savedPositions = preferencesConfig.getDividerPositions();
-
-        Platform.runLater(() -> {
-            if (savedPositions != null && savedPositions.length > 0) {
-                splitPane.setDividerPositions(savedPositions);
-                splitPane.requestLayout();
-            } else {
-                log.warn("No saved divider positions, using default");
-            }
-        });
-    }
-
-    public static void addDividerPositionListener(SplitPane splitPane, PreferencesConfig preferencesConfig) {
-        splitPane.getDividers().getFirst().positionProperty().addListener((obs, oldValue, newValue) -> {
-            saveDividerPosition(splitPane, preferencesConfig);
-        });
-    }
-
     @FXML
     private Button minimizeSearchHistoryButton;
     @FXML
     private Button minimizeUserNotesButton;
+
+    private final File EXCLUDED_ITEMS_FILE = new File("data/excluded_items.json");
+
+    private final LocalPreferences localPreferences;
 
     @FXML
     public void initialize() {
         loadStateCheckBox();
         addListeners();
         loadContent();
-        loadDividerPosition(root, preferencesConfig);
-        addDividerPositionListener(root, preferencesConfig);
-        userGamesNumberOfPagesToLoadTextfield.setText(preferencesConfig.getUserGamesNumberOfPagesToLoadTextfield());
-        checkSharedGamesComparisonTextfield.setText(preferencesConfig.getCheckSharedGamesComparisonTextfield());
+        configureSearchHistoryVisibility();
+        configureUserNotesVisibility();
+        setLastSearchTerm();
+        disableTabsBasedOnPermissions();
+        setupTableViews();
+        setupButtonBindings();
+        configureFeaturedModFilter();
+        userSearchTableView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        userSearchTableView.getSelectionModel().getSelectedItems().addListener((ListChangeListener<PlayerFX>) change -> onSelectedUser());
+        initializeSearchProperties();
+        bindUIElementsToPreferences();
 
-        boolean isSearchHistoryVisible = preferencesConfig.getSearchHistoryVisibilityState();
-        SearchHistoryTextArea.setVisible(isSearchHistoryVisible);
-        SearchHistoryTextArea.setManaged(isSearchHistoryVisible);
+        Tooltip tooltip = catchFirstLayerSmurfsOnlyCheckBox.getTooltip();
+
+        tooltip.setWrapText(true);
+        tooltip.setPrefWidth(300);
+        tooltip.setText(
+                "When enabled, only accounts directly linked to the starting account will be detected.\n" +
+                        "Accounts connected through additional layers will not be checked.\n" +
+                        "Use with caution, as disabling this could potentially scan all existing FAF accounts in the galaxy, " +
+                        "and the 'Safeguard' above will prevent it from continuing indefinitely.\n" +
+                        "\nExample:\n" +
+                        "Account A is linked to B and C.\n" +
+                        "B is linked to D.\n" +
+                        "C is linked to E and F.\n" +
+                        "With this setting enabled, only B and C are found.\n" +
+                        "D, E, and F are not found.\n" +
+                        "If the setting is disabled, the scan would continue to D, E, F, and any further linked accounts."
+        );
+
+        catchFirstLayerSmurfsOnlyCheckBox.setTooltip(tooltip);
+        tooltip.setShowDelay(javafx.util.Duration.seconds(1));
+        tooltip.setHideDelay(javafx.util.Duration.ZERO);
+        tooltip.setShowDuration(javafx.util.Duration.INDEFINITE);
+
+        toggleAllAdvancedIdentificationButton.setOnAction(event -> {
+            boolean newState = !includeMemorySerialNumberCheckBox.isSelected();
+            includeMemorySerialNumberCheckBox.setSelected(newState);
+            includeVolumeSerialNumberCheckBox.setSelected(newState);
+            includeSerialNumberCheckBox.setSelected(newState);
+            includeProcessorIdCheckBox.setSelected(newState);
+            includeProcessorNameCheckBox.setSelected(newState);
+            includeManufacturerCheckBox.setSelected(newState);
+        });
+
+        userSearchTableView.getColumns().forEach(column -> {
+            if (column.getId() == null) {
+                column.setId(column.getText().replaceAll("\\s+", ""));
+            }
+        });
+
+        Platform.runLater(() -> {
+            loadColumnLayout(userSearchTableView, localPreferences);
+            loadSplitPanePositions(root, localPreferences);
+            StartupSyncBans();
+
+        });
+    }
+
+    private void bindUIElementsToPreferences() {
+        for (Field field : LocalPreferences.TabUserManagement.class.getDeclaredFields()) {
+            field.setAccessible(true);
+            String fieldName = field.getName();
+
+            try {
+                Object value = field.get(localPreferences.getTabUserManagement());
+
+                // Only attempt binding if the controller actually has a matching UI field
+                Field fxField;
+                try {
+                    fxField = this.getClass().getDeclaredField(fieldName);
+                } catch (NoSuchFieldException e) {
+                    // Skip fields that are not UI nodes (like splitPaneDividerPositions)
+                    continue;
+                }
+
+                fxField.setAccessible(true);
+                Object node = fxField.get(this);
+
+                if (node instanceof TextField textField && value instanceof String) {
+                    textField.setText((String) value);
+                    textField.textProperty().addListener((obs, oldVal, newVal) -> {
+                        try {
+                            field.set(localPreferences.getTabUserManagement(), newVal);
+                        } catch (IllegalAccessException ignored) {
+                        }
+                    });
+                } else if (node instanceof TextArea textArea && value instanceof String) {
+                    textArea.setText((String) value);
+                    textArea.textProperty().addListener((obs, oldVal, newVal) -> {
+                        try {
+                            field.set(localPreferences.getTabUserManagement(), newVal);
+                        } catch (IllegalAccessException ignored) {
+                        }
+                    });
+                } else if (node instanceof CheckBox checkBox && value instanceof Boolean) {
+                    checkBox.setSelected((Boolean) value);
+                    checkBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+                        try {
+                            field.set(localPreferences.getTabUserManagement(), newVal);
+                        } catch (IllegalAccessException ignored) {
+                        }
+                    });
+                } else if (node instanceof TitledPane titledPane && value instanceof Boolean) {
+                    titledPane.setExpanded((Boolean) value);
+                    titledPane.expandedProperty().addListener((obs, oldVal, newVal) -> {
+                        try {
+                            field.set(localPreferences.getTabUserManagement(), newVal);
+                        } catch (IllegalAccessException ignored) {
+                        }
+                    });
+                }
+            } catch (IllegalAccessException e) {
+                log.warn("Cannot access field {}", fieldName, e);
+            }
+        }
+    }
+
+
+    private void configureSearchHistoryVisibility() {
+        LocalPreferences.TabUserManagement tabUserManagement = localPreferences.getTabUserManagement();
+        boolean isSearchHistoryVisible = tabUserManagement.isSearchHistoryTexAreaVisibilityState();
+
+        searchHistoryTextArea.setVisible(isSearchHistoryVisible);
+        searchHistoryTextArea.setManaged(isSearchHistoryVisible);
         minimizeSearchHistoryButton.setText(isSearchHistoryVisible ? "Minimize" : "Restore");
-
-        boolean isUserNotesVisible = preferencesConfig.getUserNotesVisibilityState();
-        UserNotesTextArea.setVisible(isUserNotesVisible);
-        UserNotesTextArea.setManaged(isUserNotesVisible);
-        minimizeUserNotesButton.setText(isUserNotesVisible ? "Minimize" : "Restore");
-
         minimizeSearchHistoryButton.setOpacity(0.5);
-        minimizeUserNotesButton.setOpacity(0.5);
+    }
 
-        // Set last search term for userSearchTextField
-        String textAreaContent = SearchHistoryTextArea.getText();
+    private void configureUserNotesVisibility() {
+        LocalPreferences.TabUserManagement tabUserManagement = localPreferences.getTabUserManagement();
+        boolean isUserNotesVisible = tabUserManagement.isUserNotesTextAreaVisibilityState();
+
+        userNotesTextArea.setVisible(isUserNotesVisible);
+        userNotesTextArea.setManaged(isUserNotesVisible);
+        minimizeUserNotesButton.setText(isUserNotesVisible ? "Minimize" : "Restore");
+        minimizeUserNotesButton.setOpacity(0.5);
+    }
+
+
+    private void setLastSearchTerm() {
+        String textAreaContent = searchHistoryTextArea.getText();
         String[] lines = textAreaContent.split("\n");
         if (lines.length > 0) {
             userSearchTextField.setText(lines[0]);
         }
+    }
 
+    private void disableTabsBasedOnPermissions() {
         disableTabOnMissingPermission(notesTab, GroupPermission.ROLE_ADMIN_ACCOUNT_NOTE);
         disableTabOnMissingPermission(bansTab, GroupPermission.ROLE_ADMIN_ACCOUNT_BAN);
         disableTabOnMissingPermission(teamkillsTab, GroupPermission.ROLE_READ_TEAMKILL_REPORT);
         disableTabOnMissingPermission(avatarsTab, GroupPermission.ROLE_WRITE_AVATAR);
         disableTabOnMissingPermission(userGroupsTab, GroupPermission.ROLE_READ_USER_GROUP);
+    }
 
+    private void setupTableViews() {
         ViewHelper.buildUserTableView(platformService, userSearchTableView, users, null,
-                playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), true, communicationService, preferencesConfig);
+                playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), true, communicationService);
         ViewHelper.buildNotesTableView(userNoteTableView, userNotes, false);
         ViewHelper.buildNameHistoryTableView(userNameHistoryTableView, nameRecords);
-        ViewHelper.buildBanTableView(userBansTableView, bans, false, preferencesConfig);
+        ViewHelper.buildBanTableView(userBansTableView, bans, false, localPreferences);
         ViewHelper.buildPlayersGamesTable(userLastGamesTable, replayDownLoadFormat, platformService);
+        ViewHelper.buildUserAvatarsTableView(userAvatarsTableView, avatarAssignments);
+        ViewHelper.buildUserGroupsTableView(userGroupsTableView, userGroups);
+        ViewHelper.buildUserPermissionsTableView(permissionsTableView, groupPermissions);
+    }
 
+    private void setupButtonBindings() {
         addNoteButton.disableProperty().bind(userSearchTableView.getSelectionModel().selectedItemProperty().isNull());
         editNoteButton.disableProperty().bind(userNoteTableView.getSelectionModel().selectedItemProperty().isNull());
-        //removeNoteButton.disableProperty().bind(userSearchTableView.getSelectionModel().selectedItemProperty().isNull());
+        giveAvatarButton.disableProperty().bind(
+                Bindings.or(userSearchTableView.getSelectionModel().selectedItemProperty().isNull(),
+                        currentSelectedAvatar.isNull()));
+        expiresAtTextfield.disableProperty().bind(userAvatarsTableView.getSelectionModel().selectedItemProperty().isNull());
+        setExpiresAtButton.disableProperty().bind(userAvatarsTableView.getSelectionModel().selectedItemProperty().isNull());
+        takeAvatarButton.disableProperty().bind(userAvatarsTableView.getSelectionModel().selectedItemProperty().isNull());
+        removeGroupButton.disableProperty().bind(userGroupsTableView.getSelectionModel().selectedItemProperty().isNull());
+        editBanButton.disableProperty().bind(userBansTableView.getSelectionModel().selectedItemProperty().isNull());
+    }
 
-        loadMoreGamesButton.visibleProperty()
-                .bind(Bindings.createBooleanBinding(() -> !userLastGamesTable.getItems().isEmpty() && userLastGamesTable.getItems().size() % 100 == 0, userLastGamesTable.getItems()));
-
+    private void configureFeaturedModFilter() {
         featuredModFilterChoiceBox.setConverter(new StringConverter<>() {
             @Override
             public String toString(FeaturedModFX object) {
@@ -273,59 +441,54 @@ public class UserManagementController implements Controller<SplitPane> {
 
             @Override
             public FeaturedModFX fromString(String string) {
-                throw (new UnsupportedOperationException("Not implemented"));
+                throw new UnsupportedOperationException("Not implemented");
             }
         });
+
         featuredModFilterChoiceBox.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
             userLastGamesTable.getItems().clear();
-            userGamesPage = Integer.parseInt(preferencesConfig.getUserGamesNumberOfPagesToLoadTextfield());
-            if (loadMoreGamesRunnable != null) loadMoreGamesRunnable.run();
         });
 
         featuredModFilterChoiceBox.getItems().add(null);
         featuredModFilterChoiceBox.getSelectionModel().select(0);
-        CompletableFuture.supplyAsync(userService::getFeaturedMods)
-                .thenAccept(featuredMods -> Platform.runLater(() -> featuredModFilterChoiceBox.getItems().addAll(featuredMods)));
+    }
 
-        ViewHelper.buildTeamkillTableView(userTeamkillsTableView, teamkills, false, null);
-        ViewHelper.buildUserAvatarsTableView(userAvatarsTableView, avatarAssignments);
-        ViewHelper.buildUserGroupsTableView(userGroupsTableView, userGroups);
-        ViewHelper.buildUserPermissionsTableView(permissionsTableView, groupPermissions);
-        giveAvatarButton.disableProperty().bind(
-                Bindings.or(userSearchTableView.getSelectionModel().selectedItemProperty().isNull(),
-                        currentSelectedAvatar.isNull()));
-        expiresAtTextfield.disableProperty().bind(userAvatarsTableView.getSelectionModel().selectedItemProperty().isNull());
-        setExpiresAtButton.disableProperty().bind(userAvatarsTableView.getSelectionModel().selectedItemProperty().isNull());
-        takeAvatarButton.disableProperty().bind(userAvatarsTableView.getSelectionModel().selectedItemProperty().isNull());
-        removeGroupButton.disableProperty().bind(userGroupsTableView.getSelectionModel().selectedItemProperty().isNull());
+    private void StartupSyncBans() {
+        LocalPreferences.TabSettings settings = localPreferences.getTabSettings();
 
-        //userSearchTableView.getSelectionModel().selectedItemProperty().addListener(this::onSelectedUser);
-        userSearchTableView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
-        userSearchTableView.getSelectionModel().getSelectedItems().addListener((ListChangeListener<PlayerFX>) change -> {
-            onSelectedUser();
-        });
-        editBanButton.disableProperty().bind(userBansTableView.getSelectionModel().selectedItemProperty().isNull());
+        if (settings.isSyncPermanentBansAtStartupCheckbox()) {
+            log.debug("Syncing permanent bans at startup.");
+            bansController.syncPermBannedUsersJson();
+        }
 
-        initializeSearchProperties();
+        if (settings.isSyncTemporaryBansAtStartupCheckbox()) {
+            log.debug("Syncing temporary bans at startup.");
+            bansController.syncTempBannedUsersJson();
+        }
     }
 
     private void initializeSearchProperties() {
+        //TODO check OM how it can be better
         searchUserPropertyMapping.put("All In One", "allInOne");
         searchUserPropertyMapping.put("Name", "login");
         searchUserPropertyMapping.put("User ID", "id");
         searchUserPropertyMapping.put("Previous Name", "names.name");
         searchUserPropertyMapping.put("Email", "email");
         searchUserPropertyMapping.put("IP Address", "recentIpAddress");
-        searchUserPropertyMapping.put("UUID", "uniqueIds.uuid");
-        searchUserPropertyMapping.put("Hash", "uniqueIds.hash");
-        searchUserPropertyMapping.put("Volume Serial Number", "uniqueIds.volumeSerialNumber");
-        searchUserPropertyMapping.put("Memory Serial Number", "uniqueIds.memorySerialNumber");
-        searchUserPropertyMapping.put("Serial Number", "uniqueIds.serialNumber");
-        searchUserPropertyMapping.put("Device ID", "uniqueIds.deviceId");
-        searchUserPropertyMapping.put("CPU Name", "uniqueIds.name");
-        searchUserPropertyMapping.put("Processor ID", "uniqueIds.processorId");
-        searchUserPropertyMapping.put("Bios Version", "uniqueIds.SMBIOSBIOSVersion");
-        searchUserPropertyMapping.put("Manufacturer", "uniqueIds.manufacturer");
+
+        // uniqueIdAssignments
+        searchUserPropertyMapping.put("UUID", "uniqueIdAssignments.uniqueId.uuid");
+        searchUserPropertyMapping.put("Hash", "uniqueIdAssignments.uniqueId.hash");
+        searchUserPropertyMapping.put("Volume Serial Number", "uniqueIdAssignments.uniqueId.volumeSerialNumber");
+        searchUserPropertyMapping.put("Memory Serial Number", "uniqueIdAssignments.uniqueId.memorySerialNumber");
+        searchUserPropertyMapping.put("Serial Number", "uniqueIdAssignments.uniqueId.serialNumber");
+        searchUserPropertyMapping.put("Device ID", "uniqueIdAssignments.uniqueId.deviceId");
+        searchUserPropertyMapping.put("CPU Name", "uniqueIdAssignments.uniqueId.name");
+        searchUserPropertyMapping.put("Processor ID", "uniqueIdAssignments.uniqueId.processorId");
+        searchUserPropertyMapping.put("Bios Version", "uniqueIdAssignments.uniqueId.SMBIOSBIOSVersion");
+        searchUserPropertyMapping.put("Manufacturer", "uniqueIdAssignments.uniqueId.manufacturer");
+
+        // accountLinks
         searchUserPropertyMapping.put("Steam ID", "accountLinks.serviceId");
         searchUserPropertyMapping.put("GOG ID", "accountLinks.serviceId");
 
@@ -338,64 +501,77 @@ public class UserManagementController implements Controller<SplitPane> {
         currentSelectedAvatar.setValue(avatarFX);
     }
 
+    private String lastSelectedUserId = null;
+
     private void onSelectedUser() {
-        // Clear previous data
+        ObservableList<PlayerFX> selectedUsers = userSearchTableView.getSelectionModel().getSelectedItems();
+        newBanButton.setDisable(selectedUsers == null || selectedUsers.isEmpty());
+
+        if (selectedUsers == null || selectedUsers.isEmpty()) {
+            lastSelectedUserId = null;
+            return;
+        }
+
+        PlayerFX user = selectedUsers.getFirst();
+        if (lastSelectedUserId != null && lastSelectedUserId.equals(user.getId())) {
+            return; // Skip reload if the same user selected again
+        }
+        lastSelectedUserId = user.getId();
+
+        // Clear data
         nameRecords.clear();
         userNameHistoryTableView.getSortOrder().clear();
         bans.clear();
         userBansTableView.getSortOrder().clear();
-
         userLastGamesTable.getItems().clear();
         userLastGamesTable.getSortOrder().clear();
-
         userTeamkillsTableView.getSortOrder().clear();
         teamkills.clear();
-
         userNoteTableView.getSortOrder().clear();
         userNotes.clear();
-
         avatarAssignments.clear();
         userAvatarsTableView.getSortOrder().clear();
-
         userGroups.clear();
         userGroupsTableView.getSortOrder().clear();
 
-        ObservableList<PlayerFX> selectedUsers = userSearchTableView.getSelectionModel().getSelectedItems();
+        CompletableFuture.runAsync(() -> {
+            List<UserNoteFX> notes = userService.getUserNotes(user.getId());
+            List<NameRecordFX> names = user.getNames();
+            List<BanInfoFX> userBans = user.getBans();
+            List<AvatarAssignmentFX> avatars = user.getAvatarAssignments();
 
-        if (selectedUsers != null && !selectedUsers.isEmpty()) {
-            for (PlayerFX user : selectedUsers) {
-                teamkills.addAll(userService.findTeamkillsByUserId(user.getId()));
-                userNotes.addAll(userService.getUserNotes(user.getId()));
-                nameRecords.addAll(user.getNames());
-                bans.addAll(user.getBans());
-                avatarAssignments.addAll(user.getAvatarAssignments());
+            Platform.runLater(() -> {
+                userNotes.addAll(notes);
+                nameRecords.addAll(names);
+                bans.addAll(userBans);
+                avatarAssignments.addAll(avatars);
+            });
 
-                if (!userGroupsTab.isDisable()) {
-                    permissionService.getPlayersUserGroups(user).thenAccept(playerGroups -> {
+            if (!userGroupsTab.isDisable()) {
+                permissionService.getPlayersUserGroups(user).thenAccept(playerGroups -> {
+                    Platform.runLater(() -> {
                         userGroups.addAll(playerGroups);
-                        groupPermissions.addAll(playerGroups.stream().flatMap(userGroupFX -> userGroupFX.getPermissions().stream()).distinct().toList());
+                        groupPermissions.addAll(
+                                playerGroups.stream()
+                                        .flatMap(userGroupFX -> userGroupFX.getPermissions().stream())
+                                        .distinct()
+                                        .toList()
+                        );
                     });
-                }
-
-                userGamesPage = 1;
-                int numberOfPagesToLoad = Integer.parseInt(preferencesConfig.getUserGamesNumberOfPagesToLoadTextfield());
-
-                for (int i = 0; i < numberOfPagesToLoad; i++) {
-                    final int currentPage = userGamesPage + i;
-                    loadMoreGamesRunnable = () -> CompletableFuture.supplyAsync(() ->
-                                    gamePlayerStatsMapper.map(userService.getLastHundredPlayedGamesByFeaturedMod(user.getId(), currentPage, featuredModFilterChoiceBox.getSelectionModel().getSelectedItem())))
-                            .thenAccept(gamePlayerStats -> Platform.runLater(() -> userLastGamesTable.getItems().addAll(gamePlayerStats)));
-                    loadMoreGamesRunnable.run();
-                }
+                });
             }
-        }
 
-        newBanButton.setDisable(selectedUsers == null || selectedUsers.isEmpty());
-    }
-
-    public void userSearchSmurfVillageAddToUserTable(String userID) {
-        List<PlayerFX> usersFound = userService.findUsersByAttribute("id", userID);
-        users.addAll(usersFound);
+            // Fetch last played 1k games from selected user
+            CompletableFuture
+                    .supplyAsync(() -> gamePlayerStatsMapper.map(
+                            userService.getLastThousandPlayedGamesByFeaturedMod(
+                                    user.getId(),
+                                    1,
+                                    featuredModFilterChoiceBox.getSelectionModel().getSelectedItem()
+                            )))
+                    .thenAccept(gamePlayerStats ->
+                            Platform.runLater(() -> userLastGamesTable.getItems().addAll(gamePlayerStats)));
+        });
     }
 
     public void onUserSearch() {
@@ -408,15 +584,14 @@ public class UserManagementController implements Controller<SplitPane> {
         previousUserSearchTerm = currentUserSearchTerm;
         currentUserSearchTerm = userSearchTextField.getText();
 
-        log.debug("beforeSearchParameter: {}", searchParameter);
-        log.debug("beforeSearchPattern: {}", searchPattern);
-
         if (Objects.equals(searchParameter, "allInOne")) {
             searchParameter = determineSearchParameter(searchPattern);
+            assert searchParameter != null;
             if (searchParameter.equals("unknown")) {
                 log.debug("Unknown searchParameter");
             }
         }
+
         if (Objects.equals(searchParameter, "login")) {
             if (searchPattern.contains("[id ") && searchPattern.contains("]")) {
                 int startIndex = searchPattern.indexOf("[id ") + 4;
@@ -427,24 +602,43 @@ public class UserManagementController implements Controller<SplitPane> {
                 searchParameter = "id";
             }
         }
-        log.debug("afterSearchParameter: {}", searchParameter);
-        log.debug("afterSearchPattern: {}", searchPattern);
 
-        List<PlayerFX> usersFound = userService.findUsersByAttribute(searchParameter, searchPattern);
-        users.addAll(usersFound);
-
-        String userSearchText = userSearchTextField.getText();
-        String currentHistory = SearchHistoryTextArea.getText();
-
-        if (!currentHistory.startsWith(userSearchText + "\n")) {
-            SearchHistoryTextArea.setText(userSearchText + "\n" + currentHistory);
+        if (searchParameter.equals("uniqueIdAssignments.uniqueId.deviceId")) {
+            searchPattern = URLEncoder.encode(searchPattern, StandardCharsets.UTF_8);
         }
+
+        String finalSearchParameter = searchParameter;
+        String finalSearchPattern = searchPattern;
+
+        Task<List<PlayerFX>> searchTask = new Task<>() {
+            @Override
+            protected List<PlayerFX> call() {
+                return userService.findUsersByAttribute(finalSearchParameter, finalSearchPattern);
+            }
+        };
+
+        searchTask.setOnSucceeded(event -> {
+            users.addAll(searchTask.getValue());
+
+            String userSearchText = userSearchTextField.getText();
+            String currentHistory = searchHistoryTextArea.getText();
+
+            if (!currentHistory.startsWith(userSearchText + "\n")) {
+                searchHistoryTextArea.setText(userSearchText + "\n" + currentHistory);
+            }
+        });
+
+        searchTask.setOnFailed(event -> log.error("User search failed", searchTask.getException()));
+
+        new Thread(searchTask).start();
     }
 
     private String determineSearchParameter(String searchPattern) {
-
+        if (isDeviceId(searchPattern)) {
+            return "uniqueIdAssignments.uniqueId.deviceId";
+        }
         if (isUUID(searchPattern)) {
-            return "uniqueIds.uuid";
+            return "uniqueIdAssignments.uniqueId.uuid";
         }
         if (isValidIp(searchPattern)) {
             return "recentIpAddress";
@@ -453,7 +647,7 @@ public class UserManagementController implements Controller<SplitPane> {
             return "email";
         }
         if (isHash(searchPattern)) {
-            return "uniqueIds.hash";
+            return "uniqueIdAssignments.uniqueId.hash";
         }
         if (Character.isDigit(searchPattern.charAt(0))) {
             return "id";
@@ -464,7 +658,21 @@ public class UserManagementController implements Controller<SplitPane> {
         if (isLoginAndName(searchPattern)) {
             return "login";
         }
-        return "unknown";
+
+        // Show info popup if search parameter could not be detected
+        Alert alert = new Alert(AlertType.INFORMATION);
+        alert.setTitle("Search Parameter Not Detected");
+        alert.setHeaderText(null);
+        alert.setContentText("The value \"" + searchPattern + "\" could not be automatically detected. Please select it manually from the dropdown menu.");
+        alert.showAndWait();
+
+        return null;
+    }
+
+    private boolean isDeviceId(String searchPattern) {
+        Pattern pattern = Pattern.compile(".*\\\\.*(VEN_|DEV_|SUBSYS_|REV_).*(.*)+");
+        Matcher matcher = pattern.matcher(searchPattern);
+        return matcher.matches();
     }
 
     private boolean isEmail(String searchPattern) {
@@ -474,11 +682,13 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     private boolean isHash(String searchPattern) {
-        return searchPattern.matches("^[a-fA-F0-9]+$") && searchPattern.length() == 32;
+        String trimmedPattern = searchPattern.replaceAll("^\\s+|\\s+$", "");
+        return trimmedPattern.matches("^[a-fA-F0-9]+$") && searchPattern.length() == 32;
     }
 
     private boolean isLoginName(String searchPattern) {
-        return searchPattern.indexOf('@') == -1 && (!Character.isDigit(searchPattern.charAt(0)));
+        String trimmedPattern = searchPattern.replaceAll("^\\s+|\\s+$", "");
+        return trimmedPattern.indexOf('@') == -1 && (!Character.isDigit(searchPattern.charAt(0)));
     }
 
     private boolean isLoginAndName(String searchPattern) {
@@ -486,8 +696,9 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     private boolean isUUID(String searchPattern) {
+        String trimmedPattern = searchPattern.replaceAll("^\\s+|\\s+$", "");
         Pattern pattern = Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
-        Matcher matcher = pattern.matcher(searchPattern);
+        Matcher matcher = pattern.matcher(trimmedPattern);
         return matcher.matches();
     }
 
@@ -620,11 +831,6 @@ public class UserManagementController implements Controller<SplitPane> {
         return result.isPresent() && result.get() == ButtonType.YES;
     }
 
-    public void loadMoreGames() {
-        userGamesPage++;
-        loadMoreGamesRunnable.run();
-    }
-
     public void onGiveAvatar() {
         PlayerFX selectedPlayer = userSearchTableView.getSelectionModel().getSelectedItem();
         Assert.notNull(selectedPlayer, "You need to select a player.");
@@ -697,525 +903,26 @@ public class UserManagementController implements Controller<SplitPane> {
         userGroups.remove(userGroupFX);
     }
 
-    private List<String> loadExcludedItems() {
-        List<String> excludedItems = new ArrayList<>();
-        File fileExcludedItems = new File(CONFIGURATION_FOLDER + "/excludedItems" + ".txt");
-        try {
-            Scanner s = new Scanner(fileExcludedItems);
-            while (s.hasNextLine()) {
-                excludedItems.add(s.nextLine());
-            }
-            s.close();
-        } catch (Exception e) {
-            log.debug(String.valueOf(e));
-        }
-        return excludedItems;
-    }
-
-    @FXML
-    private void checkRecentAccountsForSmurfsPause() {
-        synchronized (pauseLock) {
-            // Toggle pause/resume state
-            isPaused = !isPaused;
-
-            if (isPaused) {
-                checkRecentAccountsForSmurfsPauseButton.setText("Resume");
-            } else {
-                checkRecentAccountsForSmurfsPauseButton.setText("Pause");
-                pauseLock.notifyAll();
-            }
-        }
-    }
-
-    @FXML
-    public void checkRecentAccountsForSmurfsStop() {
-        synchronized (pauseLock) {
-            isPaused = false;
-            isStopped = true;
-            checkRecentAccountsForSmurfsPauseButton.setText("Pause");
-            pauseLock.notifyAll();
-        }
-    }
-
-    private void processUsers(String attributeName, String attributeValue, int threshold, StringBuilder logOutput, ArrayList<Object> foundSmurfs) {
-        checkRecentAccountsForSmurfsPauseButton.setOnAction(event -> checkRecentAccountsForSmurfsPause());
-        try {
-            String text = String.format("\nProcessing ... [%s] [%s]", attributeName, attributeValue);
-            updateSmurfVillageLogTextArea(text);
-
-            List<String> excludedItems = loadExcludedItems();
-            boolean excludeItemsSelected = excludeItemsCheckBox.isSelected();
-
-            synchronized (pauseLock) {
-                while (isPaused) {
-                    text = "\t\t PROCESS PAUSED. Waiting for RESUME.\n";
-                    updateSmurfVillageLogTextArea(text);
-                    pauseLock.wait();
-                }
-            }
-
-            if (excludeItemsSelected && excludedItems.contains(attributeValue)) {
-
-                text = String.format("\t\t EXCLUSION CHECK: attribute [%s] with value [%s] found in excludedItems.txt, skipping.\n", attributeName, attributeValue);
-                updateSmurfVillageLogTextArea(text);
-                return;
-            }
-
-            List<PlayerFX> users = userService.findUsersByAttribute(attributeName, attributeValue);
-
-            if (users.size() > threshold) {
-                text = String.format("\t\t THRESHOLD CHECK: Ignoring %s [%s] (found %d, limit %d, added to excludedItems.txt)\n", attributeName, attributeValue, users.size(), threshold);
-                updateSmurfVillageLogTextArea(text);
-
-                File fileExcludedItems = new File(CONFIGURATION_FOLDER + File.separator + "excludedItems" + ".txt");
-                try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileExcludedItems, true))) {
-                    writer.newLine();
-                    writer.write(attributeValue);  // Append the attributeValue to the last line
-                } catch (IOException e) {
-                    log.warn("Failed to write to excludedItems.txt: {}", e.getMessage());
-                }
-                log.debug("{} was added to the excludedItems.txt", attributeValue);
-                return;
-            }
-
-            if (users.size() != 1) {
-                logOutput.append("\nMULTIPLE USERS\n");
-                logOutput.append(String.format("  - Attribute: %s with value: [%s]", attributeName, attributeValue));
-
-                for (PlayerFX user : users) {
-                    String accountStatus = user.isBannedGlobally() ? "banned: " : "active: ";
-                    String name = user.getRepresentation();
-                    String output = String.format("\n      %-20s %-10s", accountStatus, name);
-                    logOutput.append(output);
-                    text = String.format(output);
-                    updateSmurfVillageLogTextArea(text);
-
-                    if (user.getId() != null && !foundSmurfs.contains(user.getId())) {
-                        foundSmurfs.add(user.getId());
-                    }
-                }
-            }
-            else {
-                updateSmurfVillageLogTextArea("\t\t - unique");
-            }
-        } catch (IndexOutOfBoundsException e) {
-            log.error("An IndexOutOfBoundsException occurred: {}", e.getMessage());
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public Set<String> alreadyCheckedUsers = new HashSet<>();
-    public Set<String> alreadyCheckedUuids = new HashSet<>();
-    public Set<String> alreadyCheckedHashes = new HashSet<>();
-    public Set<String> alreadyCheckedIps = new HashSet<>();
-    public Set<String> alreadyCheckedMemorySerialNumbers = new HashSet<>();
-    public Set<String> alreadyCheckedVolumeSerialNumbers = new HashSet<>();
-    public Set<String> alreadyCheckedSerialNumbers = new HashSet<>();
-    public Set<String> alreadyCheckedProcessorIds = new HashSet<>();
-    public Set<String> alreadyCheckedCpuNames = new HashSet<>();
-    public Set<String> alreadyCheckedBiosVersions = new HashSet<>();
-    public Set<String> alreadyCheckedManufacturers = new HashSet<>();
-
-    public void writeSmurfVillageLookup2File(StringBuilder logOutput) {
-        try {
-            File folder = new File("SmurfVillageLookup");
-            if (!folder.exists()) {
-                if (!folder.mkdir()) {
-                    log.error("Failed to create directory: {}", folder.getAbsolutePath());
-                    throw new IOException("Could not create directory: " + folder.getAbsolutePath());
-                }
-            }
-            String fileName = "SmurfVillageLookup/UserID_" + smurfVillageLookupTextField.getText() + ".txt";
-            BufferedWriter bw = new BufferedWriter(new FileWriter(fileName));
-            bw.append(logOutput.toString());
-            bw.close();
-            log.debug("Output was added in {}", fileName);
-        } catch (IOException e) {
-            log.warn("Error in writeSmurfVillageLookup2File", e);
-        }
-    }
-
-    void setStatusWorking() {
-        statusLabelSmurfVillageLookup.setStyle("-fx-background-color: orange; -fx-text-fill: black; -fx-background-radius: 1;");
-        statusLabelSmurfVillageLookup.setText("Processing");
-    }
-
-    private void setStatusDone() {
-        statusLabelSmurfVillageLookup.setStyle("-fx-background-color: green; -fx-background-radius: 5;");
-        statusLabelSmurfVillageLookup.setText("Complete  ");
-        statusTextFieldProcessingPlayerID.setText("Status");
-    }
-
-    public void onSmurfVillageLookup(String playerID) {
-        log.debug("Checking {}", playerID);
-        AtomicReference<String> text = new AtomicReference<>(String.format("\n\n--- Checking: " + playerID));
-        updateSmurfVillageLogTextArea(text.get());
-        text.set(String.format("\nPlayer IDs seen so far: " + alreadyCheckedUsers));
-        updateSmurfVillageLogTextArea(text.get());
-
-        statusTextFieldProcessingPlayerID.setText(playerID);
-
-        if (alreadyCheckedUsers.contains(playerID)) {
-            text.set(String.format("\nSkipping, we already have seen that account: " + playerID));
-            updateSmurfVillageLogTextArea(text.get());
-            return;
-        }
-        alreadyCheckedUsers.add(playerID);
-
-        updateSmurfVillageLogTextArea("\n=== [PlayerID: " + playerID + " ===\n");
-
-        String propertyId = searchUserPropertyMapping.get("User ID");
-        String propertyUUID = searchUserPropertyMapping.get("UUID");
-        String propertyHash = searchUserPropertyMapping.get("Hash");
-        String propertyIP = searchUserPropertyMapping.get("IP Address");
-        String propertyMemorySerialNumber = searchUserPropertyMapping.get("Memory Serial Number");
-        String propertyVolumeSerialNumber = searchUserPropertyMapping.get("Volume Serial Number");
-        String propertySerialNumber = searchUserPropertyMapping.get("Serial Number");
-        String propertyProcessorId = searchUserPropertyMapping.get("Processor ID");
-        String propertyCPUName = searchUserPropertyMapping.get("CPU Name");
-        String propertyBiosVersion = searchUserPropertyMapping.get("Bios Version"); // Bios values are not implemented
-        String propertyManufacturer = searchUserPropertyMapping.get("Manufacturer");
-
-        Set<PlayerFX> userFound = new HashSet<>(userService.findUsersByAttribute(propertyId, playerID));
-        Set<String> uuids = new HashSet<>();
-        Set<String> hashes = new HashSet<>();
-        Set<String> ips = new HashSet<>();
-        Set<String> memorySerialNumbers = new HashSet<>();
-        Set<String> volumeSerialNumbers = new HashSet<>();
-        Set<String> serialNumbers = new HashSet<>();
-        Set<String> processorIds = new HashSet<>();
-        Set<String> cpuNames = new HashSet<>();
-        Set<String> biosVersions = new HashSet<>();
-        Set<String> manufacturers = new HashSet<>();
-
-        userFound.forEach(user -> user.getUniqueIds().forEach(item -> {
-            if (includeProcessorNameCheckBox.isSelected()) {
-                cpuNames.add(item.getUuid());
-            }
-            if (includeUUIDCheckBox.isSelected()) {
-                uuids.add(item.getUuid());
-            }
-            if (includeUIDHashCheckBox.isSelected()) {
-                hashes.add(item.getHash());
-            }
-            if (includeIPCheckBox.isSelected()) {
-                ips.add(user.getRecentIpAddress());
-            }
-            if (includeMemorySerialNumberCheckBox.isSelected()) {
-                memorySerialNumbers.add(item.getMemorySerialNumber());
-            }
-            if (includeVolumeSerialNumberCheckBox.isSelected()) {
-                volumeSerialNumbers.add(item.getVolumeSerialNumber());
-            }
-            if (includeSerialNumberCheckBox.isSelected()) {
-                serialNumbers.add(item.getSerialNumber());
-            }
-            if (includeProcessorIdCheckBox.isSelected()) {
-                processorIds.add(item.getProcessorId());
-            }
-            //biosVersions.add(item.getSMBIOSBIOSVersion());
-            //if (includeManufacturerCheckBox.isSelected())
-            if (includeManufacturerCheckBox.isSelected()) {
-                manufacturers.add(item.getManufacturer());
-            }
-        }));
-
-        int maxUniqueUsersThreshold = Integer.parseInt(maxUniqueUsersThresholdTextField.getText());
-
-        ArrayList<Object> foundSmurfs = new ArrayList<>();
-
-        processSet(uuids, propertyUUID, maxUniqueUsersThreshold, logOutput, foundSmurfs, alreadyCheckedUuids, "uuid");
-        processSet(hashes, propertyHash, maxUniqueUsersThreshold, logOutput, foundSmurfs, alreadyCheckedHashes, "hash");
-        processSet(ips, propertyIP, maxUniqueUsersThreshold, logOutput, foundSmurfs, alreadyCheckedIps, "ip");
-        processSet(memorySerialNumbers, propertyMemorySerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, alreadyCheckedMemorySerialNumbers, "memorySerialNumber");
-        processSet(volumeSerialNumbers, propertyVolumeSerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, alreadyCheckedVolumeSerialNumbers, "volumeSerialNumber");
-        processSet(serialNumbers, propertySerialNumber, maxUniqueUsersThreshold, logOutput, foundSmurfs, alreadyCheckedSerialNumbers, "serialNumber");
-        processSet(processorIds, propertyProcessorId, maxUniqueUsersThreshold, logOutput, foundSmurfs, alreadyCheckedProcessorIds, "processorId");
-        processSet(cpuNames, propertyCPUName, maxUniqueUsersThreshold, logOutput, foundSmurfs, alreadyCheckedCpuNames, "cpu");
-        processSet(manufacturers, propertyManufacturer, maxUniqueUsersThreshold, logOutput, foundSmurfs, alreadyCheckedManufacturers, "manufacturer");
-        //biosVersions.stream().forEach(biosVersion -> processUsers(propertyBiosVersion, biosVersion, searchPattern, maxUniqueUsersThreshold, logOutput));
-
-        // Do not add already existing PlayerFX in the userSearchTableView
-        for (Object id : foundSmurfs) {
-            String smurfId = (String) id;
-
-            boolean exists = userSearchTableView.getItems().stream()
-                    .map(player -> player.getId())
-                    .anyMatch(playerId -> playerId.equals(smurfId));
-
-            if (!exists) {
-                userSearchSmurfVillageAddToUserTable(smurfId);
-            }
-        }
-
-        if (!foundSmurfs.isEmpty()) {
-            logOutput.append("\n\n").append(playerID).append(" is related through unique items to --> ").append(foundSmurfs).append("\n");
-            updateSmurfVillageLogTextArea("\n" +  playerID + " is related through unique items to --> " + foundSmurfs);
-
-        }
-        depthCounter += 1;
-        int depthThreshold = Integer.parseInt(depthScanningInputTextField.getText());
-        if (depthCounter >= depthThreshold) {
-            log.debug("Depth limit reached: {}/{}", depthCounter, depthThreshold);
-            searchSmurfVillageTabTextArea.setText(logOutput.toString());
-            writeSmurfVillageLookup2File(logOutput);
-            return;
-        }
-
-        if (catchFirstLayerSmurfsOnlyCheckBox.isSelected()) {
-            log.debug("The 'catchFirstLayerSmurfsOnlyCheckBox' is enabled. Smurf tracing is disabled.");
-            searchSmurfVillageTabTextArea.setText(logOutput.toString());
-            writeSmurfVillageLookup2File(logOutput);
-            return;
-        }
-
-        foundSmurfs.forEach(s -> onSmurfVillageLookup((String) s));
-
-        searchSmurfVillageTabTextArea.setText(logOutput.toString());
-        writeSmurfVillageLookup2File(logOutput);
-    }
-
-    private void processSet(Set<String> items, String property, int maxUniqueUsersThreshold, StringBuilder logOutput, List<Object> foundSmurfs, Set<String> alreadyCheckedSet, String type) {
-        items.forEach(item -> {
-            statusTextFieldProcessingItem.setText(type + ": " + item);
-            if (!alreadyCheckedSet.contains(item)) {
-                processUsers(property, item, maxUniqueUsersThreshold, logOutput, (ArrayList<Object>) foundSmurfs);
-                alreadyCheckedSet.add(item);
-            } else {
-                String message = String.format("\nIgnoring duplicate: %s [%s] already processed.\n", type, item);
-                log.debug(message);
-                updateSmurfVillageLogTextArea(message);
-            }
-        });
-    }
-
-    public boolean checkStartUpExcludedItems() {
-        String filePath = CONFIGURATION_FOLDER + "/excludedItems.txt";
-        Path path = Paths.get(filePath);
-
-        if (Files.exists(path)) {
-            try {
-                String content = Files.readString(path);
-                return !content.isEmpty();
-            } catch (IOException e) {
-                return false;
-            }
-        }
-        return false;
-    }
-
-    private void resetPreviousStateSmurfVillageLookup() {
-        alreadyCheckedUsers.clear();
-        alreadyCheckedUuids.clear();
-        alreadyCheckedHashes.clear();
-        alreadyCheckedIps.clear();
-        alreadyCheckedMemorySerialNumbers.clear();
-        alreadyCheckedVolumeSerialNumbers.clear();
-        alreadyCheckedSerialNumbers.clear();
-        alreadyCheckedProcessorIds.clear();
-        alreadyCheckedCpuNames.clear();
-        alreadyCheckedBiosVersions.clear();
-        alreadyCheckedManufacturers.clear();
-        statusTextFieldProcessingPlayerID.setText("Status");
-        statusTextFieldProcessingItem.setText("Detailed Status Information");
-        logOutput.setLength(0);
-        depthCounter = 0;
-        isPaused = false;
-        log.debug("resetPreviousStateSmurfVillageLookup");
-    }
-
-    public void onLookupSmurfVillage() {
-        boolean safeCheck = checkAndAlertExcludedItems();
-
-        users.clear();
-        userSearchTableView.getSortOrder().clear();
-
-        if (safeCheck){
-            return;
-        }
-        setStatusWorking();
-
-        Task<Void> task = new Task<>() {
-            @Override
-            protected Void call() {
-                isStopped = false;
-                searchSmurfVillageTabTextArea.setText("");
-                logSmurfVillageTabTextArea.setText("");
-                depthCounter = 0;
-                logOutput.setLength(0);
-                String lookupPlayerID = smurfVillageLookupTextField.getText();
-                onSmurfVillageLookup(lookupPlayerID);
-                return null;
-            }
-
-            @Override
-            protected void succeeded() {
-                Platform.runLater(() -> {
-                    setStatusDone();
-                    resetPreviousStateSmurfVillageLookup();
-                    logSmurfVillageTabTextArea.appendText("\n\nTask Done");
-
-                    if (searchSmurfVillageTabTextArea.getText().isEmpty()) {
-                        searchSmurfVillageTabTextArea.setText("No additional accounts found.");
-                    }
-                });
-            }
-
-            @Override
-            protected void failed() {
-                Platform.runLater(() -> log.debug("Task failed"));
-            }
-        };
-
-        new Thread(task).start();
-    }
-
-    public void updateSmurfVillageLogTextArea(String... texts) {
-        Platform.runLater(() -> {
-            try {
-                if (texts != null) {
-                    for (String text : texts) {
-                        if (text != null) {
-                            logSmurfVillageTabTextArea.appendText(text);
-                        }
-                    }
-                }
-            } catch (IndexOutOfBoundsException e) {
-                log.error("IndexOutOfBoundsException in updateSmurfVillageLogTextArea: {}", e.getMessage(), e);
-            } catch (RuntimeException e) {
-                log.error("RuntimeException in updateSmurfVillageLogTextArea: {}", e.getMessage(), e);
-            }
-        });
-    }
-
-    public boolean checkAndAlertExcludedItems() {
-        if (!checkStartUpExcludedItems()) {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.setTitle("Information Dialog");
-            alert.setHeaderText(null); // No header text
-            alert.setContentText("Your excludedItems.txt is empty or missing. " +
-                    "See Settings-Tab (Top Right) to get the latest version from Zulip channel.");
-
-            alert.showAndWait();
-            return true;
-        }
-        return false;
-    }
-
-
-    public void checkRecentAccountsForSmurfs() {
-        boolean safeCheck = checkAndAlertExcludedItems();
-
-        users.clear();
-        userSearchTableView.getSortOrder().clear();
-
-        if (safeCheck){
-            return;
-        }
-        resetPreviousStateSmurfVillageLookup();
-        searchSmurfVillageTabTextArea.setText("");
-        logSmurfVillageTabTextArea.setText("");
-        setStatusWorking();
-        // Define a task to run in the background
-        Task<Void> task = new Task<>() {
-            private int count = 0;
-            private int amountAccountsCheck = 0;
-            private static final int DELAY_MS = 150;
-            // Setting a low delay can lead to UI-thread exceptions and unpredictable behavior.
-
-            @Override
-            protected Void call() throws ExecutionException, InterruptedException {
-                List<PlayerFX> accounts = userService.findLatestRegistrations();
-
-                if (accounts == null || accounts.isEmpty()) {
-                    Platform.runLater(() -> statusTextRecentAccountsForSmurfs.setText("No accounts found."));
-                    return null;
-                }
-
-                try {
-                    amountAccountsCheck = Integer.parseInt(amountTextFieldRecentAccountsForSmurfsAmount.getText());
-                } catch (NumberFormatException e) {
-                    Platform.runLater(() -> statusTextRecentAccountsForSmurfs.setText("Invalid number format."));
-                    return null;
-                }
-
-                for (PlayerFX account : accounts) {
-                    if (isStopped) {
-                        isStopped = false;
-                        break;
-                    }
-
-                    if (count >= amountAccountsCheck) {
-                        final int currentCount = count;
-                        Platform.runLater(() -> statusTextRecentAccountsForSmurfs.setText(String.format("Reached the limit: %d/%d", currentCount, amountAccountsCheck)));
-                        break;
-                    }
-
-                    onSmurfVillageLookup(account.getId());
-                    count++;
-
-                    // Update status on the JavaFX Application Thread
-                    final int currentCount = count;
-                    Platform.runLater(() -> statusTextRecentAccountsForSmurfs.setText(String.format("Status: %d/%d", currentCount, amountAccountsCheck)));
-
-                    try {
-                        Thread.sleep(DELAY_MS);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        Platform.runLater(() -> statusTextRecentAccountsForSmurfs.setText("Task interrupted."));
-                        log.error("Task interrupted", e);
-                        return null;
-                    }
-                }
-
-                return null;
-            }
-
-            @Override
-            protected void failed() {
-                Platform.runLater(() -> resetPreviousStateSmurfVillageLookup());
-                super.failed();
-                log.error("Task failed", getException());
-            }
-
-            @Override
-            protected void succeeded() {
-                Platform.runLater(() -> {
-                    resetPreviousStateSmurfVillageLookup();
-                    setStatusDone();
-                });
-                super.succeeded();
-                if (searchSmurfVillageTabTextArea.getText().isEmpty()) {
-                    searchSmurfVillageTabTextArea.setText("No additional accounts found.");
-                }
-                log.debug("Task completed successfully.");
-            }
-        };
-
-        new Thread(task).start();
-    }
-
     private void loadStateCheckBox() {
-        amountTextFieldRecentAccountsForSmurfsAmount.setText(preferencesConfig.getAmountTextFieldRecentAccountsForSmurfsAmount().toString());
-        includeUUIDCheckBox.setSelected(preferencesConfig.getIncludeUUIDCheckBox());
-        includeUIDHashCheckBox.setSelected(preferencesConfig.getIncludeUIDHashCheckBox());
-        includeMemorySerialNumberCheckBox.setSelected(preferencesConfig.getIncludeMemorySerialNumberCheckBox());
-        includeVolumeSerialNumberCheckBox.setSelected(preferencesConfig.getIncludeVolumeSerialNumberCheckBox());
-        includeSerialNumberCheckBox.setSelected(preferencesConfig.getIncludeSerialNumberCheckBox());
-        includeProcessorIdCheckBox.setSelected(preferencesConfig.getIncludeProcessorIdCheckBox());
-        includeManufacturerCheckBox.setSelected(preferencesConfig.getIncludeManufacturerCheckBox());
-        includeIPCheckBox.setSelected(preferencesConfig.getIncludeIPCheckBox());
-        includeProcessorNameCheckBox.setSelected(preferencesConfig.getIncludeProcessorNameCheckBox());
-        catchFirstLayerSmurfsOnlyCheckBox.setSelected(preferencesConfig.getCatchFirstLayerSmurfsOnlyCheckBox());
-        depthScanningInputTextField.setText(preferencesConfig.getDepthScanningInputTextField().toString());
-        maxUniqueUsersThresholdTextField.setText(preferencesConfig.getMaxUniqueUsersThresholdTextField().toString());
+        LocalPreferences.TabUserManagement settings = localPreferences.getTabUserManagement();
+
+        includeUUIDCheckBox.setSelected(settings.isIncludeUUIDCheckBox());
+        includeUIDHashCheckBox.setSelected(settings.isIncludeUIDHashCheckBox());
+        includeMemorySerialNumberCheckBox.setSelected(settings.isIncludeMemorySerialNumberCheckBox());
+        includeVolumeSerialNumberCheckBox.setSelected(settings.isIncludeVolumeSerialNumberCheckBox());
+        includeSerialNumberCheckBox.setSelected(settings.isIncludeSerialNumberCheckBox());
+        includeProcessorIdCheckBox.setSelected(settings.isIncludeProcessorIdCheckBox());
+        includeManufacturerCheckBox.setSelected(settings.isIncludeManufacturerCheckBox());
+        includeIPCheckBox.setSelected(settings.isIncludeIPCheckBox());
+        includeProcessorNameCheckBox.setSelected(settings.isIncludeProcessorNameCheckBox());
+        catchFirstLayerSmurfsOnlyCheckBox.setSelected(settings.isCatchFirstLayerSmurfsOnlyCheckBox());
+
     }
 
     public void saveOnExitContent() {
         try {
-            Files.write(Paths.get(SEARCH_HISTORY_FILE), SearchHistoryTextArea.getText().getBytes());
-            Files.write(Paths.get(USER_NOTES_FILE), UserNotesTextArea.getText().getBytes());
+            Files.write(Paths.get(SEARCH_HISTORY_FILE), searchHistoryTextArea.getText().getBytes());
+            Files.write(Paths.get(USER_NOTES_FILE), userNotesTextArea.getText().getBytes());
         } catch (IOException e) {
             log.debug(String.valueOf(e));
         }
@@ -1225,11 +932,11 @@ public class UserManagementController implements Controller<SplitPane> {
         try {
             if (Files.exists(Paths.get(SEARCH_HISTORY_FILE))) {
                 String searchHistory = new String(Files.readAllBytes(Paths.get(SEARCH_HISTORY_FILE)));
-                SearchHistoryTextArea.setText(searchHistory);
+                searchHistoryTextArea.setText(searchHistory);
             }
             if (Files.exists(Paths.get(USER_NOTES_FILE))) {
                 String userNotes = new String(Files.readAllBytes(Paths.get(USER_NOTES_FILE)));
-                UserNotesTextArea.setText(userNotes);
+                userNotesTextArea.setText(userNotes);
             }
         } catch (IOException e) {
             log.debug(String.valueOf(e));
@@ -1274,140 +981,1129 @@ public class UserManagementController implements Controller<SplitPane> {
             }
         }
 
-        if (isValidPlayerId(playerID1) && isValidPlayerId(playerID2)) {
-            userGamesPage = 1;
-            int numberOfPagesToLoad = Integer.parseInt(preferencesConfig.getCheckSharedGamesComparisonTextfield());
+        if (!isValidPlayerId(playerID1) || !isValidPlayerId(playerID2)) {
+            checkSharedGamesButton.setText("Check - Invalid player IDs provided.");
+            return;
+        }
 
-            List<GamePlayerStatsFX> allPlayer1Games = Collections.synchronizedList(new ArrayList<>());
-            List<GamePlayerStatsFX> allPlayer2Games = Collections.synchronizedList(new ArrayList<>());
+        // Show animated "Processing..." label
+        progressLabelSharedGames.setText("Processing");
+        progressLabelSharedGames.setVisible(true);
 
-            for (int i = 0; i < numberOfPagesToLoad; i++) {
-                final int currentPage = userGamesPage + i;
+        // Timeline animation
+        Timeline timeline = new Timeline(new KeyFrame(javafx.util.Duration.millis(500), e -> {
+            String text = progressLabelSharedGames.getText();
+            if (text.endsWith("...")) {
+                progressLabelSharedGames.setText("Processing");
+            } else {
+                progressLabelSharedGames.setText(text + ".");
+            }
+        }));
+        timeline.setCycleCount(Timeline.INDEFINITE);
+        timeline.play();
 
-                try {
-                    // Sequential API calls with a delay to respect rate limits
-                    List<GamePlayerStatsFX> player1Games = gamePlayerStatsMapper.map(
-                            userService.getLastHundredPlayedGamesByFeaturedMod(
-                                    playerID1, currentPage, featuredModFilterChoiceBox.getSelectionModel().getSelectedItem())
-                    );
-                    allPlayer1Games.addAll(player1Games);
+        userLastGamesTable.getItems().clear();
 
-                    Thread.sleep(250);
+        String finalPlayerID = playerID1;
+        String finalPlayerID1 = playerID2;
 
-                    List<GamePlayerStatsFX> player2Games = gamePlayerStatsMapper.map(
-                            userService.getLastHundredPlayedGamesByFeaturedMod(
-                                    playerID2, currentPage, featuredModFilterChoiceBox.getSelectionModel().getSelectedItem())
-                    );
-                    allPlayer2Games.addAll(player2Games);
+        Task<Set<GamePlayerStatsFX>> task = new Task<>() {
+            @Override
+            protected Set<GamePlayerStatsFX> call() {
+                List<GamePlayerStatsFX> allPlayer1Games = gamePlayerStatsMapper.map(
+                        userService.getLastThousandPlayedGamesByFeaturedMod(
+                                finalPlayerID, 1, featuredModFilterChoiceBox.getSelectionModel().getSelectedItem())
+                );
 
-                    Thread.sleep(250);
-                } catch (Exception e) {
-                    log.warn("Error during API request: ", e);
-                    Platform.runLater(() -> checkSharedGamesButton.setText("Check - Error during request."));
-                    return;
-                }
+                List<GamePlayerStatsFX> allPlayer2Games = gamePlayerStatsMapper.map(
+                        userService.getLastThousandPlayedGamesByFeaturedMod(
+                                finalPlayerID1, 1, featuredModFilterChoiceBox.getSelectionModel().getSelectedItem())
+                );
+
+                Set<GameFX> player1Games = allPlayer1Games.stream()
+                        .map(GamePlayerStatsFX::getGame)
+                        .collect(Collectors.toSet());
+
+                Set<GameFX> player2Games = allPlayer2Games.stream()
+                        .map(GamePlayerStatsFX::getGame)
+                        .collect(Collectors.toSet());
+
+                Set<GameFX> commonGames = new HashSet<>(player1Games);
+                commonGames.retainAll(player2Games);
+
+                return allPlayer1Games.stream()
+                        .filter(stats -> commonGames.contains(stats.getGame()))
+                        .collect(Collectors.toSet());
+            }
+        };
+
+        task.setOnSucceeded(workerStateEvent -> {
+            Set<GamePlayerStatsFX> result = task.getValue();
+            userLastGamesTable.getItems().setAll(result);
+
+            timeline.stop();
+            progressLabelSharedGames.setVisible(false);
+
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("Shared Games Check");
+            alert.setHeaderText(null);
+
+            if (result.isEmpty()) {
+                alert.setContentText("No common games found between the selected players.");
+            } else {
+                alert.setContentText("Found " + result.size() + " shared game(s) between the selected players.");
             }
 
-            Set<GameFX> player1Games = allPlayer1Games.stream()
-                    .map(GamePlayerStatsFX::getGame)
-                    .collect(Collectors.toSet());
-
-            Set<GameFX> player2Games = allPlayer2Games.stream()
-                    .map(GamePlayerStatsFX::getGame)
-                    .collect(Collectors.toSet());
-
-            Set<GameFX> commonGames = new HashSet<>(player1Games);
-            commonGames.retainAll(player2Games);
-
-            Set<GamePlayerStatsFX> commonGameStats = allPlayer1Games.stream()
-                    .filter(stats -> commonGames.contains(stats.getGame()))
-                    .collect(Collectors.toSet());
-
-            Platform.runLater(() -> {
-                userLastGamesTable.getItems().clear();
-
-                if (!commonGameStats.isEmpty()) {
-                    userLastGamesTable.getItems().setAll(commonGameStats);
-                } else {
-                    log.info("No common games found.");
-                    checkSharedGamesButton.setText("Check");
-                }
-            });
-        } else {
-            checkSharedGamesButton.setText("Check - Invalid player IDs provided.");
-        }
-    }
-
-    private void addCheckBoxListener(CheckBox checkBox, String preferenceKey) {
-        checkBox.selectedProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("generalSettings", preferenceKey, checkBox.isSelected());
+            alert.showAndWait();
         });
-    }
 
-    private void addTextFieldListener(TextField textField, String preferenceKey) {
-        textField.textProperty().addListener((observable, oldValue, newValue) -> {
-            preferencesConfig.setPreference("generalSettings", preferenceKey, textField.getText());
+        task.setOnFailed(workerStateEvent -> {
+            log.warn("Error during API request: ", task.getException());
+            timeline.stop();
+            progressLabelSharedGames.setVisible(false);
         });
+
+        new Thread(task).start();
     }
 
+
+    //TODO refactor with localpref
     public void addListeners() {
-    addCheckBoxListener(includeUUIDCheckBox, "includeUUIDCheckBox");
-    addCheckBoxListener(includeUIDHashCheckBox, "includeUIDHashCheckBox");
-    addCheckBoxListener(includeMemorySerialNumberCheckBox, "includeMemorySerialNumberCheckBox");
-    addCheckBoxListener(includeVolumeSerialNumberCheckBox, "includeVolumeSerialNumberCheckBox");
-    addCheckBoxListener(includeSerialNumberCheckBox, "includeSerialNumberCheckBox");
-    addCheckBoxListener(includeProcessorIdCheckBox, "includeProcessorIdCheckBox");
-    addCheckBoxListener(includeManufacturerCheckBox, "includeManufacturerCheckBox");
-    addCheckBoxListener(includeIPCheckBox, "includeIPCheckBox");
-    addCheckBoxListener(includeProcessorNameCheckBox, "includeProcessorNameCheckBox");
-    addCheckBoxListener(catchFirstLayerSmurfsOnlyCheckBox, "catchFirstLayerSmurfsOnlyCheckBox");
+        minimizeSearchHistoryButton.setOnAction(event -> {
+            handleMinimizeSearchHistory();
+        });
 
-    addTextFieldListener(depthScanningInputTextField, "depthScanningInputTextField");
-    addTextFieldListener(maxUniqueUsersThresholdTextField, "maxUniqueUsersThresholdTextField");
-    addTextFieldListener(amountTextFieldRecentAccountsForSmurfsAmount, "amountTextFieldRecentAccountsForSmurfsAmount");
-    addTextFieldListener(checkSharedGamesComparisonTextfield, "checkSharedGamesComparisonTextfield");
-    addTextFieldListener(userGamesNumberOfPagesToLoadTextfield, "userGamesNumberOfPagesToLoadTextfield");
-
-    minimizeSearchHistoryButton.setOnAction(event -> {
-        handleMinimizeSearchHistory();
-    });
-
-    minimizeUserNotesButton.setOnAction(event -> {
-        handleMinimizeUserNotes();
-    });
-}
+        minimizeUserNotesButton.setOnAction(event -> {
+            handleMinimizeUserNotes();
+        });
+    }
 
     @FXML
     private void handleMinimizeSearchHistory() {
-        boolean isVisible = preferencesConfig.getSearchHistoryVisibilityState();
+        LocalPreferences.TabUserManagement tabUserManagement = localPreferences.getTabUserManagement();
+        boolean isVisible = tabUserManagement.isSearchHistoryTexAreaVisibilityState();
 
         if (isVisible) {
-            SearchHistoryTextArea.setVisible(false);
-            SearchHistoryTextArea.setManaged(false);
+            searchHistoryTextArea.setVisible(false);
+            searchHistoryTextArea.setManaged(false);
             minimizeSearchHistoryButton.setText("Restore");
-            preferencesConfig.setPreference("generalSettings", "searchHistoryTexAreaVisibilityState", false);
+            tabUserManagement.setSearchHistoryTexAreaVisibilityState(false);
         } else {
-            SearchHistoryTextArea.setVisible(true);
-            SearchHistoryTextArea.setManaged(true);
+            searchHistoryTextArea.setVisible(true);
+            searchHistoryTextArea.setManaged(true);
             minimizeSearchHistoryButton.setText("Minimize");
-            preferencesConfig.setPreference("generalSettings", "searchHistoryTexAreaVisibilityState", true);
+            tabUserManagement.setSearchHistoryTexAreaVisibilityState(true);
         }
     }
 
     @FXML
-    public void handleMinimizeUserNotes() {
-        boolean isVisible = preferencesConfig.getUserNotesVisibilityState();
+    private void handleMinimizeUserNotes() {
+        LocalPreferences.TabUserManagement tabUserManagement = localPreferences.getTabUserManagement();
+        boolean isVisible = tabUserManagement.isUserNotesTextAreaVisibilityState();
 
         if (isVisible) {
-            UserNotesTextArea.setVisible(false);
-            UserNotesTextArea.setManaged(false);
+            userNotesTextArea.setVisible(false);
+            userNotesTextArea.setManaged(false);
             minimizeUserNotesButton.setText("Restore");
-            preferencesConfig.setPreference("generalSettings", "userNotesTextAreaVisibilityState", false);
+            tabUserManagement.setUserNotesTextAreaVisibilityState(false);
         } else {
-            UserNotesTextArea.setVisible(true);
-            UserNotesTextArea.setManaged(true);
+            userNotesTextArea.setVisible(true);
+            userNotesTextArea.setManaged(true);
             minimizeUserNotesButton.setText("Minimize");
-            preferencesConfig.setPreference("generalSettings", "userNotesTextAreaVisibilityState", true);
+            tabUserManagement.setUserNotesTextAreaVisibilityState(true);
         }
     }
+
+    public void handleCheckTemporaryBans() {
+        processBannedUsers(bansController.PATH_TEMP_BANNED_USERS_JSON, temporaryBanProgressLabel, "temporary ban");
+    }
+
+    public void handleCheckPermanentBans() {
+        processBannedUsers(bansController.PATH_PERM_BANNED_USERS_JSON, permanentBanProgressLabel, "permanent ban");
+    }
+
+    public void handleCheckSmurfManagementAccounts() {
+        processBannedUsers(SmurfManagementController.SMURF_MANAGEMENT_USERS_JSON_PATH, smurfManagementProgressLabel, "smurf management");
+    }
+
+    private void processBannedUsers(Path filePath, Label progressLabel, String taskName) {
+        resetPreviousStateSmurfVillageLookup();
+        Set<String> userIds = bansController.loadExistingBannedUserIds(filePath);
+
+        if (userIds.isEmpty()) {
+            Platform.runLater(() -> progressLabel.setText("Sync in banTab first."));
+            return;
+        }
+
+        Task<Void> task = new Task<>() {
+            private long startTime;
+
+            @Override
+            protected Void call() {
+                startTime = System.currentTimeMillis();
+                int total = userIds.size();
+                int count = 0;
+
+                Platform.runLater(() -> progressLabel.setText("Processing " + total + " users..."));
+
+                for (String userId : userIds) {
+                    if (isCancelled()) break;
+
+                    try {
+                        final int processed = count + 1;
+                        Platform.runLater(() -> progressLabel.setText(processed + "/" + total + " users processed..."));
+
+                        // Lookup user synchronously only for Smurf Management
+                        if ("smurf management".equals(taskName)) {
+                            PlayerFX playerFX = findUserById(userId);
+                            if (playerFX != null) {
+                                ViewHelper.saveUserToJsonFile(playerFX, SmurfManagementController.SMURF_MANAGEMENT_USERS_JSON_PATH, "Added by Run Smurf Management");
+                            }
+                        }
+
+                        // Existing lookup call
+                        onSmurfVillageLookup(userId);
+
+                    } catch (Exception e) {
+                        log.error("Error processing user ID {}: {}", userId, e.getMessage());
+                    }
+
+                    count++;
+                }
+
+                return null;
+            }
+
+            @Override
+            protected void succeeded() {
+                Platform.runLater(() -> {
+                    long durationMs = System.currentTimeMillis() - startTime;
+
+                    long totalSeconds = durationMs / 1000;
+                    long hours = totalSeconds / 3600;
+                    long minutes = (totalSeconds % 3600) / 60;
+                    long seconds = totalSeconds % 60;
+
+                    String formattedTime;
+                    if (hours > 0) {
+                        formattedTime = String.format("%dh %dm %ds", hours, minutes, seconds);
+                    } else if (minutes > 0) {
+                        formattedTime = String.format("%dm %ds", minutes, seconds);
+                    } else {
+                        formattedTime = String.format("%ds", seconds);
+                    }
+
+                    progressLabel.setText("Done: " + userIds.size() + "/" + userIds.size() + " users in " + formattedTime + ".");
+                });
+            }
+
+            @Override
+            protected void failed() {
+                Platform.runLater(() -> progressLabel.setText("Error during " + taskName + " check."));
+            }
+
+            @Override
+            protected void cancelled() {
+                Platform.runLater(() -> progressLabel.setText("Operation cancelled."));
+            }
+        };
+
+        new Thread(task).start();
+    }
+
+    /**
+     * Synchronous method to find a user by ID.
+     */
+    private PlayerFX findUserById(String userId) {
+        try {
+            // Blocking call to fetch users by ID
+            List<PlayerFX> results = Collections.singletonList(userService.findUsersByAttribute("id", userId).getFirst());
+            return results.getFirst();
+        } catch (Exception e) {
+            log.error("Error finding user ID {}: {}", userId, e.getMessage());
+        }
+        return null;
+    }
+
+    public void userSearchSmurfVillageAddToUserTable(String userID) {
+        checkRateLimit();
+        List<PlayerFX> usersFound = userService.findUsersByAttribute("id", userID);
+        users.addAll(usersFound);
+    }
+
+    public List<Map<String, Object>> loadExcludedItemsFromJson() {
+        File excludedItemsFile = EXCLUDED_ITEMS_FILE;
+        List<Map<String, Object>> excludedItems = new ArrayList<>();
+
+        try {
+            if (excludedItemsFile.exists() && excludedItemsFile.length() > 0) {
+                ObjectMapper mapper = new ObjectMapper();
+                TypeReference<Map<String, List<Map<String, Object>>>> typeRef = new TypeReference<>() {
+                };
+                Map<String, List<Map<String, Object>>> rootData = mapper.readValue(excludedItemsFile, typeRef);
+                excludedItems = rootData.getOrDefault("excluded_items", new ArrayList<>());
+            } else {
+                log.debug("Excluded items file is empty or missing: {}", excludedItemsFile.getAbsolutePath());
+            }
+        } catch (IOException e) {
+            log.error("Failed to load excluded items: {}", e.getMessage());
+        }
+
+        return excludedItems;
+    }
+
+    @FXML
+    private void checkRecentAccountsForSmurfsPause() {
+        synchronized (pauseLock) {
+            // Toggle pause/resume state
+            isPaused = !isPaused;
+
+            if (isPaused) {
+                checkRecentAccountsForSmurfsPauseButton.setText("Resume");
+            } else {
+                checkRecentAccountsForSmurfsPauseButton.setText("Pause");
+                pauseLock.notifyAll();
+            }
+        }
+    }
+
+    @FXML
+    public void checkRecentAccountsForSmurfsStop() {
+        synchronized (pauseLock) {
+            isPaused = false;
+            isStopped = true;
+            checkRecentAccountsForSmurfsPauseButton.setText("Pause");
+            pauseLock.notifyAll();
+        }
+    }
+
+    private List<Object> processUsers(String attributeName, String attributeValue, String currentPlayerID) {
+        List<Object> foundAccounts = new ArrayList<>();
+
+        try {
+            String text = String.format("\nProcessing ... [%s] [%s]", attributeName, attributeValue);
+            updateSmurfVillageLogTextArea(text);
+
+            // --- Load JSON-based excluded items ---
+            List<Map<String, Object>> excludedItems = loadExcludedItemsFromJson();
+
+            // --- Read threshold and exclusion CheckBox from UI ---
+            int threshold = 10; // default fallback
+            try {
+                threshold = Integer.parseInt(maxMatchesBeforePromptSmurfVillageLookupTextField.getText());
+            } catch (NumberFormatException e) {
+                updateSmurfVillageLogTextArea("\t\t Invalid threshold input, using default: " + threshold + "\n");}
+            boolean promptUserOnThresholdExceeded = promptUserOnThresholdExceededSmurfVillageLookupCheckBox.isSelected();
+
+            synchronized (pauseLock) {
+                while (isPaused) {
+                    updateSmurfVillageLogTextArea("\t\t PROCESS PAUSED. Waiting for RESUME.\n");
+                    pauseLock.wait();
+                }
+            }
+
+            // --- Exclusion check based on JSON ---
+            boolean isExcluded = false;
+            for (Map<String, Object> item : excludedItems) {
+                for (Object value : item.values()) {
+                    if (attributeValue.equals(String.valueOf(value))) {
+                        isExcluded = true;
+                        break;
+                    }
+                }
+                if (isExcluded) break;
+            }
+
+            if (isExcluded) {
+                updateSmurfVillageLogTextArea(
+                        String.format("\t\t EXCLUSION CHECK: attribute [%s] with value [%s] found in excluded_items.json, skipping.",
+                                attributeName, attributeValue));
+                return foundAccounts;
+            }
+
+            // --- Skip null or empty attributes ---
+            List<PlayerFX> users = Collections.emptyList();
+            if (!"recentIpAddress".equals(attributeName) || (attributeValue != null && !attributeValue.trim().isEmpty())) {
+                try {
+                    users = userService.findUsersByAttribute(attributeName, attributeValue);
+
+                    // --- Threshold dialog for large result sets (runs on FX thread) ---
+                    if (promptUserOnThresholdExceeded  && users.size() > threshold) {
+                        final CountDownLatch latch = new CountDownLatch(1);
+                        final AtomicReference<ButtonType> userChoice = new AtomicReference<>();
+
+                        List<PlayerFX> finalUsers = users;
+                        int finalThreshold = threshold;
+                        Platform.runLater(() -> {
+                            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+                            alert.setTitle("Threshold exceeded for number of matches detected");
+                            String warningMessage = String.format(
+                                    "Found %d accounts for [%s] = [%s], exceeding the threshold of %d.\n\n" +
+                                            "Do you want to continue processing, or add this value to the exclusion list and skip it, or cancel the process?",
+                                    finalUsers.size(), attributeName, attributeValue, finalThreshold);
+                            alert.setContentText(warningMessage);
+
+                            ButtonType continueButton = new ButtonType("Continue");
+                            ButtonType excludeButton = new ButtonType("Add to exclusion list and skip");
+                            ButtonType detailsButton = new ButtonType("Show Related Accounts");
+                            ButtonType cancelButton = new ButtonType("Cancel Process");
+                            alert.getButtonTypes().setAll(continueButton, excludeButton, detailsButton, cancelButton);
+
+                            // Disable keyboard input
+                            DialogPane dialogPane = alert.getDialogPane();
+                            dialogPane.addEventFilter(KeyEvent.KEY_PRESSED, Event::consume);
+
+                            boolean detailsClicked[] = {false}; // Track if details button has been clicked
+
+                            while (true) {
+                                Optional<ButtonType> result = alert.showAndWait();
+                                if (result.isPresent()) {
+                                    ButtonType chosen = result.get();
+
+                                    if (chosen == detailsButton) {
+                                        showUserDetailsWindow(finalUsers);
+                                        detailsClicked[0] = true;
+
+                                        // Grey out the "Show Related Accounts" button
+                                        // TODO Causes some nasty bug if user clicks more than once on it
+                                        Button detailsButtonNode = (Button) dialogPane.lookupButton(detailsButton);
+                                        detailsButtonNode.setDisable(true);
+                                    } else {
+                                        userChoice.set(chosen);
+                                        break;
+                                    }
+                                } else {
+                                    // If dialog closed without selection, treat as cancel
+                                    userChoice.set(cancelButton);
+                                    break;
+                                }
+                            }
+
+                            latch.countDown();
+                        });
+
+                        // Wait for user input
+                        latch.await();
+
+                        ButtonType resultType = userChoice.get();
+                        if (resultType != null) {
+                            String buttonText = resultType.getText();
+
+                            if ("Add to exclusion list and skip".equals(buttonText)) {
+                                Map<String, Object> newExcludedItem = new HashMap<>();
+                                newExcludedItem.put(attributeName, attributeValue);
+                                newExcludedItem.put("AddedOn", LocalDateTime.now().toString());
+                                newExcludedItem.put("comment", String.format(
+                                        "Excluded by user prompt: %d related accounts found for [%s = %s]",
+                                        users.size(), attributeName, attributeValue));
+
+                                excludedHardwareItemsController.saveExcludedItem(newExcludedItem);
+                                excludedHardwareItemsController.updateStatsDisplay();
+
+                                updateSmurfVillageLogTextArea(String.format(
+                                        "\t\t Added [%s = %s] to exclusion list and skipped (%d related accounts found).\n",
+                                        attributeName, attributeValue, users.size()));
+
+                                return foundAccounts; // skip processing
+                            } else if ("Cancel Process".equals(buttonText)) {
+                                cancelRequestedByUser = true;
+                                updateSmurfVillageLogTextArea("\t\t User canceled operation.\n");
+                                return Collections.emptyList();
+                            }
+                            // Continue if "Continue" clicked
+                        }
+                    }
+
+                } catch (HttpClientErrorException e) {
+                    updateSmurfVillageLogTextArea(
+                            String.format("\t\t ERROR fetching users for [%s] [%s]: %s\n",
+                                    attributeName, attributeValue, e.getMessage()));
+                }
+            }
+
+            // --- Exclude root player ---
+            List<PlayerFX> otherAccounts = users.stream()
+                    .filter(user -> !user.getId().equals(currentPlayerID))
+                    .toList();
+
+            // --- Add root player to table if other accounts found ---
+            //TODO check if true: Condition '!foundAccounts.contains(currentPlayerID)' is always 'true' when reached
+            if (!otherAccounts.isEmpty() && !foundAccounts.contains(currentPlayerID)) {
+                addNewAccountsToTable(Collections.singletonList(currentPlayerID));
+                foundAccounts.add(currentPlayerID);
+            }
+
+            if (otherAccounts.isEmpty()) {
+                updateSmurfVillageLogTextArea(" ... no shared accounts found.");
+            } else {
+                for (PlayerFX user : otherAccounts) {
+                    String banInfo = "ACTIVE";
+                    BanInfoFX ban = user.getBans().stream()
+                            .filter(b -> b.getBanStatus() == BanStatus.BANNED)
+                            .findFirst()
+                            .orElse(null);
+
+                    if (ban != null) {
+                        banInfo = (ban.getExpiresAt() == null)
+                                ? "PERMANENT"
+                                : "TEMPORARY " + ban.getExpiresAt()
+                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+                    }
+
+                    String accountLine = String.format("\n+ %s - %s", user.getRepresentation(), banInfo);
+                    updateSmurfVillageLogTextArea(accountLine);
+
+                    if (user.getId() != null && !foundAccounts.contains(user.getId())) {
+                        foundAccounts.add(user.getId());
+                        addNewAccountsToTable(Collections.singletonList(user.getId()));
+                    }
+                }
+            }
+
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
+        return foundAccounts;
+    }
+
+    private void showUserDetailsWindow(List<PlayerFX> users) {
+        Stage detailsStage = new Stage();
+        detailsStage.setTitle("Related Accounts");
+
+        TableView<PlayerFX> table = new TableView<>();
+
+        TableColumn<PlayerFX, String> nameCol = new TableColumn<>("Username");
+        nameCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getRepresentation()));
+
+        TableColumn<PlayerFX, String> idCol = new TableColumn<>("ID");
+        idCol.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getId()));
+
+        TableColumn<PlayerFX, String> banStatusCol = new TableColumn<>("Ban Status");
+        banStatusCol.setCellValueFactory(data -> {
+            BanInfoFX ban = data.getValue().getBans().stream()
+                    .filter(b -> b.getBanStatus() == BanStatus.BANNED)
+                    .findFirst()
+                    .orElse(null);
+
+            String status;
+            if (ban == null) {
+                status = "Active";
+            } else if (ban.getExpiresAt() == null) {
+                status = "Permanent";
+            } else {
+                status = "Temporary (" + ban.getExpiresAt()
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) + ")";
+            }
+            return new SimpleStringProperty(status);
+        });
+
+        TableColumn<PlayerFX, String> lastLoginCol = new TableColumn<>("Last Login");
+        lastLoginCol.setCellValueFactory(data -> {
+            if (data.getValue().getLastLogin() != null) {
+                return new SimpleStringProperty(
+                        data.getValue().getLastLogin()
+                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+                );
+            } else {
+                return new SimpleStringProperty("Unknown");
+            }
+        });
+
+        table.getColumns().addAll(nameCol, idCol, banStatusCol, lastLoginCol);
+        table.setItems(FXCollections.observableArrayList(users));
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+
+        Label label = new Label(String.format("Found %d related accounts:", users.size()));
+        label.setStyle("-fx-font-weight: bold; -fx-padding: 5 0 5 0;");
+
+        Button closeButton = new Button("Close");
+        closeButton.setOnAction(e -> detailsStage.close());
+
+        HBox buttonBox = new HBox(closeButton);
+        buttonBox.setAlignment(Pos.CENTER_RIGHT);
+        buttonBox.setPadding(new Insets(10, 0, 0, 0));
+
+        VBox layout = new VBox(10, label, table, buttonBox);
+        layout.setPadding(new Insets(10));
+
+        Scene scene = new Scene(layout, 700, 400);
+        detailsStage.setScene(scene);
+        detailsStage.initModality(Modality.APPLICATION_MODAL);
+        detailsStage.showAndWait();
+    }
+
+    public Set<String> alreadyCheckedUsers = new HashSet<>();
+    public Set<String> alreadyCheckedUuids = new HashSet<>();
+    public Set<String> alreadyCheckedHashes = new HashSet<>();
+    public Set<String> alreadyCheckedIps = new HashSet<>();
+    public Set<String> alreadyCheckedMemorySerialNumbers = new HashSet<>();
+    public Set<String> alreadyCheckedVolumeSerialNumbers = new HashSet<>();
+    public Set<String> alreadyCheckedSerialNumbers = new HashSet<>();
+    public Set<String> alreadyCheckedProcessorIds = new HashSet<>();
+    public Set<String> alreadyCheckedCpuNames = new HashSet<>();
+    public Set<String> alreadyCheckedBiosVersions = new HashSet<>();
+    public Set<String> alreadyCheckedManufacturers = new HashSet<>();
+
+    void setStatusWorking() {
+        statusLabelSmurfVillageLookup.setStyle("-fx-background-color: orange; -fx-text-fill: black; -fx-background-radius: 1;");
+        statusLabelSmurfVillageLookup.setText("Processing");
+    }
+
+    private void setStatusDone() {
+        statusLabelSmurfVillageLookup.setStyle("-fx-background-color: green; -fx-background-radius: 5;");
+        statusLabelSmurfVillageLookup.setText("Complete  ");
+        statusTextFieldProcessingPlayerID.setText("Status");
+    }
+
+    public void onSmurfVillageLookup(String playerID) {
+        if (cancelRequestedByUser) {
+            updateSmurfVillageLogTextArea("\nProcess canceled before starting lookup.\n");
+            cancelRequestedByUser = false;
+            return;
+        }
+
+        startTaskTimer();
+        String initialLog = String.format("\n=== Checking PlayerID: %s ===\n", playerID);
+        updateSmurfVillageLogTextArea(initialLog);
+        statusTextFieldProcessingPlayerID.setText(playerID);
+
+        if (alreadyCheckedUsers.contains(playerID)) {
+            updateSmurfVillageLogTextArea("\nSkipping, we already have checked that account: " + playerID);
+            return;
+        }
+        alreadyCheckedUsers.add(playerID);
+
+        // Retrieve property mappings
+        String propertyId = searchUserPropertyMapping.get("User ID");
+        String propertyUUID = searchUserPropertyMapping.get("UUID");
+        String propertyHash = searchUserPropertyMapping.get("Hash");
+        String propertyIP = searchUserPropertyMapping.get("IP Address");
+        String propertyMemorySerialNumber = searchUserPropertyMapping.get("Memory Serial Number");
+        String propertyVolumeSerialNumber = searchUserPropertyMapping.get("Volume Serial Number");
+        String propertySerialNumber = searchUserPropertyMapping.get("Serial Number");
+        String propertyProcessorId = searchUserPropertyMapping.get("Processor ID");
+        String propertyCPUName = searchUserPropertyMapping.get("CPU Name");
+        String propertyManufacturer = searchUserPropertyMapping.get("Manufacturer");
+
+        // Collect user attributes
+        Set<PlayerFX> userFound = new HashSet<>(userService.findUsersByAttribute(propertyId, playerID));
+        Set<String> uuids = new HashSet<>();
+        Set<String> hashes = new HashSet<>();
+        Set<String> ips = new HashSet<>();
+        Set<String> memorySerialNumbers = new HashSet<>();
+        Set<String> volumeSerialNumbers = new HashSet<>();
+        Set<String> serialNumbers = new HashSet<>();
+        Set<String> processorIds = new HashSet<>();
+        Set<String> cpuNames = new HashSet<>();
+        Set<String> manufacturers = new HashSet<>();
+
+        userFound.forEach(user -> user.getUniqueIdAssignments().forEach(item -> {
+            if (includeProcessorNameCheckBox.isSelected()) cpuNames.add(item.getUniqueId().getName());
+            if (includeUUIDCheckBox.isSelected()) uuids.add(item.getUniqueId().getUuid());
+            if (includeUIDHashCheckBox.isSelected()) hashes.add(item.getUniqueId().getHash());
+            if (includeIPCheckBox.isSelected()) ips.add(user.getRecentIpAddress());
+            if (includeMemorySerialNumberCheckBox.isSelected())
+                memorySerialNumbers.add(item.getUniqueId().getMemorySerialNumber());
+            if (includeVolumeSerialNumberCheckBox.isSelected())
+                volumeSerialNumbers.add(item.getUniqueId().getVolumeSerialNumber());
+            if (includeSerialNumberCheckBox.isSelected()) serialNumbers.add(item.getUniqueId().getSerialNumber());
+            if (includeProcessorIdCheckBox.isSelected()) processorIds.add(item.getUniqueId().getProcessorId());
+            if (includeManufacturerCheckBox.isSelected()) manufacturers.add(item.getUniqueId().getManufacturer());
+        }));
+
+        Set<Object> accountsWithSharedAttributes = new LinkedHashSet<>(); // deduplicated cumulative set
+
+        // Attribute metadata helper
+        class AttributeSet {
+            Set<String> set;
+            String property;
+            Set<String> alreadyCheckedSet;
+            String type;
+
+            AttributeSet(Set<String> set, String property, Set<String> alreadyCheckedSet, String type) {
+                this.set = set;
+                this.property = property;
+                this.alreadyCheckedSet = alreadyCheckedSet;
+                this.type = type;
+            }
+        }
+
+        List<AttributeSet> attributeSets = List.of(
+                new AttributeSet(uuids, propertyUUID, alreadyCheckedUuids, "uuid"),
+                new AttributeSet(hashes, propertyHash, alreadyCheckedHashes, "hash"),
+                new AttributeSet(ips, propertyIP, alreadyCheckedIps, "ip"),
+                new AttributeSet(memorySerialNumbers, propertyMemorySerialNumber, alreadyCheckedMemorySerialNumbers, "memorySerialNumber"),
+                new AttributeSet(volumeSerialNumbers, propertyVolumeSerialNumber, alreadyCheckedVolumeSerialNumbers, "volumeSerialNumber"),
+                new AttributeSet(serialNumbers, propertySerialNumber, alreadyCheckedSerialNumbers, "serialNumber"),
+                new AttributeSet(processorIds, propertyProcessorId, alreadyCheckedProcessorIds, "processorId"),
+                new AttributeSet(cpuNames, propertyCPUName, alreadyCheckedCpuNames, "cpu"),
+                new AttributeSet(manufacturers, propertyManufacturer, alreadyCheckedManufacturers, "manufacturer")
+        );
+
+        // Process each attribute set incrementally, respecting cancellation
+        for (AttributeSet attr : attributeSets) {
+            if (cancelRequestedByUser) {
+                updateSmurfVillageLogTextArea("\nProcess canceled during attribute scanning.\n");
+                return;
+            }
+
+            processSetIncremental(
+                    attr.set,
+                    attr.property,
+                    attr.alreadyCheckedSet,
+                    attr.type,
+                    accountsWithSharedAttributes,
+                    playerID);
+        }
+
+        if (cancelRequestedByUser) {
+            updateSmurfVillageLogTextArea("\nProcess canceled before recursion.\n");
+            return;
+        }
+
+        // Log related accounts
+        if (!accountsWithSharedAttributes.isEmpty()) {
+            List<String> relatedAccounts = accountsWithSharedAttributes.stream()
+                    .map(Object::toString)
+                    .filter(id -> !id.equals(playerID))
+                    .toList();
+
+            if (!relatedAccounts.isEmpty()) {
+                String relationLog = "\n" + playerID + " is related through unique items to --> " + relatedAccounts;
+                updateSmurfVillageLogTextArea(relationLog);
+            }
+        }
+
+        if (catchFirstLayerSmurfsOnlyCheckBox.isSelected()) {
+            log.debug("Smurf tracing is disabled.");
+            return;
+        }
+
+        // Recursively check found accounts, respecting cancellation
+        for (Object s : accountsWithSharedAttributes) {
+            if (cancelRequestedByUser) {
+                updateSmurfVillageLogTextArea("\nProcess canceled during recursive lookup.\n");
+                return;
+            }
+            onSmurfVillageLookup((String) s);
+        }
+    }
+
+    // Incremental processing with immediate table addition
+    private void processSetIncremental(Set<String> items, String property,
+                                       Set<String> alreadyCheckedSet, String type,
+                                       Set<Object> cumulativeAccounts, String currentPlayerID) {
+        for (String item : items) {
+            if (cancelRequestedByUser) {
+                updateSmurfVillageLogTextArea("\nProcess canceled by user.\n");
+                return;
+            }
+
+            statusTextFieldProcessingItem.setText(type + ": " + item);
+
+            if (!alreadyCheckedSet.contains(item)) {
+                List<Object> accountsFromThisItem = processUsers(property, item, currentPlayerID);
+
+                // Only add accounts if the list is not empty
+                if (!accountsFromThisItem.isEmpty()) {
+                    for (Object accountId : accountsFromThisItem) {
+                        addNewAccountsToTable(Collections.singletonList(accountId));
+                        cumulativeAccounts.add(accountId);
+                    }
+                }
+
+                alreadyCheckedSet.add(item);
+            } else {
+                String message = String.format("\nIgnoring duplicate: %s [%s] already processed.", type, item);
+                log.debug(message);
+                updateSmurfVillageLogTextArea(message);
+            }
+        }
+    }
+
+    // Table insertion helper
+    private void addNewAccountsToTable(List<Object> accounts) {
+        for (Object accountId : accounts) {
+            boolean exists = userSearchTableView.getItems().stream()
+                    .map(AbstractEntityFX::getId)
+                    .anyMatch(playerId -> playerId.equals(accountId.toString()));
+            if (!exists) {
+                userSearchSmurfVillageAddToUserTable((String) accountId);
+            }
+        }
+    }
+
+    private void resetPreviousStateSmurfVillageLookup() {
+        alreadyCheckedUsers.clear();
+        alreadyCheckedUuids.clear();
+        alreadyCheckedHashes.clear();
+        alreadyCheckedIps.clear();
+        alreadyCheckedMemorySerialNumbers.clear();
+        alreadyCheckedVolumeSerialNumbers.clear();
+        alreadyCheckedSerialNumbers.clear();
+        alreadyCheckedProcessorIds.clear();
+        alreadyCheckedCpuNames.clear();
+        alreadyCheckedBiosVersions.clear();
+        alreadyCheckedManufacturers.clear();
+        statusTextFieldProcessingPlayerID.setText("Status");
+        statusTextFieldProcessingItem.setText("Detailed Status Information");
+        logOutput.setLength(0);
+        isPaused = false;
+    }
+
+    public void onLookupSmurfVillage() {
+        users.clear();
+        userSearchTableView.getSortOrder().clear();
+
+        setStatusWorking();
+
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() {
+                isStopped = false;
+                smurfOutputTextArea.setText("");
+                logOutput.setLength(0);
+                cancelRequestedByUser = false;
+                String lookupInput = smurfVillageLookupTextField.getText().trim();
+
+                try {
+                    String searchParameter;
+
+                    // Check if the input is numeric
+                    if (lookupInput.matches("\\d+")) {
+                        searchParameter = "id";
+                    } else {
+                        searchParameter = determineSearchParameter(lookupInput);
+                    }
+
+                    if (searchParameter == null) {
+                        Platform.runLater(() ->
+                                smurfOutputTextArea.appendText("Cannot determine search parameter for input: " + lookupInput + "\n")
+                        );
+                        return null;
+                    }
+
+                    String userID;
+
+                    if (searchParameter.equals("id")) {
+                        // numeric input, treat id as userID
+                        userID = lookupInput;
+                    } else {
+                        // search by name or another attribute
+                        List<PlayerFX> results = userService.findUsersByAttribute(searchParameter, lookupInput);
+
+                        if (results.isEmpty()) {
+                            Platform.runLater(() ->
+                                    smurfOutputTextArea.appendText("Player not found: " + lookupInput + "\n")
+                            );
+                            return null;
+                        }
+
+                        // extract the ID from the first matching player
+                        userID = String.valueOf(results.getFirst().getId());
+                    }
+
+                    onSmurfVillageLookup(userID);
+
+                } catch (Exception e) {
+                    Platform.runLater(() ->
+                            smurfOutputTextArea.appendText("Error: " + e.getMessage() + "\n")
+                    );
+                }
+
+                return null;
+            }
+
+            @Override
+            protected void succeeded() {
+                Platform.runLater(() -> {
+                    setStatusDone();
+                    resetPreviousStateSmurfVillageLookup();
+
+                    LocalDateTime now = LocalDateTime.now();
+                    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+                    String formattedDateTime = now.format(formatter);
+
+                    Duration duration = Duration.between(taskStartTime, Instant.now());
+                    long minutes = duration.toMinutes();
+                    long seconds = duration.minusMinutes(minutes).getSeconds();
+
+                    smurfOutputTextArea.appendText(
+                            "\n\nTask Done at " + formattedDateTime + " (Duration: " + minutes + "m " + seconds + "s)"
+                    );
+                });
+            }
+
+            @Override
+            protected void failed() {
+                Platform.runLater(() -> log.debug("Task failed"));
+            }
+        };
+
+        new Thread(task).start();
+    }
+
+    private Instant taskStartTime;
+
+    private void startTaskTimer() {
+        taskStartTime = Instant.now();
+    }
+
+    public void updateSmurfVillageLogTextArea(String... texts) {
+        Platform.runLater(() -> {
+            try {
+                if (texts != null) {
+                    for (String text : texts) {
+                        if (text != null) {
+                            smurfOutputTextArea.appendText(text);
+                        }
+                    }
+                }
+            } catch (IndexOutOfBoundsException e) {
+                log.error("IndexOutOfBoundsException in updateSmurfVillageLogTextArea: {}", e.getMessage(), e);
+            } catch (RuntimeException e) {
+                log.error("RuntimeException in updateSmurfVillageLogTextArea: {}", e.getMessage(), e);
+            }
+        });
+    }
+
+    private Timeline loadingAnimation;
+    private String currentLoginText = "";
+
+    public void checkRecentAccountsForSmurfs() {
+        users.clear();
+        userSearchTableView.getSortOrder().clear();
+        resetPreviousStateSmurfVillageLookup();
+        smurfOutputTextArea.setText("");
+        setStatusWorking();
+        startLoadingAnimation();
+        setStatusWorking();
+
+        Task<Void> task = new Task<>() {
+            private int count = 0;
+
+            @Override
+            protected Void call() {
+                List<PlayerFX> accounts = userService.findLatestRegistrations();
+
+                if (accounts == null || accounts.isEmpty()) {
+                    Platform.runLater(() -> statusTextRecentAccountsForSmurfs.setText("No accounts found."));
+                    return null;
+                }
+
+                int daysBack;
+                try {
+                    daysBack = Integer.parseInt(daysToCheckRecentAccountsTextField.getText());
+                } catch (NumberFormatException e) {
+                    Platform.runLater(() -> statusTextRecentAccountsForSmurfs.setText("Invalid number format for days."));
+                    return null;
+                }
+
+                LocalDate cutoffDate = LocalDate.now().minusDays(daysBack - 1);
+                Instant cutoff = cutoffDate.atStartOfDay(ZoneId.systemDefault()).toInstant();
+                log.debug("Cutoff date: {}", cutoff);
+
+                for (PlayerFX account : accounts) {
+                    if (isStopped) {
+                        isStopped = false;
+                        break;
+                    }
+
+                    Instant lastLoginTime = null;
+                    try {
+                        if (account.getLastLogin() != null) {
+                            lastLoginTime = account.getLastLogin().toInstant();
+                        }
+                    } catch (Exception e) {
+                        log.warn("Invalid last login format for account: {}", account.getId(), e);
+                    }
+
+                    if (lastLoginTime == null || lastLoginTime.isBefore(cutoff)) {
+                        continue;
+                    }
+
+                    onSmurfVillageLookup(account.getId());
+                    count++;
+
+                    final int currentCount = count;
+                    final String formattedDate = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                    .withZone(ZoneId.systemDefault())
+                    .format(lastLoginTime);
+
+                    Platform.runLater(() -> {
+                        statusTextRecentAccountsForSmurfs.setText("Checked: " + currentCount);
+                        currentLoginText = "Last login: " + formattedDate;
+                    });
+                }
+
+                return null;
+            }
+
+            @Override
+            protected void failed() {
+                super.failed();
+                stopLoadingAnimation();
+                log.error("Task failed", getException());
+            }
+
+            @Override
+            protected void succeeded() {
+                super.succeeded();
+                stopLoadingAnimation();
+                Platform.runLater(() -> {
+                    setStatusDone();
+                    statusTextRecentAccountsForSmurfs.setText("Completed: " + count + " accounts.");
+                    ProgressLabelRecentAccountsSmurfCheck.setText(""); // clear label at the end
+                    setStatusDone();
+                    resetPreviousStateSmurfVillageLookup();
+                });
+                log.debug("Task completed successfully.");
+            }
+        };
+
+        new Thread(task).start();
+    }
+
+    private void startLoadingAnimation() {
+        loadingAnimation = new Timeline(
+                new KeyFrame(javafx.util.Duration.ZERO, e -> updateLoadingLabel(0)),
+                new KeyFrame(javafx.util.Duration.seconds(0.5), e -> updateLoadingLabel(1)),
+                new KeyFrame(javafx.util.Duration.seconds(1), e -> updateLoadingLabel(2)),
+                new KeyFrame(javafx.util.Duration.seconds(1.5), e -> updateLoadingLabel(3))
+        );
+        loadingAnimation.setCycleCount(Animation.INDEFINITE);
+        loadingAnimation.play();
+    }
+
+    private void updateLoadingLabel(int dotCount) {
+        String dots = switch (dotCount) {
+            case 1 -> ".";
+            case 2 -> "..";
+            case 3 -> "...";
+            default -> "";
+        };
+        ProgressLabelRecentAccountsSmurfCheck.setText(currentLoginText + dots);
+    }
+
+    private void stopLoadingAnimation() {
+        if (loadingAnimation != null) {
+            loadingAnimation.stop();
+            loadingAnimation = null;
+        }
+        ProgressLabelRecentAccountsSmurfCheck.setText("");
+    }
+
+    private static void saveColumnRecursive(TableColumn<?, ?> column, Map<String, Double> widths, List<String> order) {
+        String id = column.getId();
+        if (id != null) {
+            widths.put(id, column.getWidth());
+            order.add(id);
+            log.debug("Added column: id={}, width={}", id, column.getWidth());
+        } else {
+            log.debug("Skipped column with no ID. Text={}, width={}", column.getText(), column.getWidth());
+        }
+
+        for (TableColumn<?, ?> subColumn : column.getColumns()) {
+            saveColumnRecursive(subColumn, widths, order);
+        }
+    }
+
+    public static void saveColumnLayout(TableView<?> tableView, LocalPreferences localPreferences) {
+        if (tableView == null || localPreferences == null) return;
+
+        Map<String, Double> widths = new HashMap<>();
+        List<String> order = new ArrayList<>();
+
+        log.debug("Starting to save column layout. Total top-level columns: {}", tableView.getColumns().size());
+
+        for (TableColumn<?, ?> column : tableView.getColumns()) {
+            saveColumnRecursive(column, widths, order);
+        }
+
+        log.debug("Final column order list: {}", order);
+        log.debug("Final column width map: {}", widths);
+
+        localPreferences.getTabUserManagement().setUserSearchTableTableColumnWidthsTabUserManagement(widths);
+        localPreferences.getTabUserManagement().setUserSearchTableColumnOrderTabUserManagement(order);
+
+        log.debug("Saved column layout to localPreferences.");
+    }
+
+    public static void loadColumnLayout(TableView<?> tableView, LocalPreferences localPreferences) {
+        if (tableView == null) {
+            log.debug("TableView is null, cannot load layout.");
+            return;
+        }
+        if (localPreferences == null) {
+            log.debug("LocalPreferences is null, cannot load layout.");
+            return;
+        }
+
+        Map<String, Double> widths = localPreferences.getTabUserManagement()
+                .getUserSearchTableTableColumnWidthsTabUserManagement();
+        List<String> order = localPreferences.getTabUserManagement()
+                .getUserSearchTableColumnOrderTabUserManagement();
+
+        log.debug("Loading column layout. Saved widths: {}, saved order: {}", widths, order);
+
+        if (order != null && !order.isEmpty()) {
+            tableView.getColumns().sort(Comparator.comparingInt(col -> {
+                int index = order.indexOf(col.getId());
+                if (index == -1) {
+                    log.debug("Column {} not found in saved order, placing at end", col.getId());
+                }
+                return index >= 0 ? index : Integer.MAX_VALUE;
+            }));
+            log.debug("Applied column order to TableView.");
+        }
+
+        for (TableColumn<?, ?> column : tableView.getColumns()) {
+            if (column.getId() != null && widths != null && widths.containsKey(column.getId())) {
+                double width = widths.get(column.getId());
+                if (column.prefWidthProperty().isBound()) {
+                    column.prefWidthProperty().unbind();
+                    log.debug("Unbound prefWidth for column {}", column.getId());
+                }
+                column.setPrefWidth(width);
+                log.debug("Set width for column {}: {}", column.getId(), width);
+            } else {
+                log.debug("Skipping column {}: no saved width", column.getId());
+            }
+        }
+
+        log.debug("Finished loading column layout.");
+    }
+
+    public static void saveSplitPanePositions(SplitPane splitPane, LocalPreferences localPreferences) {
+        if (splitPane == null || localPreferences == null) return;
+
+        List<Double> positions = splitPane.getDividers().stream()
+                .map(SplitPane.Divider::getPosition)
+                .collect(Collectors.toList());
+
+        localPreferences.getTabUserManagement().setRootSplitPaneDividerPositionsTabUserManagement(positions);
+        log.debug("Saved SplitPane positions: {}", positions);
+    }
+
+    public static void loadSplitPanePositions(SplitPane splitPane, LocalPreferences localPreferences) {
+        if (splitPane == null || localPreferences == null) return;
+
+        List<Double> positions = localPreferences.getTabUserManagement().getRootSplitPaneDividerPositionsTabUserManagement();
+        if (positions != null && !positions.isEmpty()) {
+            ObservableList<SplitPane.Divider> dividers = splitPane.getDividers();
+            for (int i = 0; i < Math.min(dividers.size(), positions.size()); i++) {
+                dividers.get(i).setPosition(positions.get(i));
+            }
+            log.debug("Loaded SplitPane positions: {}", positions);
+        } else {
+            log.debug("No saved SplitPane positions to load.");
+        }
+    }
+
+    public void onSave() {
+        saveColumnLayout(userSearchTableView, localPreferences);
+        saveSplitPanePositions(root, localPreferences);
+    }
 }
+

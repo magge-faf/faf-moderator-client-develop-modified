@@ -1,4 +1,5 @@
 import org.gradle.internal.os.OperatingSystem
+import java.text.SimpleDateFormat
 
 plugins {
     id 'application'
@@ -44,7 +45,7 @@ dependencies {
 
     annotationProcessor(platform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}"))
     implementation(platform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}"))
-    implementation 'org.java-websocket:Java-WebSocket:1.5.3' // Required for LobbyWebSocketClient
+
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
     annotationProcessor("org.projectlombok:lombok")
     annotationProcessor("org.mapstruct:mapstruct-processor:${mapStructVersion}")
@@ -57,6 +58,7 @@ dependencies {
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8")
     implementation("com.github.jasminb:jsonapi-converter:0.14")
+    implementation 'org.java-websocket:Java-WebSocket:1.5.3' // Required for LobbyWebSocketClient
     implementation("com.faforever.commons:data:${commonsVersion}")
     implementation("com.faforever.commons:api:${commonsVersion}")
     implementation("org.apache.httpcomponents:httpclient:4.5.14")
@@ -108,5 +110,42 @@ static def dateVersion() {
     def now = new Date()
     return now.format('yyyy-MM-dd')
 }
+
+version = project.hasProperty('version') ? project.property('version') : dateVersion()
+
+processResources {
+    filesMatching("**/application.properties") {
+        expand(version: project.version)
+    }
+}
+
+tasks.register("generateVersionClass") {
+    def outputDir = layout.buildDirectory.dir("generated/sources/version")
+    inputs.property("version", project.version)
+    outputs.dir(outputDir)
+
+    doLast {
+        def pkg = "com.faforever.moderatorclient.config"
+        def dir = outputDir.get().asFile
+        def file = new File(dir, "${pkg.replace('.', '/')}/ApplicationVersion.java")
+
+        def date = new SimpleDateFormat("yyyy-MM-dd").format(new Date())
+        def version = project.version == "snapshot" ? date : project.version
+
+        file.parentFile.mkdirs()
+        file.text = """package ${pkg};
+
+import org.springframework.stereotype.Component;
+
+@Component
+public class ApplicationVersion {
+    public static final String CURRENT_VERSION = "v${version}";
+}
+"""
+    }
+}
+
+sourceSets.main.java.srcDir(layout.buildDirectory.dir("generated/sources/version"))
+compileJava.dependsOn(tasks.named("generateVersionClass"))
 
 version = project.hasProperty('version') ? project.property('version') : dateVersion()

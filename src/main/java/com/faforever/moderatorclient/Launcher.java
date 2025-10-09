@@ -1,5 +1,4 @@
 package com.faforever.moderatorclient;
-
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication

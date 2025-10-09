@@ -11,7 +11,7 @@
         <ChoiceBox fx:id="statusChoiceBox"/>
     </HBox>
     <HBox spacing="10" alignment="CENTER_LEFT" GridPane.rowIndex="0" GridPane.columnIndex="1">
-        <CheckBox fx:id="autoApplyTemplateAndSaveCheckBox" text="Apply Template on Click for All Selected Reports and Save Automatically"/>
+        <CheckBox fx:id="applyTemplateAndAutoSaveCheckBox" text="Apply Template on Click for All Selected Reports and Save Automatically"/>
     </HBox>
 
     <!-- Second Row -->

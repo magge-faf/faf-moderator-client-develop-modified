@@ -8,6 +8,7 @@ import javafx.beans.property.StringProperty;
 import javafx.beans.value.ObservableObjectValue;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableSet;
+import lombok.Getter;
 
 public class ModerationReportFX extends AbstractEntityFX {
 	private final StringProperty reportDescription;
@@ -15,11 +16,13 @@ public class ModerationReportFX extends AbstractEntityFX {
 	private final StringProperty gameIncidentTimecode;
 	private final StringProperty moderatorNotice;
 	private final StringProperty moderatorPrivateNote;
-	private final ObservableSet<BanInfoFX> bans;
+	@Getter
+    private final ObservableSet<BanInfoFX> bans;
 	private final ObjectProperty<PlayerFX> reporter;
 	private final ObjectProperty<GameFX> game;
 	private final ObjectProperty<PlayerFX> lastModerator;
-	private final ObservableSet<PlayerFX> reportedUsers;
+	@Getter
+    private final ObservableSet<PlayerFX> reportedUsers;
 
 	public ModerationReportFX() {
 		reportDescription = new SimpleStringProperty();
@@ -94,11 +97,7 @@ public class ModerationReportFX extends AbstractEntityFX {
 		return moderatorPrivateNote;
 	}
 
-	public ObservableSet<BanInfoFX> getBans() {
-		return bans;
-	}
-
-	public PlayerFX getReporter() {
+    public PlayerFX getReporter() {
 		return reporter.get();
 	}
 
@@ -134,7 +133,4 @@ public class ModerationReportFX extends AbstractEntityFX {
 		return lastModerator;
 	}
 
-	public ObservableSet<PlayerFX> getReportedUsers() {
-		return reportedUsers;
-	}
 }

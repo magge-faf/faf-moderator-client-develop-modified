@@ -9,10 +9,10 @@ import com.faforever.moderatorclient.api.event.FafApiFailModifyEvent;
 import com.faforever.moderatorclient.api.event.FafUserFailModifyEvent;
 import com.faforever.moderatorclient.api.event.TokenExpiredEvent;
 import com.faforever.moderatorclient.config.ApplicationProperties;
+import com.faforever.moderatorclient.config.ApplicationVersion;
 import com.faforever.moderatorclient.config.EnvironmentProperties;
 import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.config.local.LocalPreferencesReaderWriter;
-import com.faforever.moderatorclient.config.PreferencesConfig;
 import com.faforever.moderatorclient.ui.main_window.*;
 import com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController;
 import javafx.application.Platform;
@@ -21,7 +21,6 @@ import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.image.Image;
 import javafx.stage.Stage;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.DisposableBean;
@@ -36,6 +35,9 @@ import java.util.*;
 @Slf4j
 @RequiredArgsConstructor
 public class MainController implements Controller<TabPane>, DisposableBean {
+    @Autowired
+    private ApplicationVersion applicationVersion;
+
     private final ApplicationProperties applicationProperties;
     private final LocalPreferences localPreferences;
     private final LocalPreferencesReaderWriter localPreferencesReaderWriter;
@@ -43,7 +45,6 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     private final FafApiCommunicationService fafApiCommunicationService;
     private final FafUserCommunicationService fafUserCommunicationService;
     private final UiService uiService;
-
     public TabPane root;
     public Tab userManagementTab;
     public Tab matchmakerMapPoolTab;
@@ -61,6 +62,9 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     public Tab settingsTab;
     public Tab recentNotesTab;
     public Tab reportStatisticsTab;
+    public Tab smurfManagementControllerTab;
+    public Tab replayAnalysisControllerTab;
+    public Tab excludedHardwareItemsTab;
 
     private SettingsController settingsController;
     private ModerationReportController moderationReportController;
@@ -78,13 +82,14 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     private UserGroupsController userGroupsController;
     private RecentNotesController recentNotesController;
     private ReportStatisticsController reportStatisticsController;
-
-    @Autowired
-    public PreferencesConfig preferencesConfig;
+    private SmurfManagementController smurfManagementController;
+    private ReplayAnalysisController replayAnalysisController;
+    private ExcludedHardwareItemsController excludedHardwareItemsController;
 
     private final Map<Tab, Boolean> dataLoadingState = new HashMap<>();
+
     private final FafApiCommunicationService communicationService;
-    public static final String CONFIGURATION_FOLDER = "ConfigurationModerationToolFAF";
+    public static final String CONFIGURATION_FOLDER = "data";
 
     @Override
     public TabPane getRoot() {
@@ -122,9 +127,38 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         initVotingTab();
         initRecentNotesTab();
         initReportStatisticsTab();
+        initSmurfControllerTab();
+        initReplayAnalysisControllerTab();
+        initExcludedHardwareItemsTab();
+        selectActiveTab();
     }
 
-    private void initSettingsTab(List<Tab> tabs) {
+    private void selectActiveTab() {
+        var startUpTab = localPreferences.getUi().getStartUpTab();
+        if (startUpTab == null) return;
+
+        try {
+            root.getTabs()
+                    .stream().filter(tab -> Objects.equals(tab.getId(), startUpTab))
+                    .findFirst()
+                    .ifPresent(tab -> root.getSelectionModel().select(tab));
+        } catch (Exception e) {
+            log.error("Error selecting active tab", e);
+        }
+    }
+
+    private void initExcludedHardwareItemsTab() {
+        excludedHardwareItemsController = uiService.loadFxml("ui/main_window/excludedHardwareItems.fxml");
+        excludedHardwareItemsTab.setContent(excludedHardwareItemsController.getRoot());
+    }
+
+    private void initReplayAnalysisControllerTab() {
+        replayAnalysisController = uiService.loadFxml("ui/main_window/replayAnalysisControllerTab.fxml");
+        replayAnalysisControllerTab.setContent(replayAnalysisController.getRoot());
+        replayAnalysisControllerTab.setDisable(true);
+    }
+
+    private void initSettingsTab() {
         settingsController = uiService.loadFxml("ui/main_window/settingsTab.fxml");
         settingsTab.setContent(settingsController.getRoot());
     }
@@ -132,6 +166,11 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     private void initReportStatisticsTab() {
         reportStatisticsController = uiService.loadFxml("ui/main_window/reportStatisticsTab.fxml");
         reportStatisticsTab.setContent(reportStatisticsController.getRoot());
+    }
+
+    private void initSmurfControllerTab() {
+        smurfManagementController = uiService.loadFxml("ui/main_window/smurfManagementTab.fxml");
+        smurfManagementControllerTab.setContent(smurfManagementController.getRoot());
     }
 
     private void initRecentNotesTab() {
@@ -193,7 +232,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         if (checkPermissionForTab(avatarsTab, GroupPermission.ROLE_WRITE_AVATAR)) {
             avatarsController = uiService.loadFxml("ui/main_window/avatars.fxml");
             avatarsTab.setContent(avatarsController.getRoot());
-            initLoading(avatarsTab, avatarsController::refresh);
+            initLoading(avatarsTab, avatarsController::refreshAvatars);
         }
     }
 
@@ -202,7 +241,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
                 GroupPermission.ROLE_READ_TEAMKILL_REPORT, GroupPermission.ROLE_ADMIN_MAP)) {
             recentActivityController = uiService.loadFxml("ui/main_window/recentActivity.fxml");
             recentActivityTab.setContent(recentActivityController.getRoot());
-            initLoading(recentActivityTab, recentActivityController::refresh);
+            initLoading(recentActivityTab, recentActivityController::refreshLatestRegistrationsExtendedStats);
         }
     }
 
@@ -280,23 +319,28 @@ public class MainController implements Controller<TabPane>, DisposableBean {
             Stage loginDialog = new Stage();
             loginDialog.setOnCloseRequest(event -> System.exit(0));
             loginDialog.setTitle("FAF Moderator Client");
-            loginDialog.getIcons().add(new Image(this.getClass().getResourceAsStream("/media/favicon.png")));
+            loginDialog.getIcons().add(new Image(Objects.requireNonNull(this.getClass().getResourceAsStream("/media/favicon.png"))));
             Scene scene = new Scene(loginController.getRoot());
             String stylesheet = "/style/main-light.css";
-            if (localPreferences.getUi().isDarkMode()) {
+            if (localPreferences.getTabSettings().isDarkModeCheckBox()) {
                 stylesheet = "/style/main-dark.css";
             }
-            scene.getStylesheets().add(getClass().getResource(stylesheet).toExternalForm());
+            scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource(stylesheet)).toExternalForm());
             loginDialog.setScene(scene);
             loginDialog.showAndWait();
         }
         initializeAfterLogin();
+        checkForNewVersion();
     }
 
     @Override
-    public void destroy() throws Exception {
-        log.info("Saving local preferences to disk");
+    public void destroy() {
+        log.info("Application exit received: saving local preferences to disk.");
+        settingsController.onSave();
+        moderationReportController.onSave();
+        userManagementController.onSave();
         localPreferencesReaderWriter.write(localPreferences);
+        log.info("Local preferences saved successfully.");
     }
 
     @EventListener
@@ -320,5 +364,80 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     @EventListener
     public void onTokenExpired(TokenExpiredEvent event) {
         display();
+    }
+
+    private void checkForNewVersion() {
+        long lastReminder = localPreferences.getVersionReminder().getLastReminderEpoch();
+        long now = System.currentTimeMillis();
+
+        // Only show popup if more than 3 days passed since the last reminder
+        if (now - lastReminder < 3L * 24 * 60 * 60 * 1000) {
+            return;
+        }
+
+        new Thread(() -> {
+            try {
+                String url = "https://api.github.com/repos/magge-faf/faf-moderator-client-develop-modified/releases/latest";
+                var conn = new java.net.URL(url).openConnection();
+                conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
+                conn.setRequestProperty("User-Agent", "Java-Client");
+
+                String json = new String(conn.getInputStream().readAllBytes());
+                com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(json);
+                String latestVersion = node.get("tag_name").asText();
+
+                if (isNewerVersion(latestVersion)) {
+                    Platform.runLater(() -> showUpdatePopup(latestVersion));
+                }
+            } catch (Exception e) {
+                log.warn("Failed to check for new version", e);
+            }
+        }).start();
+    }
+
+    private boolean isNewerVersion(String latest) {
+        return latest.compareTo(ApplicationVersion.CURRENT_VERSION) > 0;
+    }
+
+    private void showUpdatePopup(String latestVersion) {
+        String downloadUrl = "https://github.com/magge-faf/faf-moderator-client-develop-modified/releases/latest";
+
+        javafx.scene.control.Dialog<Void> dialog = new javafx.scene.control.Dialog<>();
+        dialog.setTitle("Update available");
+        dialog.setHeaderText("A new version is available: " + latestVersion);
+
+        // TextField to show the URL (copyable)
+        javafx.scene.control.TextField linkField = new javafx.scene.control.TextField(downloadUrl);
+        linkField.setEditable(false);
+        linkField.setFocusTraversable(false);
+
+        // Button to copy the URL
+        javafx.scene.control.Button copyButton = new javafx.scene.control.Button("Copy Download Link");
+        copyButton.setOnAction(e -> {
+            javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
+            javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+            content.putString(downloadUrl);
+            clipboard.setContent(content);
+        });
+
+        javafx.scene.layout.VBox content = new javafx.scene.layout.VBox(10, linkField, copyButton);
+        dialog.getDialogPane().setContent(content);
+
+        // Only one button to dismiss the dialog
+        javafx.scene.control.ButtonType remindLaterButton = new javafx.scene.control.ButtonType(
+                "Remind Me In 3 Days Again",
+                javafx.scene.control.ButtonBar.ButtonData.OK_DONE
+        );
+        dialog.getDialogPane().getButtonTypes().add(remindLaterButton);
+
+        dialog.showAndWait();
+
+        // Save the reminder timestamp
+        localPreferences.getVersionReminder().setLastReminderEpoch(System.currentTimeMillis());
+        try {
+            localPreferencesReaderWriter.write(localPreferences);
+        } catch (Exception e) {
+            log.warn("Failed to save version reminder timestamp", e);
+        }
     }
 }

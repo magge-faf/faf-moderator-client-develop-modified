@@ -10,6 +10,7 @@ import com.google.common.collect.ImmutableMap;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
@@ -30,22 +31,50 @@ public class ModerationReportService {
 		fafApi.patch(ElideNavigator.of(ModerationReport.class).id(dto.getId()), dto);
 	}
 
-	public CompletableFuture<List<ModerationReportFX>> getAllReports() {
+	public CompletableFuture<List<ModerationReportFX>> getAllReportsPaged(int pageSize, int batchSize) {
 		return CompletableFuture.supplyAsync(() -> {
-			List<ModerationReport> reports = fafApi.getAll(ModerationReport.class, ElideNavigator.of(ModerationReport.class)
-					.collection()
-					.addInclude("reporter")
-					.addInclude("reporter.bans")
-					.addInclude("game")
-					.addInclude("lastModerator")
-					.addInclude("reportedUsers")
-					.addInclude("reportedUsers.bans")
-			);
-			return reports.stream().map(moderationReportMapper::map).collect(Collectors.toList());
+			List<ModerationReportFX> allReports = new ArrayList<>();
+			int currentPage = 1;
+			boolean hasMore = true;
+
+			while (hasMore) {
+				List<CompletableFuture<List<ModerationReportFX>>> futures = new ArrayList<>();
+
+				// Fire a batch of requests in parallel
+				for (int i = 0; i < batchSize; i++) {
+					int page = currentPage + i;
+					futures.add(getPageOfReports(page, pageSize));
+				}
+
+				// Wait for all futures to complete and collect results
+				List<List<ModerationReportFX>> batchResults = futures.stream()
+						.map(future -> {
+							try {
+								return future.join();
+							} catch (Exception e) {
+								log.warn("Failed to fetch page {}, skipping", future, e);
+								return List.<ModerationReportFX>of(); // empty list for failed pages
+							}
+						})
+						.toList();
+
+				// Add results to the main list in page order
+				for (List<ModerationReportFX> result : batchResults) {
+					allReports.addAll(result);
+				}
+
+				// If any page returned less than pageSize, we reached the end
+				hasMore = batchResults.stream().allMatch(r -> r.size() == pageSize);
+
+				currentPage += batchSize;
+			}
+
+			return allReports;
 		});
 	}
 
 	public CompletableFuture<List<ModerationReportFX>> getPageOfReports(int page, int pageSize) {
+		fafApi.checkRateLimit();
 		return CompletableFuture.supplyAsync(() -> {
 			List<ModerationReport> reports = fafApi.getPage(
 					ModerationReport.class,
@@ -65,6 +94,4 @@ public class ModerationReportService {
 			return reports.stream().map(moderationReportMapper::map).collect(Collectors.toList());
 		});
 	}
-
 }
-
