@@ -4,6 +4,7 @@ import com.faforever.moderatorclient.api.domain.UserService;
 import com.faforever.moderatorclient.ui.domain.UserNoteFX;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleIntegerProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -19,7 +20,6 @@ import org.springframework.stereotype.Component;
 import javafx.scene.input.ClipboardContent;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Comparator;
 import java.util.concurrent.CompletableFuture;
 
 @Component
@@ -39,19 +39,24 @@ public class RecentNotesController implements Controller<Region> {
     @FXML
     public TableColumn<UserNoteFX, String> noteColumn;
     @FXML
-    public TableColumn<UserNoteFX, String> noteCreatedColumn;
+    public TableColumn<UserNoteFX, OffsetDateTime> noteCreatedColumn;
     @FXML
+    public TableColumn<UserNoteFX, OffsetDateTime> noteUpdatedColumn;
 
-    public TableColumn<UserNoteFX, String> noteUpdatedColumn;
     private final UserService userService;
     public Button refreshNotes;
 
     @Override
     public VBox getRoot() {
-        CompletableFuture.supplyAsync(() -> userService.getAllUserNotesForRecentNotesTab()).thenAccept(userNotes -> {
+        CompletableFuture.supplyAsync(userService::getAllUserNotesForRecentNotesTab).thenAccept(userNotes -> {
             Platform.runLater(() -> {
                 ObservableList<UserNoteFX> notesData = FXCollections.observableArrayList(userNotes);
                 notesTable.setItems(notesData);
+
+                notesTable.getSortOrder().clear();
+                noteCreatedColumn.setSortType(TableColumn.SortType.DESCENDING);
+                notesTable.getSortOrder().add(noteCreatedColumn);
+                notesTable.sort();
             });
         });
 
@@ -97,14 +102,38 @@ public class RecentNotesController implements Controller<Region> {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
         noteCreatedColumn.setCellValueFactory(cellData ->
-                new SimpleStringProperty(formatter.format(cellData.getValue().getCreateTime()))
+                new SimpleObjectProperty<>(cellData.getValue().getCreateTime())
         );
+        noteCreatedColumn.setCellFactory(column -> new TableCell<>() {
+            @Override
+            protected void updateItem(OffsetDateTime item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(formatter.format(item));
+                }
+            }
+        });
+        noteCreatedColumn.setComparator(OffsetDateTime::compareTo);
+
         noteUpdatedColumn.setCellValueFactory(cellData ->
-                new SimpleStringProperty(formatter.format(cellData.getValue().getUpdateTime()))
+                new SimpleObjectProperty<>(cellData.getValue().getUpdateTime())
         );
+        noteUpdatedColumn.setCellFactory(column -> new TableCell<>() {
+            @Override
+            protected void updateItem(OffsetDateTime item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(formatter.format(item));
+                }
+            }
+        });
+
         noteIdColumn.setCellValueFactory(cellData -> {
-            String idString = cellData.getValue().getId();
-            int id = Integer.parseInt(idString);
+            int id = Integer.parseInt(cellData.getValue().getId());
             return new SimpleIntegerProperty(id).asObject();
         });
         authorIdColumn.setCellValueFactory(cellData ->
@@ -116,19 +145,6 @@ public class RecentNotesController implements Controller<Region> {
         noteColumn.setCellValueFactory(cellData ->
                 new SimpleStringProperty(cellData.getValue().getNote())
         );
-
-        noteCreatedColumn.setComparator(Comparator.comparing(dateStr ->
-                OffsetDateTime.parse(dateStr, DateTimeFormatter.ISO_DATE_TIME)
-        ));
-
-        noteCreatedColumn.setSortable(true);
-        noteIdColumn.setSortable(true);
-
-        Platform.runLater(() -> {
-            noteIdColumn.setSortType(TableColumn.SortType.DESCENDING);
-            notesTable.getSortOrder().add(noteIdColumn);
-            notesTable.sort();
-        });
     }
 
     private void copySelectedItemToClipboardMouse(String field) {
