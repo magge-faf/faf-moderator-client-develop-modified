@@ -48,7 +48,10 @@ public class ReportStatisticsController implements Controller<Region> {
                 .collect(Collectors.groupingBy(r -> r.getCreateTime().toLocalDate().toString(), Collectors.counting()));
 
         Map<String, Long> reportsPerWeek = reports.stream()
-                .collect(Collectors.groupingBy(r -> r.getCreateTime().getYear() + "-W" + r.getCreateTime().get(WeekFields.of(Locale.getDefault()).weekOfWeekBasedYear()), Collectors.counting()));
+                .collect(Collectors.groupingBy(r -> {
+                    int week = r.getCreateTime().get(WeekFields.of(Locale.getDefault()).weekOfWeekBasedYear());
+                    return r.getCreateTime().getYear() + "-W" + String.format("%02d", week);
+                }, Collectors.counting()));
 
         Map<String, Long> reportsPerMonth = reports.stream()
                 .filter(r -> !YearMonth.from(r.getCreateTime()).equals(currentMonth))  // Exclude the current month
