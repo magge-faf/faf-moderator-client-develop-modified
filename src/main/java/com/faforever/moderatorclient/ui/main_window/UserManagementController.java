@@ -1427,8 +1427,7 @@ public class UserManagementController implements Controller<SplitPane> {
                     .toList();
 
             // --- Add root player to table if other accounts found ---
-            //TODO check if true: Condition '!foundAccounts.contains(currentPlayerID)' is always 'true' when reached
-            if (!otherAccounts.isEmpty() && !foundAccounts.contains(currentPlayerID)) {
+            if (!otherAccounts.isEmpty()) {
                 addNewAccountsToTable(Collections.singletonList(currentPlayerID));
                 foundAccounts.add(currentPlayerID);
             }
@@ -1438,19 +1437,23 @@ public class UserManagementController implements Controller<SplitPane> {
             } else {
                 for (PlayerFX user : otherAccounts) {
                     String banInfo = "ACTIVE";
+                    String prefix = "+";
                     BanInfoFX ban = user.getBans().stream()
                             .filter(b -> b.getBanStatus() == BanStatus.BANNED)
                             .findFirst()
                             .orElse(null);
 
                     if (ban != null) {
-                        banInfo = (ban.getExpiresAt() == null)
-                                ? "PERMANENT"
-                                : "TEMPORARY " + ban.getExpiresAt()
-                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+                        if (ban.getExpiresAt() == null) {
+                            banInfo = "PERMANENT";
+                            prefix = "-";
+                        } else {
+                            banInfo = "TEMPORARY " + ban.getExpiresAt()
+                                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+                        }
                     }
 
-                    String accountLine = String.format("\n+ %s - %s", user.getRepresentation(), banInfo);
+                    String accountLine = String.format("\n%s %s - %s", prefix, user.getRepresentation(), banInfo);
                     updateSmurfVillageLogTextArea(accountLine);
 
                     if (user.getId() != null && !foundAccounts.contains(user.getId())) {
@@ -1676,7 +1679,7 @@ public class UserManagementController implements Controller<SplitPane> {
         }
 
         if (catchFirstLayerSmurfsOnlyCheckBox.isSelected()) {
-            log.debug("Smurf tracing is disabled.");
+            log.trace("Smurf tracing is disabled.");
             return;
         }
 
