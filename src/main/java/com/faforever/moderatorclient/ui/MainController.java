@@ -296,12 +296,31 @@ public class MainController implements Controller<TabPane>, DisposableBean {
 
     public void display() {
         if (localPreferences.getAutoLogin().isEnabled()) {
-            String environment = Optional.ofNullable(localPreferences.getAutoLogin().getEnvironment())
-                    .orElseThrow(() -> new IllegalStateException("Environment is not set"));
-            String refreshToken = Optional.ofNullable(localPreferences.getAutoLogin().getRefreshToken())
-                    .orElseThrow(() -> new IllegalStateException("Environment is not set"));
+            String environment = localPreferences.getAutoLogin().getEnvironment();
+            String refreshToken = localPreferences.getAutoLogin().getRefreshToken();
+
+            if (environment == null || environment.isBlank()) {
+                log.warn("Auto login configuration is missing the environment. Disabling auto login and showing login dialog.");
+                localPreferences.getAutoLogin().setEnabled(false);
+                display();
+                return;
+            }
+
+            if (refreshToken == null || refreshToken.isBlank()) {
+                log.warn("Auto login configuration is missing the refresh token. Disabling auto login and showing login dialog.");
+                localPreferences.getAutoLogin().setEnabled(false);
+                display();
+                return;
+            }
 
             EnvironmentProperties environmentProperties = applicationProperties.getEnvironments().get(environment);
+            if (environmentProperties == null) {
+                log.warn("No environment configuration found for key '{}'. Disabling auto login and showing login dialog.", environment);
+                localPreferences.getAutoLogin().setEnabled(false);
+                display();
+                return;
+            }
+
             fafApiCommunicationService.initialize(environmentProperties);
             fafUserCommunicationService.initialize(environmentProperties);
             tokenService.prepare(environmentProperties);
@@ -309,9 +328,10 @@ public class MainController implements Controller<TabPane>, DisposableBean {
             try {
                 tokenService.loginWithRefreshToken(refreshToken, true);
             } catch (Exception e) {
-                log.error("Auto login failed", e);
+                log.error("Auto login failed, disabling auto login and showing manual login dialog.", e);
                 localPreferences.getAutoLogin().setEnabled(false);
                 display();
+                return;
             }
         } else {
             LoginController loginController = uiService.loadFxml("ui/login.fxml");
@@ -320,15 +340,18 @@ public class MainController implements Controller<TabPane>, DisposableBean {
             loginDialog.setOnCloseRequest(event -> System.exit(0));
             loginDialog.setTitle("FAF Moderator Client");
             loginDialog.getIcons().add(new Image(Objects.requireNonNull(this.getClass().getResourceAsStream("/media/favicon.png"))));
+
             Scene scene = new Scene(loginController.getRoot());
             String stylesheet = "/style/main-light.css";
             if (localPreferences.getTabSettings().isDarkModeCheckBox()) {
                 stylesheet = "/style/main-dark.css";
             }
             scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource(stylesheet)).toExternalForm());
+
             loginDialog.setScene(scene);
             loginDialog.showAndWait();
         }
+
         initializeAfterLogin();
         checkForNewVersion();
     }
