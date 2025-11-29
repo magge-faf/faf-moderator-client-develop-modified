@@ -20,7 +20,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
@@ -173,64 +172,62 @@ public class ReplayAnalysisController implements Controller<VBox> {
 
     public void downloadReplay(int replayId, Map<Integer, ReplayStatus> checkedReplays) {
         String replayUrl = "https://replay.faforever.com/" + replayId;
-        Path savePath = Path.of(REPLAY_SAVE_DIR + replayId + ".fafreplay");
+        Path savePath = Path.of(REPLAY_SAVE_DIR, replayId + ".fafreplay");
         int retryCount = 0;
-        long sleepRateLimited;
         boolean success = false;
+
         while (!success && retryCount < 10) {
             try {
                 HttpClient client = HttpClient.newBuilder()
-                    .followRedirects(HttpClient.Redirect.NORMAL)
-                    .build();
+                        .followRedirects(HttpClient.Redirect.NORMAL)
+                        .build();
+
                 HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(replayUrl))
-                    .header("User-Agent", "Greetings from modified Mordor. Just Fetching Replays!")
-                    .build();
-                HttpResponse<InputStream> response = client.send(
-                    request,
-                    HttpResponse.BodyHandlers.ofInputStream()
-                );
-                if (response.statusCode() == 200) {
+                        .uri(URI.create(replayUrl))
+                        .header("User-Agent", "Modified Mordor")
+                        .build();
+
+                HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+
+                int status = response.statusCode();
+                log.info("Replay {} download status: {}", replayId, status);
+
+                if (status == 200) {
+                    // Check Content-Type before saving
+                    String contentType = response.headers().firstValue("Content-Type").orElse("unknown");
+                    if (!contentType.contains("application") && !contentType.contains("octet-stream")) {
+                        log.warn("Replay {}: Unexpected content type: {}", replayId, contentType);
+                        checkedReplays.put(replayId, ReplayStatus.DOWNLOAD_FAILED);
+                        success = true;
+                        continue;
+                    }
+
+                    Files.createDirectories(savePath.getParent());
                     try (InputStream in = response.body()) {
                         Files.copy(in, savePath, StandardCopyOption.REPLACE_EXISTING);
-                        checkedReplays.put(replayId, ReplayStatus.DOWNLOADED);
-                        processReplayFile(savePath, checkedReplays);
-                        success = true;
                     }
-                } else if (response.statusCode() == 429) {
-                    throw new IOException("Rate limit exceeded for replay ID " + replayId);
-                } else {
-                    String errorResponse = new BufferedReader(
-                        new InputStreamReader(response.body())
-                    )
-                        .lines()
-                        .collect(Collectors.joining("\n"));
-                    log.warn(
-                        "Failed to download replay " + replayId + ": HTTP " + response.statusCode()
-                    );
-                    log.warn("Error response: {}", errorResponse);
-                    checkedReplays.put(replayId, ReplayStatus.DOWNLOAD_FAILED);
+
+                    log.info("Replay {} saved to {}", replayId, savePath);
+                    checkedReplays.put(replayId, ReplayStatus.DOWNLOADED);
+                    processReplayFile(savePath, checkedReplays);
                     success = true;
-                }
-            } catch (IOException | InterruptedException e) {
-                if (e.getMessage().contains("Rate limit exceeded")) {
+
+                } else if (status == 429) {
                     retryCount++;
-                    try {
-                        sleepRateLimited = (long) Math.pow(2, retryCount) * 1000;
-                        log.warn(
-                            "Rate limit exceeded. Retrying... attempt {} in {} ms",
-                            retryCount,
-                            sleepRateLimited
-                        );
-                        Thread.sleep(sleepRateLimited);
-                    } catch (InterruptedException ex) {
-                        Thread.currentThread().interrupt();
-                    }
+                    long sleepMs = (long) Math.pow(2, retryCount) * 1000;
+                    log.warn("Rate limit hit for replay {}. Retrying in {} ms", replayId, sleepMs);
+                    Thread.sleep(sleepMs);
+
                 } else {
-                    log.warn("Failed to download replay " + replayId + ": " + e.getMessage());
+                    log.warn("Failed to download replay {}: HTTP {}", replayId, status);
                     checkedReplays.put(replayId, ReplayStatus.DOWNLOAD_FAILED);
                     success = true;
                 }
+
+            } catch (IOException | InterruptedException e) {
+                log.warn("Replay {} download exception: {}", replayId, e.getMessage());
+                checkedReplays.put(replayId, ReplayStatus.DOWNLOAD_FAILED);
+                success = true;
             }
         }
     }
