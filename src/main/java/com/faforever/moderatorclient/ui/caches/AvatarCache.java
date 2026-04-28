@@ -2,8 +2,8 @@ package com.faforever.moderatorclient.ui.caches;
 
 import javafx.scene.image.Image;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class AvatarCache {
 
@@ -12,7 +12,7 @@ public class AvatarCache {
     private static AvatarCache singleton;
 
     private AvatarCache() {
-        this.cache = new HashMap<>();
+        this.cache = new ConcurrentHashMap<>();
     }
 
     public static synchronized AvatarCache getInstance() {

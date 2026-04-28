@@ -1,7 +1,6 @@
 package com.faforever.moderatorclient.ui.main_window;
 
 import com.faforever.commons.api.dto.Avatar;
-import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.AvatarService;
 import com.faforever.moderatorclient.config.EnvironmentProperties;
 import com.faforever.moderatorclient.mapstruct.AvatarMapper;
@@ -60,9 +59,6 @@ public class AvatarsController implements Controller<SplitPane> {
     @Autowired
     private final EnvironmentProperties environmentProperties;
 
-    @Autowired
-    private final FafApiCommunicationService fafApiCommunicationService;
-
     @Override
     public SplitPane getRoot() {
         return root;
@@ -70,20 +66,6 @@ public class AvatarsController implements Controller<SplitPane> {
 
     @FXML
     public void initialize() {
-        avatarTableView.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> {
-            avatarAssignments.clear();
-            Optional.ofNullable(newValue).ifPresent(avatar -> {
-                avatarAssignments.addAll(avatar.getAssignments());
-
-                // Load avatar preview immediately when row is selected
-                loadAvatarImageAsync(avatar);
-            });
-
-            if (newValue != null) {
-                applicationEventPublisher.publishEvent(newValue);
-            }
-        });
-
         UrlImageViewTableCell.loadProgressLabel = avatarLoadProgressLabel;
         ViewHelper.buildAvatarTableView(avatarTableView, avatars);
         ViewHelper.buildAvatarAssignmentTableView(avatarAssignmentTableView, avatarAssignments, this::removeAvatarFromPlayer);
@@ -91,12 +73,12 @@ public class AvatarsController implements Controller<SplitPane> {
         editAvatarButton.disableProperty().bind(avatarTableView.getSelectionModel().selectedItemProperty().isNull());
         deleteAvatarButton.disableProperty().bind(avatarTableView.getSelectionModel().selectedItemProperty().isNull());
 
-        avatarTableView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
+        avatarTableView.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> {
             avatarAssignments.clear();
             Optional.ofNullable(newValue).ifPresent(avatar -> {
                 avatarAssignments.addAll(avatar.getAssignments());
+                loadAvatarImageAsync(avatar);
             });
-
             if (newValue != null) {
                 applicationEventPublisher.publishEvent(newValue);
             }
@@ -119,7 +101,11 @@ public class AvatarsController implements Controller<SplitPane> {
     public void refreshAvatars() {
         avatars.clear();
         avatarAssignments.clear();
+        UrlImageViewTableCell.totalRequested = 0;
+        UrlImageViewTableCell.totalCompleted = 0;
+        UrlImageViewTableCell.updateProgressLabel();
         avatarTableView.setPlaceholder(new ProgressIndicator());
+
         Task<List<AvatarFX>> loadAvatarsTask = new Task<>() {
             @Override
             protected List<AvatarFX> call() {
@@ -140,52 +126,8 @@ public class AvatarsController implements Controller<SplitPane> {
         };
 
         loadAvatarsTask.setOnSucceeded(event -> {
-            List<AvatarFX> loadedAvatars = loadAvatarsTask.getValue();
-            avatars.setAll(loadedAvatars);
+            avatars.setAll(loadAvatarsTask.getValue());
             avatarTableView.getSortOrder().clear();
-
-            // Preload images in background
-            for (AvatarFX avatar : loadedAvatars) {
-                String url = avatar.getUrl();
-                if (url == null || url.isEmpty() || avatar.getImage() != null) continue;
-
-                String cacheKey = url + avatar.getUpdateTime();
-                if (AvatarCache.getInstance().containsKey(cacheKey)) {
-                    avatar.setImage(AvatarCache.getInstance().get(cacheKey));
-                    continue;
-                }
-
-                if (UrlImageViewTableCell.loadingUrls.add(cacheKey)) {
-                    UrlImageViewTableCell.totalRequested++;
-                    UrlImageViewTableCell.updateProgressLabel();
-
-                    UrlImageViewTableCell.runningTasks.put(cacheKey,
-                            UrlImageViewTableCell.imageLoadExecutor.submit(() -> {
-                                try {
-                                    fafApiCommunicationService.checkRateLimit();
-                                    Image img = new Image(url, true);
-                                    AvatarCache.getInstance().put(cacheKey, img);
-
-                                    img.progressProperty().addListener((obs, oldProg, newProg) -> {
-                                        if (newProg.doubleValue() >= 1.0) {
-                                            Platform.runLater(() -> {
-                                                avatar.setImage(img);
-                                                UrlImageViewTableCell.totalCompleted++;
-                                                UrlImageViewTableCell.updateProgressLabel();
-                                            });
-                                        }
-                                    });
-
-                                } catch (Exception e) {
-                                    log.warn("Failed preloading avatar: {}", url, e);
-                                } finally {
-                                    UrlImageViewTableCell.loadingUrls.remove(cacheKey);
-                                    UrlImageViewTableCell.runningTasks.remove(cacheKey);
-                                }
-                            })
-                    );
-                }
-            }
         });
 
         loadAvatarsTask.setOnFailed(e -> {
@@ -210,21 +152,44 @@ public class AvatarsController implements Controller<SplitPane> {
 
     public void onSearchAvatars() {
         avatars.clear();
+        avatarAssignments.clear();
         avatarTableView.getSortOrder().clear();
+        avatarTableView.setPlaceholder(new ProgressIndicator());
 
-        List<Avatar> avatarSearchResult;
         String pattern = searchAvatarsTextField.getText();
+        boolean byId = searchAvatarsByIdRadioButton.isSelected();
+        boolean byTooltip = searchAvatarsByTooltipRadioButton.isSelected();
+        boolean byUser = searchAvatarsByAssignedUserRadioButton.isSelected();
 
-        if (searchAvatarsByIdRadioButton.isSelected()) {
-            avatarSearchResult = avatarService.findAvatarsById(pattern);
-        } else if (searchAvatarsByTooltipRadioButton.isSelected()) {
-            avatarSearchResult = avatarService.findAvatarsByTooltip(pattern);
-        } else if (searchAvatarsByAssignedUserRadioButton.isSelected()) {
-            avatarSearchResult = avatarService.findAvatarsByAssignedUser(pattern);
-        } else {
-            avatarSearchResult = avatarService.getAllAvatars();
-        }
-        avatars.addAll(avatarMapper.map(avatarSearchResult));
+        Task<List<AvatarFX>> searchTask = new Task<>() {
+            @Override
+            protected List<AvatarFX> call() {
+                List<Avatar> result;
+                if (byId) {
+                    result = avatarService.findAvatarsById(pattern);
+                } else if (byTooltip) {
+                    result = avatarService.findAvatarsByTooltip(pattern);
+                } else if (byUser) {
+                    result = avatarService.findAvatarsByAssignedUser(pattern);
+                } else {
+                    result = avatarService.getAllAvatars();
+                }
+                return avatarMapper.map(result);
+            }
+        };
+
+        searchTask.setOnSucceeded(event -> {
+            avatars.setAll(searchTask.getValue());
+            avatarTableView.getSortOrder().clear();
+        });
+
+        searchTask.setOnFailed(e -> {
+            Throwable t = searchTask.getException();
+            log.error("Avatar search failed", t);
+            ViewHelper.errorDialog("Error", "Avatar search failed: " + t.getMessage());
+        });
+
+        new Thread(searchTask, "SearchAvatarsThread").start();
     }
 
     public void onAddAvatar() {
@@ -259,24 +224,28 @@ public class AvatarsController implements Controller<SplitPane> {
         if (avatar.getUrl() == null || avatar.getUrl().isEmpty() || avatar.getImage() != null) return;
 
         String cacheKey = avatar.getUrl() + avatar.getUpdateTime();
-        if (AvatarCache.getInstance().containsKey(cacheKey)) {
-            avatar.setImage(AvatarCache.getInstance().get(cacheKey));
+        Image cached = AvatarCache.getInstance().get(cacheKey);
+        if (cached != null) {
+            avatar.setImage(cached);
             return;
         }
 
-        Runnable load = () -> {
-            try {
-                Image img = new Image(avatar.getUrl(), false);
-                AvatarCache.getInstance().put(cacheKey, img);
-                Platform.runLater(() -> avatar.setImage(img));
-            } catch (Exception ignored) {
-            }
-        };
+        if (!UrlImageViewTableCell.loadingUrls.add(cacheKey)) return;
 
-        Thread t = new Thread(load);
-        t.setDaemon(true);
-        t.setName("LoadAvatar-" + avatar.getId());
-        t.start();
+        UrlImageViewTableCell.imageLoadExecutor.submit(() -> {
+            try {
+                Image img = new Image(avatar.getUrl(), true);
+                AvatarCache.getInstance().put(cacheKey, img);
+                img.progressProperty().addListener((obs, oldProg, newProg) -> {
+                    if (newProg.doubleValue() >= 1.0) {
+                        Platform.runLater(() -> avatar.setImage(img));
+                    }
+                });
+            } catch (Exception ignored) {
+            } finally {
+                UrlImageViewTableCell.loadingUrls.remove(cacheKey);
+            }
+        });
     }
 
 }
