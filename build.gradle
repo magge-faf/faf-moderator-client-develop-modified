@@ -139,7 +139,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class ApplicationVersion {
-    public static final String CURRENT_VERSION = "v${version}";
+    public static final String CURRENT_VERSION = "${version}";
 }
 """
     }
