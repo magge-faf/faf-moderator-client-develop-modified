@@ -463,7 +463,12 @@ public class UserManagementController implements Controller<SplitPane> {
 
         if (settings.isSyncTemporaryBansAtStartupCheckbox()) {
             log.debug("Syncing temporary bans at startup.");
-            bansController.syncTempBannedUsersJson();
+            // If the ban table is also set to load at startup, refresh it after sync
+            // completes rather than racing it with a parallel API call.
+            Runnable afterSync = settings.isFetchBansOnStartupCheckBox()
+                    ? bansController::onRefreshLatestBans
+                    : null;
+            bansController.syncTempBannedUsersJson(afterSync);
         }
     }
 

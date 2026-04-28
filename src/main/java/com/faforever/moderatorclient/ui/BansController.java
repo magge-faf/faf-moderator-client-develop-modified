@@ -97,7 +97,12 @@ public class BansController implements Controller<HBox> {
             }
         });
         Platform.runLater(() -> loadColumnLayout(banTableView, localPreferences));
-        if (localPreferences.getTabSettings().isFetchBansOnStartupCheckBox()) {
+        // If sync is also scheduled at startup, defer the table refresh until after sync
+        // completes so we don't make a redundant parallel API call. StartupSyncBans() will
+        // invoke onRefreshLatestBans() as its onComplete callback in that case.
+        boolean fetchBans = localPreferences.getTabSettings().isFetchBansOnStartupCheckBox();
+        boolean syncTemp  = localPreferences.getTabSettings().isSyncTemporaryBansAtStartupCheckbox();
+        if (fetchBans && !syncTemp) {
             onRefreshLatestBans();
         }
         playerRadioButton.setUserData((Supplier<List<BanInfoFX>>) () -> banService.getBanInfoByBannedPlayerNameContains(filter.getText()));
