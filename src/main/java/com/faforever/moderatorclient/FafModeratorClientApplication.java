@@ -4,6 +4,7 @@ import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.config.ApplicationProperties;
 import com.faforever.moderatorclient.config.ApplicationVersion;
 import com.faforever.moderatorclient.config.local.LocalPreferences;
+import com.faforever.moderatorclient.config.local.LocalPreferencesReaderWriter;
 import com.faforever.moderatorclient.ui.MainController;
 import com.faforever.moderatorclient.ui.PlatformService;
 import com.faforever.moderatorclient.ui.PlatformServiceImpl;
@@ -16,6 +17,9 @@ import javafx.animation.Timeline;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
 import javafx.scene.image.Image;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
@@ -29,6 +33,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -49,6 +54,10 @@ public class FafModeratorClientApplication extends Application {
     private UserManagementController userManagementController;
     @Autowired
     private ModerationReportController moderationReportController;
+    @Autowired
+    private LocalPreferences localPreferences;
+    @Autowired
+    private LocalPreferencesReaderWriter localPreferencesReaderWriter;
 
     private Timeline timeline;
     private Stage primaryStage;
@@ -56,6 +65,7 @@ public class FafModeratorClientApplication extends Application {
     private long fetchingDurationMillis = 0;
     private boolean hasFetchedReports = false;
     private long lastRefreshedTime = -1;
+    private boolean wasInCooldown = false;
 
     public static void applicationMain(String[] args) {
         Application.launch(FafModeratorClientApplication.class, args);
@@ -147,6 +157,12 @@ public class FafModeratorClientApplication extends Application {
 
         String lastUpdateStr = getLastUpdateTime();
 
+        boolean isNowInCooldown = cooldownRemaining > 0;
+        if (isNowInCooldown && !wasInCooldown && !localPreferences.getUi().isSuppressRateLimitWarning()) {
+            showRateLimitWarningDialog();
+        }
+        wasInCooldown = isNowInCooldown;
+
         String cooldownText = cooldownRemaining > 0
                 ? String.format(" | Cooldown: %ds", (int) (cooldownRemaining / 1000))
                 : "";
@@ -166,6 +182,28 @@ public class FafModeratorClientApplication extends Application {
         }
 
         primaryStage.setTitle(title);
+    }
+
+    private void showRateLimitWarningDialog() {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("API Rate Limit Reached");
+        alert.setHeaderText("API Rate Limit Active");
+        alert.setContentText(
+                "The maximum number of API requests per minute has been reached.\n\n" +
+                        "The client is still working and will automatically resume once the rate limit resets. " +
+                        "No action is required.\n\n" +
+                        "See the title bar for the live status of requests in the last 60 seconds."
+        );
+
+        ButtonType dontShowAgain = new ButtonType("Don't tell me again");
+        ButtonType gotIt = new ButtonType("Got it", ButtonBar.ButtonData.OK_DONE);
+        alert.getButtonTypes().setAll(gotIt, dontShowAgain);
+
+        Optional<ButtonType> result = alert.showAndWait();
+        if (result.isPresent() && result.get() == dontShowAgain) {
+            localPreferences.getUi().setSuppressRateLimitWarning(true);
+            localPreferencesReaderWriter.write(localPreferences);
+        }
     }
 
     private void startFetchingPattern() {

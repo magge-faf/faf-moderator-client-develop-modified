@@ -35,6 +35,7 @@ public class LocalPreferences {
         String browserComboBox = "SelectBrowser";
         boolean darkMode = true;
         String startUpTab = "userManagementTab";
+        boolean suppressRateLimitWarning = false;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
