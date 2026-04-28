@@ -362,6 +362,8 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         settingsController.onSave();
         moderationReportController.onSave();
         userManagementController.onSave();
+        bansController.onSave();
+        recentNotesController.onSave();
         localPreferencesReaderWriter.write(localPreferences);
         log.info("Local preferences saved successfully.");
     }

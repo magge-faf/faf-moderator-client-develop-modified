@@ -19,6 +19,8 @@ public class LocalPreferences {
     private TabSettings tabSettings = new TabSettings();
     private VersionReminder versionReminder = new VersionReminder();
     private TabEditModerationReport tabEditModerationReport = new TabEditModerationReport();
+    private TabRecentNotes tabRecentNotes = new TabRecentNotes();
+    private TabBans tabBans = new TabBans();
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     @Data
@@ -138,5 +140,19 @@ public class LocalPreferences {
     @Data
     public static class VersionReminder {
         private long lastReminderEpoch = 0; // timestamp in milliseconds
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @Data
+    public static class TabRecentNotes {
+        Map<String, Double> columnWidthsTabRecentNotes = new HashMap<>();
+        List<String> columnOrderTabRecentNotes = new ArrayList<>();
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @Data
+    public static class TabBans {
+        Map<String, Double> columnWidthsTabBans = new HashMap<>();
+        List<String> columnOrderTabBans = new ArrayList<>();
     }
 }

@@ -90,7 +90,13 @@ public class BansController implements Controller<HBox> {
         filteredList = new FilteredList<>(itemList);
         SortedList<BanInfoFX> sortedItemList = new SortedList<>(filteredList);
         sortedItemList.comparatorProperty().bind(banTableView.comparatorProperty());
-        ViewHelper.buildBanTableView(banTableView, sortedItemList, true, localPreferences );
+        ViewHelper.buildBanTableView(banTableView, sortedItemList, true, localPreferences);
+        banTableView.getColumns().forEach(column -> {
+            if (column.getId() == null || column.getId().isEmpty()) {
+                column.setId(column.getText().replaceAll("\\s+", ""));
+            }
+        });
+        Platform.runLater(() -> loadColumnLayout(banTableView, localPreferences));
         playerRadioButton.setUserData((Supplier<List<BanInfoFX>>) () -> banService.getBanInfoByBannedPlayerNameContains(filter.getText()));
         banIdRadioButton.setUserData((Supplier<List<BanInfoFX>>) () -> Collections.singletonList(banService.getBanInfoById(filter.getText())));
         editBanButton.disableProperty().bind(banTableView.getSelectionModel().selectedItemProperty().isNull());
@@ -305,6 +311,43 @@ public class BansController implements Controller<HBox> {
         Thread thread = new Thread(syncTask);
         thread.setDaemon(true);
         thread.start();
+    }
+
+    public void onSave() {
+        saveColumnLayout(banTableView, localPreferences);
+    }
+
+    private static void saveColumnLayout(TableView<?> tableView, LocalPreferences localPreferences) {
+        if (tableView == null || localPreferences == null) return;
+        Map<String, Double> widths = new HashMap<>();
+        List<String> order = new ArrayList<>();
+        for (TableColumn<?, ?> column : tableView.getColumns()) {
+            if (column.getId() != null) {
+                widths.put(column.getId(), column.getWidth());
+                order.add(column.getId());
+            }
+        }
+        localPreferences.getTabBans().setColumnWidthsTabBans(widths);
+        localPreferences.getTabBans().setColumnOrderTabBans(order);
+    }
+
+    private static void loadColumnLayout(TableView<?> tableView, LocalPreferences localPreferences) {
+        if (tableView == null || localPreferences == null) return;
+        Map<String, Double> widths = localPreferences.getTabBans().getColumnWidthsTabBans();
+        List<String> order = localPreferences.getTabBans().getColumnOrderTabBans();
+        if (order != null && !order.isEmpty()) {
+            tableView.getColumns().sort(Comparator.comparingInt(col -> {
+                int index = order.indexOf(col.getId());
+                return index >= 0 ? index : Integer.MAX_VALUE;
+            }));
+        }
+        if (widths != null) {
+            for (TableColumn<?, ?> column : tableView.getColumns()) {
+                if (column.getId() != null && widths.containsKey(column.getId())) {
+                    column.setPrefWidth(widths.get(column.getId()));
+                }
+            }
+        }
     }
 
     public Set<String> loadExistingBannedUserIds(Path filePath) {

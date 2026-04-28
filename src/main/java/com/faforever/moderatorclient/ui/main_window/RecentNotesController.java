@@ -1,6 +1,7 @@
 package com.faforever.moderatorclient.ui.main_window;
 
 import com.faforever.moderatorclient.api.domain.UserService;
+import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.ui.domain.UserNoteFX;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleIntegerProperty;
@@ -20,6 +21,11 @@ import org.springframework.stereotype.Component;
 import javafx.scene.input.ClipboardContent;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 @Component
@@ -44,6 +50,7 @@ public class RecentNotesController implements Controller<Region> {
     public TableColumn<UserNoteFX, OffsetDateTime> noteUpdatedColumn;
 
     private final UserService userService;
+    private final LocalPreferences localPreferences;
     public Button refreshNotes;
 
     @Override
@@ -66,6 +73,7 @@ public class RecentNotesController implements Controller<Region> {
     @FXML
     public void initialize() {
         setupColumns();
+        Platform.runLater(() -> loadColumnLayout(notesTable, localPreferences));
 
         notesTable.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
             if (event.isControlDown() && event.getCode() == KeyCode.C) {
@@ -165,6 +173,43 @@ public class RecentNotesController implements Controller<Region> {
             content.putString(contentString);
 
             clipboard.setContent(content);
+        }
+    }
+
+    public void onSave() {
+        saveColumnLayout(notesTable, localPreferences);
+    }
+
+    private static void saveColumnLayout(TableView<?> tableView, LocalPreferences localPreferences) {
+        if (tableView == null || localPreferences == null) return;
+        Map<String, Double> widths = new HashMap<>();
+        List<String> order = new ArrayList<>();
+        for (TableColumn<?, ?> column : tableView.getColumns()) {
+            if (column.getId() != null) {
+                widths.put(column.getId(), column.getWidth());
+                order.add(column.getId());
+            }
+        }
+        localPreferences.getTabRecentNotes().setColumnWidthsTabRecentNotes(widths);
+        localPreferences.getTabRecentNotes().setColumnOrderTabRecentNotes(order);
+    }
+
+    private static void loadColumnLayout(TableView<?> tableView, LocalPreferences localPreferences) {
+        if (tableView == null || localPreferences == null) return;
+        Map<String, Double> widths = localPreferences.getTabRecentNotes().getColumnWidthsTabRecentNotes();
+        List<String> order = localPreferences.getTabRecentNotes().getColumnOrderTabRecentNotes();
+        if (order != null && !order.isEmpty()) {
+            tableView.getColumns().sort(Comparator.comparingInt(col -> {
+                int index = order.indexOf(col.getId());
+                return index >= 0 ? index : Integer.MAX_VALUE;
+            }));
+        }
+        if (widths != null) {
+            for (TableColumn<?, ?> column : tableView.getColumns()) {
+                if (column.getId() != null && widths.containsKey(column.getId())) {
+                    column.setPrefWidth(widths.get(column.getId()));
+                }
+            }
         }
     }
 
