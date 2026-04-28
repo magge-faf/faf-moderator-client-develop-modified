@@ -29,12 +29,14 @@
             <Separator/>
 
             <VBox spacing="5">
-                <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="Default Starting Tab" textAlignment="CENTER"/>
-                <HBox alignment="CENTER_LEFT">
-                    <children>
-                        <ComboBox fx:id="defaultActiveTabComboBox" prefWidth="150.0" visibleRowCount="20"/>
-                    </children>
+                <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="Start Up"/>
+                <HBox alignment="CENTER_LEFT" spacing="10">
+                    <Label text="Starting Tab:"/>
+                    <ComboBox fx:id="defaultActiveTabComboBox" prefWidth="150.0" visibleRowCount="20"/>
                 </HBox>
+                <CheckBox fx:id="darkModeCheckBox" mnemonicParsing="false" text="Dark Mode"/>
+                <CheckBox fx:id="fetchBansOnStartupCheckBox" mnemonicParsing="false" text="Load bans at startup"/>
+                <CheckBox fx:id="syncTemporaryBansAtStartupCheckbox" text="Sync temporary bans at startup"/>
             </VBox>
 
             <Separator/>
@@ -78,27 +80,12 @@
                                   text="Enable syncing of permanent bans at startup"/>
                     </content>
                 </TitledPane>
-
-                <TitledPane text="Temporary Bans">
-                    <content>
-                        <CheckBox fx:id="syncTemporaryBansAtStartupCheckbox"
-                                  text="Enable syncing of temporary bans at startup"/>
-                    </content>
-                </TitledPane>
             </VBox>
 
             <Separator/>
 
             <children>
                 <CheckBox fx:id="rememberLoginCheckBox" mnemonicParsing="false" text="Remember login"/>
-                <CheckBox fx:id="darkModeCheckBox" mnemonicParsing="false" text="Dark Mode"/>
-                <CheckBox fx:id="fetchBansOnStartupCheckBox" mnemonicParsing="false" text="Load bans at startup"/>
-
-                <Separator prefWidth="200.0">
-                    <VBox.margin>
-                        <Insets/>
-                    </VBox.margin>
-                </Separator>
             </children>
 
         </VBox>
