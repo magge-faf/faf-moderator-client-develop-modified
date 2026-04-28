@@ -61,7 +61,7 @@ public class FafModeratorClientApplication extends Application {
 
     private Timeline timeline;
     private Stage primaryStage;
-    private boolean isFetching = false;
+
     private long fetchingDurationMillis = 0;
     private boolean hasFetchedReports = false;
     private long lastRefreshedTime = -1;
@@ -158,10 +158,11 @@ public class FafModeratorClientApplication extends Application {
         String lastUpdateStr = getLastUpdateTime();
 
         boolean isNowInCooldown = cooldownRemaining > 0;
-        if (isNowInCooldown && !wasInCooldown && !localPreferences.getUi().isSuppressRateLimitWarning()) {
+        boolean shouldWarn = isNowInCooldown && !wasInCooldown && !localPreferences.getUi().isSuppressRateLimitWarning();
+        wasInCooldown = isNowInCooldown; // set before showAndWait so re-entrant runLater callbacks don't stack dialogs
+        if (shouldWarn) {
             showRateLimitWarningDialog();
         }
-        wasInCooldown = isNowInCooldown;
 
         String cooldownText = cooldownRemaining > 0
                 ? String.format(" | Cooldown: %ds", (int) (cooldownRemaining / 1000))
@@ -175,7 +176,7 @@ public class FafModeratorClientApplication extends Application {
                 cooldownText;
 
         if (hasActiveRequests) {
-            if (!isFetching) startFetchingPattern();
+            startFetchingPattern();
             title += " | Fetching reports...";
         } else {
             stopFetchingPattern();
@@ -207,8 +208,9 @@ public class FafModeratorClientApplication extends Application {
     }
 
     private void startFetchingPattern() {
-        if (timeline != null && timeline.getStatus() == Timeline.Status.RUNNING) {
-            return;
+        if (timeline != null) {
+            if (timeline.getStatus() == Timeline.Status.RUNNING) return;
+            timeline.stop();
         }
 
         final long[] counterSeconds = {0};
