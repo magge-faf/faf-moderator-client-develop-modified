@@ -100,9 +100,6 @@ public class BansController implements Controller<HBox> {
         if (localPreferences.getTabSettings().isFetchBansOnStartupCheckBox()) {
             onRefreshLatestBans();
         }
-        if (localPreferences.getTabSettings().isSyncTemporaryBansAtStartupCheckbox()) {
-            syncTempBannedUsersJson();
-        }
         playerRadioButton.setUserData((Supplier<List<BanInfoFX>>) () -> banService.getBanInfoByBannedPlayerNameContains(filter.getText()));
         banIdRadioButton.setUserData((Supplier<List<BanInfoFX>>) () -> Collections.singletonList(banService.getBanInfoById(filter.getText())));
         editBanButton.disableProperty().bind(banTableView.getSelectionModel().selectedItemProperty().isNull());

@@ -116,16 +116,12 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         initAvatarTab();
         initBanTab();
         initDomainBlacklistTab();
-        initMapVaultTab();
-        initMatchmakerMapPoolTab();
         initMessagesTab();
-        initModVaultTab();
         initPermissionTab();
         initRecentActivityTab();
         initReportTab();
         initSettingsTab();
         initTutorialTab();
-        initUserManagementTab();
         initVotingTab();
         initRecentNotesTab();
         initReportStatisticsTab();
