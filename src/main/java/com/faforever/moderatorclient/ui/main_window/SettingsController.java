@@ -53,6 +53,8 @@ public class SettingsController implements Controller<Pane> {
     public CheckBox syncPermanentBansAtStartupCheckbox;
     @FXML
     public CheckBox syncTemporaryBansAtStartupCheckbox;
+    @FXML
+    public CheckBox fetchBansOnStartupCheckBox;
 
 
     @Override
@@ -89,6 +91,7 @@ public class SettingsController implements Controller<Pane> {
         syncTemporaryBansBeforeSearchCheckbox.setSelected(localPreferences.getTabSettings().isSyncTemporaryBansBeforeSearchCheckbox());
         syncPermanentBansAtStartupCheckbox.setSelected(localPreferences.getTabSettings().isSyncPermanentBansAtStartupCheckbox());
         syncPermanentBansBeforeSearchCheckbox.setSelected(localPreferences.getTabSettings().isSyncPermanentBansBeforeSearchCheckbox());
+        fetchBansOnStartupCheckBox.setSelected(localPreferences.getTabSettings().isFetchBansOnStartupCheckBox());
 
         if (browserComboBox.getValue() == null) {
             browserComboBox.setValue(localPreferences.getUi().getBrowserComboBox());
@@ -352,6 +355,7 @@ public class SettingsController implements Controller<Pane> {
 
         localPreferences.getTabSettings().setSyncTemporaryBansAtStartupCheckbox(syncTemporaryBansAtStartupCheckbox.isSelected());
         localPreferences.getTabSettings().setSyncTemporaryBansBeforeSearchCheckbox(syncTemporaryBansBeforeSearchCheckbox.isSelected());
+        localPreferences.getTabSettings().setFetchBansOnStartupCheckBox(fetchBansOnStartupCheckBox.isSelected());
 
         Tab selectedTab = defaultActiveTabComboBox.getSelectionModel().getSelectedItem();
         if (selectedTab != null) {

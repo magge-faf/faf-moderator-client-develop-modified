@@ -97,6 +97,9 @@ public class BansController implements Controller<HBox> {
             }
         });
         Platform.runLater(() -> loadColumnLayout(banTableView, localPreferences));
+        if (localPreferences.getTabSettings().isFetchBansOnStartupCheckBox()) {
+            onRefreshLatestBans();
+        }
         playerRadioButton.setUserData((Supplier<List<BanInfoFX>>) () -> banService.getBanInfoByBannedPlayerNameContains(filter.getText()));
         banIdRadioButton.setUserData((Supplier<List<BanInfoFX>>) () -> Collections.singletonList(banService.getBanInfoById(filter.getText())));
         editBanButton.disableProperty().bind(banTableView.getSelectionModel().selectedItemProperty().isNull());

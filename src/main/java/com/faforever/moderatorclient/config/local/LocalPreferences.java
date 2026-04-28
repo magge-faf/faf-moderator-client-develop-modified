@@ -92,6 +92,7 @@ public class LocalPreferences {
         boolean syncTemporaryBansBeforeSearchCheckbox = false;
         boolean rememberLoginCheckBox = true;
         boolean darkModeCheckBox = true;
+        boolean fetchBansOnStartupCheckBox = false;
 
         // TitledPanes
 

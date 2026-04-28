@@ -102,6 +102,7 @@
             <children>
                 <CheckBox fx:id="rememberLoginCheckBox" mnemonicParsing="false" text="Remember login"/>
                 <CheckBox fx:id="darkModeCheckBox" mnemonicParsing="false" text="Dark Mode"/>
+                <CheckBox fx:id="fetchBansOnStartupCheckBox" mnemonicParsing="false" text="Load bans at startup"/>
 
                 <Separator prefWidth="200.0">
                     <VBox.margin>
