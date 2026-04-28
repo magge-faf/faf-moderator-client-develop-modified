@@ -5,6 +5,7 @@ import com.faforever.commons.replay.ModeratorEvent;
 import com.faforever.commons.replay.ReplayDataParser;
 import com.faforever.commons.replay.body.Event;
 import com.faforever.moderatorclient.api.TokenService;
+import com.faforever.moderatorclient.config.ApplicationVersion;
 import com.faforever.moderatorclient.ui.Controller;
 import com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -184,7 +185,7 @@ public class ReplayAnalysisController implements Controller<VBox> {
 
                 HttpRequest request = HttpRequest.newBuilder()
                         .uri(URI.create(replayUrl))
-                        .header("User-Agent", "Modified Mordor")
+                        .header("User-Agent", "Modified Mordor/" + ApplicationVersion.CURRENT_VERSION)
                         .build();
 
                 HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
