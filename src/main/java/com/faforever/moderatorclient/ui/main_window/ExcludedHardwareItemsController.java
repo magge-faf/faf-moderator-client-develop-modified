@@ -3,6 +3,7 @@ package com.faforever.moderatorclient.ui.main_window;
 import com.faforever.moderatorclient.ui.Controller;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
@@ -217,7 +218,7 @@ public class ExcludedHardwareItemsController implements Controller<VBox> {
 
     void updateStatsDisplay() {
         if (!EXCLUDED_ITEMS_FILE.exists() || EXCLUDED_ITEMS_FILE.length() == 0) {
-            statsExcludedItemsLabel.setText("No excluded items found.");
+            Platform.runLater(() -> statsExcludedItemsLabel.setText("No excluded items found."));
             return;
         }
 
@@ -227,7 +228,7 @@ public class ExcludedHardwareItemsController implements Controller<VBox> {
             List<Map<String, Object>> itemList = (List<Map<String, Object>>) rootData.getOrDefault("excluded_items", Collections.emptyList());
 
             if (itemList.isEmpty()) {
-                statsExcludedItemsLabel.setText("No excluded items found.");
+                Platform.runLater(() -> statsExcludedItemsLabel.setText("No excluded items found."));
                 return;
             }
 
@@ -247,11 +248,12 @@ public class ExcludedHardwareItemsController implements Controller<VBox> {
                 sb.append(" (").append(String.join(", ", nonZeroStats)).append(")");
             }
 
-            statsExcludedItemsLabel.setText(sb.toString());
+            String text = sb.toString();
+            Platform.runLater(() -> statsExcludedItemsLabel.setText(text));
 
         } catch (IOException e) {
             log.error("Failed to read excluded items for stats: {}", e.getMessage());
-            statsExcludedItemsLabel.setText("Error reading stats.");
+            Platform.runLater(() -> statsExcludedItemsLabel.setText("Error reading stats."));
         }
     }
 
