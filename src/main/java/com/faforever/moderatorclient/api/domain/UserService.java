@@ -67,7 +67,6 @@ public class UserService {
     }
 
     public List<PlayerFX> findLatestRegistrations() {
-        fafApi.checkRateLimit();
         ElideNavigatorOnCollection<Player> navigator = ElideNavigator.of(Player.class)
                 .collection()
                 .addSortingRule("id", false)

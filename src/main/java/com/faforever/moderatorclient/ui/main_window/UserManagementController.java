@@ -1875,14 +1875,24 @@ public class UserManagementController implements Controller<SplitPane> {
     private String currentLoginText = "";
 
     public void checkRecentAccountsForSmurfs() {
+        int daysBack;
+        try {
+            daysBack = Integer.parseInt(daysToCheckRecentAccountsTextField.getText().trim());
+        } catch (NumberFormatException e) {
+            statusTextRecentAccountsForSmurfs.setText("Invalid number format for days.");
+            return;
+        }
+
         users.clear();
         userSearchTableView.getSortOrder().clear();
         resetPreviousStateSmurfVillageLookup();
         smurfOutputTextArea.setText("");
+        stopLoadingAnimation();
         setStatusWorking();
         startLoadingAnimation();
-        setStatusWorking();
+        checkRecentAccountsForSmurfsButton.setDisable(true);
 
+        final int finalDaysBack = daysBack;
         Task<Void> task = new Task<>() {
             private int count = 0;
 
@@ -1895,15 +1905,7 @@ public class UserManagementController implements Controller<SplitPane> {
                     return null;
                 }
 
-                int daysBack;
-                try {
-                    daysBack = Integer.parseInt(daysToCheckRecentAccountsTextField.getText());
-                } catch (NumberFormatException e) {
-                    Platform.runLater(() -> statusTextRecentAccountsForSmurfs.setText("Invalid number format for days."));
-                    return null;
-                }
-
-                LocalDate cutoffDate = LocalDate.now().minusDays(daysBack - 1);
+                LocalDate cutoffDate = LocalDate.now().minusDays(finalDaysBack - 1);
                 Instant cutoff = cutoffDate.atStartOfDay(ZoneId.systemDefault()).toInstant();
                 log.debug("Cutoff date: {}", cutoff);
 
@@ -1931,8 +1933,8 @@ public class UserManagementController implements Controller<SplitPane> {
 
                     final int currentCount = count;
                     final String formattedDate = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-                    .withZone(ZoneId.systemDefault())
-                    .format(lastLoginTime);
+                            .withZone(ZoneId.systemDefault())
+                            .format(lastLoginTime);
 
                     Platform.runLater(() -> {
                         statusTextRecentAccountsForSmurfs.setText("Checked: " + currentCount);
@@ -1947,6 +1949,7 @@ public class UserManagementController implements Controller<SplitPane> {
             protected void failed() {
                 super.failed();
                 stopLoadingAnimation();
+                Platform.runLater(() -> checkRecentAccountsForSmurfsButton.setDisable(false));
                 log.error("Task failed", getException());
             }
 
@@ -1957,9 +1960,7 @@ public class UserManagementController implements Controller<SplitPane> {
                 Platform.runLater(() -> {
                     setStatusDone();
                     statusTextRecentAccountsForSmurfs.setText("Completed: " + count + " accounts.");
-                    ProgressLabelRecentAccountsSmurfCheck.setText(""); // clear label at the end
-                    setStatusDone();
-                    resetPreviousStateSmurfVillageLookup();
+                    checkRecentAccountsForSmurfsButton.setDisable(false);
                 });
                 log.debug("Task completed successfully.");
             }
@@ -1969,6 +1970,7 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     private void startLoadingAnimation() {
+        stopLoadingAnimation();
         loadingAnimation = new Timeline(
                 new KeyFrame(javafx.util.Duration.ZERO, e -> updateLoadingLabel(0)),
                 new KeyFrame(javafx.util.Duration.seconds(0.5), e -> updateLoadingLabel(1)),
