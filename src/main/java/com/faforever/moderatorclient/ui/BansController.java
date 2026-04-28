@@ -100,6 +100,9 @@ public class BansController implements Controller<HBox> {
         if (localPreferences.getTabSettings().isFetchBansOnStartupCheckBox()) {
             onRefreshLatestBans();
         }
+        if (localPreferences.getTabSettings().isSyncTemporaryBansAtStartupCheckbox()) {
+            syncTempBannedUsersJson();
+        }
         playerRadioButton.setUserData((Supplier<List<BanInfoFX>>) () -> banService.getBanInfoByBannedPlayerNameContains(filter.getText()));
         banIdRadioButton.setUserData((Supplier<List<BanInfoFX>>) () -> Collections.singletonList(banService.getBanInfoById(filter.getText())));
         editBanButton.disableProperty().bind(banTableView.getSelectionModel().selectedItemProperty().isNull());
@@ -187,6 +190,10 @@ public class BansController implements Controller<HBox> {
     }
 
     public void syncTempBannedUsersJson() {
+        syncTempBannedUsersJson(null);
+    }
+
+    public void syncTempBannedUsersJson(Runnable onComplete) {
         if (tempSyncProgressContainer == null || tempSyncProgressIndicator == null || tempSyncProgressLabel == null) {
             log.debug("FXML components not loaded: tempSyncProgress* is null.");
             return;
@@ -205,11 +212,16 @@ public class BansController implements Controller<HBox> {
                 tempSyncProgressContainer,
                 tempSyncProgressIndicator,
                 tempSyncProgressLabel,
-                "tempSyncProgress"
+                "tempSyncProgress",
+                onComplete
         );
     }
 
     private void startSyncTask(Path destinationPath, BanDurationType banDurationType, VBox progressContainer, ProgressIndicator progressIndicator, Label progressLabel, String sourceEvent) {
+        startSyncTask(destinationPath, banDurationType, progressContainer, progressIndicator, progressLabel, sourceEvent, null);
+    }
+
+    private void startSyncTask(Path destinationPath, BanDurationType banDurationType, VBox progressContainer, ProgressIndicator progressIndicator, Label progressLabel, String sourceEvent, Runnable onComplete) {
         BansController thisController = this;
 
         Task<Boolean> syncTask = new Task<>() {
@@ -295,6 +307,7 @@ public class BansController implements Controller<HBox> {
             progressLabel.setVisible(false);
             progressLabel.setVisible(false);
             updateBanCounts();
+            if (onComplete != null) onComplete.run();
         });
 
         syncTask.setOnFailed(workerStateEvent -> {

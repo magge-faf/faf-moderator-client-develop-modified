@@ -70,11 +70,9 @@
 
             <Separator/>
 
-            <Label text="WIP - Disabled in this build"/>
-
-            <VBox spacing="10" disable="true">
+            <VBox spacing="10">
                 <Label text="Configure how bans are synchronized from the FAF server (producer) to your local JSON file (consumer)." style="-fx-font-style: italic; -fx-font-size: 0.9em;"/>
-                <TitledPane text="Permanent Bans">
+                <TitledPane text="Permanent Bans (WIP - disabled)" disable="true">
                     <content>
                         <VBox spacing="5">
                             <CheckBox fx:id="syncPermanentBansAtStartupCheckbox"
