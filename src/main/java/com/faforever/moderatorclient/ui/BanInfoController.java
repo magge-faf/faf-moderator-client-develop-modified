@@ -90,8 +90,12 @@ public class BanInfoController implements Controller<Pane> {
     public void initialize() {
         banIsRevokedNotice.managedProperty().bind(banIsRevokedNotice.visibleProperty());
         banReasonTextField.textProperty().addListener((observable, oldValue, newValue) -> {
+            if (newValue.regionMatches(true, 0, "warning", 0, 7)) {
+                warningBanRadioButton.setSelected(true);
+            }
+
             Pattern pattern = Pattern.compile("(?i)(\\d+)\\s+day\\s+ban");
-            Matcher matcher = pattern.matcher(banReasonTextField.getText());
+            Matcher matcher = pattern.matcher(newValue);
             if (matcher.find()) {
                 String numDays = matcher.group(1);
                 log.debug("Detected number before 'day ban': " + numDays);
