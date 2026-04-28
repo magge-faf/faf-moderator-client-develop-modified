@@ -1115,12 +1115,7 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     public void handleCheckTemporaryBans() {
-        if (localPreferences.getTabSettings().isSyncTemporaryBansBeforeSearchCheckbox()) {
-            bansController.syncTempBannedUsersJson(() ->
-                    processBannedUsers(bansController.PATH_TEMP_BANNED_USERS_JSON, temporaryBanProgressLabel, "temporary ban"));
-        } else {
-            processBannedUsers(bansController.PATH_TEMP_BANNED_USERS_JSON, temporaryBanProgressLabel, "temporary ban");
-        }
+        processBannedUsers(bansController.PATH_TEMP_BANNED_USERS_JSON, temporaryBanProgressLabel, "temporary ban");
     }
 
     public void handleCheckPermanentBans() {

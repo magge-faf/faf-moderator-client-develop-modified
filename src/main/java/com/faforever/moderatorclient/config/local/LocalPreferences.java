@@ -87,9 +87,7 @@ public class LocalPreferences {
 
         // CheckBoxes
         boolean syncPermanentBansAtStartupCheckbox = false;
-        boolean syncPermanentBansBeforeSearchCheckbox = false;
         boolean syncTemporaryBansAtStartupCheckbox = false;
-        boolean syncTemporaryBansBeforeSearchCheckbox = false;
         boolean rememberLoginCheckBox = true;
         boolean darkModeCheckBox = true;
         boolean fetchBansOnStartupCheckBox = false;

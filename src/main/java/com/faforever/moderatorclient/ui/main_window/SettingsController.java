@@ -46,10 +46,6 @@ public class SettingsController implements Controller<Pane> {
     @FXML
     public ComboBox<String> browserComboBox;
     @FXML
-    public CheckBox syncTemporaryBansBeforeSearchCheckbox;
-    @FXML
-    public CheckBox syncPermanentBansBeforeSearchCheckbox;
-    @FXML
     public CheckBox syncPermanentBansAtStartupCheckbox;
     @FXML
     public CheckBox syncTemporaryBansAtStartupCheckbox;
@@ -88,9 +84,7 @@ public class SettingsController implements Controller<Pane> {
         });
 
         syncTemporaryBansAtStartupCheckbox.setSelected(localPreferences.getTabSettings().isSyncTemporaryBansAtStartupCheckbox());
-        syncTemporaryBansBeforeSearchCheckbox.setSelected(localPreferences.getTabSettings().isSyncTemporaryBansBeforeSearchCheckbox());
         syncPermanentBansAtStartupCheckbox.setSelected(localPreferences.getTabSettings().isSyncPermanentBansAtStartupCheckbox());
-        syncPermanentBansBeforeSearchCheckbox.setSelected(localPreferences.getTabSettings().isSyncPermanentBansBeforeSearchCheckbox());
         fetchBansOnStartupCheckBox.setSelected(localPreferences.getTabSettings().isFetchBansOnStartupCheckBox());
 
         if (browserComboBox.getValue() == null) {
@@ -351,10 +345,7 @@ public class SettingsController implements Controller<Pane> {
         localPreferences.getUi().setDarkMode(darkModeCheckBox.isSelected());
 
         localPreferences.getTabSettings().setSyncPermanentBansAtStartupCheckbox(syncPermanentBansAtStartupCheckbox.isSelected());
-        localPreferences.getTabSettings().setSyncPermanentBansBeforeSearchCheckbox(syncPermanentBansBeforeSearchCheckbox.isSelected());
-
         localPreferences.getTabSettings().setSyncTemporaryBansAtStartupCheckbox(syncTemporaryBansAtStartupCheckbox.isSelected());
-        localPreferences.getTabSettings().setSyncTemporaryBansBeforeSearchCheckbox(syncTemporaryBansBeforeSearchCheckbox.isSelected());
         localPreferences.getTabSettings().setFetchBansOnStartupCheckBox(fetchBansOnStartupCheckBox.isSelected());
 
         Tab selectedTab = defaultActiveTabComboBox.getSelectionModel().getSelectedItem();
