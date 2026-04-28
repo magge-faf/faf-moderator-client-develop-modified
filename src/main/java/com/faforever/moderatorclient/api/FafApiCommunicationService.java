@@ -56,6 +56,7 @@ public class FafApiCommunicationService {
     private final JsonApiErrorHandler jsonApiErrorHandler;
     private final CycleAvoidingMappingContext cycleAvoidingMappingContext;
     private final RestTemplateBuilder restTemplateBuilder;
+    private final ApiHistoryService apiHistoryService;
     private EnvironmentProperties environmentProperties;
     private final CountDownLatch authorizedLatch;
     @Getter
@@ -75,7 +76,8 @@ public class FafApiCommunicationService {
             RestTemplateBuilder restTemplateBuilder,
             JsonApiMessageConverter jsonApiMessageConverter,
             JsonApiErrorHandler jsonApiErrorHandler,
-            EnvironmentProperties environmentProperties) {
+            EnvironmentProperties environmentProperties,
+            ApiHistoryService apiHistoryService) {
         this.defaultResourceConverter = defaultResourceConverter;
         this.updateResourceConverter = updateResourceConverter;
         this.hmacHeaderInterceptor = hmacHeaderInterceptor;
@@ -86,6 +88,7 @@ public class FafApiCommunicationService {
         this.oAuthTokenInterceptor = oAuthTokenInterceptor;
         this.restTemplateBuilder = restTemplateBuilder;
         this.environmentProperties = environmentProperties;
+        this.apiHistoryService = apiHistoryService;
 
         authorizedLatch = new CountDownLatch(1);
     }
@@ -129,6 +132,22 @@ public class FafApiCommunicationService {
                                 }
                             }
                             return execution.execute(request, body);
+                        },
+                        (request, body, execution) -> {
+                            long start = System.currentTimeMillis();
+                            String method = request.getMethod().name();
+                            String uri = request.getURI();
+                            String path = uri.getPath() + (uri.getQuery() != null ? "?" + uri.getQuery() : "");
+                            try {
+                                var response = execution.execute(request, body);
+                                long duration = System.currentTimeMillis() - start;
+                                apiHistoryService.record(method, path, response.getStatusCode().value(), duration, response.getStatusCode().is2xxSuccessful());
+                                return response;
+                            } catch (Exception e) {
+                                long duration = System.currentTimeMillis() - start;
+                                apiHistoryService.record(method, path, 0, duration, false);
+                                throw e;
+                            }
                         }
                 )).build();
 

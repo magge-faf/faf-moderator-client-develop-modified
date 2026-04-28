@@ -26,4 +26,5 @@
     <Tab fx:id="smurfManagementControllerTab" closable="false" text="Smurf Management"/>
     <Tab fx:id="replayAnalysisControllerTab" closable="false" text="Replay Analysis"/>
     <Tab fx:id="excludedHardwareItemsTab" closable="false" text="Manage Excluded Items"/>
+    <Tab fx:id="apiHistoryTab" closable="false" text="API History"/>
 </TabPane>

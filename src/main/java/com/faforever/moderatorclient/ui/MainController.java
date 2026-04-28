@@ -65,6 +65,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     public Tab smurfManagementControllerTab;
     public Tab replayAnalysisControllerTab;
     public Tab excludedHardwareItemsTab;
+    public Tab apiHistoryTab;
 
     private SettingsController settingsController;
     private ModerationReportController moderationReportController;
@@ -85,6 +86,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     private SmurfManagementController smurfManagementController;
     private ReplayAnalysisController replayAnalysisController;
     private ExcludedHardwareItemsController excludedHardwareItemsController;
+    private ApiHistoryController apiHistoryController;
 
     private final Map<Tab, Boolean> dataLoadingState = new HashMap<>();
 
@@ -130,6 +132,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         initSmurfControllerTab();
         initReplayAnalysisControllerTab();
         initExcludedHardwareItemsTab();
+        initApiHistoryTab();
         selectActiveTab();
     }
 
@@ -150,6 +153,11 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     private void initExcludedHardwareItemsTab() {
         excludedHardwareItemsController = uiService.loadFxml("ui/main_window/excludedHardwareItems.fxml");
         excludedHardwareItemsTab.setContent(excludedHardwareItemsController.getRoot());
+    }
+
+    private void initApiHistoryTab() {
+        apiHistoryController = uiService.loadFxml("ui/main_window/apiHistoryTab.fxml");
+        apiHistoryTab.setContent(apiHistoryController.getRoot());
     }
 
     private void initReplayAnalysisControllerTab() {

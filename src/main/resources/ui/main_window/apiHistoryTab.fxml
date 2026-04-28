@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<VBox fx:id="root" spacing="5" style="-fx-padding: 10px;" xmlns="http://javafx.com/javafx/20.0.1"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.faforever.moderatorclient.ui.main_window.ApiHistoryController">
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <Button text="Clear" onAction="#onClear"/>
+        <Label text="Session API call history (newest first, max 1000 entries)." style="-fx-font-style: italic;"/>
+    </HBox>
+    <TableView fx:id="historyTable" VBox.vgrow="ALWAYS">
+        <columns>
+            <TableColumn fx:id="timeColumn"     text="Time"     prefWidth="80"/>
+            <TableColumn fx:id="methodColumn"   text="Method"   prefWidth="70"/>
+            <TableColumn fx:id="urlColumn"      text="URL"      prefWidth="650"/>
+            <TableColumn fx:id="statusColumn"   text="Status"   prefWidth="70"/>
+            <TableColumn fx:id="durationColumn" text="Duration" prefWidth="90"/>
+        </columns>
+    </TableView>
+</VBox>
