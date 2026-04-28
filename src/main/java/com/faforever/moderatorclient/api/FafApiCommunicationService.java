@@ -136,7 +136,7 @@ public class FafApiCommunicationService {
                         (request, body, execution) -> {
                             long start = System.currentTimeMillis();
                             String method = request.getMethod().name();
-                            String uri = request.getURI();
+                            java.net.URI uri = request.getURI();
                             String path = uri.getPath() + (uri.getQuery() != null ? "?" + uri.getQuery() : "");
                             try {
                                 var response = execution.execute(request, body);
@@ -321,15 +321,12 @@ public class FafApiCommunicationService {
 
     public <T extends ElideEntity> List<T> getFirstPageOnlyForFindUsersByAttribute(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder, int pageSize) {
         // If the total number of results is lower than the max page size, no additional requests are made.
-        checkRateLimit();
         routeBuilder.pageSize(pageSize).pageNumber(1);
         return getPage(clazz, routeBuilder, pageSize, 1, Collections.emptyMap());
     }
 
     @SneakyThrows
     public <T extends ElideEntity> List<T> getAll(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder) {
-        checkRateLimit();
-
         int page = 1;
         int pageSize = environmentProperties.getMaxPageSize();
         List<T> result = new LinkedList<>();
@@ -350,7 +347,6 @@ public class FafApiCommunicationService {
     }
 
     public <T extends ElideEntity> List<T> getAll(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder, java.util.Map<String, Serializable> params) {
-        checkRateLimit();
         return getMany(clazz, routeBuilder, environmentProperties.getMaxPageSize(), params);
     }
 
@@ -361,7 +357,6 @@ public class FafApiCommunicationService {
             int count,
             Map<String, Serializable> params) {
 
-        checkRateLimit();
         List<T> result = new LinkedList<>();
         int page = 1;
         int pageSize = environmentProperties.getMaxPageSize();
