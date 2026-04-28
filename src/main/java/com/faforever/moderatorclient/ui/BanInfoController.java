@@ -56,6 +56,7 @@ public class BanInfoController implements Controller<Pane> {
     public RadioButton permanentBanRadioButton;
     public RadioButton forNoOfDaysBanRadioButton;
     public RadioButton temporaryBanRadioButton;
+    public RadioButton warningBanRadioButton;
     public RadioButton chatOnlyBanRadioButton;
     public RadioButton vaultBanRadioButton;
     public RadioButton globalBanRadioButton;
@@ -175,8 +176,9 @@ public class BanInfoController implements Controller<Pane> {
             banInfo.setExpiresAt(OffsetDateTime.now(ZoneOffset.UTC).plusDays(Long.parseLong(banDaysTextField.getText())));
         else if (temporaryBanRadioButton.isSelected()) {
             banInfo.setExpiresAt(OffsetDateTime.of(LocalDateTime.parse(untilTextField.getText(), DateTimeFormatter.ISO_LOCAL_DATE_TIME), ZoneOffset.UTC));
-        }
-        else {
+        } else if (warningBanRadioButton.isSelected()) {
+            banInfo.setExpiresAt(OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(5));
+        } else {
             banInfo.setExpiresAt(null);
         }
 
@@ -224,7 +226,7 @@ public class BanInfoController implements Controller<Pane> {
             validationErrors.add("No ban reason is given.");
         }
 
-        if (!forNoOfDaysBanRadioButton.isSelected() && !temporaryBanRadioButton.isSelected() && !permanentBanRadioButton.isSelected()) {
+        if (!forNoOfDaysBanRadioButton.isSelected() && !temporaryBanRadioButton.isSelected() && !permanentBanRadioButton.isSelected() && !warningBanRadioButton.isSelected()) {
             validationErrors.add("No ban duration is selected.");
         }
 

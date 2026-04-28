@@ -105,6 +105,12 @@
                         </Label>
                     </children>
                 </HBox>
+                <RadioButton fx:id="warningBanRadioButton" mnemonicParsing="false"
+                             text="warning (5 min ban)" toggleGroup="$banDuration">
+                    <padding>
+                        <Insets bottom="3.0" top="3.0"/>
+                    </padding>
+                </RadioButton>
             </children>
         </VBox>
         <VBox GridPane.columnIndex="1" GridPane.rowIndex="4" GridPane.vgrow="ALWAYS">
