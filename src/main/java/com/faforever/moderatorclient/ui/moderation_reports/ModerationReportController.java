@@ -2044,8 +2044,8 @@ public class ModerationReportController implements Controller<Region> {
         BufferedReader bufReader = new BufferedReader(new StringReader(chatLog));
 
         String compileSentences = "Can you give me some mass, |Can you give me some energy, |" +
-                "Can you give me one Engineer, | to notify: | to allies: Sent Mass | to allies: Sent Energy |" +
-                " to allies: sent |give me Mass";
+                "Can you give me one Engineer, |→ notify: |→ allies: Sent Mass |→ allies: Sent Energy |" +
+                "→ allies: sent |give me Mass";
 
         Pattern pattern = Pattern.compile(compileSentences);
         String chatLine;
