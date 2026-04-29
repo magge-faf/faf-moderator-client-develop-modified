@@ -10,6 +10,7 @@ import com.faforever.moderatorclient.ui.ViewHelper;
 import com.faforever.moderatorclient.ui.domain.GroupPermissionFX;
 import com.faforever.moderatorclient.ui.domain.PlayerFX;
 import com.faforever.moderatorclient.ui.domain.UserGroupFX;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
@@ -46,7 +47,7 @@ public class UserGroupsController implements Controller<HBox> {
         ViewHelper.buildUserPermissionsTableView(groupPermissionsTableView, groupPermissions);
         ViewHelper.buildUserGroupsTableView(groupChildrenTableView, childUserGroups);
         ViewHelper.buildSimpleUserTableView(membersTableView, members);
-        permissionService.getAllUserGroups().thenAccept(userGroups -> this.userGroups.addAll(userGroups));
+        permissionService.getAllUserGroups().thenAccept(userGroups -> Platform.runLater(() -> this.userGroups.addAll(userGroups)));
         groupsTableView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
             groupPermissions.clear();
             childUserGroups.clear();
@@ -66,7 +67,7 @@ public class UserGroupsController implements Controller<HBox> {
     }
 
     public void onRefreshGroups() {
-        permissionService.getAllUserGroups().thenAccept(userGroups -> this.userGroups.setAll(userGroups));
+        permissionService.getAllUserGroups().thenAccept(userGroups -> Platform.runLater(() -> this.userGroups.setAll(userGroups)));
     }
 
     public void openGroupDialog() {

@@ -327,7 +327,9 @@ public class ModerationReportController implements Controller<Region> {
 
                 ComboBox<TemplateAndReasonConfig> templateComboBox = new ComboBox<>();
                 templateComboBox.getItems().addAll(templates);
-                templateComboBox.setValue(templates.getFirst());
+                if (!templates.isEmpty()) {
+                    templateComboBox.setValue(templates.getFirst());
+                }
                 templateComboBox.setCellFactory(param -> new ListCell<TemplateAndReasonConfig>() {
                     @Override
                     protected void updateItem(TemplateAndReasonConfig item, boolean empty) {
