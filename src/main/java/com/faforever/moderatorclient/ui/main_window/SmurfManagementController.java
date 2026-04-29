@@ -4,8 +4,6 @@ import com.faforever.moderatorclient.ui.Controller;
 import com.faforever.moderatorclient.ui.UserDataController;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import javafx.animation.KeyFrame;
-import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -22,8 +20,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.awt.Desktop;
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
+import java.util.concurrent.CompletableFuture;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -34,10 +35,10 @@ import java.util.function.Function;
 @Slf4j
 public class SmurfManagementController implements Controller<VBox> {
 
-    public static Path SMURF_MANAGEMENT_USERS_JSON_PATH = Paths.get("data", "smurf_management.json");
-    private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static double WINDOW_WIDTH_RATIO = 0.8;
-    private static double WINDOW_HEIGHT_RATIO = 0.8;
+    public static final Path SMURF_MANAGEMENT_USERS_JSON_PATH = Paths.get("data", "smurf_management.json");
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final double WINDOW_WIDTH_RATIO = 0.8;
+    private static final double WINDOW_HEIGHT_RATIO = 0.8;
 
     @Autowired
     public UserManagementController userManagementController;
@@ -78,13 +79,6 @@ public class SmurfManagementController implements Controller<VBox> {
         // Set up the context menu and double-click action
         setupContextMenu(smurfManagementTableView);
         setupDoubleClickAction(smurfManagementTableView);
-
-        // refresh timeline for live updates
-        Timeline refreshTimeline = new Timeline(
-                new KeyFrame(javafx.util.Duration.seconds(1), e -> smurfManagementTableView.refresh())
-        );
-        refreshTimeline.setCycleCount(Timeline.INDEFINITE);
-        refreshTimeline.play();
 
         root.getChildren().add(smurfManagementTableView);
     }
@@ -260,22 +254,26 @@ public class SmurfManagementController implements Controller<VBox> {
     }
 
     public void loadSmurfManagementUsers() {
-        try {
-            List<UserDataController> users = OBJECT_MAPPER.readValue(SMURF_MANAGEMENT_USERS_JSON_PATH.toFile(),
-                    new TypeReference<>() {
-                    });
-            Platform.runLater(() -> smurfManagementUsersList.setAll(users));
-        } catch (IOException e) {
-            log.error("Failed to read: {}", SMURF_MANAGEMENT_USERS_JSON_PATH, e);
-        }
+        CompletableFuture.runAsync(() -> {
+            try {
+                List<UserDataController> users = OBJECT_MAPPER.readValue(SMURF_MANAGEMENT_USERS_JSON_PATH.toFile(),
+                        new TypeReference<>() {});
+                Platform.runLater(() -> smurfManagementUsersList.setAll(users));
+            } catch (IOException e) {
+                log.error("Failed to read: {}", SMURF_MANAGEMENT_USERS_JSON_PATH, e);
+            }
+        });
     }
 
     private void saveUserToSmurfManagement() {
-        try {
-            OBJECT_MAPPER.writeValue(SMURF_MANAGEMENT_USERS_JSON_PATH.toFile(), smurfManagementUsersList);
-        } catch (IOException e) {
-            log.error("Failed to write blockedUsers.json", e);
-        }
+        List<UserDataController> snapshot = List.copyOf(smurfManagementUsersList);
+        CompletableFuture.runAsync(() -> {
+            try {
+                OBJECT_MAPPER.writeValue(SMURF_MANAGEMENT_USERS_JSON_PATH.toFile(), snapshot);
+            } catch (IOException e) {
+                log.error("Failed to write {}", SMURF_MANAGEMENT_USERS_JSON_PATH, e);
+            }
+        });
     }
 
     // ------------------ Hardware Info ------------------
@@ -413,9 +411,14 @@ public class SmurfManagementController implements Controller<VBox> {
     }
 
     private int compareAddedOnDesc(Map<String, Object> a, Map<String, Object> b) {
+        String strA = Objects.toString(a.get("addedOn"), "");
+        String strB = Objects.toString(b.get("addedOn"), "");
+        if (strA.isBlank() && strB.isBlank()) return 0;
+        if (strA.isBlank()) return 1;
+        if (strB.isBlank()) return -1;
         try {
-            Instant instantA = Instant.parse(Objects.toString(a.get("addedOn"), Instant.EPOCH.toString()));
-            Instant instantB = Instant.parse(Objects.toString(b.get("addedOn"), Instant.EPOCH.toString()));
+            Instant instantA = HUMAN_READABLE_FORMATTER.parse(strA, Instant::from);
+            Instant instantB = HUMAN_READABLE_FORMATTER.parse(strB, Instant::from);
             return instantB.compareTo(instantA);
         } catch (DateTimeParseException e) {
             return 0;
@@ -465,15 +468,6 @@ public class SmurfManagementController implements Controller<VBox> {
     }
 
     public void openFile(String fileName) throws IOException {
-        Path notepadPlusPlus = Paths.get("C:\\Program Files\\Notepad++\\notepad++.exe");
-        Path notepad = Paths.get("C:\\Windows\\System32\\notepad.exe");
-
-        if (Files.exists(notepadPlusPlus)) {
-            ProcessBuilder pb = new ProcessBuilder(notepadPlusPlus.toString(), fileName);
-            pb.start();
-        } else {
-            ProcessBuilder pb = new ProcessBuilder(notepad.toString(), fileName);
-            pb.start();
-        }
+        Desktop.getDesktop().open(new File(fileName));
     }
 }
