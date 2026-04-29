@@ -1,122 +1,93 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<?import javafx.scene.layout.*?>
 <?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
 
-<VBox fx:id="root" spacing="10" style="-fx-padding: 15; -fx-background-color: #2f3439;"
+<VBox fx:id="root" spacing="10" style="-fx-padding: 15;"
       xmlns="http://javafx.com/javafx/20.0.1"
       xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.faforever.moderatorclient.ui.main_window.ExcludedHardwareItemsController">
 
-    <HBox spacing="10" alignment="CENTER_LEFT">
-        <Button fx:id="openExcludedItemsFolder" text="Open JSON Folder" onAction="#handleOpenExcludedItemsFolder"/>
-        <Button fx:id="openJsonFile" text="Open JSON File" onAction="#handleOpenJsonFile"/>
-        <Button fx:id="createJsonBackup" text="Backup JSON File" onAction="#handleOnCreateJsonBackup"/>
+    <HBox spacing="10">
+        <Button text="Open JSON File"   onAction="#handleOpenJsonFile"/>
+        <Button text="Open Folder"      onAction="#handleOpenExcludedItemsFolder"/>
+        <Button text="Backup JSON"      onAction="#handleOnCreateJsonBackup"/>
     </HBox>
 
     <Separator/>
 
-    <ScrollPane fitToWidth="true" fitToHeight="true" hbarPolicy="NEVER"
-                style="-fx-background: transparent; -fx-background-color: transparent;">
-        <content>
-            <VBox spacing="20" maxWidth="700" style="-fx-padding: 10;">
+    <SplitPane orientation="VERTICAL" VBox.vgrow="ALWAYS" dividerPositions="0.45">
 
-                <!-- Annotation Section -->
-                <TitledPane text="Annotation" style="-fx-font-weight: bold;">
-                    <content>
-                        <GridPane hgap="10" vgap="10" style="-fx-padding: 10;">
-                            <Label text="Comment:" GridPane.rowIndex="0" GridPane.columnIndex="0" minWidth="140"/>
-                            <HBox spacing="8" alignment="CENTER_LEFT" GridPane.rowIndex="0" GridPane.columnIndex="1">
-                                <TextField fx:id="commentField" promptText="Enter Comment" HBox.hgrow="ALWAYS"
-                                           style="-fx-control-inner-background: #5b646a; -fx-text-fill: white;"/>
-                                <CheckBox fx:id="keepCommentFieldCheckBox" text="Keep Comment" textFill="white"/>
-                            </HBox>
+        <!-- Input form -->
+        <ScrollPane fitToWidth="true" hbarPolicy="NEVER">
+            <VBox spacing="12" style="-fx-padding: 5 5 5 0;">
 
-                            <Label text="Reason:" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
-                            <HBox spacing="8" alignment="CENTER_LEFT" GridPane.rowIndex="1" GridPane.columnIndex="1">
-                                <TextField fx:id="reasonField" promptText="Enter Reason" HBox.hgrow="ALWAYS"
-                                           style="-fx-control-inner-background: #5b646a; -fx-text-fill: white;"/>
-                                <CheckBox fx:id="keepReasonFieldCheckBox" text="Keep Reason" textFill="white"/>
-                            </HBox>
+                <TitledPane text="Annotation" expanded="true">
+                    <GridPane hgap="10" vgap="8" style="-fx-padding: 10;">
+                        <columnConstraints>
+                            <ColumnConstraints minWidth="170" maxWidth="170"/>
+                            <ColumnConstraints hgrow="ALWAYS"/>
+                        </columnConstraints>
+                        <Label text="Comment:" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+                        <HBox spacing="8" alignment="CENTER_LEFT" GridPane.rowIndex="0" GridPane.columnIndex="1">
+                            <TextField fx:id="commentField" promptText="Enter Comment" HBox.hgrow="ALWAYS"/>
+                            <CheckBox fx:id="keepCommentFieldCheckBox" text="Keep"/>
+                        </HBox>
+                        <Label text="Reason:" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+                        <HBox spacing="8" alignment="CENTER_LEFT" GridPane.rowIndex="1" GridPane.columnIndex="1">
+                            <TextField fx:id="reasonField" promptText="Enter Reason" HBox.hgrow="ALWAYS"/>
+                            <CheckBox fx:id="keepReasonFieldCheckBox" text="Keep"/>
+                        </HBox>
+                    </GridPane>
+                </TitledPane>
+
+                <TitledPane text="Hardware Information" expanded="true">
+                    <VBox spacing="10" style="-fx-padding: 10;">
+                        <GridPane hgap="10" vgap="8">
+                            <columnConstraints>
+                                <ColumnConstraints minWidth="190" maxWidth="190"/>
+                                <ColumnConstraints hgrow="ALWAYS"/>
+                            </columnConstraints>
+                            <Label text="IP Address:"            GridPane.rowIndex="0" GridPane.columnIndex="0"/>
+                            <TextField fx:id="ipAddressField"    GridPane.rowIndex="0" GridPane.columnIndex="1" promptText="Enter IP Address"/>
+                            <Label text="UUID:"                  GridPane.rowIndex="1" GridPane.columnIndex="0"/>
+                            <TextField fx:id="uuidField"         GridPane.rowIndex="1" GridPane.columnIndex="1" promptText="Enter UUID"/>
+                            <Label text="Device ID:"             GridPane.rowIndex="2" GridPane.columnIndex="0"/>
+                            <TextField fx:id="deviceIdField"     GridPane.rowIndex="2" GridPane.columnIndex="1" promptText="Enter Device ID"/>
+                            <Label text="Manufacturer:"          GridPane.rowIndex="3" GridPane.columnIndex="0"/>
+                            <TextField fx:id="manufacturerField" GridPane.rowIndex="3" GridPane.columnIndex="1" promptText="Enter Manufacturer"/>
+                            <Label text="CPU Name:"              GridPane.rowIndex="4" GridPane.columnIndex="0"/>
+                            <TextField fx:id="cpuNameField"      GridPane.rowIndex="4" GridPane.columnIndex="1" promptText="Enter CPU Name"/>
+                            <Label text="Processor ID:"          GridPane.rowIndex="5" GridPane.columnIndex="0"/>
+                            <TextField fx:id="processorIdField"  GridPane.rowIndex="5" GridPane.columnIndex="1" promptText="Enter Processor ID"/>
+                            <Label text="Serial Number:"         GridPane.rowIndex="6" GridPane.columnIndex="0"/>
+                            <TextField fx:id="serialNumberField" GridPane.rowIndex="6" GridPane.columnIndex="1" promptText="Enter Serial Number"/>
+                            <Label text="Volume Serial Number:"  GridPane.rowIndex="7" GridPane.columnIndex="0"/>
+                            <TextField fx:id="volumeSerialNumberField" GridPane.rowIndex="7" GridPane.columnIndex="1" promptText="Enter Volume Serial Number"/>
+                            <Label text="Hash:"                  GridPane.rowIndex="8" GridPane.columnIndex="0"/>
+                            <TextField fx:id="hashField"         GridPane.rowIndex="8" GridPane.columnIndex="1" promptText="Enter Hash"/>
+                            <Label text="Memory Serial Number:"  GridPane.rowIndex="9" GridPane.columnIndex="0"/>
+                            <TextField fx:id="memorySerialNumberField" GridPane.rowIndex="9" GridPane.columnIndex="1" promptText="Enter Memory Serial Number"/>
                         </GridPane>
-                    </content>
+                        <Button fx:id="addItemButton" text="Add Excluded Item" onAction="#handleAddItem"/>
+                    </VBox>
                 </TitledPane>
 
-                <!-- Hardware Information Section -->
-                <TitledPane text="Hardware Information" style="-fx-font-weight: bold;">
-                    <content>
-                        <VBox spacing="10" style="-fx-padding: 10;">
-                            <GridPane hgap="10" vgap="10">
-                                <Label text="IP Address:" GridPane.rowIndex="0" GridPane.columnIndex="0"
-                                       minWidth="140"/>
-                                <TextField fx:id="ipAddressField" promptText="Enter IP Address"
-                                           GridPane.rowIndex="0" GridPane.columnIndex="1"
-                                           style="-fx-control-inner-background: #5b646a; -fx-text-fill: white;"/>
-
-                                <Label text="UUID:" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
-                                <TextField fx:id="uuidField" promptText="Enter UUID"
-                                           GridPane.rowIndex="1" GridPane.columnIndex="1"
-                                           style="-fx-control-inner-background: #5b646a; -fx-text-fill: white;"/>
-
-                                <Label text="Device ID:" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
-                                <TextField fx:id="deviceIdField" promptText="Enter Device ID"
-                                           GridPane.rowIndex="2" GridPane.columnIndex="1"
-                                           style="-fx-control-inner-background: #5b646a; -fx-text-fill: white;"/>
-
-                                <Label text="Manufacturer:" GridPane.rowIndex="3" GridPane.columnIndex="0"/>
-                                <TextField fx:id="manufacturerField" promptText="Enter Manufacturer"
-                                           GridPane.rowIndex="3" GridPane.columnIndex="1"
-                                           style="-fx-control-inner-background: #5b646a; -fx-text-fill: white;"/>
-
-                                <Label text="CPU Name:" GridPane.rowIndex="4" GridPane.columnIndex="0"/>
-                                <TextField fx:id="cpuNameField" promptText="Enter CPU Name"
-                                           GridPane.rowIndex="4" GridPane.columnIndex="1"
-                                           style="-fx-control-inner-background: #5b646a; -fx-text-fill: white;"/>
-
-                                <Label text="Processor ID:" GridPane.rowIndex="5" GridPane.columnIndex="0"/>
-                                <TextField fx:id="processorIdField" promptText="Enter Processor ID"
-                                           GridPane.rowIndex="5" GridPane.columnIndex="1"
-                                           style="-fx-control-inner-background: #5b646a; -fx-text-fill: white;"/>
-
-                                <Label text="Serial Number:" GridPane.rowIndex="6" GridPane.columnIndex="0"/>
-                                <TextField fx:id="serialNumberField" promptText="Enter Serial Number"
-                                           GridPane.rowIndex="6" GridPane.columnIndex="1"
-                                           style="-fx-control-inner-background: #5b646a; -fx-text-fill: white;"/>
-
-                                <Label text="Volume Serial Number:" GridPane.rowIndex="7" GridPane.columnIndex="0"/>
-                                <TextField fx:id="volumeSerialNumberField" promptText="Enter Volume Serial Number"
-                                           GridPane.rowIndex="7" GridPane.columnIndex="1"
-                                           style="-fx-control-inner-background: #5b646a; -fx-text-fill: white;"/>
-
-                                <Label text="Hash:" GridPane.rowIndex="8" GridPane.columnIndex="0"/>
-                                <TextField fx:id="hashField" promptText="Enter Hash"
-                                           GridPane.rowIndex="8" GridPane.columnIndex="1"
-                                           style="-fx-control-inner-background: #5b646a; -fx-text-fill: white;"/>
-
-                                <Label text="Memory Serial Number:" GridPane.rowIndex="9" GridPane.columnIndex="0"/>
-                                <TextField fx:id="memorySerialNumberField" promptText="Enter Memory Serial Number"
-                                           GridPane.rowIndex="9" GridPane.columnIndex="1"
-                                           style="-fx-control-inner-background: #5b646a; -fx-text-fill: white;"/>
-                            </GridPane>
-                            <Button fx:id="addItemButton"
-                                    text="Add Excluded Item"
-                                    onAction="#handleAddItem"
-                                    maxWidth="160"
-                                    style="-fx-background-color: #5f676d; -fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 6;"/>
-                        </VBox>
-                    </content>
-                </TitledPane>
             </VBox>
-        </content>
-    </ScrollPane>
-    <VBox spacing="5">
-        <!-- Item Statistics Section -->
-        <VBox spacing="5">
-            <Label fx:id="statsExcludedItemsLabel"
-                   wrapText="true"
-                   text="No data available."
-                   maxWidth="650"
-                   style="-fx-text-fill: white; -fx-background-color: #3a3f45; -fx-padding: 6; -fx-background-radius: 4;"/>
+        </ScrollPane>
+
+        <!-- Existing excluded items -->
+        <VBox spacing="5" style="-fx-padding: 5 0 0 0;">
+            <HBox spacing="10" alignment="CENTER_LEFT">
+                <Label text="Excluded Items" style="-fx-font-weight: bold;"/>
+                <Label fx:id="statsExcludedItemsLabel" style="-fx-text-fill: gray;"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <TextField fx:id="tableSearchField" promptText="Search…" prefWidth="200"/>
+                <Button fx:id="removeItemButton" text="Remove Selected" onAction="#handleRemoveItem" disable="true"/>
+            </HBox>
+            <TableView fx:id="excludedItemsTable" VBox.vgrow="ALWAYS"/>
         </VBox>
-    </VBox>
+
+    </SplitPane>
+
 </VBox>
