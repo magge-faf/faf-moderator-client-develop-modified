@@ -321,6 +321,7 @@ public class BansController implements Controller<HBox> {
             progressIndicator.setManaged(false);
             progressLabel.setVisible(false);
             progressLabel.setVisible(false);
+            if (onComplete != null) onComplete.run();
         });
 
         progressIndicator.progressProperty().bind(syncTask.progressProperty());
