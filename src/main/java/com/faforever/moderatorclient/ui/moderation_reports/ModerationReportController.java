@@ -22,6 +22,7 @@ import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.collections.*;
 import javafx.scene.input.Clipboard;
+import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
 import javafx.util.Duration;
@@ -1649,10 +1650,10 @@ public class ModerationReportController implements Controller<Region> {
         return fullNameWithId.trim();
     }
 
+    private static final Font MONO = Font.font("Courier New", 12);
+
     private void addColoredTextForPointOfInterest(String line, TextFlow textFlow) {
-        Text text = new Text(line);
-        text.setFill(Color.ORANGE);
-        textFlow.getChildren().add(text);
+        textFlow.getChildren().add(styledText(line, Color.ORANGE));
     }
 
     List<String> keywordsPointOfInterestReplay = List.of(
@@ -1673,59 +1674,73 @@ public class ModerationReportController implements Controller<Region> {
         }
 
         textFlow.getChildren().clear();
-
         String[] lines = filteredLog.split("\n");
 
+        // First pass: compute column widths from chat lines
+        int maxLineNumLen  = 2;
+        int maxSenderLen   = 1;
+        int maxReceiverLen = 1;
+        for (String line : lines) {
+            Matcher m = CHAT_LINE_PATTERN.matcher(line);
+            if (m.matches()) {
+                maxLineNumLen  = Math.max(maxLineNumLen,  m.group(1).length());
+                maxSenderLen   = Math.max(maxSenderLen,   m.group(3).length());
+                maxReceiverLen = Math.max(maxReceiverLen, m.group(4).length());
+            }
+        }
+        final int lineNumW   = maxLineNumLen;
+        final int senderW    = maxSenderLen;
+        final int receiverW  = maxReceiverLen;
+
+        // Second pass: render
         for (String line : lines) {
             if (line == null || line.trim().isEmpty()) {
                 textFlow.getChildren().add(newline());
                 continue;
             }
-
             if (line.contains("boundsType=LOGICAL")) {
                 continue;
             }
 
+            boolean isPoi = false;
             for (String keyword : keywordsPointOfInterestReplay) {
                 if (line.contains(keyword)) {
                     addColoredTextForPointOfInterest(line, textFlow);
                     textFlow.getChildren().add(newline());
+                    isPoi = true;
                     break;
                 }
             }
-
-            // Check POI again so we can skip to next line after adding it
-            boolean isPoi = keywordsPointOfInterestReplay.stream().anyMatch(line::contains);
             if (isPoi) continue;
 
             Matcher m = CHAT_LINE_PATTERN.matcher(line);
             if (m.matches()) {
-                String lineNum  = m.group(1);
-                String timestamp = m.group(2);
-                String sender   = m.group(3);
-                String receiver = m.group(4);
-                String message  = m.group(5);
+                String rawSender   = m.group(3);
+                String rawReceiver = m.group(4);
 
-                Text lineNumText = styledText(lineNum + " ", Color.DIMGRAY);
-                Text timestampText = styledText(timestamp + " ", Color.GRAY);
+                String lineNumPad  = String.format("%-" + lineNumW  + "s", m.group(1));
+                String senderPad   = String.format("%-" + senderW   + "s", rawSender);
+                String receiverPad = String.format("%-" + receiverW + "s", rawReceiver);
 
                 Color senderColor;
-                if (!offenderName.isEmpty() && sender.equals(offenderName)) {
+                if (!offenderName.isEmpty() && rawSender.equals(offenderName)) {
                     senderColor = Color.LIGHTCORAL;
-                } else if (!reporterName.isEmpty() && sender.equals(reporterName)) {
+                } else if (!reporterName.isEmpty() && rawSender.equals(reporterName)) {
                     senderColor = Color.LIGHTBLUE;
                 } else {
                     senderColor = Color.LIGHTYELLOW;
                 }
-                Text senderText = styledText(sender, senderColor);
-                Text arrowText  = styledText(" → " + receiver + ": ", Color.DIMGRAY);
-                Text msgText    = styledText(message, Color.WHITE);
 
-                textFlow.getChildren().addAll(lineNumText, timestampText, senderText, arrowText, msgText, newline());
+                textFlow.getChildren().addAll(
+                        styledText(lineNumPad + " ", Color.DIMGRAY),
+                        styledText(m.group(2) + "  ", Color.GRAY),
+                        styledText(senderPad + "  ", senderColor),
+                        styledText(receiverPad + "  ", Color.DIMGRAY),
+                        styledText(m.group(5), Color.WHITE),
+                        newline()
+                );
             } else {
-                // Header / metadata / other non-chat lines
-                Text text = styledText(line, Color.WHITE);
-                textFlow.getChildren().addAll(text, newline());
+                textFlow.getChildren().addAll(styledText(line, Color.WHITE), newline());
             }
         }
     }
@@ -1733,12 +1748,13 @@ public class ModerationReportController implements Controller<Region> {
     private static Text styledText(String content, Color color) {
         Text t = new Text(content);
         t.setFill(color);
+        t.setFont(MONO);
         return t;
     }
 
     private static Text newline() {
         Text t = new Text("\n");
-        t.setFill(Color.WHITE);
+        t.setFont(MONO);
         return t;
     }
 
