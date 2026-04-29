@@ -423,14 +423,12 @@ public class SmurfManagementController implements Controller<VBox> {
         addHardwareEntries(entries, "Memory Serial",  hw.getMemorySerialNumberEntries(), UserDataController.MemorySerialNumberEntry::getMemorySerialNumber, UserDataController.MemorySerialNumberEntry::getAddedOn);
         addHardwareEntries(entries, "Volume Serial",  hw.getVolumeSerialNumberEntries(), UserDataController.VolumeSerialNumberEntry::getVolumeSerialNumber, UserDataController.VolumeSerialNumberEntry::getAddedOn);
 
-        entries.sort(Comparator.comparing(
-                m -> Objects.toString(m.get("addedOn"), ""),
-                Comparator.comparingLong(s -> {
-                    if (s == null || s.isBlank()) return Long.MIN_VALUE;
-                    try { return HUMAN_READABLE_FORMATTER.parse(s, Instant::from).toEpochMilli(); }
-                    catch (Exception e) { return Long.MIN_VALUE; }
-                }).reversed()
-        ));
+        Comparator<String> byDateDesc = Comparator.comparingLong((String s) -> {
+            if (s == null || s.isBlank()) return Long.MIN_VALUE;
+            try { return HUMAN_READABLE_FORMATTER.parse(s, Instant::from).toEpochMilli(); }
+            catch (Exception e) { return Long.MIN_VALUE; }
+        }).reversed();
+        entries.sort(Comparator.comparing(m -> Objects.toString(m.get("addedOn"), ""), byDateDesc));
         return entries;
     }
 
