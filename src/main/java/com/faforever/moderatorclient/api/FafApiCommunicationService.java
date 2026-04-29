@@ -277,7 +277,6 @@ public class FafApiCommunicationService {
     }
 
     public <T extends ElideEntity> void delete(T entity) {
-        checkRateLimit();
         delete(ElideNavigator.of(entity));
     }
 
@@ -297,13 +296,11 @@ public class FafApiCommunicationService {
 
     @SneakyThrows
     public <T extends ElideEntity> T getOne(ElideNavigatorOnId<T> navigator) {
-        checkRateLimit();
         return getOne(navigator.build(), navigator.getDtoClass(), Collections.emptyMap());
     }
 
     @SneakyThrows
     public <T extends ElideEntity> T getOne(String endpointPath, Class<T> type) {
-        checkRateLimit();
         return getOne(endpointPath, type, Collections.emptyMap());
     }
 
@@ -377,7 +374,6 @@ public class FafApiCommunicationService {
     }
 
     public <T extends ElideEntity> List<T> getPage(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder, int pageSize, int page, java.util.Map<String, Serializable> params) {
-        checkRateLimit();
         java.util.Map<String, List<String>> multiValues = params.entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> Collections.singletonList(String.valueOf(entry.getValue()))));
 

@@ -79,7 +79,6 @@ public class UserService {
     }
 
     public List<PlayerFX> findUsersByAttribute(@NotNull String attribute, @NotNull String pattern) {
-        fafApi.checkRateLimit();
         log.debug("Searching for player by attribute '{}' with pattern: {}", attribute, pattern);
         ElideNavigatorOnCollection<Player> navigator = ElideNavigator.of(Player.class)
                 .collection()
@@ -97,7 +96,6 @@ public class UserService {
     }
 
     public List<TeamkillFX> findLatestTeamkills() {
-        fafApi.checkRateLimit();
         ElideNavigatorOnCollection<Teamkill> navigator = ElideNavigator.of(Teamkill.class)
                 .collection()
                 .addInclude("teamkiller")
@@ -111,7 +109,6 @@ public class UserService {
     }
 
     public List<TeamkillFX> findTeamkillsByUserId(@NotNull String userId) {
-        fafApi.checkRateLimit();
         log.debug("Searching for teamkills invoked by player id: {}", userId);
         ElideNavigatorOnCollection<Teamkill> navigator = ElideNavigator.of(Teamkill.class)
                 .collection()
@@ -124,7 +121,6 @@ public class UserService {
     }
 
     public List<GamePlayerStats> getLastThousandPlayedGamesByFeaturedMod(@NotNull String userId, int page, FeaturedModFX featuredModFX) {
-        fafApi.checkRateLimit();
         log.debug("Searching for games played by player id: {}", userId);
         ElideNavigatorOnCollection<GamePlayerStats> navigator = ElideNavigator.of(GamePlayerStats.class)
                 .collection()
@@ -150,14 +146,12 @@ public class UserService {
     }
 
     public List<FeaturedModFX> getFeaturedMods() {
-        fafApi.checkRateLimit();
         ElideNavigatorOnCollection<FeaturedMod> navigator = ElideNavigator.of(FeaturedMod.class)
                 .collection();
         return featuredModMapper.map(fafApi.getAll(FeaturedMod.class, navigator));
     }
 
     public UserNoteFX getUserNoteById(@NotNull String userNoteId) {
-        fafApi.checkRateLimit();
         log.debug("Search for player note id: {}", userNoteId);
         ElideNavigatorOnId<UserNote> navigator = ElideNavigator.of(UserNote.class)
                 .id(userNoteId)
@@ -167,7 +161,6 @@ public class UserService {
     }
 
     public List<UserNoteFX> getUserNotes(@NotNull String userId) {
-        fafApi.checkRateLimit();
         log.debug("Search for all note of player id: {}", userId);
         ElideNavigatorOnCollection<UserNote> navigator = ElideNavigator.of(UserNote.class)
                 .collection()
@@ -178,32 +171,27 @@ public class UserService {
     }
 
     public String createUserNote(UserNote userNote) {
-        fafApi.checkRateLimit();
         log.debug("Creating userNote: {}", userNote);
         return fafApi.post(ElideNavigator.of(UserNote.class).collection(), userNote).getId();
     }
 
     public void deleteUserNote(@NotNull String userNoteId) {
-        fafApi.checkRateLimit();
         log.debug("Deleting user note with id: {}", userNoteId);
         ElideNavigatorOnId<UserNote> navigator = ElideNavigator.of(UserNote.class).id(userNoteId);
         fafApi.delete(navigator);
     }
 
     public UserNoteFX patchUserNote(UserNote userNote) {
-        fafApi.checkRateLimit();
         log.debug("Patching UserNote of id: {}", userNote.getId());
         return userNoteMapper.map(fafApi.patch(ElideNavigator.of(UserNote.class).id(userNote.getId()), userNote));
     }
 
     public void updatePlayer(String id, String newName) {
-        fafApi.checkRateLimit();
         log.debug("Update of player of player id: " + id);
         fafApi.forceRenameUserName(id, newName);
     }
 
     public List<UserNoteFX> getAllUserNotesForRecentNotesTab() {
-        fafApi.checkRateLimit();
         log.debug("Searching for all user notes");
         ElideNavigatorOnCollection<UserNote> navigator = ElideNavigator.of(UserNote.class)
                 .collection()

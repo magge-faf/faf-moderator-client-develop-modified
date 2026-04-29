@@ -55,7 +55,6 @@ public class AvatarService {
         List<Avatar> currentPage;
 
         do {
-            FafApiCommunicationService.checkRateLimit();
             currentPage = fafApi.getPage(Avatar.class, navigator, pageSize, page++, Collections.emptyMap());
             allAvatars.addAll(currentPage);
         } while (currentPage.size() == pageSize); // stop when the last page has fewer items

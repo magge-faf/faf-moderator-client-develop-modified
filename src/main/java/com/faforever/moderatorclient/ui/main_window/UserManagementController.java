@@ -69,7 +69,6 @@ import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.ButtonType;
 import org.springframework.web.client.HttpClientErrorException;
 
-import static com.faforever.moderatorclient.api.FafApiCommunicationService.checkRateLimit;
 import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
 
 @Slf4j

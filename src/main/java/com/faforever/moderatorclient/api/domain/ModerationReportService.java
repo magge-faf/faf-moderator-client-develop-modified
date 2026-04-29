@@ -74,7 +74,6 @@ public class ModerationReportService {
 	}
 
 	public CompletableFuture<List<ModerationReportFX>> getPageOfReports(int page, int pageSize) {
-		fafApi.checkRateLimit();
 		return CompletableFuture.supplyAsync(() -> {
 			List<ModerationReport> reports = fafApi.getPage(
 					ModerationReport.class,
