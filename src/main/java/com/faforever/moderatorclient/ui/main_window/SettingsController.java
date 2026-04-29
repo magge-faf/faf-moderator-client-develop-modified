@@ -280,23 +280,14 @@ public class SettingsController implements Controller<Pane> {
     }
 
     public void openFile(String fileName) throws IOException {
-        Path notepadPlusPlus = Paths.get("C:\\Program Files\\Notepad++\\notepad++.exe");
-        Path notepad = Paths.get("C:\\Windows\\System32\\notepad.exe");
-
-        if (Files.exists(notepadPlusPlus)) {
-            ProcessBuilder pb = new ProcessBuilder(notepadPlusPlus.toString(), fileName);
-            pb.start();
-        } else {
-            ProcessBuilder pb = new ProcessBuilder(notepad.toString(), fileName);
-            pb.start();
-        }
+        openPath(new File(fileName));
     }
 
     public void onOpenConfigurationFolder() {
         File folder = new File(CONFIGURATION_FOLDER);
         if (folder.exists() && folder.isDirectory()) {
             try {
-                new ProcessBuilder("explorer", folder.getAbsolutePath()).start();
+                openPath(folder);
             } catch (IOException e) {
                 log.error("Failed to open configuration folder: {}", e.toString());
             }
@@ -325,12 +316,23 @@ public class SettingsController implements Controller<Pane> {
 
         if (directory.exists() && directory.isDirectory()) {
             try {
-                new ProcessBuilder("explorer", directory.getAbsolutePath()).start();
+                openPath(directory);
             } catch (IOException e) {
                 log.error("Failed to open directory: {}", e.toString());
             }
         } else {
             log.info("Directory does not exist: {}", path);
+        }
+    }
+
+    private static void openPath(File path) throws IOException {
+        String os = System.getProperty("os.name").toLowerCase();
+        if (os.contains("win")) {
+            new ProcessBuilder("cmd", "/c", "start", "", path.getAbsolutePath()).start();
+        } else if (os.contains("mac")) {
+            new ProcessBuilder("open", path.getAbsolutePath()).start();
+        } else {
+            new ProcessBuilder("xdg-open", path.getAbsolutePath()).start();
         }
     }
 
