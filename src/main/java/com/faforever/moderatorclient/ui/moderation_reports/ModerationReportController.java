@@ -1740,8 +1740,44 @@ public class ModerationReportController implements Controller<Region> {
                         newline()
                 );
             } else {
-                textFlow.getChildren().addAll(styledText(line, Color.WHITE), newline());
+                appendHighlightedLine(textFlow, line, offenderName, reporterName);
+                textFlow.getChildren().add(newline());
             }
+        }
+    }
+
+    private void appendHighlightedLine(TextFlow textFlow, String line, String offenderName, String reporterName) {
+        record Span(int start, int end, Color color) {}
+        List<Span> spans = new ArrayList<>();
+
+        for (String name : new String[]{offenderName, reporterName}) {
+            if (name == null || name.isEmpty()) continue;
+            Color color = name.equals(offenderName) ? Color.LIGHTCORAL : Color.LIGHTBLUE;
+            int idx = 0;
+            while ((idx = line.indexOf(name, idx)) != -1) {
+                spans.add(new Span(idx, idx + name.length(), color));
+                idx += name.length();
+            }
+        }
+
+        if (spans.isEmpty()) {
+            textFlow.getChildren().add(styledText(line, Color.WHITE));
+            return;
+        }
+
+        spans.sort(Comparator.comparingInt(Span::start));
+
+        int pos = 0;
+        for (Span span : spans) {
+            if (span.start() < pos) continue; // skip overlaps
+            if (span.start() > pos) {
+                textFlow.getChildren().add(styledText(line.substring(pos, span.start()), Color.WHITE));
+            }
+            textFlow.getChildren().add(styledText(line.substring(span.start(), span.end()), span.color()));
+            pos = span.end();
+        }
+        if (pos < line.length()) {
+            textFlow.getChildren().add(styledText(line.substring(pos), Color.WHITE));
         }
     }
 
