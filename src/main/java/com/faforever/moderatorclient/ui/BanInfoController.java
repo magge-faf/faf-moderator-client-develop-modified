@@ -98,7 +98,7 @@ public class BanInfoController implements Controller<Pane> {
             Matcher matcher = pattern.matcher(newValue);
             if (matcher.find()) {
                 String numDays = matcher.group(1);
-                log.debug("Detected number before 'day ban': " + numDays);
+                log.debug("Detected number before 'day ban': {}", numDays);
                 banDaysTextField.setText(numDays);
             } else {
                 log.debug("No number before 'day ban' found");

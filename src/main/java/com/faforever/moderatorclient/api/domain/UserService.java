@@ -187,7 +187,7 @@ public class UserService {
     }
 
     public void updatePlayer(String id, String newName) {
-        log.debug("Update of player of player id: " + id);
+        log.debug("Update of player id: {}", id);
         fafApi.forceRenameUserName(id, newName);
     }
 

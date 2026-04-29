@@ -17,3 +17,14 @@ build/
 # Ignore zip and gzip files
 *.zip
 *.gz
+
+# Runtime / local data files
+data/
+logs/
+client-prefs.json
+client.log
+ConfigurationModerationToolFAF/
+
+# Editor / tool config
+.vscode/
+.claude/

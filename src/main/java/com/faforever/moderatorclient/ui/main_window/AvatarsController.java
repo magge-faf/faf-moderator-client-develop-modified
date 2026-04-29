@@ -241,7 +241,8 @@ public class AvatarsController implements Controller<SplitPane> {
                         Platform.runLater(() -> avatar.setImage(img));
                     }
                 });
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                log.debug("Failed to load avatar image from {}: {}", avatar.getUrl(), e.getMessage());
             } finally {
                 UrlImageViewTableCell.loadingUrls.remove(cacheKey);
             }

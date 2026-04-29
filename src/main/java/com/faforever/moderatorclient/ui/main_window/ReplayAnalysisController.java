@@ -164,7 +164,7 @@ public class ReplayAnalysisController implements Controller<VBox> {
         if (!Files.exists(replayDir)) {
             try {
                 Files.createDirectories(replayDir);
-                log.info("Created directory: " + REPLAY_SAVE_DIR);
+                log.info("Created directory: {}", REPLAY_SAVE_DIR);
             } catch (IOException e) {
                 log.error("Failed to create replay directory: {}", e.getMessage());
             }
