@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.layout.HBox?>
 
@@ -12,6 +14,12 @@
         <Button text="Open JSON" onAction="#openJsonFile"/>
         <Button text="Create Backup" onAction="#createBackupJson"/>
         <Button text="Run Smurf Management" onAction="#runSmurfManagementButton"/>
+        <Button text="Reload" onAction="#reloadSmurfManagement"/>
+    </HBox>
+    <HBox spacing="10" alignment="CENTER_LEFT">
+        <Label text="Search:"/>
+        <TextField fx:id="searchField" promptText="Filter by name, ID, comment, or reason" prefWidth="300"/>
+        <Label fx:id="countLabel" style="-fx-text-fill: gray;"/>
     </HBox>
 
     <!-- SmurfManagement table will be added in the initialize method here -->
