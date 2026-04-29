@@ -1662,11 +1662,11 @@ public class ModerationReportController implements Controller<Region> {
             "Cheats Enabled:"
     );
 
+    // Matches: #N [mm:ss] or [HH:mm:ss] sender → receiver: message
+    private static final Pattern CHAT_LINE_PATTERN =
+            Pattern.compile("^(#\\d+) (\\[[^\\]]+\\]) (.+?) → (.+?): (.*)$");
+
     public void updateChatLogToColorTextFlow(TextFlow textFlow, String filteredLog, String reporterName, String offenderName) {
-
-        String colorOffender = "LIGHTCORAL";
-        String colorReporter = "LIGHTBLUE";
-
         if (textFlow == null) {
             log.debug("TextFlow is not initialized in updateChatLogToColorTextFlow");
             return;
@@ -1678,7 +1678,7 @@ public class ModerationReportController implements Controller<Region> {
 
         for (String line : lines) {
             if (line == null || line.trim().isEmpty()) {
-                textFlow.getChildren().add(new Text("\n"));
+                textFlow.getChildren().add(newline());
                 continue;
             }
 
@@ -1686,87 +1686,60 @@ public class ModerationReportController implements Controller<Region> {
                 continue;
             }
 
-            boolean isProcessed = false;
-
             for (String keyword : keywordsPointOfInterestReplay) {
                 if (line.contains(keyword)) {
                     addColoredTextForPointOfInterest(line, textFlow);
-                    isProcessed = true;
+                    textFlow.getChildren().add(newline());
                     break;
                 }
             }
 
-            if (isProcessed) {
-                textFlow.getChildren().add(new Text("\n"));
-                continue;
-            }
+            // Check POI again so we can skip to next line after adding it
+            boolean isPoi = keywordsPointOfInterestReplay.stream().anyMatch(line::contains);
+            if (isPoi) continue;
 
-            int offenderIndex = line.indexOf(offenderName);
-            int reporterIndex = line.indexOf(reporterName);
+            Matcher m = CHAT_LINE_PATTERN.matcher(line);
+            if (m.matches()) {
+                String lineNum  = m.group(1);
+                String timestamp = m.group(2);
+                String sender   = m.group(3);
+                String receiver = m.group(4);
+                String message  = m.group(5);
 
-            if (offenderIndex != -1 && reporterIndex != -1) {
-                if (offenderIndex < reporterIndex) {
-                    processLineWithBothNames(textFlow, line, offenderName, reporterName, colorOffender, colorReporter);
+                Text lineNumText = styledText(lineNum + " ", Color.DIMGRAY);
+                Text timestampText = styledText(timestamp + " ", Color.GRAY);
+
+                Color senderColor;
+                if (!offenderName.isEmpty() && sender.equals(offenderName)) {
+                    senderColor = Color.LIGHTCORAL;
+                } else if (!reporterName.isEmpty() && sender.equals(reporterName)) {
+                    senderColor = Color.LIGHTBLUE;
                 } else {
-                    processLineWithBothNames(textFlow, line, reporterName, offenderName, colorReporter, colorOffender);
+                    senderColor = Color.LIGHTYELLOW;
                 }
-            } else if (offenderIndex != -1) {
-                processLineWithSingleName(textFlow, line, offenderName, colorOffender);
-            } else if (reporterIndex != -1) {
-                processLineWithSingleName(textFlow, line, reporterName, colorReporter);
+                Text senderText = styledText(sender, senderColor);
+                Text arrowText  = styledText(" → " + receiver + ": ", Color.DIMGRAY);
+                Text msgText    = styledText(message, Color.WHITE);
+
+                textFlow.getChildren().addAll(lineNumText, timestampText, senderText, arrowText, msgText, newline());
             } else {
-                Text text = new Text(line);
-                text.setFill(Color.WHITE);
-                textFlow.getChildren().add(text);
+                // Header / metadata / other non-chat lines
+                Text text = styledText(line, Color.WHITE);
+                textFlow.getChildren().addAll(text, newline());
             }
-
-            textFlow.getChildren().add(new Text("\n"));
         }
     }
 
-    private void processLineWithSingleName(TextFlow textFlow, String line, String name, String color) {
-        String[] parts = line.split(name);
-        Text textBefore = new Text(parts[0]);
-        textBefore.setFill(Color.WHITE);
-        textFlow.getChildren().add(textBefore);
-
-        Text nameText = new Text(name);
-        nameText.setFill(Color.web(color));
-        textFlow.getChildren().add(nameText);
-
-        if (parts.length > 1) {
-            Text textAfter = new Text(parts[1]);
-            textAfter.setFill(Color.WHITE);
-            textFlow.getChildren().add(textAfter);
-        }
+    private static Text styledText(String content, Color color) {
+        Text t = new Text(content);
+        t.setFill(color);
+        return t;
     }
 
-    private void processLineWithBothNames(TextFlow textFlow, String line, String firstName, String secondName, String firstColor, String secondColor) {
-        String[] firstParts = line.split(firstName, 2);
-
-        Text textBeforeFirst = new Text(firstParts[0]);
-        textBeforeFirst.setFill(Color.WHITE);
-        textFlow.getChildren().add(textBeforeFirst);
-
-        Text firstNameText = new Text(firstName);
-        firstNameText.setFill(Color.web(firstColor));
-        textFlow.getChildren().add(firstNameText);
-
-        String[] secondParts = firstParts[1].split(secondName, 2);
-
-        Text textBetween = new Text(secondParts[0]);
-        textBetween.setFill(Color.WHITE);
-        textFlow.getChildren().add(textBetween);
-
-        Text secondNameText = new Text(secondName);
-        secondNameText.setFill(Color.web(secondColor));
-        textFlow.getChildren().add(secondNameText);
-
-        if (secondParts.length > 1) {
-            Text textAfterSecond = new Text(secondParts[1]);
-            textAfterSecond.setFill(Color.WHITE);
-            textFlow.getChildren().add(textAfterSecond);
-        }
+    private static Text newline() {
+        Text t = new Text("\n");
+        t.setFill(Color.WHITE);
+        return t;
     }
 
     private void deleteTempFile(Path tempFilePath) {
