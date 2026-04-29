@@ -1842,11 +1842,16 @@ public class ModerationReportController implements Controller<Region> {
 
     private String formatChatMessage(ChatMessage message) {
         long timeMillis = message.getTime().toMillis();
-        String formattedTime = timeMillis >= 0
-                ? DurationFormatUtils.formatDuration(timeMillis, "HH:mm:ss")
-                : "N/A";
+        String formattedTime;
+        if (timeMillis < 0) {
+            formattedTime = "N/A";
+        } else if (timeMillis < 3_600_000) {
+            formattedTime = DurationFormatUtils.formatDuration(timeMillis, "mm:ss");
+        } else {
+            formattedTime = DurationFormatUtils.formatDuration(timeMillis, "HH:mm:ss");
+        }
 
-        return format("[{0}] from {1} to {2}: {3}",
+        return format("[{0}] {1} → {2}: {3}",
                 formattedTime, message.getSender(), message.getReceiver(), message.getMessage());
     }
 
@@ -2044,14 +2049,15 @@ public class ModerationReportController implements Controller<Region> {
 
         Pattern pattern = Pattern.compile(compileSentences);
         String chatLine;
+        int lineNum = 0;
 
         while ((chatLine = bufReader.readLine()) != null) {
             boolean matchFound = pattern.matcher(chatLine).find();
             if (!localPreferences.getTabReports().isShowNotifyChatMessages() && matchFound) {
-                // Skip notify chat messages
                 continue;
             }
-            filteredChatLog.append(chatLine).append("\n");
+            lineNum++;
+            filteredChatLog.append("#").append(lineNum).append(" ").append(chatLine).append("\n");
         }
 
         return filteredChatLog.toString();
