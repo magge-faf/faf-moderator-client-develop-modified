@@ -22,7 +22,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.awt.Desktop;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
@@ -479,6 +478,17 @@ public class SmurfManagementController implements Controller<VBox> {
     }
 
     public void openFile(String fileName) throws IOException {
-        Desktop.getDesktop().open(new File(fileName));
+        openPath(new File(fileName));
+    }
+
+    private static void openPath(File path) throws IOException {
+        String os = System.getProperty("os.name").toLowerCase();
+        if (os.contains("win")) {
+            new ProcessBuilder("cmd", "/c", "start", "", path.getAbsolutePath()).start();
+        } else if (os.contains("mac")) {
+            new ProcessBuilder("open", path.getAbsolutePath()).start();
+        } else {
+            new ProcessBuilder("xdg-open", path.getAbsolutePath()).start();
+        }
     }
 }

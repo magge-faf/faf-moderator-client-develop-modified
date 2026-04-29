@@ -17,7 +17,6 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.awt.Desktop;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -175,7 +174,7 @@ public class ExcludedHardwareItemsController implements Controller<VBox> {
             return;
         }
         try {
-            Desktop.getDesktop().open(folder);
+            openPath(folder);
         } catch (IOException e) {
             log.error("Failed to open folder: {}", e.getMessage());
         }
@@ -318,7 +317,7 @@ public class ExcludedHardwareItemsController implements Controller<VBox> {
             return;
         }
         try {
-            Desktop.getDesktop().open(EXCLUDED_ITEMS_FILE);
+            openPath(EXCLUDED_ITEMS_FILE);
         } catch (IOException e) {
             log.error("Failed to open excluded_items.json: {}", e.getMessage());
             showAlert(Alert.AlertType.ERROR, "Open File Failed",
@@ -382,6 +381,17 @@ public class ExcludedHardwareItemsController implements Controller<VBox> {
         return setKeys.stream()
                 .map(k -> DISPLAY_NAMES.getOrDefault(k, k) + ": " + item.get(k))
                 .collect(Collectors.joining(" | "));
+    }
+
+    private static void openPath(File path) throws IOException {
+        String os = System.getProperty("os.name").toLowerCase();
+        if (os.contains("win")) {
+            new ProcessBuilder("cmd", "/c", "start", "", path.getAbsolutePath()).start();
+        } else if (os.contains("mac")) {
+            new ProcessBuilder("open", path.getAbsolutePath()).start();
+        } else {
+            new ProcessBuilder("xdg-open", path.getAbsolutePath()).start();
+        }
     }
 
     private void showAlert(Alert.AlertType type, String title, String message) {
