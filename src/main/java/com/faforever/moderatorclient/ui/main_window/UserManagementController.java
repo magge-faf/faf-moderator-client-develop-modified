@@ -1250,7 +1250,11 @@ public class UserManagementController implements Controller<SplitPane> {
 
     public void userSearchSmurfVillageAddToUserTable(String userID) {
         List<PlayerFX> usersFound = userService.findUsersByAttribute("id", userID);
-        Platform.runLater(() -> users.addAll(usersFound));
+        Platform.runLater(() -> {
+            if (users.stream().noneMatch(u -> u.getId().equals(userID))) {
+                users.addAll(usersFound);
+            }
+        });
     }
 
     public List<Map<String, Object>> loadExcludedItemsFromJson() {
@@ -1743,12 +1747,7 @@ public class UserManagementController implements Controller<SplitPane> {
     // Table insertion helper
     private void addNewAccountsToTable(List<Object> accounts) {
         for (Object accountId : accounts) {
-            boolean exists = userSearchTableView.getItems().stream()
-                    .map(AbstractEntityFX::getId)
-                    .anyMatch(playerId -> playerId.equals(accountId.toString()));
-            if (!exists) {
-                userSearchSmurfVillageAddToUserTable((String) accountId);
-            }
+            userSearchSmurfVillageAddToUserTable((String) accountId);
         }
     }
 
