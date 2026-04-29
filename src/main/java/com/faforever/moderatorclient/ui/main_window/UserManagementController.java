@@ -104,7 +104,6 @@ public class UserManagementController implements Controller<SplitPane> {
     @FXML
     public Label ProgressLabelRecentAccountsSmurfCheck;
     public Label searchHistoryLabel;
-    @FXML
     private volatile boolean cancelRequestedByUser = false;
     @FXML
     public Tab smurfOutputTab;
@@ -141,7 +140,21 @@ public class UserManagementController implements Controller<SplitPane> {
 
     private volatile boolean isPaused = false;
     private volatile boolean isStopped = false;
-    private final Object pauseLock = new Object(); // Monitor an object for synchronization
+    private final Object pauseLock = new Object();
+
+    // Snapshots of UI state captured on FX thread before each background task starts.
+    // Background threads read these instead of touching live JavaFX nodes.
+    private volatile boolean snapIncludeUUID;
+    private volatile boolean snapIncludeHash;
+    private volatile boolean snapIncludeIP;
+    private volatile boolean snapIncludeMemorySerial;
+    private volatile boolean snapIncludeVolumeSerial;
+    private volatile boolean snapIncludeSerial;
+    private volatile boolean snapIncludeProcessorId;
+    private volatile boolean snapIncludeCpuName;
+    private volatile boolean snapIncludeManufacturer;
+    private volatile int     snapThreshold = 10;
+    private volatile boolean snapPromptOnThreshold;
 
     @FXML
     public Button checkRecentAccountsForSmurfsStopButton;
@@ -1138,6 +1151,7 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     private void processBannedUsers(Path filePath, Label progressLabel, String taskName) {
+        captureSmurfCheckSettings();
         resetPreviousStateSmurfVillageLookup();
         Set<String> userIds = bansController.loadExistingBannedUserIds(filePath);
 
@@ -1227,19 +1241,17 @@ public class UserManagementController implements Controller<SplitPane> {
      */
     private PlayerFX findUserById(String userId) {
         try {
-            // Blocking call to fetch users by ID
-            List<PlayerFX> results = Collections.singletonList(userService.findUsersByAttribute("id", userId).getFirst());
-            return results.getFirst();
+            List<PlayerFX> results = userService.findUsersByAttribute("id", userId);
+            return results.isEmpty() ? null : results.getFirst();
         } catch (Exception e) {
             log.error("Error finding user ID {}: {}", userId, e.getMessage());
+            return null;
         }
-        return null;
     }
 
     public void userSearchSmurfVillageAddToUserTable(String userID) {
-        checkRateLimit();
         List<PlayerFX> usersFound = userService.findUsersByAttribute("id", userID);
-        users.addAll(usersFound);
+        Platform.runLater(() -> users.addAll(usersFound));
     }
 
     public List<Map<String, Object>> loadExcludedItemsFromJson() {
@@ -1298,13 +1310,8 @@ public class UserManagementController implements Controller<SplitPane> {
             // --- Load JSON-based excluded items ---
             List<Map<String, Object>> excludedItems = loadExcludedItemsFromJson();
 
-            // --- Read threshold and exclusion CheckBox from UI ---
-            int threshold = 10; // default fallback
-            try {
-                threshold = Integer.parseInt(maxMatchesBeforePromptSmurfVillageLookupTextField.getText());
-            } catch (NumberFormatException e) {
-                updateSmurfVillageLogTextArea("\t\t Invalid threshold input, using default: " + threshold + "\n");}
-            boolean promptUserOnThresholdExceeded = promptUserOnThresholdExceededSmurfVillageLookupCheckBox.isSelected();
+            int threshold = snapThreshold;
+            boolean promptUserOnThresholdExceeded = snapPromptOnThreshold;
 
             synchronized (pauseLock) {
                 while (isPaused) {
@@ -1580,7 +1587,7 @@ public class UserManagementController implements Controller<SplitPane> {
         startTaskTimer();
         String initialLog = String.format("\n=== Checking PlayerID: %s ===\n", playerID);
         updateSmurfVillageLogTextArea(initialLog);
-        statusTextFieldProcessingPlayerID.setText(playerID);
+        Platform.runLater(() -> statusTextFieldProcessingPlayerID.setText(playerID));
 
         if (alreadyCheckedUsers.contains(playerID)) {
             updateSmurfVillageLogTextArea("\nSkipping, we already have checked that account: " + playerID);
@@ -1613,17 +1620,15 @@ public class UserManagementController implements Controller<SplitPane> {
         Set<String> manufacturers = new HashSet<>();
 
         userFound.forEach(user -> user.getUniqueIdAssignments().forEach(item -> {
-            if (includeProcessorNameCheckBox.isSelected()) cpuNames.add(item.getUniqueId().getName());
-            if (includeUUIDCheckBox.isSelected()) uuids.add(item.getUniqueId().getUuid());
-            if (includeUIDHashCheckBox.isSelected()) hashes.add(item.getUniqueId().getHash());
-            if (includeIPCheckBox.isSelected()) ips.add(user.getRecentIpAddress());
-            if (includeMemorySerialNumberCheckBox.isSelected())
-                memorySerialNumbers.add(item.getUniqueId().getMemorySerialNumber());
-            if (includeVolumeSerialNumberCheckBox.isSelected())
-                volumeSerialNumbers.add(item.getUniqueId().getVolumeSerialNumber());
-            if (includeSerialNumberCheckBox.isSelected()) serialNumbers.add(item.getUniqueId().getSerialNumber());
-            if (includeProcessorIdCheckBox.isSelected()) processorIds.add(item.getUniqueId().getProcessorId());
-            if (includeManufacturerCheckBox.isSelected()) manufacturers.add(item.getUniqueId().getManufacturer());
+            if (snapIncludeCpuName)      cpuNames.add(item.getUniqueId().getName());
+            if (snapIncludeUUID)         uuids.add(item.getUniqueId().getUuid());
+            if (snapIncludeHash)         hashes.add(item.getUniqueId().getHash());
+            if (snapIncludeIP)           ips.add(user.getRecentIpAddress());
+            if (snapIncludeMemorySerial) memorySerialNumbers.add(item.getUniqueId().getMemorySerialNumber());
+            if (snapIncludeVolumeSerial) volumeSerialNumbers.add(item.getUniqueId().getVolumeSerialNumber());
+            if (snapIncludeSerial)       serialNumbers.add(item.getUniqueId().getSerialNumber());
+            if (snapIncludeProcessorId)  processorIds.add(item.getUniqueId().getProcessorId());
+            if (snapIncludeManufacturer) manufacturers.add(item.getUniqueId().getManufacturer());
         }));
 
         Set<Object> accountsWithSharedAttributes = new LinkedHashSet<>(); // deduplicated cumulative set
@@ -1714,7 +1719,7 @@ public class UserManagementController implements Controller<SplitPane> {
                 return;
             }
 
-            statusTextFieldProcessingItem.setText(type + ": " + item);
+            Platform.runLater(() -> statusTextFieldProcessingItem.setText(type + ": " + item));
 
             if (!alreadyCheckedSet.contains(item)) {
                 List<Object> accountsFromThisItem = processUsers(property, item, currentPlayerID);
@@ -1748,6 +1753,24 @@ public class UserManagementController implements Controller<SplitPane> {
         }
     }
 
+    private void captureSmurfCheckSettings() {
+        snapIncludeUUID          = includeUUIDCheckBox.isSelected();
+        snapIncludeHash          = includeUIDHashCheckBox.isSelected();
+        snapIncludeIP            = includeIPCheckBox.isSelected();
+        snapIncludeMemorySerial  = includeMemorySerialNumberCheckBox.isSelected();
+        snapIncludeVolumeSerial  = includeVolumeSerialNumberCheckBox.isSelected();
+        snapIncludeSerial        = includeSerialNumberCheckBox.isSelected();
+        snapIncludeProcessorId   = includeProcessorIdCheckBox.isSelected();
+        snapIncludeCpuName       = includeProcessorNameCheckBox.isSelected();
+        snapIncludeManufacturer  = includeManufacturerCheckBox.isSelected();
+        snapPromptOnThreshold    = promptUserOnThresholdExceededSmurfVillageLookupCheckBox.isSelected();
+        try {
+            snapThreshold = Integer.parseInt(maxMatchesBeforePromptSmurfVillageLookupTextField.getText().trim());
+        } catch (NumberFormatException e) {
+            snapThreshold = 10;
+        }
+    }
+
     private void resetPreviousStateSmurfVillageLookup() {
         alreadyCheckedUsers.clear();
         alreadyCheckedUuids.clear();
@@ -1767,6 +1790,7 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     public void onLookupSmurfVillage() {
+        captureSmurfCheckSettings();
         users.clear();
         userSearchTableView.getSortOrder().clear();
 
@@ -1894,6 +1918,7 @@ public class UserManagementController implements Controller<SplitPane> {
             return;
         }
 
+        captureSmurfCheckSettings();
         users.clear();
         userSearchTableView.getSortOrder().clear();
         resetPreviousStateSmurfVillageLookup();
