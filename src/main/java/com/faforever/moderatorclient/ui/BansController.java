@@ -20,7 +20,6 @@ import javafx.fxml.FXML;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,22 +54,6 @@ public class BansController implements Controller<HBox> {
     private boolean inSearchMode = false;
     private final LocalPreferences localPreferences;
 
-    @FXML
-    private VBox permSyncProgressContainer;
-    @FXML
-    private ProgressIndicator permSyncProgressIndicator;
-    @FXML
-    private Label permSyncProgressLabel;
-    @FXML
-    private VBox tempSyncProgressContainer;
-    @FXML
-    private ProgressIndicator tempSyncProgressIndicator;
-    @FXML
-    private Label tempSyncProgressLabel;
-    @FXML
-    private Label permBanCountLabel;
-    @FXML
-    private Label tempBanCountLabel;
 
     @Override
     public HBox getRoot() {
@@ -112,18 +95,11 @@ public class BansController implements Controller<HBox> {
                 filteredList.setPredicate(banInfoFX -> !onlyActiveCheckBox.isSelected() || banInfoFX.getBanStatus() == BanStatus.BANNED);
         onlyActiveCheckBox.selectedProperty().addListener(onlyActiveBansChangeListener);
         onlyActiveBansChangeListener.invalidated(onlyActiveCheckBox.selectedProperty());
-        updateBanCounts();
-    }
-
-    private void updateBanCounts() {
-        permBanCountLabel.setText("(" + loadExistingBannedUserIds(PATH_PERM_BANNED_USERS_JSON).size() + ")");
-        tempBanCountLabel.setText("(" + loadExistingBannedUserIds(PATH_TEMP_BANNED_USERS_JSON).size() + ")");
     }
 
     public void onRefreshLatestBans() {
         banService.getLatestBans().thenAccept(banInfoFXES -> Platform.runLater(() -> {
             itemList.setAll(banInfoFXES);
-            updateBanCounts();
         })).exceptionally(throwable -> {
             log.error("error loading bans", throwable);
             return null;
@@ -169,26 +145,7 @@ public class BansController implements Controller<HBox> {
     }
 
     public void syncPermBannedUsersJson() {
-        if (permSyncProgressContainer == null || permSyncProgressIndicator == null || permSyncProgressLabel == null) {
-            log.debug("FXML components not loaded: permSyncProgress* is null.");
-            return;
-        }
-
-        permSyncProgressContainer.setVisible(true);
-        permSyncProgressContainer.setManaged(true);
-        permSyncProgressIndicator.setVisible(true);
-        permSyncProgressIndicator.setManaged(true);
-        permSyncProgressLabel.setVisible(true);
-        permSyncProgressLabel.setManaged(true);
-
-        startSyncTask(
-                PATH_PERM_BANNED_USERS_JSON,
-                BanDurationType.PERMANENT,
-                permSyncProgressContainer,
-                permSyncProgressIndicator,
-                permSyncProgressLabel,
-                "permSyncProgress"
-        );
+        startSyncTask(PATH_PERM_BANNED_USERS_JSON, BanDurationType.PERMANENT, null);
     }
 
     public void syncTempBannedUsersJson() {
@@ -196,34 +153,10 @@ public class BansController implements Controller<HBox> {
     }
 
     public void syncTempBannedUsersJson(Runnable onComplete) {
-        if (tempSyncProgressContainer == null || tempSyncProgressIndicator == null || tempSyncProgressLabel == null) {
-            log.debug("FXML components not loaded: tempSyncProgress* is null.");
-            return;
-        }
-
-        tempSyncProgressContainer.setVisible(true);
-        tempSyncProgressContainer.setManaged(true);
-        tempSyncProgressIndicator.setVisible(true);
-        tempSyncProgressIndicator.setManaged(true);
-        tempSyncProgressLabel.setVisible(true);
-        tempSyncProgressLabel.setManaged(true);
-
-        startSyncTask(
-                PATH_TEMP_BANNED_USERS_JSON,
-                BanDurationType.TEMPORARY,
-                tempSyncProgressContainer,
-                tempSyncProgressIndicator,
-                tempSyncProgressLabel,
-                "tempSyncProgress",
-                onComplete
-        );
+        startSyncTask(PATH_TEMP_BANNED_USERS_JSON, BanDurationType.TEMPORARY, onComplete);
     }
 
-    private void startSyncTask(Path destinationPath, BanDurationType banDurationType, VBox progressContainer, ProgressIndicator progressIndicator, Label progressLabel, String sourceEvent) {
-        startSyncTask(destinationPath, banDurationType, progressContainer, progressIndicator, progressLabel, sourceEvent, null);
-    }
-
-    private void startSyncTask(Path destinationPath, BanDurationType banDurationType, VBox progressContainer, ProgressIndicator progressIndicator, Label progressLabel, String sourceEvent, Runnable onComplete) {
+    private void startSyncTask(Path destinationPath, BanDurationType banDurationType, Runnable onComplete) {
         BansController thisController = this;
 
         Task<Boolean> syncTask = new Task<>() {
@@ -244,8 +177,7 @@ public class BansController implements Controller<HBox> {
                     File bannedUsersFile = destinationPath.toFile();
 
                     if (bannedUsersFile.exists()) {
-                        List<Map<String, Object>> existingRawData = objectMapper.readValue(bannedUsersFile, new TypeReference<>() {
-                        });
+                        List<Map<String, Object>> existingRawData = objectMapper.readValue(bannedUsersFile, new TypeReference<>() {});
                         List<Map<String, Object>> updatedData = existingRawData.stream()
                                 .filter(userData -> {
                                     if (userData.containsKey("userInfo")) {
@@ -268,7 +200,6 @@ public class BansController implements Controller<HBox> {
                         if (existingBannedUserIds.contains(userIdToCheck)) {
                             processedCount++;
                             updateProgress(processedCount, totalBans);
-                            updateMessage(String.format("%d/%d (%s)", processedCount, totalBans, banDurationType.toString().toLowerCase()));
                             continue;
                         }
 
@@ -276,14 +207,13 @@ public class BansController implements Controller<HBox> {
                         List<PlayerFX> bannedUserListResult = userService.findUsersByAttribute("id", bannedUser.getPlayer().getId());
                         if (!bannedUserListResult.isEmpty()) {
                             PlayerFX bannedUserPlayerFX = bannedUserListResult.getFirst();
-                            ViewHelper.saveUserToJsonFile(bannedUserPlayerFX, destinationPath, sourceEvent );
+                            ViewHelper.saveUserToJsonFile(bannedUserPlayerFX, destinationPath, banDurationType.toString().toLowerCase() + "SyncProgress");
                             existingBannedUserIds.add(userIdToCheck);
                         } else {
                             log.warn("Could not find player with ID {} for ban {}", bannedUser.getPlayer().getId(), bannedUser.getId());
                         }
                         processedCount++;
                         updateProgress(processedCount, totalBans);
-                        updateMessage(String.format("%d/%d (%s)", processedCount, totalBans, banDurationType.toString().toLowerCase()));
                     }
                     return true;
                 } catch (InterruptedException e) {
@@ -302,30 +232,13 @@ public class BansController implements Controller<HBox> {
 
         syncTask.setOnSucceeded(workerStateEvent -> {
             log.info("Successfully synced {} banned users.", banDurationType.toString().toLowerCase());
-            progressContainer.setVisible(false);
-            progressContainer.setManaged(false);
-            progressIndicator.setVisible(false);
-            progressIndicator.setManaged(false);
-            progressLabel.setVisible(false);
-            progressLabel.setVisible(false);
-            updateBanCounts();
             if (onComplete != null) onComplete.run();
         });
 
         syncTask.setOnFailed(workerStateEvent -> {
-            Throwable ex = syncTask.getException();
-            log.error("Failed to sync {} banned users.", banDurationType.toString().toLowerCase(), ex);
-            progressContainer.setVisible(false);
-            progressContainer.setManaged(false);
-            progressIndicator.setVisible(false);
-            progressIndicator.setManaged(false);
-            progressLabel.setVisible(false);
-            progressLabel.setVisible(false);
+            log.error("Failed to sync {} banned users.", banDurationType.toString().toLowerCase(), syncTask.getException());
             if (onComplete != null) onComplete.run();
         });
-
-        progressIndicator.progressProperty().bind(syncTask.progressProperty());
-        progressLabel.textProperty().bind(syncTask.messageProperty());
 
         Thread thread = new Thread(syncTask);
         thread.setDaemon(true);

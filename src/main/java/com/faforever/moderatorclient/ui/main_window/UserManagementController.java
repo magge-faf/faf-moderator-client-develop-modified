@@ -76,8 +76,6 @@ import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLD
 @RequiredArgsConstructor
 public class UserManagementController implements Controller<SplitPane> {
     @FXML
-    public Button checkPermanentBansButton;
-    @FXML
     public Button checkTemporaryBansButton;
     @FXML
     public Button checkSmurfManagementAccountsButton;
@@ -130,7 +128,6 @@ public class UserManagementController implements Controller<SplitPane> {
     @FXML
     public Label
             temporaryBanProgressLabel,
-            permanentBanProgressLabel,
             smurfManagementProgressLabel,
             progressLabelSharedGames;
 
@@ -319,6 +316,8 @@ public class UserManagementController implements Controller<SplitPane> {
             loadSplitPanePositions(root, localPreferences);
             StartupSyncBans();
 
+            int smurfCount = bansController.loadExistingBannedUserIds(SmurfManagementController.SMURF_MANAGEMENT_USERS_JSON_PATH).size();
+            checkSmurfManagementAccountsButton.setText("Run Smurf Management: " + smurfCount);
         });
     }
 
@@ -1139,10 +1138,6 @@ public class UserManagementController implements Controller<SplitPane> {
 
     public void handleCheckTemporaryBans() {
         processBannedUsers(bansController.PATH_TEMP_BANNED_USERS_JSON, temporaryBanProgressLabel, "temporary ban");
-    }
-
-    public void handleCheckPermanentBans() {
-        processBannedUsers(bansController.PATH_PERM_BANNED_USERS_JSON, permanentBanProgressLabel, "permanent ban");
     }
 
     public void handleCheckSmurfManagementAccounts() {

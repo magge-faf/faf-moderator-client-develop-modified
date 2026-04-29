@@ -132,10 +132,6 @@
                             <Label fx:id="temporaryBanProgressLabel" style="-fx-font-size: 12px; -fx-text-fill: gray;"/>
                         </HBox>
                         <HBox spacing="10" alignment="CENTER_LEFT">
-                            <Button fx:id="checkPermanentBansButton" text="Check Permanent Bans" onAction="#handleCheckPermanentBans"/>
-                            <Label fx:id="permanentBanProgressLabel" style="-fx-font-size: 12px; -fx-text-fill: gray;"/>
-                        </HBox>
-                        <HBox spacing="10" alignment="CENTER_LEFT">
                             <Button fx:id="checkSmurfManagementAccountsButton" text="Run Smurf Management" onAction="#handleCheckSmurfManagementAccounts"/>
                             <Label fx:id="smurfManagementProgressLabel" style="-fx-font-size: 12px; -fx-text-fill: gray;"/>
                         </HBox>
