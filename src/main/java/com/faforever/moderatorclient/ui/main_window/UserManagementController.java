@@ -1123,6 +1123,8 @@ public class UserManagementController implements Controller<SplitPane> {
 
         bansController.syncTempBannedUsersJson(() -> {
             Platform.runLater(() -> {
+                int count = bansController.loadExistingBannedUserIds(bansController.PATH_TEMP_BANNED_USERS_JSON).size();
+                checkTemporaryBansButton.setText("Check Temporary Bans: " + count);
                 checkTemporaryBansButton.setDisable(false);
                 processBannedUsers(bansController.PATH_TEMP_BANNED_USERS_JSON, temporaryBanProgressLabel, "temporary ban");
             });
