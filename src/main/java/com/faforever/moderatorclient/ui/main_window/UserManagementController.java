@@ -152,6 +152,7 @@ public class UserManagementController implements Controller<SplitPane> {
     private volatile int     snapThreshold = 10;
     private volatile boolean snapPromptOnThreshold;
     private volatile boolean snapOnlyShowActive;
+    private volatile boolean snapSuppressCleanOutput;
 
     @FXML
     public Button checkRecentAccountsForSmurfsStopButton;
@@ -1598,12 +1599,15 @@ public class UserManagementController implements Controller<SplitPane> {
         }
 
         startTaskTimer();
-        String initialLog = String.format("\n=== Checking PlayerID: %s ===", playerID);
-        updateSmurfVillageLogTextArea(initialLog);
+        if (!snapSuppressCleanOutput) {
+            updateSmurfVillageLogTextArea(String.format("\n=== Checking PlayerID: %s ===", playerID));
+        }
         Platform.runLater(() -> statusTextFieldProcessingPlayerID.setText(playerID));
 
         if (alreadyCheckedUsers.contains(playerID)) {
-            updateSmurfVillageLogTextArea("\nSkipping, we already have checked that account: " + playerID);
+            if (!snapSuppressCleanOutput) {
+                updateSmurfVillageLogTextArea("\nSkipping, we already have checked that account: " + playerID);
+            }
             return;
         }
         alreadyCheckedUsers.add(playerID);
@@ -1701,8 +1705,11 @@ public class UserManagementController implements Controller<SplitPane> {
                 .toList();
 
         if (!relatedAccounts.isEmpty()) {
+            if (snapSuppressCleanOutput) {
+                updateSmurfVillageLogTextArea(String.format("\n=== Checking PlayerID: %s ===", playerID));
+            }
             updateSmurfVillageLogTextArea("\n  " + playerID + " → related: " + relatedAccounts + "\n");
-        } else {
+        } else if (!snapSuppressCleanOutput) {
             updateSmurfVillageLogTextArea("\n  → no related accounts\n");
         }
 
@@ -1772,6 +1779,7 @@ public class UserManagementController implements Controller<SplitPane> {
         snapIncludeManufacturer  = includeManufacturerCheckBox.isSelected();
         snapPromptOnThreshold    = promptUserOnThresholdExceededSmurfVillageLookupCheckBox.isSelected();
         snapOnlyShowActive       = onlyShowActiveAccountsCheckBox.isSelected();
+        snapSuppressCleanOutput  = false;
         try {
             snapThreshold = Integer.parseInt(maxMatchesBeforePromptSmurfVillageLookupTextField.getText().trim());
         } catch (NumberFormatException e) {
@@ -1928,6 +1936,7 @@ public class UserManagementController implements Controller<SplitPane> {
         }
 
         captureSmurfCheckSettings();
+        snapSuppressCleanOutput = true;
         users.clear();
         userSearchTableView.getSortOrder().clear();
         resetPreviousStateSmurfVillageLookup();
