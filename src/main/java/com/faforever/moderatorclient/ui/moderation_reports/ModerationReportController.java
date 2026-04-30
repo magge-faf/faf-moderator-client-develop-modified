@@ -1733,12 +1733,16 @@ public class ModerationReportController implements Controller<Region> {
                 String receiverPad = String.format("%-" + receiverW + "s", rawReceiver);
 
                 Color senderColor;
+                Color messageColor;
                 if (!offenderName.isEmpty() && rawSender.equals(offenderName)) {
                     senderColor = Color.LIGHTCORAL;
+                    messageColor = Color.LIGHTCORAL;
                 } else if (!reporterName.isEmpty() && rawSender.equals(reporterName)) {
                     senderColor = Color.LIGHTBLUE;
+                    messageColor = Color.LIGHTBLUE;
                 } else {
                     senderColor = Color.LIGHTYELLOW;
+                    messageColor = Color.WHITE;
                 }
 
                 textFlow.getChildren().addAll(
@@ -1746,7 +1750,7 @@ public class ModerationReportController implements Controller<Region> {
                         styledText(m.group(2) + "  ", Color.GRAY),
                         styledText(senderPad + "  ", senderColor),
                         styledText(receiverPad + "  ", Color.DIMGRAY),
-                        styledText(m.group(5), Color.WHITE),
+                        styledText(m.group(5), messageColor),
                         newline()
                 );
             } else {
