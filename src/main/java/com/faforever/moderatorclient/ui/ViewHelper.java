@@ -330,7 +330,10 @@ public class ViewHelper {
         extractors.put(reasonColumn, BanInfoFX::getReason);
 
         TableColumn<BanInfoFX, String> authorColumn = new TableColumn<>("Author");
-        authorColumn.setCellValueFactory(o -> o.getValue().authorProperty().get().representationProperty());
+        authorColumn.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
+            PlayerFX author = o.getValue().getAuthor();
+            return author == null ? null : author.getRepresentation();
+        }, o.getValue().authorProperty()));
         tableView.getColumns().add(authorColumn);
         extractors.put(authorColumn, banInfoFX -> banInfoFX.getAuthor().getLogin());
 

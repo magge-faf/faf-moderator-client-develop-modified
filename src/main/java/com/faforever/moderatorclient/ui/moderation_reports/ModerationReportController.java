@@ -1002,10 +1002,14 @@ public class ModerationReportController implements Controller<Region> {
 
     private void setupReportSelectionListener() {
         reportTableView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
+            if (newValue == null) {
+                resetButtonsToInvalidState();
+                return;
+            }
             try {
                 updateReportDetails(newValue);
             } catch (Exception e) {
-                log.debug("Exception for selected report: ");
+                log.debug("Exception for selected report: ", e);
                 resetButtonsToInvalidState();
             }
         });
@@ -1370,7 +1374,7 @@ public class ModerationReportController implements Controller<Region> {
 
     }
 
-    private boolean isTaskRunning = false;
+    private volatile boolean isTaskRunning = false;
 
     @SneakyThrows
     private void showChatLog(ModerationReportFX report) {
