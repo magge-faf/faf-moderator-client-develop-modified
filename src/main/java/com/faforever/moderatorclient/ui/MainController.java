@@ -332,8 +332,10 @@ public class MainController implements Controller<TabPane>, DisposableBean {
             try {
                 tokenService.loginWithRefreshToken(refreshToken, true);
             } catch (Exception e) {
-                log.error("Auto login failed, disabling auto login and showing manual login dialog.", e);
+                log.warn("Auto login failed (refresh token expired or revoked), clearing stored token and showing manual login dialog.", e);
                 localPreferences.getAutoLogin().setEnabled(false);
+                localPreferences.getAutoLogin().setRefreshToken(null);
+                localPreferencesReaderWriter.write(localPreferences);
                 display();
                 return;
             }
