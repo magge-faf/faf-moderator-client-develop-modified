@@ -13,6 +13,7 @@ repositories {
 
 compileJava() {
     options.compilerArgs << "-Amapstruct.defaultComponentModel=jsr330"
+    options.compilerArgs << "-Amapstruct.unmappedTargetPolicy=IGNORE"
 }
 
 project.ext.javafxPlatform = "${javafxPlatform}"
