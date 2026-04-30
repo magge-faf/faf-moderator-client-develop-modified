@@ -920,6 +920,7 @@ public class UserManagementController implements Controller<SplitPane> {
         includeIPCheckBox.setSelected(settings.isIncludeIPCheckBox());
         includeProcessorNameCheckBox.setSelected(settings.isIncludeProcessorNameCheckBox());
         catchFirstLayerSmurfsOnlyCheckBox.setSelected(settings.isCatchFirstLayerSmurfsOnlyCheckBox());
+        onlyShowActiveAccountsCheckBox.setSelected(settings.isOnlyShowActiveAccountsCheckBox());
 
     }
 
@@ -1119,6 +1120,7 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     public void handleCheckTemporaryBans() {
+        smurfOutputTextArea.setText("");
         checkTemporaryBansButton.setDisable(true);
         checkTemporaryBansButton.setText("Check Temporary Bans (awaiting data...)");
         temporaryBanProgressLabel.setText("Fetching temporary bans...");
@@ -1134,6 +1136,7 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     public void handleCheckSmurfManagementAccounts() {
+        smurfOutputTextArea.setText("");
         processBannedUsers(SmurfManagementController.SMURF_MANAGEMENT_USERS_JSON_PATH, smurfManagementProgressLabel, "smurf management");
     }
 
@@ -1296,8 +1299,10 @@ public class UserManagementController implements Controller<SplitPane> {
 
         try {
             String displayAttr = attributeName.contains(".") ? attributeName.substring(attributeName.lastIndexOf('.') + 1) : attributeName;
-            String text = String.format("\n  [%-20s]  %s", displayAttr, attributeValue);
-            updateSmurfVillageLogTextArea(text);
+            String headerLine = String.format("\n  [%-20s]  %s", displayAttr, attributeValue);
+            if (!snapOnlyShowActive) {
+                updateSmurfVillageLogTextArea(headerLine);
+            }
 
             // --- Load JSON-based excluded items ---
             List<Map<String, Object>> excludedItems = loadExcludedItemsFromJson();
@@ -1443,8 +1448,11 @@ public class UserManagementController implements Controller<SplitPane> {
             }
 
             if (otherAccounts.isEmpty()) {
-                updateSmurfVillageLogTextArea("   (no matches)");
+                if (!snapOnlyShowActive) {
+                    updateSmurfVillageLogTextArea("   (no matches)");
+                }
             } else {
+                List<String> activeLines = new ArrayList<>();
                 for (PlayerFX user : otherAccounts) {
                     BanInfoFX ban = user.getBans().stream()
                             .filter(b -> b.getBanStatus() == BanStatus.BANNED)
@@ -1469,14 +1477,20 @@ public class UserManagementController implements Controller<SplitPane> {
                         prefix = "~";
                     }
 
-                    String accountLine = String.format("\n    %s  %-26s  id: %6s   %s",
-                            prefix, user.getLogin(), user.getId(), banInfo);
-                    updateSmurfVillageLogTextArea(accountLine);
+                    activeLines.add(String.format("\n    %s  %-26s  id: %6s   %s",
+                            prefix, user.getLogin(), user.getId(), banInfo));
 
                     if (user.getId() != null && !foundAccounts.contains(user.getId())) {
                         foundAccounts.add(user.getId());
                         addNewAccountsToTable(Collections.singletonList(user.getId()));
                     }
+                }
+
+                if (!activeLines.isEmpty()) {
+                    if (snapOnlyShowActive) {
+                        updateSmurfVillageLogTextArea(headerLine);
+                    }
+                    activeLines.forEach(line -> updateSmurfVillageLogTextArea(line));
                 }
             }
 
@@ -1905,6 +1919,7 @@ public class UserManagementController implements Controller<SplitPane> {
     private String currentLoginText = "";
 
     public void checkRecentAccountsForSmurfs() {
+        smurfOutputTextArea.setText("");
         int daysBack;
         try {
             daysBack = Integer.parseInt(daysToCheckRecentAccountsTextField.getText().trim());

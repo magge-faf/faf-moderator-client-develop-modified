@@ -51,6 +51,7 @@ public class LocalPreferences {
         // CheckBox
         boolean promptUserOnThresholdExceededSmurfVillageLookupCheckBox = true;
         boolean catchFirstLayerSmurfsOnlyCheckBox = true;
+        boolean onlyShowActiveAccountsCheckBox = false;
 
         boolean includeUUIDCheckBox = false;
         boolean includeUIDHashCheckBox = true;
