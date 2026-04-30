@@ -54,6 +54,7 @@ public class BanInfoController implements Controller<Pane> {
     public TextField untilTextField;
     public Label untilDateTimeValidateLabel;
     public RadioButton permanentBanRadioButton;
+    public RadioButton multiAccountBanRadioButton;
     public RadioButton forNoOfDaysBanRadioButton;
     public RadioButton temporaryBanRadioButton;
     public RadioButton warningBanRadioButton;
@@ -61,12 +62,17 @@ public class BanInfoController implements Controller<Pane> {
     public RadioButton vaultBanRadioButton;
     public RadioButton globalBanRadioButton;
     public Button revokeButton;
+    public Button specificTimeButton;
     public Label userLabel;
     public Label banIsRevokedNotice;
     public TextField revocationTimeTextField;
     public VBox revokeOptions;
+    public VBox specificTimeSection;
     public TextField reportIdTextField;
     public ToggleGroup banDuration;
+
+    private static final String MULTI_ACCOUNT_REASON =
+            "Account suspended due to detection of multiple accounts for the same user.";
 
     @Getter
     private BanInfoFX banInfo;
@@ -104,6 +110,22 @@ public class BanInfoController implements Controller<Pane> {
                 log.debug("No number before 'day ban' found");
             }
         });
+
+        multiAccountBanRadioButton.selectedProperty().addListener((obs, wasSelected, isSelected) -> {
+            if (isSelected) {
+                banReasonTextField.setText(MULTI_ACCOUNT_REASON);
+            }
+        });
+    }
+
+    public void onSpecificTimeToggle() {
+        boolean show = !specificTimeSection.isVisible();
+        specificTimeSection.setVisible(show);
+        specificTimeSection.setManaged(show);
+        specificTimeButton.setText(show ? "▾ Specific date/time..." : "▸ Specific date/time...");
+        if (!show && temporaryBanRadioButton.isSelected()) {
+            forNoOfDaysBanRadioButton.setSelected(true);
+        }
     }
 
     public void onRevokeTimeTextChanged() {
@@ -130,7 +152,12 @@ public class BanInfoController implements Controller<Pane> {
             revokeButton.setDisable(false);
 
             permanentBanRadioButton.setSelected(banInfo.getDuration() == BanDurationType.PERMANENT);
-            temporaryBanRadioButton.setSelected(banInfo.getDuration() == BanDurationType.TEMPORARY);
+            if (banInfo.getDuration() == BanDurationType.TEMPORARY) {
+                specificTimeSection.setVisible(true);
+                specificTimeSection.setManaged(true);
+                specificTimeButton.setText("▾ Specific date/time...");
+                temporaryBanRadioButton.setSelected(true);
+            }
             Optional.ofNullable(banInfo.getExpiresAt()).ifPresent(offsetDateTime -> untilTextField.setText(offsetDateTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)));
 
             if (banInfo.getRevokeTime() != null) {
@@ -183,6 +210,7 @@ public class BanInfoController implements Controller<Pane> {
         } else if (warningBanRadioButton.isSelected()) {
             banInfo.setExpiresAt(OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(5));
         } else {
+            // permanentBanRadioButton or multiAccountBanRadioButton — no expiry
             banInfo.setExpiresAt(null);
         }
 
@@ -230,7 +258,9 @@ public class BanInfoController implements Controller<Pane> {
             validationErrors.add("No ban reason is given.");
         }
 
-        if (!forNoOfDaysBanRadioButton.isSelected() && !temporaryBanRadioButton.isSelected() && !permanentBanRadioButton.isSelected() && !warningBanRadioButton.isSelected()) {
+        if (!forNoOfDaysBanRadioButton.isSelected() && !temporaryBanRadioButton.isSelected()
+                && !permanentBanRadioButton.isSelected() && !warningBanRadioButton.isSelected()
+                && !multiAccountBanRadioButton.isSelected()) {
             validationErrors.add("No ban duration is selected.");
         }
 

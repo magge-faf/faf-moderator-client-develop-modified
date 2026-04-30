@@ -55,7 +55,8 @@
                    GridPane.rowIndex="2"/>
         <VBox GridPane.columnIndex="1" GridPane.rowIndex="3">
             <children>
-                <RadioButton fx:id="permanentBanRadioButton" mnemonicParsing="false" text="permanent ban">
+                <RadioButton fx:id="warningBanRadioButton" mnemonicParsing="false"
+                             text="warning (5 min ban)">
                     <toggleGroup>
                         <ToggleGroup fx:id="banDuration"/>
                     </toggleGroup>
@@ -78,39 +79,54 @@
                                    promptText="positive integer"/>
                     </children>
                 </HBox>
-                <RadioButton fx:id="temporaryBanRadioButton"  mnemonicParsing="false"
-                             text="temporary ban until (i.e. 2017-12-31T12:00:00)" toggleGroup="$banDuration">
+                <RadioButton fx:id="permanentBanRadioButton" mnemonicParsing="false"
+                             text="permanent ban" toggleGroup="$banDuration">
                     <padding>
                         <Insets bottom="3.0" top="3.0"/>
                     </padding>
                 </RadioButton>
-                <HBox>
+                <RadioButton fx:id="multiAccountBanRadioButton" mnemonicParsing="false"
+                             text="permanent ban (Multi-Account Default)" toggleGroup="$banDuration">
+                    <padding>
+                        <Insets bottom="3.0" top="3.0"/>
+                    </padding>
+                </RadioButton>
+                <Button fx:id="specificTimeButton" mnemonicParsing="false"
+                        text="▸ Specific date/time..." onAction="#onSpecificTimeToggle"
+                        style="-fx-background-color: transparent; -fx-border-color: transparent; -fx-text-fill: #aaaaaa; -fx-padding: 2 0 2 0; -fx-cursor: hand;">
                     <VBox.margin>
-                        <Insets left="40.0"/>
+                        <Insets top="3.0"/>
                     </VBox.margin>
-                    <children>
-                        <TextField fx:id="untilTextField" maxWidth="250.0" onKeyReleased="#onDurationTextChange"
-                                   prefWidth="250.0" promptText="yyyy-mm-ddThh:mm"/>
-                        <Label fx:id="untilDateTimeValidateLabel" maxHeight="1.7976931348623157E308"
-                               maxWidth="1.7976931348623157E308">
-                            <opaqueInsets>
-                                <Insets/>
-                            </opaqueInsets>
-                            <HBox.margin>
-                                <Insets left="10.0"/>
-                            </HBox.margin>
-                            <font>
-                                <Font name="System Italic" size="15.0"/>
-                            </font>
-                        </Label>
-                    </children>
-                </HBox>
-                <RadioButton fx:id="warningBanRadioButton" mnemonicParsing="false"
-                             text="warning (5 min ban)" toggleGroup="$banDuration">
-                    <padding>
-                        <Insets bottom="3.0" top="3.0"/>
-                    </padding>
-                </RadioButton>
+                </Button>
+                <VBox fx:id="specificTimeSection" managed="false" visible="false">
+                    <RadioButton fx:id="temporaryBanRadioButton" mnemonicParsing="false"
+                                 text="temporary ban until (i.e. 2017-12-31T12:00:00)" toggleGroup="$banDuration">
+                        <padding>
+                            <Insets bottom="3.0" top="3.0"/>
+                        </padding>
+                    </RadioButton>
+                    <HBox>
+                        <VBox.margin>
+                            <Insets left="40.0"/>
+                        </VBox.margin>
+                        <children>
+                            <TextField fx:id="untilTextField" maxWidth="250.0" onKeyReleased="#onDurationTextChange"
+                                       prefWidth="250.0" promptText="yyyy-mm-ddThh:mm"/>
+                            <Label fx:id="untilDateTimeValidateLabel" maxHeight="1.7976931348623157E308"
+                                   maxWidth="1.7976931348623157E308">
+                                <opaqueInsets>
+                                    <Insets/>
+                                </opaqueInsets>
+                                <HBox.margin>
+                                    <Insets left="10.0"/>
+                                </HBox.margin>
+                                <font>
+                                    <Font name="System Italic" size="15.0"/>
+                                </font>
+                            </Label>
+                        </children>
+                    </HBox>
+                </VBox>
             </children>
         </VBox>
         <VBox GridPane.columnIndex="1" GridPane.rowIndex="4" GridPane.vgrow="ALWAYS">
