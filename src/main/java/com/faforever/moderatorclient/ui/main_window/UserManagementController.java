@@ -1290,6 +1290,7 @@ public class UserManagementController implements Controller<SplitPane> {
         synchronized (pauseLock) {
             isPaused = false;
             isStopped = true;
+            cancelRequestedByUser = true;
             checkRecentAccountsForSmurfsPauseButton.setText("Pause");
             pauseLock.notifyAll();
         }
@@ -1945,6 +1946,9 @@ public class UserManagementController implements Controller<SplitPane> {
 
             @Override
             protected Void call() {
+                cancelRequestedByUser = false;
+                isStopped = false;
+
                 List<PlayerFX> accounts = userService.findLatestRegistrations();
 
                 if (accounts == null || accounts.isEmpty()) {
@@ -1957,6 +1961,22 @@ public class UserManagementController implements Controller<SplitPane> {
                 log.debug("Cutoff date: {}", cutoff);
 
                 for (PlayerFX account : accounts) {
+                    if (isStopped) {
+                        isStopped = false;
+                        break;
+                    }
+
+                    // Honour pause between accounts so the UI responds instantly
+                    synchronized (pauseLock) {
+                        while (isPaused && !isStopped) {
+                            try {
+                                pauseLock.wait();
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                isStopped = true;
+                            }
+                        }
+                    }
                     if (isStopped) {
                         isStopped = false;
                         break;
