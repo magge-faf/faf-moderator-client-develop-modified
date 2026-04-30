@@ -1295,21 +1295,19 @@ public class UserManagementController implements Controller<SplitPane> {
         }
     }
 
-    private List<Object> processUsers(String attributeName, String attributeValue, String currentPlayerID) {
-        List<Object> foundAccounts = new ArrayList<>();
+    private List<PlayerFX> processUsers(String attributeName, String attributeValue,
+                                        PlayerFX currentPlayer,
+                                        List<Map<String, Object>> excludedItems) {
+        List<PlayerFX> foundAccounts = new ArrayList<>();
+        String currentPlayerId = currentPlayer != null ? currentPlayer.getId() : null;
 
         try {
-            String displayAttr = attributeName.contains(".") ? attributeName.substring(attributeName.lastIndexOf('.') + 1) : attributeName;
-            String headerLine = String.format("\n  [%s]  %s", displayAttr, attributeValue);
-            if (!snapOnlyShowActive) {
-                updateSmurfVillageLogTextArea(headerLine);
+            if (attributeValue == null || attributeValue.isBlank()) {
+                return foundAccounts;
             }
 
-            // --- Load JSON-based excluded items ---
-            List<Map<String, Object>> excludedItems = loadExcludedItemsFromJson();
-
-            int threshold = snapThreshold;
-            boolean promptUserOnThresholdExceeded = snapPromptOnThreshold;
+            String displayAttr = attributeName.contains(".") ? attributeName.substring(attributeName.lastIndexOf('.') + 1) : attributeName;
+            String headerLine = String.format("\n  [%s]  %s", displayAttr, attributeValue);
 
             synchronized (pauseLock) {
                 while (isPaused) {
@@ -1318,16 +1316,14 @@ public class UserManagementController implements Controller<SplitPane> {
                 }
             }
 
-            // --- Exclusion check based on JSON ---
+            // Exclusion check: match only against the specific attribute key
             boolean isExcluded = false;
             for (Map<String, Object> item : excludedItems) {
-                for (Object value : item.values()) {
-                    if (attributeValue.equals(String.valueOf(value))) {
-                        isExcluded = true;
-                        break;
-                    }
+                Object val = item.get(attributeName);
+                if (val != null && attributeValue.equals(String.valueOf(val))) {
+                    isExcluded = true;
+                    break;
                 }
-                if (isExcluded) break;
             }
 
             if (isExcluded) {
@@ -1337,122 +1333,110 @@ public class UserManagementController implements Controller<SplitPane> {
                 return foundAccounts;
             }
 
-            // --- Skip null or empty attributes ---
             List<PlayerFX> users = Collections.emptyList();
-            if (!"recentIpAddress".equals(attributeName) || (attributeValue != null && !attributeValue.trim().isEmpty())) {
-                try {
-                    users = userService.findUsersByAttribute(attributeName, attributeValue);
+            try {
+                users = userService.findUsersByAttribute(attributeName, attributeValue);
 
-                    // --- Threshold dialog for large result sets (runs on FX thread) ---
-                    if (promptUserOnThresholdExceeded  && users.size() > threshold) {
-                        final CountDownLatch latch = new CountDownLatch(1);
-                        final AtomicReference<ButtonType> userChoice = new AtomicReference<>();
+                if (snapPromptOnThreshold && users.size() > snapThreshold) {
+                    final CountDownLatch latch = new CountDownLatch(1);
+                    final AtomicReference<ButtonType> userChoice = new AtomicReference<>();
 
-                        List<PlayerFX> finalUsers = users;
-                        int finalThreshold = threshold;
-                        Platform.runLater(() -> {
-                            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-                            alert.setTitle("Threshold exceeded for number of matches detected");
-                            String warningMessage = String.format(
-                                    "Found %d accounts for [%s] = [%s], exceeding the threshold of %d.\n\n" +
-                                            "Do you want to continue processing, or add this value to the exclusion list and skip it, or cancel the process?",
-                                    finalUsers.size(), attributeName, attributeValue, finalThreshold);
-                            alert.setContentText(warningMessage);
+                    List<PlayerFX> finalUsers = users;
+                    int finalThreshold = snapThreshold;
+                    Platform.runLater(() -> {
+                        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+                        alert.setTitle("Threshold exceeded for number of matches detected");
+                        String warningMessage = String.format(
+                                "Found %d accounts for [%s] = [%s], exceeding the threshold of %d.\n\n" +
+                                        "Do you want to continue processing, or add this value to the exclusion list and skip it, or cancel the process?",
+                                finalUsers.size(), attributeName, attributeValue, finalThreshold);
+                        alert.setContentText(warningMessage);
 
-                            ButtonType continueButton = new ButtonType("Continue");
-                            ButtonType excludeButton = new ButtonType("Add to exclusion list and skip");
-                            ButtonType detailsButton = new ButtonType("Show Related Accounts");
-                            ButtonType cancelButton = new ButtonType("Cancel Process");
-                            alert.getButtonTypes().setAll(continueButton, excludeButton, detailsButton, cancelButton);
+                        ButtonType continueButton = new ButtonType("Continue");
+                        ButtonType excludeButton = new ButtonType("Add to exclusion list and skip");
+                        ButtonType detailsButton = new ButtonType("Show Related Accounts");
+                        ButtonType cancelButton = new ButtonType("Cancel Process");
+                        alert.getButtonTypes().setAll(continueButton, excludeButton, detailsButton, cancelButton);
 
-                            // Disable keyboard input
-                            DialogPane dialogPane = alert.getDialogPane();
-                            dialogPane.addEventFilter(KeyEvent.KEY_PRESSED, Event::consume);
+                        DialogPane dialogPane = alert.getDialogPane();
+                        dialogPane.addEventFilter(KeyEvent.KEY_PRESSED, Event::consume);
 
-                            boolean detailsClicked[] = {false}; // Track if details button has been clicked
-
-                            while (true) {
-                                Optional<ButtonType> result = alert.showAndWait();
-                                if (result.isPresent()) {
-                                    ButtonType chosen = result.get();
-
-                                    if (chosen == detailsButton) {
-                                        showUserDetailsWindow(finalUsers);
-                                        detailsClicked[0] = true;
-
-                                        // Grey out the "Show Related Accounts" button
-                                        // TODO Causes some nasty bug if user clicks more than once on it
-                                        Button detailsButtonNode = (Button) dialogPane.lookupButton(detailsButton);
-                                        detailsButtonNode.setDisable(true);
-                                    } else {
-                                        userChoice.set(chosen);
-                                        break;
-                                    }
+                        while (true) {
+                            Optional<ButtonType> result = alert.showAndWait();
+                            if (result.isPresent()) {
+                                ButtonType chosen = result.get();
+                                if (chosen == detailsButton) {
+                                    showUserDetailsWindow(finalUsers);
+                                    ((Button) dialogPane.lookupButton(detailsButton)).setDisable(true);
                                 } else {
-                                    // If dialog closed without selection, treat as cancel
-                                    userChoice.set(cancelButton);
+                                    userChoice.set(chosen);
                                     break;
                                 }
+                            } else {
+                                userChoice.set(cancelButton);
+                                break;
                             }
+                        }
 
-                            latch.countDown();
-                        });
+                        latch.countDown();
+                    });
 
-                        // Wait for user input
-                        latch.await();
+                    latch.await();
 
-                        ButtonType resultType = userChoice.get();
-                        if (resultType != null) {
-                            String buttonText = resultType.getText();
+                    ButtonType resultType = userChoice.get();
+                    if (resultType != null) {
+                        String buttonText = resultType.getText();
+                        if ("Add to exclusion list and skip".equals(buttonText)) {
+                            Map<String, Object> newExcludedItem = new HashMap<>();
+                            newExcludedItem.put(attributeName, attributeValue);
+                            newExcludedItem.put("AddedOn", LocalDateTime.now().toString());
+                            newExcludedItem.put("comment", String.format(
+                                    "Excluded by user prompt: %d related accounts found for [%s = %s]",
+                                    users.size(), attributeName, attributeValue));
 
-                            if ("Add to exclusion list and skip".equals(buttonText)) {
-                                Map<String, Object> newExcludedItem = new HashMap<>();
-                                newExcludedItem.put(attributeName, attributeValue);
-                                newExcludedItem.put("AddedOn", LocalDateTime.now().toString());
-                                newExcludedItem.put("comment", String.format(
-                                        "Excluded by user prompt: %d related accounts found for [%s = %s]",
-                                        users.size(), attributeName, attributeValue));
+                            excludedHardwareItemsController.saveExcludedItem(newExcludedItem);
+                            excludedHardwareItemsController.updateStatsDisplay();
+                            excludedItems.add(newExcludedItem);
 
-                                excludedHardwareItemsController.saveExcludedItem(newExcludedItem);
-                                excludedHardwareItemsController.updateStatsDisplay();
-
-                                updateSmurfVillageLogTextArea(String.format(
-                                        "\t\t Added [%s = %s] to exclusion list and skipped (%d related accounts found).\n",
-                                        attributeName, attributeValue, users.size()));
-
-                                return foundAccounts; // skip processing
-                            } else if ("Cancel Process".equals(buttonText)) {
-                                cancelRequestedByUser = true;
-                                updateSmurfVillageLogTextArea("\t\t User canceled operation.\n");
-                                return Collections.emptyList();
-                            }
-                            // Continue if "Continue" clicked
+                            updateSmurfVillageLogTextArea(String.format(
+                                    "\t\t Added [%s = %s] to exclusion list and skipped (%d related accounts found).\n",
+                                    attributeName, attributeValue, users.size()));
+                            return foundAccounts;
+                        } else if ("Cancel Process".equals(buttonText)) {
+                            cancelRequestedByUser = true;
+                            updateSmurfVillageLogTextArea("\t\t User canceled operation.\n");
+                            return Collections.emptyList();
                         }
                     }
-
-                } catch (HttpClientErrorException e) {
-                    updateSmurfVillageLogTextArea(
-                            String.format("\t\t ERROR fetching users for [%s] [%s]: %s\n",
-                                    attributeName, attributeValue, e.getMessage()));
                 }
+
+            } catch (HttpClientErrorException e) {
+                updateSmurfVillageLogTextArea(
+                        String.format("\t\t ERROR fetching users for [%s] [%s]: %s\n",
+                                attributeName, attributeValue, e.getMessage()));
             }
 
-            // --- Exclude root player ---
             List<PlayerFX> otherAccounts = users.stream()
-                    .filter(user -> !user.getId().equals(currentPlayerID))
+                    .filter(user -> !user.getId().equals(currentPlayerId))
                     .toList();
 
-            // --- Add root player to table if other accounts found ---
-            if (!otherAccounts.isEmpty()) {
-                addNewAccountsToTable(Collections.singletonList(currentPlayerID));
-                foundAccounts.add(currentPlayerID);
+            // Batch all log output for this attribute into one Platform.runLater
+            StringBuilder localLog = new StringBuilder();
+            boolean headerEmitted = false;
+            if (!snapOnlyShowActive) {
+                localLog.append(headerLine);
+                headerEmitted = true;
             }
 
             if (otherAccounts.isEmpty()) {
                 if (!snapOnlyShowActive) {
-                    updateSmurfVillageLogTextArea("   (no matches)");
+                    localLog.append("   (no matches)");
                 }
             } else {
+                if (currentPlayer != null) {
+                    addPlayerDirectlyToTable(currentPlayer);
+                }
+
                 List<String> activeLines = new ArrayList<>();
                 for (PlayerFX user : otherAccounts) {
                     BanInfoFX ban = user.getBans().stream()
@@ -1481,18 +1465,25 @@ public class UserManagementController implements Controller<SplitPane> {
                     activeLines.add(String.format("\n    %s  %s  id: %s   %s",
                             prefix, user.getLogin(), user.getId(), banInfo));
 
-                    if (user.getId() != null && !foundAccounts.contains(user.getId())) {
-                        foundAccounts.add(user.getId());
-                        addNewAccountsToTable(Collections.singletonList(user.getId()));
+                    String userId = user.getId();
+                    if (userId != null && foundAccounts.stream().noneMatch(p -> p.getId().equals(userId))) {
+                        foundAccounts.add(user);
+                        addPlayerDirectlyToTable(user);
                     }
                 }
 
                 if (!activeLines.isEmpty()) {
-                    if (snapOnlyShowActive) {
-                        updateSmurfVillageLogTextArea(headerLine);
+                    if (snapOnlyShowActive && !headerEmitted) {
+                        localLog.append(headerLine);
                     }
-                    activeLines.forEach(line -> updateSmurfVillageLogTextArea(line));
+                    for (String line : activeLines) {
+                        localLog.append(line);
+                    }
                 }
+            }
+
+            if (localLog.length() > 0) {
+                updateSmurfVillageLogTextArea(localLog.toString());
             }
 
         } catch (InterruptedException e) {
@@ -1568,17 +1559,17 @@ public class UserManagementController implements Controller<SplitPane> {
         detailsStage.showAndWait();
     }
 
-    public Set<String> alreadyCheckedUsers = new HashSet<>();
-    public Set<String> alreadyCheckedUuids = new HashSet<>();
-    public Set<String> alreadyCheckedHashes = new HashSet<>();
-    public Set<String> alreadyCheckedIps = new HashSet<>();
-    public Set<String> alreadyCheckedMemorySerialNumbers = new HashSet<>();
-    public Set<String> alreadyCheckedVolumeSerialNumbers = new HashSet<>();
-    public Set<String> alreadyCheckedSerialNumbers = new HashSet<>();
-    public Set<String> alreadyCheckedProcessorIds = new HashSet<>();
-    public Set<String> alreadyCheckedCpuNames = new HashSet<>();
-    public Set<String> alreadyCheckedBiosVersions = new HashSet<>();
-    public Set<String> alreadyCheckedManufacturers = new HashSet<>();
+    private Set<String> alreadyCheckedUsers = new HashSet<>();
+    private Set<String> alreadyCheckedUuids = new HashSet<>();
+    private Set<String> alreadyCheckedHashes = new HashSet<>();
+    private Set<String> alreadyCheckedIps = new HashSet<>();
+    private Set<String> alreadyCheckedMemorySerialNumbers = new HashSet<>();
+    private Set<String> alreadyCheckedVolumeSerialNumbers = new HashSet<>();
+    private Set<String> alreadyCheckedSerialNumbers = new HashSet<>();
+    private Set<String> alreadyCheckedProcessorIds = new HashSet<>();
+    private Set<String> alreadyCheckedCpuNames = new HashSet<>();
+    private Set<String> alreadyCheckedBiosVersions = new HashSet<>();
+    private Set<String> alreadyCheckedManufacturers = new HashSet<>();
 
     void setStatusWorking() {
         statusLabelSmurfVillageLookup.setStyle("-fx-background-color: orange; -fx-text-fill: black; -fx-background-radius: 1;");
@@ -1598,7 +1589,6 @@ public class UserManagementController implements Controller<SplitPane> {
             return;
         }
 
-        startTaskTimer();
         if (!snapSuppressCleanOutput) {
             updateSmurfVillageLogTextArea(String.format("\n=== Checking PlayerID: %s ===", playerID));
         }
@@ -1624,8 +1614,13 @@ public class UserManagementController implements Controller<SplitPane> {
         String propertyCPUName = searchUserPropertyMapping.get("CPU Name");
         String propertyManufacturer = searchUserPropertyMapping.get("Manufacturer");
 
-        // Collect user attributes
-        Set<PlayerFX> userFound = new HashSet<>(userService.findUsersByAttribute(propertyId, playerID));
+        // Fetch player data and extract hardware attributes
+        List<PlayerFX> userFoundList = userService.findUsersByAttribute(propertyId, playerID);
+        PlayerFX currentPlayer = userFoundList.isEmpty() ? null : userFoundList.getFirst();
+
+        // Load excluded items once for the entire attribute scan
+        List<Map<String, Object>> excludedItems = loadExcludedItemsFromJson();
+
         Set<String> uuids = new HashSet<>();
         Set<String> hashes = new HashSet<>();
         Set<String> ips = new HashSet<>();
@@ -1636,19 +1631,23 @@ public class UserManagementController implements Controller<SplitPane> {
         Set<String> cpuNames = new HashSet<>();
         Set<String> manufacturers = new HashSet<>();
 
-        userFound.forEach(user -> user.getUniqueIdAssignments().forEach(item -> {
-            if (snapIncludeCpuName)      cpuNames.add(item.getUniqueId().getName());
-            if (snapIncludeUUID)         uuids.add(item.getUniqueId().getUuid());
-            if (snapIncludeHash)         hashes.add(item.getUniqueId().getHash());
-            if (snapIncludeIP)           ips.add(user.getRecentIpAddress());
-            if (snapIncludeMemorySerial) memorySerialNumbers.add(item.getUniqueId().getMemorySerialNumber());
-            if (snapIncludeVolumeSerial) volumeSerialNumbers.add(item.getUniqueId().getVolumeSerialNumber());
-            if (snapIncludeSerial)       serialNumbers.add(item.getUniqueId().getSerialNumber());
-            if (snapIncludeProcessorId)  processorIds.add(item.getUniqueId().getProcessorId());
-            if (snapIncludeManufacturer) manufacturers.add(item.getUniqueId().getManufacturer());
-        }));
+        for (PlayerFX user : userFoundList) {
+            if (snapIncludeIP) addIfNotBlank(ips, user.getRecentIpAddress());
+            for (var item : user.getUniqueIdAssignments()) {
+                var uid = item.getUniqueId();
+                if (uid == null) continue;
+                if (snapIncludeCpuName)      addIfNotBlank(cpuNames, uid.getName());
+                if (snapIncludeUUID)         addIfNotBlank(uuids, uid.getUuid());
+                if (snapIncludeHash)         addIfNotBlank(hashes, uid.getHash());
+                if (snapIncludeMemorySerial) addIfNotBlank(memorySerialNumbers, uid.getMemorySerialNumber());
+                if (snapIncludeVolumeSerial) addIfNotBlank(volumeSerialNumbers, uid.getVolumeSerialNumber());
+                if (snapIncludeSerial)       addIfNotBlank(serialNumbers, uid.getSerialNumber());
+                if (snapIncludeProcessorId)  addIfNotBlank(processorIds, uid.getProcessorId());
+                if (snapIncludeManufacturer) addIfNotBlank(manufacturers, uid.getManufacturer());
+            }
+        }
 
-        Set<Object> accountsWithSharedAttributes = new LinkedHashSet<>(); // deduplicated cumulative set
+        Set<String> accountsWithSharedAttributes = new LinkedHashSet<>();
 
         // Attribute metadata helper
         class AttributeSet {
@@ -1677,7 +1676,6 @@ public class UserManagementController implements Controller<SplitPane> {
                 new AttributeSet(manufacturers, propertyManufacturer, alreadyCheckedManufacturers, "manufacturer")
         );
 
-        // Process each attribute set incrementally, respecting cancellation
         for (AttributeSet attr : attributeSets) {
             if (cancelRequestedByUser) {
                 updateSmurfVillageLogTextArea("\nProcess canceled during attribute scanning.\n");
@@ -1690,7 +1688,8 @@ public class UserManagementController implements Controller<SplitPane> {
                     attr.alreadyCheckedSet,
                     attr.type,
                     accountsWithSharedAttributes,
-                    playerID);
+                    currentPlayer,
+                    excludedItems);
         }
 
         if (cancelRequestedByUser) {
@@ -1698,17 +1697,11 @@ public class UserManagementController implements Controller<SplitPane> {
             return;
         }
 
-        // Log related accounts
-        List<String> relatedAccounts = accountsWithSharedAttributes.stream()
-                .map(Object::toString)
-                .filter(id -> !id.equals(playerID))
-                .toList();
-
-        if (!relatedAccounts.isEmpty()) {
+        if (!accountsWithSharedAttributes.isEmpty()) {
             if (snapSuppressCleanOutput) {
                 updateSmurfVillageLogTextArea(String.format("\n=== Checking PlayerID: %s ===", playerID));
             }
-            updateSmurfVillageLogTextArea("\n  " + playerID + " → related: " + relatedAccounts + "\n");
+            updateSmurfVillageLogTextArea("\n  " + playerID + " → related: " + new ArrayList<>(accountsWithSharedAttributes) + "\n");
         } else if (!snapSuppressCleanOutput) {
             updateSmurfVillageLogTextArea("\n  → no related accounts\n");
         }
@@ -1718,20 +1711,23 @@ public class UserManagementController implements Controller<SplitPane> {
             return;
         }
 
-        // Recursively check found accounts, respecting cancellation
-        for (Object s : accountsWithSharedAttributes) {
+        for (String id : accountsWithSharedAttributes) {
             if (cancelRequestedByUser) {
                 updateSmurfVillageLogTextArea("\nProcess canceled during recursive lookup.\n");
                 return;
             }
-            onSmurfVillageLookup((String) s);
+            onSmurfVillageLookup(id);
         }
     }
 
-    // Incremental processing with immediate table addition
+    private static void addIfNotBlank(Set<String> set, String value) {
+        if (value != null && !value.isBlank()) set.add(value);
+    }
+
     private void processSetIncremental(Set<String> items, String property,
                                        Set<String> alreadyCheckedSet, String type,
-                                       Set<Object> cumulativeAccounts, String currentPlayerID) {
+                                       Set<String> cumulativeAccounts, PlayerFX currentPlayer,
+                                       List<Map<String, Object>> excludedItems) {
         for (String item : items) {
             if (cancelRequestedByUser) {
                 updateSmurfVillageLogTextArea("\nProcess canceled by user.\n");
@@ -1741,16 +1737,10 @@ public class UserManagementController implements Controller<SplitPane> {
             Platform.runLater(() -> statusTextFieldProcessingItem.setText(type + ": " + item));
 
             if (!alreadyCheckedSet.contains(item)) {
-                List<Object> accountsFromThisItem = processUsers(property, item, currentPlayerID);
-
-                // Only add accounts if the list is not empty
-                if (!accountsFromThisItem.isEmpty()) {
-                    for (Object accountId : accountsFromThisItem) {
-                        addNewAccountsToTable(Collections.singletonList(accountId));
-                        cumulativeAccounts.add(accountId);
-                    }
+                List<PlayerFX> accountsFromThisItem = processUsers(property, item, currentPlayer, excludedItems);
+                for (PlayerFX player : accountsFromThisItem) {
+                    cumulativeAccounts.add(player.getId());
                 }
-
                 alreadyCheckedSet.add(item);
             } else {
                 String message = String.format("\nIgnoring duplicate: %s [%s] already processed.", type, item);
@@ -1760,11 +1750,13 @@ public class UserManagementController implements Controller<SplitPane> {
         }
     }
 
-    // Table insertion helper
-    private void addNewAccountsToTable(List<Object> accounts) {
-        for (Object accountId : accounts) {
-            userSearchSmurfVillageAddToUserTable((String) accountId);
-        }
+    private void addPlayerDirectlyToTable(PlayerFX player) {
+        if (player == null) return;
+        Platform.runLater(() -> {
+            if (users.stream().noneMatch(u -> u.getId().equals(player.getId()))) {
+                users.add(player);
+            }
+        });
     }
 
     private void captureSmurfCheckSettings() {
@@ -1858,6 +1850,7 @@ public class UserManagementController implements Controller<SplitPane> {
                         userID = String.valueOf(results.getFirst().getId());
                     }
 
+                    startTaskTimer();
                     onSmurfVillageLookup(userID);
 
                 } catch (Exception e) {
