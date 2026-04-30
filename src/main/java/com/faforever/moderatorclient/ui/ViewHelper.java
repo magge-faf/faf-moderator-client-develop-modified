@@ -558,7 +558,7 @@ public class ViewHelper {
                             break;
                         }
                     } catch (Exception e) {
-                        log.debug(String.valueOf(e));
+                        log.debug("Error reading line from file", e);
                     }
                 }
                 if (alreadyExists) {
@@ -570,7 +570,7 @@ public class ViewHelper {
                 }
             }
         } catch (IOException e) {
-            log.debug(String.valueOf(e));
+            log.debug("Failed to write to file", e);
         }
     }
 

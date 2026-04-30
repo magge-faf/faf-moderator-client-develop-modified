@@ -1180,7 +1180,7 @@ public class UserManagementController implements Controller<SplitPane> {
                         onSmurfVillageLookup(userId);
 
                     } catch (Exception e) {
-                        log.error("Error processing user ID {}: {}", userId, e.getMessage());
+                        log.error("Error processing user ID {}", userId, e);
                     }
 
                     count++;
@@ -1234,7 +1234,7 @@ public class UserManagementController implements Controller<SplitPane> {
             List<PlayerFX> results = userService.findUsersByAttribute("id", userId);
             return results.isEmpty() ? null : results.getFirst();
         } catch (Exception e) {
-            log.error("Error finding user ID {}: {}", userId, e.getMessage());
+            log.error("Error finding user ID {}", userId, e);
             return null;
         }
     }

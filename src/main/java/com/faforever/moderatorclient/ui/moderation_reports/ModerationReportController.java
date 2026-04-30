@@ -288,7 +288,7 @@ public class ModerationReportController implements Controller<Region> {
                 }
             }, 750);
         } catch (NullPointerException e) {
-            log.debug(String.valueOf(e));
+            log.debug("NPE in template-without-reasons (nothing selected?)", e);
         }
     }
 
@@ -411,7 +411,7 @@ public class ModerationReportController implements Controller<Region> {
                 });
             });
         } catch (Exception e) {
-            log.warn(String.valueOf(e));
+            log.warn("Error in template-with-reasons button", e);
         }
     }
 
@@ -420,7 +420,7 @@ public class ModerationReportController implements Controller<Region> {
         try {
             return objectMapper.readValue(templatesAndReasonsFile, TemplateAndReasonConfig.class);
         } catch (IOException e) {
-            log.warn(String.valueOf(e));
+            log.warn("Failed to load templates and reasons config", e);
         }
         return null;
     }
@@ -681,7 +681,7 @@ public class ModerationReportController implements Controller<Region> {
                 }
             }, 750);
         } catch (NullPointerException e) {
-            log.debug(String.valueOf(e));
+            log.debug("NPE in reference-only button (nothing selected?)", e);
         }
     }
 
@@ -1414,7 +1414,7 @@ public class ModerationReportController implements Controller<Region> {
                                 contentGamingModeratorTask.append(line).append("\n");
                             }
                         } catch (IOException e) {
-                            log.warn(String.valueOf(e));
+                            log.warn("Failed to read gaming moderator task template", e);
                         }
 
                         try {
