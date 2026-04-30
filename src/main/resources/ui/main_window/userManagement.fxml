@@ -109,6 +109,8 @@
 
                                 <!-- Expert Settings -->
                                 <Label text="Expert Settings"/>
+                                <CheckBox fx:id="onlyShowActiveAccountsCheckBox"
+                                          text="Only Show Unbanned (Active) Accounts"/>
                                 <CheckBox fx:id="catchFirstLayerSmurfsOnlyCheckBox"
                                           text="Limit to First Layer Accounts (See Tooltip)">
                                     <tooltip>
@@ -273,7 +275,8 @@
 
         <Tab fx:id="smurfOutputTab" text="Smurf Village">
             <VBox>
-                <TextArea fx:id="smurfOutputTextArea" VBox.vgrow="ALWAYS"/>
+                <TextArea fx:id="smurfOutputTextArea" VBox.vgrow="ALWAYS"
+                          style="-fx-font-family: 'Consolas', 'Courier New', monospace; -fx-font-size: 12px;"/>
             </VBox>
         </Tab>
     </TabPane>
