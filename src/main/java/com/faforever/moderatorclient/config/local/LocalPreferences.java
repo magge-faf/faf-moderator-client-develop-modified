@@ -19,6 +19,8 @@ public class LocalPreferences {
     private TabSettings tabSettings = new TabSettings();
     private VersionReminder versionReminder = new VersionReminder();
     private TabEditModerationReport tabEditModerationReport = new TabEditModerationReport();
+    private TabRecentNotes tabRecentNotes = new TabRecentNotes();
+    private TabBans tabBans = new TabBans();
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     @Data
@@ -35,6 +37,7 @@ public class LocalPreferences {
         String browserComboBox = "SelectBrowser";
         boolean darkMode = true;
         String startUpTab = "userManagementTab";
+        boolean suppressRateLimitWarning = false;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -48,6 +51,7 @@ public class LocalPreferences {
         // CheckBox
         boolean promptUserOnThresholdExceededSmurfVillageLookupCheckBox = true;
         boolean catchFirstLayerSmurfsOnlyCheckBox = true;
+        boolean onlyShowActiveAccountsCheckBox = false;
 
         boolean includeUUIDCheckBox = false;
         boolean includeUIDHashCheckBox = true;
@@ -84,11 +88,10 @@ public class LocalPreferences {
 
         // CheckBoxes
         boolean syncPermanentBansAtStartupCheckbox = false;
-        boolean syncPermanentBansBeforeSearchCheckbox = false;
         boolean syncTemporaryBansAtStartupCheckbox = false;
-        boolean syncTemporaryBansBeforeSearchCheckbox = false;
         boolean rememberLoginCheckBox = true;
         boolean darkModeCheckBox = true;
+        boolean fetchBansOnStartupCheckBox = false;
 
         // TitledPanes
 
@@ -137,5 +140,19 @@ public class LocalPreferences {
     @Data
     public static class VersionReminder {
         private long lastReminderEpoch = 0; // timestamp in milliseconds
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @Data
+    public static class TabRecentNotes {
+        Map<String, Double> columnWidthsTabRecentNotes = new HashMap<>();
+        List<String> columnOrderTabRecentNotes = new ArrayList<>();
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @Data
+    public static class TabBans {
+        Map<String, Double> columnWidthsTabBans = new HashMap<>();
+        List<String> columnOrderTabBans = new ArrayList<>();
     }
 }

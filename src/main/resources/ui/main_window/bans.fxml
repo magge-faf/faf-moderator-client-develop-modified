@@ -56,48 +56,6 @@
                 <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
             </VBox.margin>
         </Button>
-        <Separator/>
-        <Label text="WIP - but should work"/>
-        <Label text="User Ban Synchronization"/>
-        <Label text="Do not sync both at the same time."/>
-        <Label text="Doing so will cause malformed JSON data."/>
-        <Label text="You can resume syncs after closing Mordor (Supposedly)."/>
-        <Label text="Sync Perm will take a very long time."/>
-        <Label text="(Better backup the file between sessions)"/>
-
-        <Separator/>
-        <HBox alignment="CENTER_LEFT" spacing="5.0">
-            <Button layoutX="15.0" layoutY="50.0" mnemonicParsing="false" onAction="#syncTempBannedUsersJson" text="Sync Temporary Bans">
-                <VBox.margin>
-                    <Insets bottom="5.0" left="5.0" right="5.0" top="10.0"/>
-                </VBox.margin>
-            </Button>
-            <Label fx:id="tempBanCountLabel"/>
-        </HBox>
-        <VBox fx:id="tempSyncProgressContainer" alignment="CENTER" spacing="5">
-            <ProgressIndicator fx:id="tempSyncProgressIndicator" visible="false" managed="false"/>
-            <Label fx:id="tempSyncProgressLabel" visible="false" managed="false"/>
-            <VBox.margin>
-                <Insets bottom="5.0" left="5.0" right="5.0" top="2.0"/>
-            </VBox.margin>
-        </VBox>
-        <HBox alignment="CENTER_LEFT" spacing="5">
-
-            <Button layoutX="15.0" layoutY="50.0" mnemonicParsing="false" onAction="#syncPermBannedUsersJson"
-                    text="Sync Permanent Bans">
-                <VBox.margin>
-                    <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
-                </VBox.margin>
-            </Button>
-            <Label fx:id="permBanCountLabel"/>
-        </HBox>
-        <VBox fx:id="permSyncProgressContainer" alignment="CENTER" spacing="5">
-            <ProgressIndicator fx:id="permSyncProgressIndicator" visible="false" managed="false"/>
-            <Label fx:id="permSyncProgressLabel" visible="false" managed="false"/>
-            <VBox.margin>
-                <Insets bottom="5.0" left="5.0" right="5.0" top="2.0"/>
-            </VBox.margin>
-        </VBox>
     </VBox>
     <TableView fx:id="banTableView" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
                HBox.hgrow="ALWAYS"/>

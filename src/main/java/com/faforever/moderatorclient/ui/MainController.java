@@ -65,6 +65,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     public Tab smurfManagementControllerTab;
     public Tab replayAnalysisControllerTab;
     public Tab excludedHardwareItemsTab;
+    public Tab apiHistoryTab;
 
     private SettingsController settingsController;
     private ModerationReportController moderationReportController;
@@ -85,6 +86,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     private SmurfManagementController smurfManagementController;
     private ReplayAnalysisController replayAnalysisController;
     private ExcludedHardwareItemsController excludedHardwareItemsController;
+    private ApiHistoryController apiHistoryController;
 
     private final Map<Tab, Boolean> dataLoadingState = new HashMap<>();
 
@@ -114,22 +116,19 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         initAvatarTab();
         initBanTab();
         initDomainBlacklistTab();
-        initMapVaultTab();
-        initMatchmakerMapPoolTab();
         initMessagesTab();
-        initModVaultTab();
         initPermissionTab();
         initRecentActivityTab();
         initReportTab();
         initSettingsTab();
         initTutorialTab();
-        initUserManagementTab();
         initVotingTab();
         initRecentNotesTab();
         initReportStatisticsTab();
         initSmurfControllerTab();
         initReplayAnalysisControllerTab();
         initExcludedHardwareItemsTab();
+        initApiHistoryTab();
         selectActiveTab();
     }
 
@@ -150,6 +149,11 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     private void initExcludedHardwareItemsTab() {
         excludedHardwareItemsController = uiService.loadFxml("ui/main_window/excludedHardwareItems.fxml");
         excludedHardwareItemsTab.setContent(excludedHardwareItemsController.getRoot());
+    }
+
+    private void initApiHistoryTab() {
+        apiHistoryController = uiService.loadFxml("ui/main_window/apiHistoryTab.fxml");
+        apiHistoryTab.setContent(apiHistoryController.getRoot());
     }
 
     private void initReplayAnalysisControllerTab() {
@@ -296,12 +300,31 @@ public class MainController implements Controller<TabPane>, DisposableBean {
 
     public void display() {
         if (localPreferences.getAutoLogin().isEnabled()) {
-            String environment = Optional.ofNullable(localPreferences.getAutoLogin().getEnvironment())
-                    .orElseThrow(() -> new IllegalStateException("Environment is not set"));
-            String refreshToken = Optional.ofNullable(localPreferences.getAutoLogin().getRefreshToken())
-                    .orElseThrow(() -> new IllegalStateException("Environment is not set"));
+            String environment = localPreferences.getAutoLogin().getEnvironment();
+            String refreshToken = localPreferences.getAutoLogin().getRefreshToken();
+
+            if (environment == null || environment.isBlank()) {
+                log.warn("Auto login configuration is missing the environment. Disabling auto login and showing login dialog.");
+                localPreferences.getAutoLogin().setEnabled(false);
+                display();
+                return;
+            }
+
+            if (refreshToken == null || refreshToken.isBlank()) {
+                log.warn("Auto login configuration is missing the refresh token. Disabling auto login and showing login dialog.");
+                localPreferences.getAutoLogin().setEnabled(false);
+                display();
+                return;
+            }
 
             EnvironmentProperties environmentProperties = applicationProperties.getEnvironments().get(environment);
+            if (environmentProperties == null) {
+                log.warn("No environment configuration found for key '{}'. Disabling auto login and showing login dialog.", environment);
+                localPreferences.getAutoLogin().setEnabled(false);
+                display();
+                return;
+            }
+
             fafApiCommunicationService.initialize(environmentProperties);
             fafUserCommunicationService.initialize(environmentProperties);
             tokenService.prepare(environmentProperties);
@@ -309,9 +332,12 @@ public class MainController implements Controller<TabPane>, DisposableBean {
             try {
                 tokenService.loginWithRefreshToken(refreshToken, true);
             } catch (Exception e) {
-                log.error("Auto login failed", e);
+                log.warn("Auto login failed (refresh token expired or revoked), clearing stored token and showing manual login dialog.", e);
                 localPreferences.getAutoLogin().setEnabled(false);
+                localPreferences.getAutoLogin().setRefreshToken(null);
+                localPreferencesReaderWriter.write(localPreferences);
                 display();
+                return;
             }
         } else {
             LoginController loginController = uiService.loadFxml("ui/login.fxml");
@@ -320,15 +346,18 @@ public class MainController implements Controller<TabPane>, DisposableBean {
             loginDialog.setOnCloseRequest(event -> System.exit(0));
             loginDialog.setTitle("FAF Moderator Client");
             loginDialog.getIcons().add(new Image(Objects.requireNonNull(this.getClass().getResourceAsStream("/media/favicon.png"))));
+
             Scene scene = new Scene(loginController.getRoot());
             String stylesheet = "/style/main-light.css";
             if (localPreferences.getTabSettings().isDarkModeCheckBox()) {
                 stylesheet = "/style/main-dark.css";
             }
             scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource(stylesheet)).toExternalForm());
+
             loginDialog.setScene(scene);
             loginDialog.showAndWait();
         }
+
         initializeAfterLogin();
         checkForNewVersion();
     }
@@ -339,6 +368,8 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         settingsController.onSave();
         moderationReportController.onSave();
         userManagementController.onSave();
+        bansController.onSave();
+        recentNotesController.onSave();
         localPreferencesReaderWriter.write(localPreferences);
         log.info("Local preferences saved successfully.");
     }

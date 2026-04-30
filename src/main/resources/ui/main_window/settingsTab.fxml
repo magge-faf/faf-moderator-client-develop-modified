@@ -29,12 +29,13 @@
             <Separator/>
 
             <VBox spacing="5">
-                <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="Default Starting Tab" textAlignment="CENTER"/>
-                <HBox alignment="CENTER_LEFT">
-                    <children>
-                        <ComboBox fx:id="defaultActiveTabComboBox" prefWidth="150.0" visibleRowCount="20"/>
-                    </children>
+                <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="Start Up"/>
+                <HBox alignment="CENTER_LEFT" spacing="10">
+                    <Label text="Starting Tab:"/>
+                    <ComboBox fx:id="defaultActiveTabComboBox" prefWidth="150.0" visibleRowCount="20"/>
                 </HBox>
+                <CheckBox fx:id="darkModeCheckBox" mnemonicParsing="false" text="Dark Mode"/>
+                <CheckBox fx:id="fetchBansOnStartupCheckBox" mnemonicParsing="false" text="Load bans at startup"/>
             </VBox>
 
             <Separator/>
@@ -70,44 +71,8 @@
 
             <Separator/>
 
-            <Label text="WIP - Disabled in this build"/>
-
-            <VBox spacing="10" disable="true">
-                <Label text="Configure how bans are synchronized from the FAF server (producer) to your local JSON file (consumer)." style="-fx-font-style: italic; -fx-font-size: 0.9em;"/>
-                <TitledPane text="Permanent Bans">
-                    <content>
-                        <VBox spacing="5">
-                            <CheckBox fx:id="syncPermanentBansAtStartupCheckbox"
-                                      text="Enable syncing of permanent bans at startup"/>
-                            <CheckBox fx:id="syncPermanentBansBeforeSearchCheckbox"
-                                      text="Enable synchronization of permanent bans when the 'Check Permanent Bans' button is pressed."/>
-                        </VBox>
-                    </content>
-                </TitledPane>
-
-                <TitledPane text="Temporary Bans">
-                    <content>
-                        <VBox spacing="5">
-                            <CheckBox fx:id="syncTemporaryBansAtStartupCheckbox"
-                                      text="Enable syncing of temporary bans at startup"/>
-                            <CheckBox fx:id="syncTemporaryBansBeforeSearchCheckbox"
-                                      text="Enable synchronization of temporary bans when the 'Check Temporary Bans' button is pressed."/>
-                        </VBox>
-                    </content>
-                </TitledPane>
-            </VBox>
-
-            <Separator/>
-
             <children>
                 <CheckBox fx:id="rememberLoginCheckBox" mnemonicParsing="false" text="Remember login"/>
-                <CheckBox fx:id="darkModeCheckBox" mnemonicParsing="false" text="Dark Mode"/>
-
-                <Separator prefWidth="200.0">
-                    <VBox.margin>
-                        <Insets/>
-                    </VBox.margin>
-                </Separator>
             </children>
 
         </VBox>

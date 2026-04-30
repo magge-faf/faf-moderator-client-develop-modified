@@ -22,6 +22,7 @@ import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.collections.*;
 import javafx.scene.input.Clipboard;
+import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
 import javafx.util.Duration;
@@ -287,7 +288,7 @@ public class ModerationReportController implements Controller<Region> {
                 }
             }, 750);
         } catch (NullPointerException e) {
-            log.debug(String.valueOf(e));
+            log.debug("NPE in template-without-reasons (nothing selected?)", e);
         }
     }
 
@@ -326,7 +327,9 @@ public class ModerationReportController implements Controller<Region> {
 
                 ComboBox<TemplateAndReasonConfig> templateComboBox = new ComboBox<>();
                 templateComboBox.getItems().addAll(templates);
-                templateComboBox.setValue(templates.getFirst());
+                if (!templates.isEmpty()) {
+                    templateComboBox.setValue(templates.getFirst());
+                }
                 templateComboBox.setCellFactory(param -> new ListCell<TemplateAndReasonConfig>() {
                     @Override
                     protected void updateItem(TemplateAndReasonConfig item, boolean empty) {
@@ -408,7 +411,7 @@ public class ModerationReportController implements Controller<Region> {
                 });
             });
         } catch (Exception e) {
-            log.warn(String.valueOf(e));
+            log.warn("Error in template-with-reasons button", e);
         }
     }
 
@@ -417,7 +420,7 @@ public class ModerationReportController implements Controller<Region> {
         try {
             return objectMapper.readValue(templatesAndReasonsFile, TemplateAndReasonConfig.class);
         } catch (IOException e) {
-            log.warn(String.valueOf(e));
+            log.warn("Failed to load templates and reasons config", e);
         }
         return null;
     }
@@ -678,7 +681,7 @@ public class ModerationReportController implements Controller<Region> {
                 }
             }, 750);
         } catch (NullPointerException e) {
-            log.debug(String.valueOf(e));
+            log.debug("NPE in reference-only button (nothing selected?)", e);
         }
     }
 
@@ -999,10 +1002,14 @@ public class ModerationReportController implements Controller<Region> {
 
     private void setupReportSelectionListener() {
         reportTableView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
+            if (newValue == null) {
+                resetButtonsToInvalidState();
+                return;
+            }
             try {
                 updateReportDetails(newValue);
             } catch (Exception e) {
-                log.debug("Exception for selected report: ");
+                log.debug("Exception for selected report: ", e);
                 resetButtonsToInvalidState();
             }
         });
@@ -1108,14 +1115,6 @@ public class ModerationReportController implements Controller<Region> {
         ViewHelper.buildModerationReportTableView(reportTableView, sortedItemList, this::showChatLog);
         statusChoiceBox.getSelectionModel().selectedItemProperty().addListener(observable -> renewFilter());
         playerNameFilterTextField.textProperty().addListener(observable -> renewFilter());
-        reportTableView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
-            try {
-                updateReportDetails(newValue);
-            } catch (Exception e) {
-                log.debug(String.valueOf(e));
-                resetButtonsToInvalidState();
-            }
-        });
     }
 
     public static void setSysClipboardText(String writeMe) {
@@ -1216,15 +1215,27 @@ public class ModerationReportController implements Controller<Region> {
             // Step 2: Load all reports in background
             moderationReportService.getAllReportsPaged(fullPageSize, batchSize)
                     .thenAccept(allReports -> Platform.runLater(() -> {
+                        ModerationReportFX previousSelection = reportTableView.getSelectionModel().getSelectedItem();
+                        String previousSelectionId = previousSelection != null ? previousSelection.getId() : null;
+
                         itemList.clear();
                         itemList.addAll(allReports);
 
                         cachedReports.setAll(allReports);
                         processStatisticsModerator(allReports);
                         showInTableRepeatedOffenders(allReports);
-
                         totalReportsLoaded.set(allReports.size());
                         log.debug("All reports loaded. Total count: {}", allReports.size());
+
+                        if (previousSelectionId != null) {
+                            allReports.stream()
+                                    .filter(r -> previousSelectionId.equals(r.getId()))
+                                    .findFirst()
+                                    .ifPresent(r -> Platform.runLater(() -> {
+                                        reportTableView.getSelectionModel().select(r);
+                                        reportTableView.scrollTo(r);
+                                    }));
+                        }
                     }))
                     .exceptionally(throwable -> {
                         log.error("Error loading all reports", throwable);
@@ -1355,7 +1366,7 @@ public class ModerationReportController implements Controller<Region> {
 
     }
 
-    private boolean isTaskRunning = false;
+    private volatile boolean isTaskRunning = false;
 
     @SneakyThrows
     private void showChatLog(ModerationReportFX report) {
@@ -1403,7 +1414,7 @@ public class ModerationReportController implements Controller<Region> {
                                 contentGamingModeratorTask.append(line).append("\n");
                             }
                         } catch (IOException e) {
-                            log.warn(String.valueOf(e));
+                            log.warn("Failed to read gaming moderator task template", e);
                         }
 
                         try {
@@ -1649,10 +1660,10 @@ public class ModerationReportController implements Controller<Region> {
         return fullNameWithId.trim();
     }
 
+    private static final Font MONO = Font.font("Courier New", 12);
+
     private void addColoredTextForPointOfInterest(String line, TextFlow textFlow) {
-        Text text = new Text(line);
-        text.setFill(Color.ORANGE);
-        textFlow.getChildren().add(text);
+        textFlow.getChildren().add(styledText(line, Color.ORANGE));
     }
 
     List<String> keywordsPointOfInterestReplay = List.of(
@@ -1662,111 +1673,139 @@ public class ModerationReportController implements Controller<Region> {
             "Cheats Enabled:"
     );
 
+    // Matches: #N [mm:ss] or [HH:mm:ss] sender → receiver: message
+    private static final Pattern CHAT_LINE_PATTERN =
+            Pattern.compile("^(#\\d+) (\\[[^\\]]+\\]) (.+?) → (.+?): (.*)$");
+
     public void updateChatLogToColorTextFlow(TextFlow textFlow, String filteredLog, String reporterName, String offenderName) {
-
-        String colorOffender = "LIGHTCORAL";
-        String colorReporter = "LIGHTBLUE";
-
         if (textFlow == null) {
             log.debug("TextFlow is not initialized in updateChatLogToColorTextFlow");
             return;
         }
 
         textFlow.getChildren().clear();
-
         String[] lines = filteredLog.split("\n");
 
+        // First pass: compute column widths from chat lines
+        int maxLineNumLen  = 2;
+        int maxSenderLen   = 1;
+        int maxReceiverLen = 1;
+        for (String line : lines) {
+            Matcher m = CHAT_LINE_PATTERN.matcher(line);
+            if (m.matches()) {
+                maxLineNumLen  = Math.max(maxLineNumLen,  m.group(1).length());
+                maxSenderLen   = Math.max(maxSenderLen,   m.group(3).length());
+                maxReceiverLen = Math.max(maxReceiverLen, m.group(4).length());
+            }
+        }
+        final int lineNumW   = maxLineNumLen;
+        final int senderW    = maxSenderLen;
+        final int receiverW  = maxReceiverLen;
+
+        // Second pass: render
         for (String line : lines) {
             if (line == null || line.trim().isEmpty()) {
-                textFlow.getChildren().add(new Text("\n"));
+                textFlow.getChildren().add(newline());
                 continue;
             }
-
             if (line.contains("boundsType=LOGICAL")) {
                 continue;
             }
 
-            boolean isProcessed = false;
-
+            boolean isPoi = false;
             for (String keyword : keywordsPointOfInterestReplay) {
                 if (line.contains(keyword)) {
                     addColoredTextForPointOfInterest(line, textFlow);
-                    isProcessed = true;
+                    textFlow.getChildren().add(newline());
+                    isPoi = true;
                     break;
                 }
             }
+            if (isPoi) continue;
 
-            if (isProcessed) {
-                textFlow.getChildren().add(new Text("\n"));
-                continue;
-            }
+            Matcher m = CHAT_LINE_PATTERN.matcher(line);
+            if (m.matches()) {
+                String rawSender   = m.group(3);
+                String rawReceiver = m.group(4);
 
-            int offenderIndex = line.indexOf(offenderName);
-            int reporterIndex = line.indexOf(reporterName);
+                String lineNumPad  = String.format("%-" + lineNumW  + "s", m.group(1));
+                String senderPad   = String.format("%-" + senderW   + "s", rawSender);
+                String receiverPad = String.format("%-" + receiverW + "s", rawReceiver);
 
-            if (offenderIndex != -1 && reporterIndex != -1) {
-                if (offenderIndex < reporterIndex) {
-                    processLineWithBothNames(textFlow, line, offenderName, reporterName, colorOffender, colorReporter);
+                Color senderColor;
+                Color messageColor;
+                if (!offenderName.isEmpty() && rawSender.equals(offenderName)) {
+                    senderColor = Color.LIGHTCORAL;
+                    messageColor = Color.LIGHTCORAL;
+                } else if (!reporterName.isEmpty() && rawSender.equals(reporterName)) {
+                    senderColor = Color.LIGHTBLUE;
+                    messageColor = Color.LIGHTBLUE;
                 } else {
-                    processLineWithBothNames(textFlow, line, reporterName, offenderName, colorReporter, colorOffender);
+                    senderColor = Color.LIGHTYELLOW;
+                    messageColor = Color.WHITE;
                 }
-            } else if (offenderIndex != -1) {
-                processLineWithSingleName(textFlow, line, offenderName, colorOffender);
-            } else if (reporterIndex != -1) {
-                processLineWithSingleName(textFlow, line, reporterName, colorReporter);
+
+                textFlow.getChildren().addAll(
+                        styledText(lineNumPad + " ", Color.DIMGRAY),
+                        styledText(m.group(2) + "  ", Color.GRAY),
+                        styledText(senderPad + "  ", senderColor),
+                        styledText(receiverPad + "  ", Color.DIMGRAY),
+                        styledText(m.group(5), messageColor),
+                        newline()
+                );
             } else {
-                Text text = new Text(line);
-                text.setFill(Color.WHITE);
-                textFlow.getChildren().add(text);
+                appendHighlightedLine(textFlow, line, offenderName, reporterName);
+                textFlow.getChildren().add(newline());
             }
-
-            textFlow.getChildren().add(new Text("\n"));
         }
     }
 
-    private void processLineWithSingleName(TextFlow textFlow, String line, String name, String color) {
-        String[] parts = line.split(name);
-        Text textBefore = new Text(parts[0]);
-        textBefore.setFill(Color.WHITE);
-        textFlow.getChildren().add(textBefore);
+    private void appendHighlightedLine(TextFlow textFlow, String line, String offenderName, String reporterName) {
+        record Span(int start, int end, Color color) {}
+        List<Span> spans = new ArrayList<>();
 
-        Text nameText = new Text(name);
-        nameText.setFill(Color.web(color));
-        textFlow.getChildren().add(nameText);
+        for (String name : new String[]{offenderName, reporterName}) {
+            if (name == null || name.isEmpty()) continue;
+            Color color = name.equals(offenderName) ? Color.LIGHTCORAL : Color.LIGHTBLUE;
+            int idx = 0;
+            while ((idx = line.indexOf(name, idx)) != -1) {
+                spans.add(new Span(idx, idx + name.length(), color));
+                idx += name.length();
+            }
+        }
 
-        if (parts.length > 1) {
-            Text textAfter = new Text(parts[1]);
-            textAfter.setFill(Color.WHITE);
-            textFlow.getChildren().add(textAfter);
+        if (spans.isEmpty()) {
+            textFlow.getChildren().add(styledText(line, Color.WHITE));
+            return;
+        }
+
+        spans.sort(Comparator.comparingInt(Span::start));
+
+        int pos = 0;
+        for (Span span : spans) {
+            if (span.start() < pos) continue; // skip overlaps
+            if (span.start() > pos) {
+                textFlow.getChildren().add(styledText(line.substring(pos, span.start()), Color.WHITE));
+            }
+            textFlow.getChildren().add(styledText(line.substring(span.start(), span.end()), span.color()));
+            pos = span.end();
+        }
+        if (pos < line.length()) {
+            textFlow.getChildren().add(styledText(line.substring(pos), Color.WHITE));
         }
     }
 
-    private void processLineWithBothNames(TextFlow textFlow, String line, String firstName, String secondName, String firstColor, String secondColor) {
-        String[] firstParts = line.split(firstName, 2);
+    private static Text styledText(String content, Color color) {
+        Text t = new Text(content);
+        t.setFill(color);
+        t.setFont(MONO);
+        return t;
+    }
 
-        Text textBeforeFirst = new Text(firstParts[0]);
-        textBeforeFirst.setFill(Color.WHITE);
-        textFlow.getChildren().add(textBeforeFirst);
-
-        Text firstNameText = new Text(firstName);
-        firstNameText.setFill(Color.web(firstColor));
-        textFlow.getChildren().add(firstNameText);
-
-        String[] secondParts = firstParts[1].split(secondName, 2);
-
-        Text textBetween = new Text(secondParts[0]);
-        textBetween.setFill(Color.WHITE);
-        textFlow.getChildren().add(textBetween);
-
-        Text secondNameText = new Text(secondName);
-        secondNameText.setFill(Color.web(secondColor));
-        textFlow.getChildren().add(secondNameText);
-
-        if (secondParts.length > 1) {
-            Text textAfterSecond = new Text(secondParts[1]);
-            textAfterSecond.setFill(Color.WHITE);
-            textFlow.getChildren().add(textAfterSecond);
-        }
+    private static Text newline() {
+        Text t = new Text("\n");
+        t.setFont(MONO);
+        return t;
     }
 
     private void deleteTempFile(Path tempFilePath) {
@@ -1842,11 +1881,16 @@ public class ModerationReportController implements Controller<Region> {
 
     private String formatChatMessage(ChatMessage message) {
         long timeMillis = message.getTime().toMillis();
-        String formattedTime = timeMillis >= 0
-                ? DurationFormatUtils.formatDuration(timeMillis, "HH:mm:ss")
-                : "N/A";
+        String formattedTime;
+        if (timeMillis < 0) {
+            formattedTime = "N/A";
+        } else if (timeMillis < 3_600_000) {
+            formattedTime = DurationFormatUtils.formatDuration(timeMillis, "mm:ss");
+        } else {
+            formattedTime = DurationFormatUtils.formatDuration(timeMillis, "HH:mm:ss");
+        }
 
-        return format("[{0}] from {1} to {2}: {3}",
+        return format("[{0}] {1} → {2}: {3}",
                 formattedTime, message.getSender(), message.getReceiver(), message.getMessage());
     }
 
@@ -2039,19 +2083,20 @@ public class ModerationReportController implements Controller<Region> {
         BufferedReader bufReader = new BufferedReader(new StringReader(chatLog));
 
         String compileSentences = "Can you give me some mass, |Can you give me some energy, |" +
-                "Can you give me one Engineer, | to notify: | to allies: Sent Mass | to allies: Sent Energy |" +
-                " to allies: sent |give me Mass";
+                "Can you give me one Engineer, |→ notify: |→ allies: Sent Mass |→ allies: Sent Energy |" +
+                "→ allies: sent |give me Mass";
 
         Pattern pattern = Pattern.compile(compileSentences);
         String chatLine;
+        int lineNum = 0;
 
         while ((chatLine = bufReader.readLine()) != null) {
             boolean matchFound = pattern.matcher(chatLine).find();
             if (!localPreferences.getTabReports().isShowNotifyChatMessages() && matchFound) {
-                // Skip notify chat messages
                 continue;
             }
-            filteredChatLog.append(chatLine).append("\n");
+            lineNum++;
+            filteredChatLog.append("#").append(lineNum).append(" ").append(chatLine).append("\n");
         }
 
         return filteredChatLog.toString();

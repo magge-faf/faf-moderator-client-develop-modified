@@ -71,7 +71,9 @@ public class OAuthValuesReceiver {
     CompletableFuture.runAsync(() -> {
       try {
         redirectUriLatch.await();
-      } catch (InterruptedException ignored) {}
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
       openHydraUrl();
     });
   }

@@ -52,7 +52,7 @@ public class ModerationReportService {
 							try {
 								return future.join();
 							} catch (Exception e) {
-								log.warn("Failed to fetch page {}, skipping", future, e);
+								log.warn("Failed to fetch a report page, skipping", e);
 								return List.<ModerationReportFX>of(); // empty list for failed pages
 							}
 						})
@@ -74,7 +74,6 @@ public class ModerationReportService {
 	}
 
 	public CompletableFuture<List<ModerationReportFX>> getPageOfReports(int page, int pageSize) {
-		fafApi.checkRateLimit();
 		return CompletableFuture.supplyAsync(() -> {
 			List<ModerationReport> reports = fafApi.getPage(
 					ModerationReport.class,

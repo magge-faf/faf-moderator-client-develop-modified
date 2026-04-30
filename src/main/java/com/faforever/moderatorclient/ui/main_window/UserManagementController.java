@@ -69,15 +69,12 @@ import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.ButtonType;
 import org.springframework.web.client.HttpClientErrorException;
 
-import static com.faforever.moderatorclient.api.FafApiCommunicationService.checkRateLimit;
 import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class UserManagementController implements Controller<SplitPane> {
-    @FXML
-    public Button checkPermanentBansButton;
     @FXML
     public Button checkTemporaryBansButton;
     @FXML
@@ -104,7 +101,6 @@ public class UserManagementController implements Controller<SplitPane> {
     @FXML
     public Label ProgressLabelRecentAccountsSmurfCheck;
     public Label searchHistoryLabel;
-    @FXML
     private volatile boolean cancelRequestedByUser = false;
     @FXML
     public Tab smurfOutputTab;
@@ -132,7 +128,6 @@ public class UserManagementController implements Controller<SplitPane> {
     @FXML
     public Label
             temporaryBanProgressLabel,
-            permanentBanProgressLabel,
             smurfManagementProgressLabel,
             progressLabelSharedGames;
 
@@ -141,7 +136,23 @@ public class UserManagementController implements Controller<SplitPane> {
 
     private volatile boolean isPaused = false;
     private volatile boolean isStopped = false;
-    private final Object pauseLock = new Object(); // Monitor an object for synchronization
+    private final Object pauseLock = new Object();
+
+    // Snapshots of UI state captured on FX thread before each background task starts.
+    // Background threads read these instead of touching live JavaFX nodes.
+    private volatile boolean snapIncludeUUID;
+    private volatile boolean snapIncludeHash;
+    private volatile boolean snapIncludeIP;
+    private volatile boolean snapIncludeMemorySerial;
+    private volatile boolean snapIncludeVolumeSerial;
+    private volatile boolean snapIncludeSerial;
+    private volatile boolean snapIncludeProcessorId;
+    private volatile boolean snapIncludeCpuName;
+    private volatile boolean snapIncludeManufacturer;
+    private volatile int     snapThreshold = 10;
+    private volatile boolean snapPromptOnThreshold;
+    private volatile boolean snapOnlyShowActive;
+    private volatile boolean snapSuppressCleanOutput;
 
     @FXML
     public Button checkRecentAccountsForSmurfsStopButton;
@@ -181,6 +192,7 @@ public class UserManagementController implements Controller<SplitPane> {
     public CheckBox includeProcessorIdCheckBox;
     public CheckBox includeManufacturerCheckBox;
     public CheckBox includeIPCheckBox;
+    public CheckBox onlyShowActiveAccountsCheckBox;
 
     @Value("${faforever.vault.replay-download-url-format}")
     private String replayDownLoadFormat;
@@ -307,6 +319,8 @@ public class UserManagementController implements Controller<SplitPane> {
             loadSplitPanePositions(root, localPreferences);
             StartupSyncBans();
 
+            int smurfCount = bansController.loadExistingBannedUserIds(SmurfManagementController.SMURF_MANAGEMENT_USERS_JSON_PATH).size();
+            checkSmurfManagementAccountsButton.setText("Run Smurf Management: " + smurfCount);
         });
     }
 
@@ -454,17 +468,8 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     private void StartupSyncBans() {
-        LocalPreferences.TabSettings settings = localPreferences.getTabSettings();
-
-        if (settings.isSyncPermanentBansAtStartupCheckbox()) {
-            log.debug("Syncing permanent bans at startup.");
-            bansController.syncPermBannedUsersJson();
-        }
-
-        if (settings.isSyncTemporaryBansAtStartupCheckbox()) {
-            log.debug("Syncing temporary bans at startup.");
-            bansController.syncTempBannedUsersJson();
-        }
+        int smurfCount = bansController.loadExistingBannedUserIds(SmurfManagementController.SMURF_MANAGEMENT_USERS_JSON_PATH).size();
+        checkSmurfManagementAccountsButton.setText("Run Smurf Management: " + smurfCount);
     }
 
     private void initializeSearchProperties() {
@@ -916,6 +921,7 @@ public class UserManagementController implements Controller<SplitPane> {
         includeIPCheckBox.setSelected(settings.isIncludeIPCheckBox());
         includeProcessorNameCheckBox.setSelected(settings.isIncludeProcessorNameCheckBox());
         catchFirstLayerSmurfsOnlyCheckBox.setSelected(settings.isCatchFirstLayerSmurfsOnlyCheckBox());
+        onlyShowActiveAccountsCheckBox.setSelected(settings.isOnlyShowActiveAccountsCheckBox());
 
     }
 
@@ -1115,18 +1121,28 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     public void handleCheckTemporaryBans() {
-        processBannedUsers(bansController.PATH_TEMP_BANNED_USERS_JSON, temporaryBanProgressLabel, "temporary ban");
-    }
+        smurfOutputTextArea.setText("");
+        checkTemporaryBansButton.setDisable(true);
+        checkTemporaryBansButton.setText("Check Temporary Bans (awaiting data...)");
+        temporaryBanProgressLabel.setText("Fetching temporary bans...");
 
-    public void handleCheckPermanentBans() {
-        processBannedUsers(bansController.PATH_PERM_BANNED_USERS_JSON, permanentBanProgressLabel, "permanent ban");
+        bansController.syncTempBannedUsersJson(() -> {
+            Platform.runLater(() -> {
+                int count = bansController.loadExistingBannedUserIds(bansController.PATH_TEMP_BANNED_USERS_JSON).size();
+                checkTemporaryBansButton.setText("Check Temporary Bans: " + count);
+                checkTemporaryBansButton.setDisable(false);
+                processBannedUsers(bansController.PATH_TEMP_BANNED_USERS_JSON, temporaryBanProgressLabel, "temporary ban");
+            });
+        });
     }
 
     public void handleCheckSmurfManagementAccounts() {
+        smurfOutputTextArea.setText("");
         processBannedUsers(SmurfManagementController.SMURF_MANAGEMENT_USERS_JSON_PATH, smurfManagementProgressLabel, "smurf management");
     }
 
     private void processBannedUsers(Path filePath, Label progressLabel, String taskName) {
+        captureSmurfCheckSettings();
         resetPreviousStateSmurfVillageLookup();
         Set<String> userIds = bansController.loadExistingBannedUserIds(filePath);
 
@@ -1165,7 +1181,7 @@ public class UserManagementController implements Controller<SplitPane> {
                         onSmurfVillageLookup(userId);
 
                     } catch (Exception e) {
-                        log.error("Error processing user ID {}: {}", userId, e.getMessage());
+                        log.error("Error processing user ID {}", userId, e);
                     }
 
                     count++;
@@ -1216,19 +1232,21 @@ public class UserManagementController implements Controller<SplitPane> {
      */
     private PlayerFX findUserById(String userId) {
         try {
-            // Blocking call to fetch users by ID
-            List<PlayerFX> results = Collections.singletonList(userService.findUsersByAttribute("id", userId).getFirst());
-            return results.getFirst();
+            List<PlayerFX> results = userService.findUsersByAttribute("id", userId);
+            return results.isEmpty() ? null : results.getFirst();
         } catch (Exception e) {
-            log.error("Error finding user ID {}: {}", userId, e.getMessage());
+            log.error("Error finding user ID {}", userId, e);
+            return null;
         }
-        return null;
     }
 
     public void userSearchSmurfVillageAddToUserTable(String userID) {
-        checkRateLimit();
         List<PlayerFX> usersFound = userService.findUsersByAttribute("id", userID);
-        users.addAll(usersFound);
+        Platform.runLater(() -> {
+            if (users.stream().noneMatch(u -> u.getId().equals(userID))) {
+                users.addAll(usersFound);
+            }
+        });
     }
 
     public List<Map<String, Object>> loadExcludedItemsFromJson() {
@@ -1281,19 +1299,17 @@ public class UserManagementController implements Controller<SplitPane> {
         List<Object> foundAccounts = new ArrayList<>();
 
         try {
-            String text = String.format("\nProcessing ... [%s] [%s]", attributeName, attributeValue);
-            updateSmurfVillageLogTextArea(text);
+            String displayAttr = attributeName.contains(".") ? attributeName.substring(attributeName.lastIndexOf('.') + 1) : attributeName;
+            String headerLine = String.format("\n  [%s]  %s", displayAttr, attributeValue);
+            if (!snapOnlyShowActive) {
+                updateSmurfVillageLogTextArea(headerLine);
+            }
 
             // --- Load JSON-based excluded items ---
             List<Map<String, Object>> excludedItems = loadExcludedItemsFromJson();
 
-            // --- Read threshold and exclusion CheckBox from UI ---
-            int threshold = 10; // default fallback
-            try {
-                threshold = Integer.parseInt(maxMatchesBeforePromptSmurfVillageLookupTextField.getText());
-            } catch (NumberFormatException e) {
-                updateSmurfVillageLogTextArea("\t\t Invalid threshold input, using default: " + threshold + "\n");}
-            boolean promptUserOnThresholdExceeded = promptUserOnThresholdExceededSmurfVillageLookupCheckBox.isSelected();
+            int threshold = snapThreshold;
+            boolean promptUserOnThresholdExceeded = snapPromptOnThreshold;
 
             synchronized (pauseLock) {
                 while (isPaused) {
@@ -1316,8 +1332,8 @@ public class UserManagementController implements Controller<SplitPane> {
 
             if (isExcluded) {
                 updateSmurfVillageLogTextArea(
-                        String.format("\t\t EXCLUSION CHECK: attribute [%s] with value [%s] found in excluded_items.json, skipping.",
-                                attributeName, attributeValue));
+                        String.format("\n  EXCLUDED: [%s] = [%s] (in excluded_items.json, skipping)",
+                                displayAttr, attributeValue));
                 return foundAccounts;
             }
 
@@ -1427,36 +1443,55 @@ public class UserManagementController implements Controller<SplitPane> {
                     .toList();
 
             // --- Add root player to table if other accounts found ---
-            //TODO check if true: Condition '!foundAccounts.contains(currentPlayerID)' is always 'true' when reached
-            if (!otherAccounts.isEmpty() && !foundAccounts.contains(currentPlayerID)) {
+            if (!otherAccounts.isEmpty()) {
                 addNewAccountsToTable(Collections.singletonList(currentPlayerID));
                 foundAccounts.add(currentPlayerID);
             }
 
             if (otherAccounts.isEmpty()) {
-                updateSmurfVillageLogTextArea(" ... no shared accounts found.");
+                if (!snapOnlyShowActive) {
+                    updateSmurfVillageLogTextArea("   (no matches)");
+                }
             } else {
+                List<String> activeLines = new ArrayList<>();
                 for (PlayerFX user : otherAccounts) {
-                    String banInfo = "ACTIVE";
                     BanInfoFX ban = user.getBans().stream()
                             .filter(b -> b.getBanStatus() == BanStatus.BANNED)
                             .findFirst()
                             .orElse(null);
 
-                    if (ban != null) {
-                        banInfo = (ban.getExpiresAt() == null)
-                                ? "PERMANENT"
-                                : "TEMPORARY " + ban.getExpiresAt()
-                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+                    if (snapOnlyShowActive && ban != null) {
+                        continue;
                     }
 
-                    String accountLine = String.format("\n+ %s - %s", user.getRepresentation(), banInfo);
-                    updateSmurfVillageLogTextArea(accountLine);
+                    String banInfo;
+                    String prefix;
+                    if (ban == null) {
+                        banInfo = "ACTIVE";
+                        prefix = "+";
+                    } else if (ban.getExpiresAt() == null) {
+                        banInfo = "PERM-BANNED";
+                        prefix = "-";
+                    } else {
+                        banInfo = "TEMP-BANNED until " + ban.getExpiresAt()
+                                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+                        prefix = "~";
+                    }
+
+                    activeLines.add(String.format("\n    %s  %s  id: %s   %s",
+                            prefix, user.getLogin(), user.getId(), banInfo));
 
                     if (user.getId() != null && !foundAccounts.contains(user.getId())) {
                         foundAccounts.add(user.getId());
                         addNewAccountsToTable(Collections.singletonList(user.getId()));
                     }
+                }
+
+                if (!activeLines.isEmpty()) {
+                    if (snapOnlyShowActive) {
+                        updateSmurfVillageLogTextArea(headerLine);
+                    }
+                    activeLines.forEach(line -> updateSmurfVillageLogTextArea(line));
                 }
             }
 
@@ -1564,12 +1599,15 @@ public class UserManagementController implements Controller<SplitPane> {
         }
 
         startTaskTimer();
-        String initialLog = String.format("\n=== Checking PlayerID: %s ===\n", playerID);
-        updateSmurfVillageLogTextArea(initialLog);
-        statusTextFieldProcessingPlayerID.setText(playerID);
+        if (!snapSuppressCleanOutput) {
+            updateSmurfVillageLogTextArea(String.format("\n=== Checking PlayerID: %s ===", playerID));
+        }
+        Platform.runLater(() -> statusTextFieldProcessingPlayerID.setText(playerID));
 
         if (alreadyCheckedUsers.contains(playerID)) {
-            updateSmurfVillageLogTextArea("\nSkipping, we already have checked that account: " + playerID);
+            if (!snapSuppressCleanOutput) {
+                updateSmurfVillageLogTextArea("\nSkipping, we already have checked that account: " + playerID);
+            }
             return;
         }
         alreadyCheckedUsers.add(playerID);
@@ -1599,17 +1637,15 @@ public class UserManagementController implements Controller<SplitPane> {
         Set<String> manufacturers = new HashSet<>();
 
         userFound.forEach(user -> user.getUniqueIdAssignments().forEach(item -> {
-            if (includeProcessorNameCheckBox.isSelected()) cpuNames.add(item.getUniqueId().getName());
-            if (includeUUIDCheckBox.isSelected()) uuids.add(item.getUniqueId().getUuid());
-            if (includeUIDHashCheckBox.isSelected()) hashes.add(item.getUniqueId().getHash());
-            if (includeIPCheckBox.isSelected()) ips.add(user.getRecentIpAddress());
-            if (includeMemorySerialNumberCheckBox.isSelected())
-                memorySerialNumbers.add(item.getUniqueId().getMemorySerialNumber());
-            if (includeVolumeSerialNumberCheckBox.isSelected())
-                volumeSerialNumbers.add(item.getUniqueId().getVolumeSerialNumber());
-            if (includeSerialNumberCheckBox.isSelected()) serialNumbers.add(item.getUniqueId().getSerialNumber());
-            if (includeProcessorIdCheckBox.isSelected()) processorIds.add(item.getUniqueId().getProcessorId());
-            if (includeManufacturerCheckBox.isSelected()) manufacturers.add(item.getUniqueId().getManufacturer());
+            if (snapIncludeCpuName)      cpuNames.add(item.getUniqueId().getName());
+            if (snapIncludeUUID)         uuids.add(item.getUniqueId().getUuid());
+            if (snapIncludeHash)         hashes.add(item.getUniqueId().getHash());
+            if (snapIncludeIP)           ips.add(user.getRecentIpAddress());
+            if (snapIncludeMemorySerial) memorySerialNumbers.add(item.getUniqueId().getMemorySerialNumber());
+            if (snapIncludeVolumeSerial) volumeSerialNumbers.add(item.getUniqueId().getVolumeSerialNumber());
+            if (snapIncludeSerial)       serialNumbers.add(item.getUniqueId().getSerialNumber());
+            if (snapIncludeProcessorId)  processorIds.add(item.getUniqueId().getProcessorId());
+            if (snapIncludeManufacturer) manufacturers.add(item.getUniqueId().getManufacturer());
         }));
 
         Set<Object> accountsWithSharedAttributes = new LinkedHashSet<>(); // deduplicated cumulative set
@@ -1663,20 +1699,22 @@ public class UserManagementController implements Controller<SplitPane> {
         }
 
         // Log related accounts
-        if (!accountsWithSharedAttributes.isEmpty()) {
-            List<String> relatedAccounts = accountsWithSharedAttributes.stream()
-                    .map(Object::toString)
-                    .filter(id -> !id.equals(playerID))
-                    .toList();
+        List<String> relatedAccounts = accountsWithSharedAttributes.stream()
+                .map(Object::toString)
+                .filter(id -> !id.equals(playerID))
+                .toList();
 
-            if (!relatedAccounts.isEmpty()) {
-                String relationLog = "\n" + playerID + " is related through unique items to --> " + relatedAccounts;
-                updateSmurfVillageLogTextArea(relationLog);
+        if (!relatedAccounts.isEmpty()) {
+            if (snapSuppressCleanOutput) {
+                updateSmurfVillageLogTextArea(String.format("\n=== Checking PlayerID: %s ===", playerID));
             }
+            updateSmurfVillageLogTextArea("\n  " + playerID + " → related: " + relatedAccounts + "\n");
+        } else if (!snapSuppressCleanOutput) {
+            updateSmurfVillageLogTextArea("\n  → no related accounts\n");
         }
 
         if (catchFirstLayerSmurfsOnlyCheckBox.isSelected()) {
-            log.debug("Smurf tracing is disabled.");
+            log.trace("Smurf tracing is disabled.");
             return;
         }
 
@@ -1700,7 +1738,7 @@ public class UserManagementController implements Controller<SplitPane> {
                 return;
             }
 
-            statusTextFieldProcessingItem.setText(type + ": " + item);
+            Platform.runLater(() -> statusTextFieldProcessingItem.setText(type + ": " + item));
 
             if (!alreadyCheckedSet.contains(item)) {
                 List<Object> accountsFromThisItem = processUsers(property, item, currentPlayerID);
@@ -1725,12 +1763,27 @@ public class UserManagementController implements Controller<SplitPane> {
     // Table insertion helper
     private void addNewAccountsToTable(List<Object> accounts) {
         for (Object accountId : accounts) {
-            boolean exists = userSearchTableView.getItems().stream()
-                    .map(AbstractEntityFX::getId)
-                    .anyMatch(playerId -> playerId.equals(accountId.toString()));
-            if (!exists) {
-                userSearchSmurfVillageAddToUserTable((String) accountId);
-            }
+            userSearchSmurfVillageAddToUserTable((String) accountId);
+        }
+    }
+
+    private void captureSmurfCheckSettings() {
+        snapIncludeUUID          = includeUUIDCheckBox.isSelected();
+        snapIncludeHash          = includeUIDHashCheckBox.isSelected();
+        snapIncludeIP            = includeIPCheckBox.isSelected();
+        snapIncludeMemorySerial  = includeMemorySerialNumberCheckBox.isSelected();
+        snapIncludeVolumeSerial  = includeVolumeSerialNumberCheckBox.isSelected();
+        snapIncludeSerial        = includeSerialNumberCheckBox.isSelected();
+        snapIncludeProcessorId   = includeProcessorIdCheckBox.isSelected();
+        snapIncludeCpuName       = includeProcessorNameCheckBox.isSelected();
+        snapIncludeManufacturer  = includeManufacturerCheckBox.isSelected();
+        snapPromptOnThreshold    = promptUserOnThresholdExceededSmurfVillageLookupCheckBox.isSelected();
+        snapOnlyShowActive       = onlyShowActiveAccountsCheckBox.isSelected();
+        snapSuppressCleanOutput  = false;
+        try {
+            snapThreshold = Integer.parseInt(maxMatchesBeforePromptSmurfVillageLookupTextField.getText().trim());
+        } catch (NumberFormatException e) {
+            snapThreshold = 10;
         }
     }
 
@@ -1753,6 +1806,7 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     public void onLookupSmurfVillage() {
+        captureSmurfCheckSettings();
         users.clear();
         userSearchTableView.getSortOrder().clear();
 
@@ -1872,14 +1926,27 @@ public class UserManagementController implements Controller<SplitPane> {
     private String currentLoginText = "";
 
     public void checkRecentAccountsForSmurfs() {
+        smurfOutputTextArea.setText("");
+        int daysBack;
+        try {
+            daysBack = Integer.parseInt(daysToCheckRecentAccountsTextField.getText().trim());
+        } catch (NumberFormatException e) {
+            statusTextRecentAccountsForSmurfs.setText("Invalid number format for days.");
+            return;
+        }
+
+        captureSmurfCheckSettings();
+        snapSuppressCleanOutput = true;
         users.clear();
         userSearchTableView.getSortOrder().clear();
         resetPreviousStateSmurfVillageLookup();
         smurfOutputTextArea.setText("");
+        stopLoadingAnimation();
         setStatusWorking();
         startLoadingAnimation();
-        setStatusWorking();
+        checkRecentAccountsForSmurfsButton.setDisable(true);
 
+        final int finalDaysBack = daysBack;
         Task<Void> task = new Task<>() {
             private int count = 0;
 
@@ -1892,15 +1959,7 @@ public class UserManagementController implements Controller<SplitPane> {
                     return null;
                 }
 
-                int daysBack;
-                try {
-                    daysBack = Integer.parseInt(daysToCheckRecentAccountsTextField.getText());
-                } catch (NumberFormatException e) {
-                    Platform.runLater(() -> statusTextRecentAccountsForSmurfs.setText("Invalid number format for days."));
-                    return null;
-                }
-
-                LocalDate cutoffDate = LocalDate.now().minusDays(daysBack - 1);
+                LocalDate cutoffDate = LocalDate.now().minusDays(finalDaysBack - 1);
                 Instant cutoff = cutoffDate.atStartOfDay(ZoneId.systemDefault()).toInstant();
                 log.debug("Cutoff date: {}", cutoff);
 
@@ -1928,8 +1987,8 @@ public class UserManagementController implements Controller<SplitPane> {
 
                     final int currentCount = count;
                     final String formattedDate = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-                    .withZone(ZoneId.systemDefault())
-                    .format(lastLoginTime);
+                            .withZone(ZoneId.systemDefault())
+                            .format(lastLoginTime);
 
                     Platform.runLater(() -> {
                         statusTextRecentAccountsForSmurfs.setText("Checked: " + currentCount);
@@ -1944,6 +2003,7 @@ public class UserManagementController implements Controller<SplitPane> {
             protected void failed() {
                 super.failed();
                 stopLoadingAnimation();
+                Platform.runLater(() -> checkRecentAccountsForSmurfsButton.setDisable(false));
                 log.error("Task failed", getException());
             }
 
@@ -1954,9 +2014,7 @@ public class UserManagementController implements Controller<SplitPane> {
                 Platform.runLater(() -> {
                     setStatusDone();
                     statusTextRecentAccountsForSmurfs.setText("Completed: " + count + " accounts.");
-                    ProgressLabelRecentAccountsSmurfCheck.setText(""); // clear label at the end
-                    setStatusDone();
-                    resetPreviousStateSmurfVillageLookup();
+                    checkRecentAccountsForSmurfsButton.setDisable(false);
                 });
                 log.debug("Task completed successfully.");
             }
@@ -1966,6 +2024,7 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     private void startLoadingAnimation() {
+        stopLoadingAnimation();
         loadingAnimation = new Timeline(
                 new KeyFrame(javafx.util.Duration.ZERO, e -> updateLoadingLabel(0)),
                 new KeyFrame(javafx.util.Duration.seconds(0.5), e -> updateLoadingLabel(1)),

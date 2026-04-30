@@ -55,7 +55,6 @@ public class AvatarService {
         List<Avatar> currentPage;
 
         do {
-            FafApiCommunicationService.checkRateLimit();
             currentPage = fafApi.getPage(Avatar.class, navigator, pageSize, page++, Collections.emptyMap());
             allAvatars.addAll(currentPage);
         } while (currentPage.size() == pageSize); // stop when the last page has fewer items
@@ -170,14 +169,14 @@ public class AvatarService {
     }
 
     private void patchAvatarAssignment(AvatarAssignment avatarAssignment) {
-        log.debug("Patching avatar assignmenet id: " + avatarAssignment.getId());
+        log.debug("Patching avatar assignment id: {}", avatarAssignment.getId());
         ElideNavigatorOnId<AvatarAssignment> navigator = ElideNavigator.of(AvatarAssignment.class)
                 .id(avatarAssignment.getId());
         fafApi.patch(navigator, avatarAssignment);
     }
 
     public void patchAvatarAssignment(AvatarAssignmentUpdate avatarAssignmentUpdate) {
-        log.debug("Patching avatar assignmenet id: " + avatarAssignmentUpdate.getId());
+        log.debug("Patching avatar assignment id: {}", avatarAssignmentUpdate.getId());
         ElideNavigatorOnId<AvatarAssignment> navigator = ElideNavigator.of(AvatarAssignment.class)
                 .id(avatarAssignmentUpdate.getId());
         fafApi.patch(navigator, avatarAssignmentUpdate);
@@ -188,7 +187,7 @@ public class AvatarService {
     }
 
     public void removeAvatarAssignment(AvatarAssignment avatarAssignment) {
-        log.debug("Removing avatar assignmenet id: " + avatarAssignment.getId());
+        log.debug("Removing avatar assignment id: {}", avatarAssignment.getId());
         ElideNavigatorOnId<AvatarAssignment> navigator = ElideNavigator.of(AvatarAssignment.class)
                 .id(avatarAssignment.getId());
         fafApi.delete(navigator);

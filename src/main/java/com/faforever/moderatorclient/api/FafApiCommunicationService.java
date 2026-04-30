@@ -56,6 +56,7 @@ public class FafApiCommunicationService {
     private final JsonApiErrorHandler jsonApiErrorHandler;
     private final CycleAvoidingMappingContext cycleAvoidingMappingContext;
     private final RestTemplateBuilder restTemplateBuilder;
+    private final ApiHistoryService apiHistoryService;
     private EnvironmentProperties environmentProperties;
     private final CountDownLatch authorizedLatch;
     @Getter
@@ -75,7 +76,8 @@ public class FafApiCommunicationService {
             RestTemplateBuilder restTemplateBuilder,
             JsonApiMessageConverter jsonApiMessageConverter,
             JsonApiErrorHandler jsonApiErrorHandler,
-            EnvironmentProperties environmentProperties) {
+            EnvironmentProperties environmentProperties,
+            ApiHistoryService apiHistoryService) {
         this.defaultResourceConverter = defaultResourceConverter;
         this.updateResourceConverter = updateResourceConverter;
         this.hmacHeaderInterceptor = hmacHeaderInterceptor;
@@ -86,6 +88,7 @@ public class FafApiCommunicationService {
         this.oAuthTokenInterceptor = oAuthTokenInterceptor;
         this.restTemplateBuilder = restTemplateBuilder;
         this.environmentProperties = environmentProperties;
+        this.apiHistoryService = apiHistoryService;
 
         authorizedLatch = new CountDownLatch(1);
     }
@@ -129,6 +132,22 @@ public class FafApiCommunicationService {
                                 }
                             }
                             return execution.execute(request, body);
+                        },
+                        (request, body, execution) -> {
+                            long start = System.currentTimeMillis();
+                            String method = request.getMethod().name();
+                            java.net.URI uri = request.getURI();
+                            String path = uri.getPath() + (uri.getQuery() != null ? "?" + uri.getQuery() : "");
+                            try {
+                                var response = execution.execute(request, body);
+                                long duration = System.currentTimeMillis() - start;
+                                apiHistoryService.record(method, path, response.getStatusCode().value(), duration, response.getStatusCode().is2xxSuccessful());
+                                return response;
+                            } catch (Exception e) {
+                                long duration = System.currentTimeMillis() - start;
+                                apiHistoryService.record(method, path, 0, duration, false);
+                                throw e;
+                            }
                         }
                 )).build();
 
@@ -258,7 +277,6 @@ public class FafApiCommunicationService {
     }
 
     public <T extends ElideEntity> void delete(T entity) {
-        checkRateLimit();
         delete(ElideNavigator.of(entity));
     }
 
@@ -278,13 +296,11 @@ public class FafApiCommunicationService {
 
     @SneakyThrows
     public <T extends ElideEntity> T getOne(ElideNavigatorOnId<T> navigator) {
-        checkRateLimit();
         return getOne(navigator.build(), navigator.getDtoClass(), Collections.emptyMap());
     }
 
     @SneakyThrows
     public <T extends ElideEntity> T getOne(String endpointPath, Class<T> type) {
-        checkRateLimit();
         return getOne(endpointPath, type, Collections.emptyMap());
     }
 
@@ -302,15 +318,12 @@ public class FafApiCommunicationService {
 
     public <T extends ElideEntity> List<T> getFirstPageOnlyForFindUsersByAttribute(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder, int pageSize) {
         // If the total number of results is lower than the max page size, no additional requests are made.
-        checkRateLimit();
         routeBuilder.pageSize(pageSize).pageNumber(1);
         return getPage(clazz, routeBuilder, pageSize, 1, Collections.emptyMap());
     }
 
     @SneakyThrows
     public <T extends ElideEntity> List<T> getAll(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder) {
-        checkRateLimit();
-
         int page = 1;
         int pageSize = environmentProperties.getMaxPageSize();
         List<T> result = new LinkedList<>();
@@ -331,7 +344,6 @@ public class FafApiCommunicationService {
     }
 
     public <T extends ElideEntity> List<T> getAll(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder, java.util.Map<String, Serializable> params) {
-        checkRateLimit();
         return getMany(clazz, routeBuilder, environmentProperties.getMaxPageSize(), params);
     }
 
@@ -342,7 +354,6 @@ public class FafApiCommunicationService {
             int count,
             Map<String, Serializable> params) {
 
-        checkRateLimit();
         List<T> result = new LinkedList<>();
         int page = 1;
         int pageSize = environmentProperties.getMaxPageSize();
@@ -363,7 +374,6 @@ public class FafApiCommunicationService {
     }
 
     public <T extends ElideEntity> List<T> getPage(Class<T> clazz, ElideNavigatorOnCollection<T> routeBuilder, int pageSize, int page, java.util.Map<String, Serializable> params) {
-        checkRateLimit();
         java.util.Map<String, List<String>> multiValues = params.entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> Collections.singletonList(String.valueOf(entry.getValue()))));
 

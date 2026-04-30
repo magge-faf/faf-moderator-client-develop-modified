@@ -20,7 +20,6 @@ import javafx.fxml.FXML;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -55,22 +54,6 @@ public class BansController implements Controller<HBox> {
     private boolean inSearchMode = false;
     private final LocalPreferences localPreferences;
 
-    @FXML
-    private VBox permSyncProgressContainer;
-    @FXML
-    private ProgressIndicator permSyncProgressIndicator;
-    @FXML
-    private Label permSyncProgressLabel;
-    @FXML
-    private VBox tempSyncProgressContainer;
-    @FXML
-    private ProgressIndicator tempSyncProgressIndicator;
-    @FXML
-    private Label tempSyncProgressLabel;
-    @FXML
-    private Label permBanCountLabel;
-    @FXML
-    private Label tempBanCountLabel;
 
     @Override
     public HBox getRoot() {
@@ -90,7 +73,17 @@ public class BansController implements Controller<HBox> {
         filteredList = new FilteredList<>(itemList);
         SortedList<BanInfoFX> sortedItemList = new SortedList<>(filteredList);
         sortedItemList.comparatorProperty().bind(banTableView.comparatorProperty());
-        ViewHelper.buildBanTableView(banTableView, sortedItemList, true, localPreferences );
+        ViewHelper.buildBanTableView(banTableView, sortedItemList, true, localPreferences);
+        banTableView.getColumns().forEach(column -> {
+            if (column.getId() == null || column.getId().isEmpty()) {
+                column.setId(column.getText().replaceAll("\\s+", ""));
+            }
+        });
+        Platform.runLater(() -> loadColumnLayout(banTableView, localPreferences));
+        boolean fetchBans = localPreferences.getTabSettings().isFetchBansOnStartupCheckBox();
+        if (fetchBans) {
+            onRefreshLatestBans();
+        }
         playerRadioButton.setUserData((Supplier<List<BanInfoFX>>) () -> banService.getBanInfoByBannedPlayerNameContains(filter.getText()));
         banIdRadioButton.setUserData((Supplier<List<BanInfoFX>>) () -> Collections.singletonList(banService.getBanInfoById(filter.getText())));
         editBanButton.disableProperty().bind(banTableView.getSelectionModel().selectedItemProperty().isNull());
@@ -98,18 +91,11 @@ public class BansController implements Controller<HBox> {
                 filteredList.setPredicate(banInfoFX -> !onlyActiveCheckBox.isSelected() || banInfoFX.getBanStatus() == BanStatus.BANNED);
         onlyActiveCheckBox.selectedProperty().addListener(onlyActiveBansChangeListener);
         onlyActiveBansChangeListener.invalidated(onlyActiveCheckBox.selectedProperty());
-        updateBanCounts();
-    }
-
-    private void updateBanCounts() {
-        permBanCountLabel.setText("(" + loadExistingBannedUserIds(PATH_PERM_BANNED_USERS_JSON).size() + ")");
-        tempBanCountLabel.setText("(" + loadExistingBannedUserIds(PATH_TEMP_BANNED_USERS_JSON).size() + ")");
     }
 
     public void onRefreshLatestBans() {
         banService.getLatestBans().thenAccept(banInfoFXES -> Platform.runLater(() -> {
             itemList.setAll(banInfoFXES);
-            updateBanCounts();
         })).exceptionally(throwable -> {
             log.error("error loading bans", throwable);
             return null;
@@ -155,52 +141,18 @@ public class BansController implements Controller<HBox> {
     }
 
     public void syncPermBannedUsersJson() {
-        if (permSyncProgressContainer == null || permSyncProgressIndicator == null || permSyncProgressLabel == null) {
-            log.debug("FXML components not loaded: permSyncProgress* is null.");
-            return;
-        }
-
-        permSyncProgressContainer.setVisible(true);
-        permSyncProgressContainer.setManaged(true);
-        permSyncProgressIndicator.setVisible(true);
-        permSyncProgressIndicator.setManaged(true);
-        permSyncProgressLabel.setVisible(true);
-        permSyncProgressLabel.setManaged(true);
-
-        startSyncTask(
-                PATH_PERM_BANNED_USERS_JSON,
-                BanDurationType.PERMANENT,
-                permSyncProgressContainer,
-                permSyncProgressIndicator,
-                permSyncProgressLabel,
-                "permSyncProgress"
-        );
+        startSyncTask(PATH_PERM_BANNED_USERS_JSON, BanDurationType.PERMANENT, null);
     }
 
     public void syncTempBannedUsersJson() {
-        if (tempSyncProgressContainer == null || tempSyncProgressIndicator == null || tempSyncProgressLabel == null) {
-            log.debug("FXML components not loaded: tempSyncProgress* is null.");
-            return;
-        }
-
-        tempSyncProgressContainer.setVisible(true);
-        tempSyncProgressContainer.setManaged(true);
-        tempSyncProgressIndicator.setVisible(true);
-        tempSyncProgressIndicator.setManaged(true);
-        tempSyncProgressLabel.setVisible(true);
-        tempSyncProgressLabel.setManaged(true);
-
-        startSyncTask(
-                PATH_TEMP_BANNED_USERS_JSON,
-                BanDurationType.TEMPORARY,
-                tempSyncProgressContainer,
-                tempSyncProgressIndicator,
-                tempSyncProgressLabel,
-                "tempSyncProgress"
-        );
+        syncTempBannedUsersJson(null);
     }
 
-    private void startSyncTask(Path destinationPath, BanDurationType banDurationType, VBox progressContainer, ProgressIndicator progressIndicator, Label progressLabel, String sourceEvent) {
+    public void syncTempBannedUsersJson(Runnable onComplete) {
+        startSyncTask(PATH_TEMP_BANNED_USERS_JSON, BanDurationType.TEMPORARY, onComplete);
+    }
+
+    private void startSyncTask(Path destinationPath, BanDurationType banDurationType, Runnable onComplete) {
         BansController thisController = this;
 
         Task<Boolean> syncTask = new Task<>() {
@@ -221,8 +173,7 @@ public class BansController implements Controller<HBox> {
                     File bannedUsersFile = destinationPath.toFile();
 
                     if (bannedUsersFile.exists()) {
-                        List<Map<String, Object>> existingRawData = objectMapper.readValue(bannedUsersFile, new TypeReference<>() {
-                        });
+                        List<Map<String, Object>> existingRawData = objectMapper.readValue(bannedUsersFile, new TypeReference<>() {});
                         List<Map<String, Object>> updatedData = existingRawData.stream()
                                 .filter(userData -> {
                                     if (userData.containsKey("userInfo")) {
@@ -245,7 +196,6 @@ public class BansController implements Controller<HBox> {
                         if (existingBannedUserIds.contains(userIdToCheck)) {
                             processedCount++;
                             updateProgress(processedCount, totalBans);
-                            updateMessage(String.format("%d/%d (%s)", processedCount, totalBans, banDurationType.toString().toLowerCase()));
                             continue;
                         }
 
@@ -253,14 +203,13 @@ public class BansController implements Controller<HBox> {
                         List<PlayerFX> bannedUserListResult = userService.findUsersByAttribute("id", bannedUser.getPlayer().getId());
                         if (!bannedUserListResult.isEmpty()) {
                             PlayerFX bannedUserPlayerFX = bannedUserListResult.getFirst();
-                            ViewHelper.saveUserToJsonFile(bannedUserPlayerFX, destinationPath, sourceEvent );
+                            ViewHelper.saveUserToJsonFile(bannedUserPlayerFX, destinationPath, banDurationType.toString().toLowerCase() + "SyncProgress");
                             existingBannedUserIds.add(userIdToCheck);
                         } else {
                             log.warn("Could not find player with ID {} for ban {}", bannedUser.getPlayer().getId(), bannedUser.getId());
                         }
                         processedCount++;
                         updateProgress(processedCount, totalBans);
-                        updateMessage(String.format("%d/%d (%s)", processedCount, totalBans, banDurationType.toString().toLowerCase()));
                     }
                     return true;
                 } catch (InterruptedException e) {
@@ -279,32 +228,54 @@ public class BansController implements Controller<HBox> {
 
         syncTask.setOnSucceeded(workerStateEvent -> {
             log.info("Successfully synced {} banned users.", banDurationType.toString().toLowerCase());
-            progressContainer.setVisible(false);
-            progressContainer.setManaged(false);
-            progressIndicator.setVisible(false);
-            progressIndicator.setManaged(false);
-            progressLabel.setVisible(false);
-            progressLabel.setVisible(false);
-            updateBanCounts();
+            if (onComplete != null) onComplete.run();
         });
 
         syncTask.setOnFailed(workerStateEvent -> {
-            Throwable ex = syncTask.getException();
-            log.error("Failed to sync {} banned users.", banDurationType.toString().toLowerCase(), ex);
-            progressContainer.setVisible(false);
-            progressContainer.setManaged(false);
-            progressIndicator.setVisible(false);
-            progressIndicator.setManaged(false);
-            progressLabel.setVisible(false);
-            progressLabel.setVisible(false);
+            log.error("Failed to sync {} banned users.", banDurationType.toString().toLowerCase(), syncTask.getException());
+            if (onComplete != null) onComplete.run();
         });
-
-        progressIndicator.progressProperty().bind(syncTask.progressProperty());
-        progressLabel.textProperty().bind(syncTask.messageProperty());
 
         Thread thread = new Thread(syncTask);
         thread.setDaemon(true);
         thread.start();
+    }
+
+    public void onSave() {
+        saveColumnLayout(banTableView, localPreferences);
+    }
+
+    private static void saveColumnLayout(TableView<?> tableView, LocalPreferences localPreferences) {
+        if (tableView == null || localPreferences == null) return;
+        Map<String, Double> widths = new HashMap<>();
+        List<String> order = new ArrayList<>();
+        for (TableColumn<?, ?> column : tableView.getColumns()) {
+            if (column.getId() != null) {
+                widths.put(column.getId(), column.getWidth());
+                order.add(column.getId());
+            }
+        }
+        localPreferences.getTabBans().setColumnWidthsTabBans(widths);
+        localPreferences.getTabBans().setColumnOrderTabBans(order);
+    }
+
+    private static void loadColumnLayout(TableView<?> tableView, LocalPreferences localPreferences) {
+        if (tableView == null || localPreferences == null) return;
+        Map<String, Double> widths = localPreferences.getTabBans().getColumnWidthsTabBans();
+        List<String> order = localPreferences.getTabBans().getColumnOrderTabBans();
+        if (order != null && !order.isEmpty()) {
+            tableView.getColumns().sort(Comparator.comparingInt(col -> {
+                int index = order.indexOf(col.getId());
+                return index >= 0 ? index : Integer.MAX_VALUE;
+            }));
+        }
+        if (widths != null) {
+            for (TableColumn<?, ?> column : tableView.getColumns()) {
+                if (column.getId() != null && widths.containsKey(column.getId())) {
+                    column.setPrefWidth(widths.get(column.getId()));
+                }
+            }
+        }
     }
 
     public Set<String> loadExistingBannedUserIds(Path filePath) {

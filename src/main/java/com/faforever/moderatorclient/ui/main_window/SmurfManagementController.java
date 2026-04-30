@@ -4,12 +4,12 @@ import com.faforever.moderatorclient.ui.Controller;
 import com.faforever.moderatorclient.ui.UserDataController;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import javafx.animation.KeyFrame;
-import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
+import javafx.collections.transformation.SortedList;
 import javafx.fxml.FXML;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
@@ -22,31 +22,42 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
 @Component
 @Slf4j
 public class SmurfManagementController implements Controller<VBox> {
 
-    public static Path SMURF_MANAGEMENT_USERS_JSON_PATH = Paths.get("data", "smurf_management.json");
-    private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static double WINDOW_WIDTH_RATIO = 0.8;
-    private static double WINDOW_HEIGHT_RATIO = 0.8;
+    public static final Path SMURF_MANAGEMENT_USERS_JSON_PATH = Paths.get("data", "smurf_management.json");
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final double WINDOW_WIDTH_RATIO = 0.8;
+    private static final double WINDOW_HEIGHT_RATIO = 0.8;
+
+    private static final DateTimeFormatter HUMAN_READABLE_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                    .withZone(ZoneId.systemDefault());
 
     @Autowired
     public UserManagementController userManagementController;
 
     @FXML
     public VBox root;
+    @FXML
+    private TextField searchField;
+    @FXML
+    private Label countLabel;
 
     private TableView<UserDataController> smurfManagementTableView;
     private final ObservableList<UserDataController> smurfManagementUsersList = FXCollections.observableArrayList();
+    private FilteredList<UserDataController> filteredList;
 
     @Override
     public VBox getRoot() {
@@ -56,7 +67,24 @@ public class SmurfManagementController implements Controller<VBox> {
     @FXML
     public void initialize() {
         smurfManagementTableView = createSmurfManagementTable();
-        smurfManagementTableView.setItems(smurfManagementUsersList);
+
+        filteredList = new FilteredList<>(smurfManagementUsersList, p -> true);
+        SortedList<UserDataController> sortedList = new SortedList<>(filteredList);
+        sortedList.comparatorProperty().bind(smurfManagementTableView.comparatorProperty());
+        smurfManagementTableView.setItems(sortedList);
+
+        searchField.textProperty().addListener((obs, old, filter) -> {
+            String f = filter == null ? "" : filter.toLowerCase().strip();
+            filteredList.setPredicate(user -> {
+                if (f.isEmpty()) return true;
+                return safeGet(user, UserDataController.UserInfo::getUserName).toLowerCase().contains(f)
+                        || safeGet(user, UserDataController.UserInfo::getUserId).contains(f)
+                        || safeGet(user, UserDataController.UserInfo::getComment).toLowerCase().contains(f)
+                        || safeGet(user, UserDataController.UserInfo::getReason).toLowerCase().contains(f);
+            });
+            updateCountLabel();
+        });
+
         smurfManagementTableView.setOnKeyPressed(event -> {
             if (event.isControlDown() && event.getCode() == javafx.scene.input.KeyCode.C) {
                 UserDataController selected = smurfManagementTableView.getSelectionModel().getSelectedItem();
@@ -72,21 +100,19 @@ public class SmurfManagementController implements Controller<VBox> {
             }
         });
 
+        smurfManagementUsersList.addListener((javafx.collections.ListChangeListener<UserDataController>) c -> updateCountLabel());
+
         ensureJsonFileExists();
         loadSmurfManagementUsers();
 
-        // Set up the context menu and double-click action
         setupContextMenu(smurfManagementTableView);
         setupDoubleClickAction(smurfManagementTableView);
 
-        // refresh timeline for live updates
-        Timeline refreshTimeline = new Timeline(
-                new KeyFrame(javafx.util.Duration.seconds(1), e -> smurfManagementTableView.refresh())
-        );
-        refreshTimeline.setCycleCount(Timeline.INDEFINITE);
-        refreshTimeline.play();
-
         root.getChildren().add(smurfManagementTableView);
+    }
+
+    private void updateCountLabel() {
+        countLabel.setText(filteredList.size() + " / " + smurfManagementUsersList.size() + " entries");
     }
 
     private void ensureJsonFileExists() {
@@ -98,60 +124,55 @@ public class SmurfManagementController implements Controller<VBox> {
                 Files.writeString(SMURF_MANAGEMENT_USERS_JSON_PATH, "[]");
             }
         } catch (IOException e) {
-            log.error("Failed to {} ensure exists.", SMURF_MANAGEMENT_USERS_JSON_PATH, e);
+            log.error("Failed to ensure {} exists.", SMURF_MANAGEMENT_USERS_JSON_PATH, e);
         }
     }
 
     public TableView<UserDataController> createSmurfManagementTable() {
         TableView<UserDataController> table = new TableView<>();
 
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
+        DateTimeFormatter formatter = HUMAN_READABLE_FORMATTER;
 
         table.getColumns().addAll(
-                createColumn("User ID", user -> safeGet(user, UserDataController.UserInfo::getUserId)),
-                createColumn("User Name", user -> safeGet(user, UserDataController.UserInfo::getUserName)),
-                createColumn("Comment", user -> safeGet(user, UserDataController.UserInfo::getComment)),
-                createColumn("Reason", user -> safeGet(user, UserDataController.UserInfo::getReason)),
+                createNumericColumn("User ID",    user -> safeGet(user, UserDataController.UserInfo::getUserId)),
+                createColumn      ("User Name",   user -> safeGet(user, UserDataController.UserInfo::getUserName)),
+                createColumn      ("Comment",     user -> safeGet(user, UserDataController.UserInfo::getComment)),
+                createColumn      ("Reason",      user -> safeGet(user, UserDataController.UserInfo::getReason)),
 
-                createColumn("Last Login", user -> {
+                createDateColumn("Last Login", user -> {
                     List<UserDataController.LoginEntry> lastLogins = user.getAccountHistory().getLastLogins();
                     if (lastLogins == null || lastLogins.isEmpty()) return "Never";
-                    String lastLoginStr = lastLogins.getLast().getAddedOn();
-                    Instant lastLogin = parseInstantSafe(lastLoginStr);
+                    Instant lastLogin = parseInstantSafe(lastLogins.getLast().getAddedOn());
                     return lastLogin == null ? "" : formatter.format(lastLogin);
                 }),
 
-                createColumn("Date Added", user -> {
-                    String addedStr = safeGet(user, UserDataController.UserInfo::getAddedOn);
-                    Instant added = parseInstantSafe(addedStr);
+                createDateColumn("Date Added", user -> {
+                    Instant added = parseInstantSafe(safeGet(user, UserDataController.UserInfo::getAddedOn));
                     return added == null ? "" : formatter.format(added);
                 }),
 
-                createColumn("Last Activity", user -> {
-                    String lastEditStr = safeGet(user, UserDataController.UserInfo::getLastEdit);
-                    Instant lastEdit = parseInstantSafe(lastEditStr);
+                createDateColumn("Last Activity", user -> {
+                    Instant lastEdit = parseInstantSafe(safeGet(user, UserDataController.UserInfo::getLastEdit));
                     return lastEdit == null ? "" : formatter.format(lastEdit);
                 }),
 
                 createColumn("Last Event", user -> {
                     List<UserDataController.HistoryEntry> history = user.getAccountHistory().getHistory();
                     if (history == null || history.isEmpty()) return "";
-                    UserDataController.HistoryEntry lastEntry = history.get(history.size() - 1);
-                    return lastEntry.getAction();
+                    return history.get(history.size() - 1).getAction();
                 }),
 
-                createColumn("IP Count", user -> String.valueOf(user.getHardwareInfo().getIpAddresses().size())),
-                createColumn("UUID Count", user -> String.valueOf(user.getHardwareInfo().getUuidEntries().size())),
+                createNumericColumn("IP Count",   user -> String.valueOf(user.getHardwareInfo().getIpAddresses().size())),
+                createNumericColumn("UUID Count",  user -> String.valueOf(user.getHardwareInfo().getUuidEntries().size())),
 
                 createColumn("Last IP", user -> {
                     List<UserDataController.IpAddressEntry> ips = user.getHardwareInfo().getIpAddresses();
-                    if (ips == null || ips.isEmpty()) return "";
-                    return ips.get(ips.size() - 1).getIp();
+                    return (ips == null || ips.isEmpty()) ? "" : ips.get(ips.size() - 1).getIp();
                 }),
 
-                createColumn("Ban Status", user -> getFirstBan(user, UserDataController.BanInfo::getBanStatus)),
-                createColumn("Ban Expires At", user -> getFirstBan(user, UserDataController.BanInfo::getBanExpiresAt)),
-                createColumn("Ban Created At", user -> getFirstBan(user, UserDataController.BanInfo::getBanCreatedAt))
+                createColumn    ("Ban Status",     user -> getFirstBan(user, UserDataController.BanInfo::getBanStatus)),
+                createDateColumn("Ban Expires At", user -> getFirstBan(user, UserDataController.BanInfo::getBanExpiresAt)),
+                createDateColumn("Ban Created At", user -> getFirstBan(user, UserDataController.BanInfo::getBanCreatedAt))
         );
 
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
@@ -160,18 +181,46 @@ public class SmurfManagementController implements Controller<VBox> {
         return table;
     }
 
+    // ---- Column factories ----
+
+    private TableColumn<UserDataController, String> createColumn(String title, Function<UserDataController, String> mapper) {
+        TableColumn<UserDataController, String> col = new TableColumn<>(title);
+        col.setCellValueFactory(cell -> new SimpleStringProperty(mapper.apply(cell.getValue())));
+        return col;
+    }
+
+    private TableColumn<UserDataController, String> createNumericColumn(String title, Function<UserDataController, String> mapper) {
+        TableColumn<UserDataController, String> col = createColumn(title, mapper);
+        col.setComparator(Comparator.comparingInt(s -> {
+            try { return Integer.parseInt(s); }
+            catch (NumberFormatException e) { return Integer.MIN_VALUE; }
+        }));
+        return col;
+    }
+
+    private TableColumn<UserDataController, String> createDateColumn(String title, Function<UserDataController, String> mapper) {
+        TableColumn<UserDataController, String> col = createColumn(title, mapper);
+        col.setComparator(Comparator.comparing(SmurfManagementController::parseDateForSort));
+        return col;
+    }
+
+    private static Instant parseDateForSort(String s) {
+        if (s == null || s.isBlank() || "Never".equals(s)) return Instant.EPOCH;
+        try {
+            return HUMAN_READABLE_FORMATTER.parse(s, Instant::from);
+        } catch (Exception e) {
+            return Instant.EPOCH;
+        }
+    }
+
+    // ---- Helpers ----
+
     private Instant parseInstantSafe(String str) {
         try {
             return str == null ? null : Instant.parse(str);
         } catch (DateTimeParseException e) {
             return null;
         }
-    }
-
-    private TableColumn<UserDataController, String> createColumn(String title, Function<UserDataController, String> mapper) {
-        TableColumn<UserDataController, String> col = new TableColumn<>(title);
-        col.setCellValueFactory(cell -> new SimpleStringProperty(mapper.apply(cell.getValue())));
-        return col;
     }
 
     private String safeGet(UserDataController user, Function<UserDataController.UserInfo, String> mapper) {
@@ -182,17 +231,37 @@ public class SmurfManagementController implements Controller<VBox> {
         List<UserDataController.BanInfo> bans = Optional.ofNullable(user.getUserInfo())
                 .map(UserDataController.UserInfo::getBans)
                 .orElse(Collections.emptyList());
-        return !bans.isEmpty() ? mapper.apply(bans.getFirst()) : "";
+        return bans.isEmpty() ? "" : mapper.apply(bans.getFirst());
     }
 
-    /*private String getRegistrationDate(UserDataController user) {
-        var history = user.getAccountHistory();
-        if (history == null || history.getHistory().isEmpty()) return "";
-        return Objects.toString(history.getHistory().getFirst().get("registrationDate"), "");
-    }*/
+    // ---- Context menu ----
 
     private void setupContextMenu(TableView<UserDataController> table) {
         ContextMenu menu = new ContextMenu();
+
+        MenuItem copyIdItem = new MenuItem("Copy User ID");
+        copyIdItem.setOnAction(e -> {
+            UserDataController selected = table.getSelectionModel().getSelectedItem();
+            if (selected != null) copyToClipboard(safeGet(selected, UserDataController.UserInfo::getUserId));
+        });
+
+        MenuItem copyNameItem = new MenuItem("Copy Username");
+        copyNameItem.setOnAction(e -> {
+            UserDataController selected = table.getSelectionModel().getSelectedItem();
+            if (selected != null) copyToClipboard(safeGet(selected, UserDataController.UserInfo::getUserName));
+        });
+
+        MenuItem editCommentItem = new MenuItem("Edit Comment");
+        editCommentItem.setOnAction(e -> {
+            UserDataController selected = table.getSelectionModel().getSelectedItem();
+            if (selected != null) editUserField(selected, true);
+        });
+
+        MenuItem editReasonItem = new MenuItem("Edit Reason");
+        editReasonItem.setOnAction(e -> {
+            UserDataController selected = table.getSelectionModel().getSelectedItem();
+            if (selected != null) editUserField(selected, false);
+        });
 
         MenuItem removeUserItem = new MenuItem("Remove User");
         removeUserItem.setOnAction(e -> {
@@ -200,37 +269,30 @@ public class SmurfManagementController implements Controller<VBox> {
             if (selected != null) removeUser(selected);
         });
 
-        MenuItem editCommentItem = new MenuItem("Edit Comment");
-        editCommentItem.setOnAction(e -> {
-            UserDataController selected = table.getSelectionModel().getSelectedItem();
-            if (selected != null) editUserField(selected, "Comment");
-        });
-
-        MenuItem editReasonItem = new MenuItem("Edit Reason");
-        editReasonItem.setOnAction(e -> {
-            UserDataController selected = table.getSelectionModel().getSelectedItem();
-            if (selected != null) editUserField(selected, "Reason");
-        });
-
-        menu.getItems().addAll(removeUserItem, editCommentItem, editReasonItem);
+        menu.getItems().addAll(copyIdItem, copyNameItem, new SeparatorMenuItem(), editCommentItem, editReasonItem, new SeparatorMenuItem(), removeUserItem);
         table.setContextMenu(menu);
     }
 
-    private void editUserField(UserDataController user, String fieldName) {
-        TextInputDialog dialog = new TextInputDialog(
-                fieldName.equals("Comment") ? safeGet(user, UserDataController.UserInfo::getComment)
-                        : safeGet(user, UserDataController.UserInfo::getReason)
-        );
-        dialog.setTitle("Edit " + fieldName);
-        dialog.setHeaderText("Edit " + fieldName + " for user: " + safeGet(user, UserDataController.UserInfo::getUserName));
-        dialog.setContentText(fieldName + ":");
+    private void copyToClipboard(String text) {
+        javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
+        javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+        content.putString(text);
+        clipboard.setContent(content);
+    }
 
-        Optional<String> result = dialog.showAndWait();
-        result.ifPresent(newValue -> {
-            if (fieldName.equals("Comment")) {
-                if (user.getUserInfo() != null) user.getUserInfo().setComment(newValue);
-            } else if (fieldName.equals("Reason")) {
-                if (user.getUserInfo() != null) user.getUserInfo().setReason(newValue);
+    private void editUserField(UserDataController user, boolean isComment) {
+        String label = isComment ? "Comment" : "Reason";
+        String current = isComment
+                ? safeGet(user, UserDataController.UserInfo::getComment)
+                : safeGet(user, UserDataController.UserInfo::getReason);
+        TextInputDialog dialog = new TextInputDialog(current);
+        dialog.setTitle("Edit " + label);
+        dialog.setHeaderText("Edit " + label + " for: " + safeGet(user, UserDataController.UserInfo::getUserName));
+        dialog.setContentText(label + ":");
+        dialog.showAndWait().ifPresent(newValue -> {
+            if (user.getUserInfo() != null) {
+                if (isComment) user.getUserInfo().setComment(newValue);
+                else user.getUserInfo().setReason(newValue);
             }
             smurfManagementTableView.refresh();
             saveUserToSmurfManagement();
@@ -246,13 +308,7 @@ public class SmurfManagementController implements Controller<VBox> {
         });
     }
 
-    private double getScreenWidth() {
-        return Screen.getPrimary().getVisualBounds().getWidth();
-    }
-
-    private double getScreenHeight() {
-        return Screen.getPrimary().getVisualBounds().getHeight();
-    }
+    // ---- Data operations ----
 
     private void removeUser(UserDataController user) {
         smurfManagementUsersList.removeIf(u -> Objects.equals(u.getUserInfo().getUserId(), user.getUserInfo().getUserId()));
@@ -260,25 +316,30 @@ public class SmurfManagementController implements Controller<VBox> {
     }
 
     public void loadSmurfManagementUsers() {
-        try {
-            List<UserDataController> users = OBJECT_MAPPER.readValue(SMURF_MANAGEMENT_USERS_JSON_PATH.toFile(),
-                    new TypeReference<>() {
-                    });
-            Platform.runLater(() -> smurfManagementUsersList.setAll(users));
-        } catch (IOException e) {
-            log.error("Failed to read: {}", SMURF_MANAGEMENT_USERS_JSON_PATH, e);
-        }
+        CompletableFuture.runAsync(() -> {
+            try {
+                List<UserDataController> users = OBJECT_MAPPER.readValue(SMURF_MANAGEMENT_USERS_JSON_PATH.toFile(),
+                        new TypeReference<>() {});
+                Platform.runLater(() -> smurfManagementUsersList.setAll(users));
+            } catch (IOException e) {
+                log.error("Failed to read: {}", SMURF_MANAGEMENT_USERS_JSON_PATH, e);
+            }
+        });
     }
 
     private void saveUserToSmurfManagement() {
-        try {
-            OBJECT_MAPPER.writeValue(SMURF_MANAGEMENT_USERS_JSON_PATH.toFile(), smurfManagementUsersList);
-        } catch (IOException e) {
-            log.error("Failed to write blockedUsers.json", e);
-        }
+        List<UserDataController> snapshot = List.copyOf(smurfManagementUsersList);
+        CompletableFuture.runAsync(() -> {
+            try {
+                OBJECT_MAPPER.writeValue(SMURF_MANAGEMENT_USERS_JSON_PATH.toFile(), snapshot);
+            } catch (IOException e) {
+                log.error("Failed to write {}", SMURF_MANAGEMENT_USERS_JSON_PATH, e);
+            }
+        });
     }
 
-    // ------------------ Hardware Info ------------------
+    // ---- Hardware info popup ----
+
     private void showHwInfo(UserDataController user) {
         Stage stage = new Stage();
         TableView<Map<String, Object>> table = createHwTable(user);
@@ -292,12 +353,14 @@ public class SmurfManagementController implements Controller<VBox> {
         layout.setSpacing(5);
         layout.setPadding(new Insets(5));
 
-        Scene scene = new Scene(layout, getScreenWidth() * WINDOW_WIDTH_RATIO, getScreenHeight() * WINDOW_HEIGHT_RATIO);
+        double w = Screen.getPrimary().getVisualBounds().getWidth();
+        double h = Screen.getPrimary().getVisualBounds().getHeight();
+        Scene scene = new Scene(layout, w * WINDOW_WIDTH_RATIO, h * WINDOW_HEIGHT_RATIO);
         scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/style/main-dark.css")).toExternalForm());
 
         stage.setScene(scene);
-        stage.setTitle("HWID Info: " + safeGet(user, UserDataController.UserInfo::getUserName) +
-                " " + safeGet(user, UserDataController.UserInfo::getUserId));
+        stage.setTitle("HWID Info: " + safeGet(user, UserDataController.UserInfo::getUserName)
+                + " [id " + safeGet(user, UserDataController.UserInfo::getUserId) + "]");
         stage.setResizable(true);
         stage.show();
     }
@@ -305,55 +368,39 @@ public class SmurfManagementController implements Controller<VBox> {
     private TableView<Map<String, Object>> createHwTable(UserDataController user) {
         TableView<Map<String, Object>> table = new TableView<>();
         table.getColumns().addAll(
-                createHwColumn("Type", "type", 100),
-                createHwColumn("Value", "value", 500),
-                createHwColumn("Added On", "addedOn", 200)
+                createHwColumn("Type",     "type",    120),
+                createHwColumn("Value",    "value",   500),
+                createHwColumn("Added On", "addedOn", 180)
         );
-
-        List<Map<String, Object>> hwEntries = flattenHardwareInfo(user);
-        table.getItems().addAll(hwEntries);
+        table.getItems().addAll(flattenHardwareInfo(user));
         return table;
     }
 
     private TableColumn<Map<String, Object>, String> createHwColumn(String title, String key, double prefWidth) {
         TableColumn<Map<String, Object>, String> col = new TableColumn<>(title);
-        col.setCellValueFactory(cd -> new SimpleStringProperty(
-                Objects.toString(cd.getValue().get(key), "")
-        ));
+        col.setCellValueFactory(cd -> new SimpleStringProperty(Objects.toString(cd.getValue().get(key), "")));
         col.setPrefWidth(prefWidth);
         return col;
     }
 
-    private static final DateTimeFormatter HUMAN_READABLE_FORMATTER =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-                    .withZone(ZoneId.systemDefault());
-
     private <T> void addHardwareEntries(
-            List<Map<String, Object>> entries,
-            String type,
-            List<T> list,
-            Function<T, String> valueExtractor,
-            Function<T, String> addedOnExtractor) {
-
+            List<Map<String, Object>> entries, String type, List<T> list,
+            Function<T, String> valueExtractor, Function<T, String> addedOnExtractor) {
         if (list == null) return;
-
         for (T item : list) {
             Map<String, Object> map = new HashMap<>();
             map.put("type", type);
             map.put("value", valueExtractor.apply(item));
-
             String addedOnIso = addedOnExtractor.apply(item);
             if (addedOnIso != null && !addedOnIso.isBlank()) {
                 try {
-                    Instant instant = Instant.parse(addedOnIso);
-                    map.put("addedOn", HUMAN_READABLE_FORMATTER.format(instant));
+                    map.put("addedOn", HUMAN_READABLE_FORMATTER.format(Instant.parse(addedOnIso)));
                 } catch (Exception e) {
-                    map.put("addedOn", addedOnIso); // fallback
+                    map.put("addedOn", addedOnIso);
                 }
             } else {
                 map.put("addedOn", "");
             }
-
             entries.add(map);
         }
     }
@@ -363,77 +410,43 @@ public class SmurfManagementController implements Controller<VBox> {
         if (user.getHardwareInfo() == null) return entries;
 
         UserDataController.HardwareInfo hw = user.getHardwareInfo();
+        addHardwareEntries(entries, "IP Address",     hw.getIpAddresses(),            UserDataController.IpAddressEntry::getIp,                    UserDataController.IpAddressEntry::getAddedOn);
+        addHardwareEntries(entries, "UUID",           hw.getUuidEntries(),            UserDataController.UuidEntry::getUuid,                       UserDataController.UuidEntry::getAddedOn);
+        addHardwareEntries(entries, "Device ID",      hw.getDeviceIdEntries(),        UserDataController.DeviceIdEntry::getDeviceId,               UserDataController.DeviceIdEntry::getAddedOn);
+        addHardwareEntries(entries, "Serial Number",  hw.getSerialNumberEntries(),    UserDataController.SerialNumberEntry::getSerialNumber,        UserDataController.SerialNumberEntry::getAddedOn);
+        addHardwareEntries(entries, "Processor ID",   hw.getProcessorIdEntries(),     UserDataController.ProcessorIdEntry::getProcessorId,          UserDataController.ProcessorIdEntry::getAddedOn);
+        addHardwareEntries(entries, "CPU Name",       hw.getCpuNameEntries(),         UserDataController.CpuNameEntry::getCpuName,                  UserDataController.CpuNameEntry::getAddedOn);
+        addHardwareEntries(entries, "BIOS Version",   hw.getBiosVersionEntries(),     UserDataController.BiosVersionEntry::getBiosVersion,          UserDataController.BiosVersionEntry::getAddedOn);
+        addHardwareEntries(entries, "Manufacturer",   hw.getManufacturerEntries(),    UserDataController.ManufacturerEntry::getManufacturer,        UserDataController.ManufacturerEntry::getAddedOn);
+        addHardwareEntries(entries, "Hash",           hw.getHashEntries(),            UserDataController.HashEntry::getHash,                        UserDataController.HashEntry::getAddedOn);
+        addHardwareEntries(entries, "Memory Serial",  hw.getMemorySerialNumberEntries(), UserDataController.MemorySerialNumberEntry::getMemorySerialNumber, UserDataController.MemorySerialNumberEntry::getAddedOn);
+        addHardwareEntries(entries, "Volume Serial",  hw.getVolumeSerialNumberEntries(), UserDataController.VolumeSerialNumberEntry::getVolumeSerialNumber, UserDataController.VolumeSerialNumberEntry::getAddedOn);
 
-        addHardwareEntries(entries, "IP Address", hw.getIpAddresses(),
-                UserDataController.IpAddressEntry::getIp,
-                UserDataController.IpAddressEntry::getAddedOn);
-
-        addHardwareEntries(entries, "UUID", hw.getUuidEntries(),
-                UserDataController.UuidEntry::getUuid,
-                UserDataController.UuidEntry::getAddedOn);
-
-        addHardwareEntries(entries, "Device ID", hw.getDeviceIdEntries(),
-                UserDataController.DeviceIdEntry::getDeviceId,
-                UserDataController.DeviceIdEntry::getAddedOn);
-
-        addHardwareEntries(entries, "Serial Number", hw.getSerialNumberEntries(),
-                UserDataController.SerialNumberEntry::getSerialNumber,
-                UserDataController.SerialNumberEntry::getAddedOn);
-
-        addHardwareEntries(entries, "Processor ID", hw.getProcessorIdEntries(),
-                UserDataController.ProcessorIdEntry::getProcessorId,
-                UserDataController.ProcessorIdEntry::getAddedOn);
-
-        addHardwareEntries(entries, "CPU Name", hw.getCpuNameEntries(),
-                UserDataController.CpuNameEntry::getCpuName,
-                UserDataController.CpuNameEntry::getAddedOn);
-
-        addHardwareEntries(entries, "BIOS Version", hw.getBiosVersionEntries(),
-                UserDataController.BiosVersionEntry::getBiosVersion,
-                UserDataController.BiosVersionEntry::getAddedOn);
-
-        addHardwareEntries(entries, "Manufacturer", hw.getManufacturerEntries(),
-                UserDataController.ManufacturerEntry::getManufacturer,
-                UserDataController.ManufacturerEntry::getAddedOn);
-
-        addHardwareEntries(entries, "Hash", hw.getHashEntries(),
-                UserDataController.HashEntry::getHash,
-                UserDataController.HashEntry::getAddedOn);
-
-        addHardwareEntries(entries, "Memory Serial", hw.getMemorySerialNumberEntries(),
-                UserDataController.MemorySerialNumberEntry::getMemorySerialNumber,
-                UserDataController.MemorySerialNumberEntry::getAddedOn);
-
-        addHardwareEntries(entries, "Volume Serial", hw.getVolumeSerialNumberEntries(),
-                UserDataController.VolumeSerialNumberEntry::getVolumeSerialNumber,
-                UserDataController.VolumeSerialNumberEntry::getAddedOn);
-
-        entries.sort(this::compareAddedOnDesc);
+        Comparator<String> byDateDesc = Comparator.comparingLong((String s) -> {
+            if (s == null || s.isBlank()) return Long.MIN_VALUE;
+            try { return HUMAN_READABLE_FORMATTER.parse(s, Instant::from).toEpochMilli(); }
+            catch (Exception e) { return Long.MIN_VALUE; }
+        }).reversed();
+        entries.sort(Comparator.comparing(m -> Objects.toString(m.get("addedOn"), ""), byDateDesc));
         return entries;
     }
 
-    private int compareAddedOnDesc(Map<String, Object> a, Map<String, Object> b) {
-        try {
-            Instant instantA = Instant.parse(Objects.toString(a.get("addedOn"), Instant.EPOCH.toString()));
-            Instant instantB = Instant.parse(Objects.toString(b.get("addedOn"), Instant.EPOCH.toString()));
-            return instantB.compareTo(instantA);
-        } catch (DateTimeParseException e) {
-            return 0;
-        }
+    // ---- FXML actions ----
+
+    @FXML
+    public void reloadSmurfManagement() {
+        loadSmurfManagementUsers();
     }
 
     @FXML
     public void createBackupJson() {
         String timestamp = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         Path backupPath = Paths.get("data", "smurf_management_backup_" + timestamp + ".json");
-
         try {
             if (!Files.exists(SMURF_MANAGEMENT_USERS_JSON_PATH)) {
-                log.warn("Original JSON file does not exist: {}", SMURF_MANAGEMENT_USERS_JSON_PATH);
                 showAlert(Alert.AlertType.WARNING, "Backup Failed", "Original JSON file does not exist.");
                 return;
             }
-
             Files.createDirectories(backupPath.getParent());
             Files.copy(SMURF_MANAGEMENT_USERS_JSON_PATH, backupPath, StandardCopyOption.REPLACE_EXISTING);
             log.info("Backup created at: {}", backupPath);
@@ -465,15 +478,17 @@ public class SmurfManagementController implements Controller<VBox> {
     }
 
     public void openFile(String fileName) throws IOException {
-        Path notepadPlusPlus = Paths.get("C:\\Program Files\\Notepad++\\notepad++.exe");
-        Path notepad = Paths.get("C:\\Windows\\System32\\notepad.exe");
+        openPath(new File(fileName));
+    }
 
-        if (Files.exists(notepadPlusPlus)) {
-            ProcessBuilder pb = new ProcessBuilder(notepadPlusPlus.toString(), fileName);
-            pb.start();
+    private static void openPath(File path) throws IOException {
+        String os = System.getProperty("os.name").toLowerCase();
+        if (os.contains("win")) {
+            new ProcessBuilder("cmd", "/c", "start", "", path.getAbsolutePath()).start();
+        } else if (os.contains("mac")) {
+            new ProcessBuilder("open", path.getAbsolutePath()).start();
         } else {
-            ProcessBuilder pb = new ProcessBuilder(notepad.toString(), fileName);
-            pb.start();
+            new ProcessBuilder("xdg-open", path.getAbsolutePath()).start();
         }
     }
 }

@@ -32,7 +32,6 @@ public class BanService {
     private final EnvironmentProperties environmentProperties;
 
     public void patchBanInfo(@NotNull BanInfoFX banInfoFX) {
-        fafApi.checkRateLimit();
         BanInfo banInfo = banInfoMapper.map(banInfoFX);
         log.debug("Patching BanInfo of id: {}", banInfo.getId());
         fafUser.post(REVOKE_ENDPOINT, RevokeRefreshTokenRequest.allClientsOf(banInfo.getPlayer().getId()));
@@ -42,14 +41,12 @@ public class BanService {
     }
 
     public String createBan(@NotNull BanInfoFX banInfoFX) {
-        fafApi.checkRateLimit();
         BanInfo banInfo = banInfoMapper.map(banInfoFX);
         fafUser.post(REVOKE_ENDPOINT, RevokeRefreshTokenRequest.allClientsOf(banInfo.getPlayer().getId()));
         return fafApi.post(ElideNavigator.of(BanInfo.class).collection(), banInfo).getId();
     }
 
     public void updateBan(BanInfo banInfoUpdate) {
-        fafApi.checkRateLimit();
         log.debug("Update for ban id: {}", banInfoUpdate.getId());
         ElideNavigatorOnId<BanInfo> navigator = ElideNavigator.of(BanInfo.class)
                 .id(banInfoUpdate.getId());
@@ -65,7 +62,6 @@ public class BanService {
             List<BanInfo> banInfos;
 
             do {
-                fafApi.checkRateLimit();
                 banInfos = fafApi.getPage(BanInfo.class, ElideNavigator.of(BanInfo.class)
                                 .collection()
                                 .addInclude("player")
@@ -90,7 +86,6 @@ public class BanService {
     }
 
     public BanInfoFX getBanInfoById(String banInfoId) {
-        fafApi.checkRateLimit();
         log.debug("Search for ban id: {}", banInfoId);
         ElideNavigatorOnId<BanInfo> navigator = ElideNavigator.of(BanInfo.class)
                 .id(banInfoId)
@@ -100,7 +95,6 @@ public class BanService {
     }
 
     public List<BanInfoFX> getBanInfoByBannedPlayerNameContains(String name) {
-        fafApi.checkRateLimit();
         ElideNavigatorOnCollection<BanInfo> navigator = ElideNavigator.of(BanInfo.class)
                 .collection()
                 .setFilter(ElideNavigator.qBuilder().string("player.login").eq("*" + name + "*"))

@@ -109,6 +109,8 @@
 
                                 <!-- Expert Settings -->
                                 <Label text="Expert Settings"/>
+                                <CheckBox fx:id="onlyShowActiveAccountsCheckBox"
+                                          text="Only Show Unbanned (Active) Accounts"/>
                                 <CheckBox fx:id="catchFirstLayerSmurfsOnlyCheckBox"
                                           text="Limit to First Layer Accounts (See Tooltip)">
                                     <tooltip>
@@ -130,10 +132,6 @@
                         <HBox spacing="10" alignment="CENTER_LEFT">
                             <Button fx:id="checkTemporaryBansButton" text="Check Temporary Bans" onAction="#handleCheckTemporaryBans"/>
                             <Label fx:id="temporaryBanProgressLabel" style="-fx-font-size: 12px; -fx-text-fill: gray;"/>
-                        </HBox>
-                        <HBox spacing="10" alignment="CENTER_LEFT">
-                            <Button fx:id="checkPermanentBansButton" text="Check Permanent Bans" onAction="#handleCheckPermanentBans"/>
-                            <Label fx:id="permanentBanProgressLabel" style="-fx-font-size: 12px; -fx-text-fill: gray;"/>
                         </HBox>
                         <HBox spacing="10" alignment="CENTER_LEFT">
                             <Button fx:id="checkSmurfManagementAccountsButton" text="Run Smurf Management" onAction="#handleCheckSmurfManagementAccounts"/>
@@ -277,7 +275,8 @@
 
         <Tab fx:id="smurfOutputTab" text="Smurf Village">
             <VBox>
-                <TextArea fx:id="smurfOutputTextArea" VBox.vgrow="ALWAYS"/>
+                <TextArea fx:id="smurfOutputTextArea" VBox.vgrow="ALWAYS"
+                          style="-fx-font-family: 'Consolas', 'Courier New', monospace; -fx-font-size: 12px;"/>
             </VBox>
         </Tab>
     </TabPane>
