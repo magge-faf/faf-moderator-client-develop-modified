@@ -36,7 +36,6 @@
                 </HBox>
                 <CheckBox fx:id="darkModeCheckBox" mnemonicParsing="false" text="Dark Mode"/>
                 <CheckBox fx:id="fetchBansOnStartupCheckBox" mnemonicParsing="false" text="Load bans at startup"/>
-                <CheckBox fx:id="syncTemporaryBansAtStartupCheckbox" text="Sync temporary bans at startup"/>
             </VBox>
 
             <Separator/>
@@ -68,18 +67,6 @@
                         </FXCollections>
                     </items>
                 </ComboBox>
-            </VBox>
-
-            <Separator/>
-
-            <VBox spacing="10">
-                <Label text="Configure how bans are synchronized from the FAF server (producer) to your local JSON file (consumer)." style="-fx-font-style: italic; -fx-font-size: 0.9em;"/>
-                <TitledPane text="Permanent Bans (WIP - disabled)" disable="true">
-                    <content>
-                        <CheckBox fx:id="syncPermanentBansAtStartupCheckbox"
-                                  text="Enable syncing of permanent bans at startup"/>
-                    </content>
-                </TitledPane>
             </VBox>
 
             <Separator/>

@@ -465,28 +465,8 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     private void StartupSyncBans() {
-        LocalPreferences.TabSettings settings = localPreferences.getTabSettings();
-
-        if (settings.isSyncPermanentBansAtStartupCheckbox()) {
-            log.debug("Syncing permanent bans at startup.");
-            bansController.syncPermBannedUsersJson();
-        }
-
-        if (settings.isSyncTemporaryBansAtStartupCheckbox()) {
-            log.debug("Syncing temporary bans at startup.");
-            checkTemporaryBansButton.setDisable(true);
-            checkTemporaryBansButton.setText("Check Temporary Bans (syncing...)");
-
-            boolean fetchBans = settings.isFetchBansOnStartupCheckBox();
-            bansController.syncTempBannedUsersJson(() -> {
-                int count = bansController.loadExistingBannedUserIds(bansController.PATH_TEMP_BANNED_USERS_JSON).size();
-                checkTemporaryBansButton.setText("Check Temporary Bans: " + count);
-                checkTemporaryBansButton.setDisable(false);
-                if (fetchBans) {
-                    bansController.onRefreshLatestBans();
-                }
-            });
-        }
+        int smurfCount = bansController.loadExistingBannedUserIds(SmurfManagementController.SMURF_MANAGEMENT_USERS_JSON_PATH).size();
+        checkSmurfManagementAccountsButton.setText("Run Smurf Management: " + smurfCount);
     }
 
     private void initializeSearchProperties() {
