@@ -1299,7 +1299,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
         try {
             String displayAttr = attributeName.contains(".") ? attributeName.substring(attributeName.lastIndexOf('.') + 1) : attributeName;
-            String headerLine = String.format("\n  [%-20s]  %s", displayAttr, attributeValue);
+            String headerLine = String.format("\n  [%s]  %s", displayAttr, attributeValue);
             if (!snapOnlyShowActive) {
                 updateSmurfVillageLogTextArea(headerLine);
             }
@@ -1331,7 +1331,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
             if (isExcluded) {
                 updateSmurfVillageLogTextArea(
-                        String.format("\t\t EXCLUSION CHECK: attribute [%s] with value [%s] found in excluded_items.json, skipping.",
+                        String.format("\n  EXCLUDED: [%s] = [%s] (in excluded_items.json, skipping)",
                                 displayAttr, attributeValue));
                 return foundAccounts;
             }
@@ -1477,7 +1477,7 @@ public class UserManagementController implements Controller<SplitPane> {
                         prefix = "~";
                     }
 
-                    activeLines.add(String.format("\n    %s  %-26s  id: %6s   %s",
+                    activeLines.add(String.format("\n    %s  %s  id: %s   %s",
                             prefix, user.getLogin(), user.getId(), banInfo));
 
                     if (user.getId() != null && !foundAccounts.contains(user.getId())) {
@@ -1598,7 +1598,7 @@ public class UserManagementController implements Controller<SplitPane> {
         }
 
         startTaskTimer();
-        String initialLog = String.format("\n=== Checking PlayerID: %s ===\n", playerID);
+        String initialLog = String.format("\n=== Checking PlayerID: %s ===", playerID);
         updateSmurfVillageLogTextArea(initialLog);
         Platform.runLater(() -> statusTextFieldProcessingPlayerID.setText(playerID));
 
@@ -1695,16 +1695,15 @@ public class UserManagementController implements Controller<SplitPane> {
         }
 
         // Log related accounts
-        if (!accountsWithSharedAttributes.isEmpty()) {
-            List<String> relatedAccounts = accountsWithSharedAttributes.stream()
-                    .map(Object::toString)
-                    .filter(id -> !id.equals(playerID))
-                    .toList();
+        List<String> relatedAccounts = accountsWithSharedAttributes.stream()
+                .map(Object::toString)
+                .filter(id -> !id.equals(playerID))
+                .toList();
 
-            if (!relatedAccounts.isEmpty()) {
-                String relationLog = "\n  " + playerID + " → related: " + relatedAccounts;
-                updateSmurfVillageLogTextArea(relationLog);
-            }
+        if (!relatedAccounts.isEmpty()) {
+            updateSmurfVillageLogTextArea("\n  " + playerID + " → related: " + relatedAccounts + "\n");
+        } else {
+            updateSmurfVillageLogTextArea("\n  → no related accounts\n");
         }
 
         if (catchFirstLayerSmurfsOnlyCheckBox.isSelected()) {
