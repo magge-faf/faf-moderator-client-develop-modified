@@ -191,10 +191,10 @@ public class SettingsController implements Controller<Pane> {
                 Files.createDirectories(Paths.get(CONFIGURATION_FOLDER));
                 try (FileWriter writer = new FileWriter(file)) {
                     writer.write(JSON_CONTENT_templatesAndReasons);
-                    System.out.println("File created and content written successfully.");
+                    log.info("Created {}", jsonFileTemplatesAndReasons);
                 }
             } catch (IOException e) {
-                log.warn(String.valueOf(e));
+                log.warn("Failed to create {}", jsonFileTemplatesAndReasons, e);
             }
         } else {
             log.info(jsonFileTemplatesAndReasons +" already exists.");
@@ -245,10 +245,10 @@ public class SettingsController implements Controller<Pane> {
                 Files.createDirectories(Paths.get(CONFIGURATION_FOLDER));
                 try (FileWriter writer = new FileWriter(file)) {
                     writer.write(JSON_CONTENT_templatesFinishReports);
-                    System.out.println("File created and content written successfully.");
+                    log.info("Created {}", jsonFileTemplatesFinishReports);
                 }
             } catch (IOException e) {
-                log.warn(String.valueOf(e));
+                log.warn("Failed to create {}", jsonFileTemplatesFinishReports, e);
             }
         } else {
             log.info("{} already exists.", jsonFileTemplatesFinishReports);
@@ -256,20 +256,18 @@ public class SettingsController implements Controller<Pane> {
     }
 
     public void createTemplateGamingModeratorTask() {
-        try {
-            File fileCompleted = new File(CONFIGURATION_FOLDER + File.separator + "templateGamingModeratorTask.txt");
-
-            if (!fileCompleted.exists()) {
-                String contentCompleted = """
-                        AI-Prompt: Gaming Moderator Task
-                        Reported Chat Log Assessing report from %reporter% against offender %offenderNames%:
-                        Itemize all instances of speech by %offenderNames%. Translate to English where necessary.""";
-                FileWriter writer = new FileWriter(fileCompleted);
+        File fileCompleted = new File(CONFIGURATION_FOLDER + File.separator + "templateGamingModeratorTask.txt");
+        if (!fileCompleted.exists()) {
+            String contentCompleted = """
+                    AI-Prompt: Gaming Moderator Task
+                    Reported Chat Log Assessing report from %reporter% against offender %offenderNames%:
+                    Itemize all instances of speech by %offenderNames%. Translate to English where necessary.""";
+            try (FileWriter writer = new FileWriter(fileCompleted)) {
                 writer.write(contentCompleted);
-                writer.close();
+                log.info("Created {}", fileCompleted.getPath());
+            } catch (IOException e) {
+                log.error("Failed to create templateGamingModeratorTask.txt", e);
             }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
         }
     }
 
@@ -283,7 +281,7 @@ public class SettingsController implements Controller<Pane> {
             try {
                 openPath(folder);
             } catch (IOException e) {
-                log.error("Failed to open configuration folder: {}", e.toString());
+                log.error("Failed to open configuration folder", e);
             }
         } else {
             log.warn("Configuration folder does not exist or is invalid: {}", folder.getAbsolutePath());
@@ -312,7 +310,7 @@ public class SettingsController implements Controller<Pane> {
             try {
                 openPath(directory);
             } catch (IOException e) {
-                log.error("Failed to open directory: {}", e.toString());
+                log.error("Failed to open directory {}", path, e);
             }
         } else {
             log.info("Directory does not exist: {}", path);

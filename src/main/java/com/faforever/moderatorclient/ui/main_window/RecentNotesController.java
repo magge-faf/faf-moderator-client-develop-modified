@@ -141,15 +141,21 @@ public class RecentNotesController implements Controller<Region> {
         });
 
         noteIdColumn.setCellValueFactory(cellData -> {
-            int id = Integer.parseInt(cellData.getValue().getId());
-            return new SimpleIntegerProperty(id).asObject();
+            String rawId = cellData.getValue().getId();
+            try {
+                return new SimpleIntegerProperty(rawId == null ? 0 : Integer.parseInt(rawId)).asObject();
+            } catch (NumberFormatException e) {
+                return new SimpleIntegerProperty(0).asObject();
+            }
         });
-        authorIdColumn.setCellValueFactory(cellData ->
-                new SimpleStringProperty(cellData.getValue().getAuthor().getLogin())
-        );
-        playerIdColumn.setCellValueFactory(cellData ->
-                new SimpleStringProperty(cellData.getValue().getPlayer().getRepresentation())
-        );
+        authorIdColumn.setCellValueFactory(cellData -> {
+            var author = cellData.getValue().getAuthor();
+            return new SimpleStringProperty(author == null ? "" : author.getLogin());
+        });
+        playerIdColumn.setCellValueFactory(cellData -> {
+            var player = cellData.getValue().getPlayer();
+            return new SimpleStringProperty(player == null ? "" : player.getRepresentation());
+        });
         noteColumn.setCellValueFactory(cellData ->
                 new SimpleStringProperty(cellData.getValue().getNote())
         );
@@ -161,8 +167,8 @@ public class RecentNotesController implements Controller<Region> {
             UserNoteFX selectedNote = notesTable.getItems().get(selectedIndex);
             String contentString = switch (field) {
                 case "Note" -> selectedNote.getNote();
-                case "Moderator" -> selectedNote.getAuthor().getLogin();
-                case "User" -> selectedNote.getPlayer().getRepresentation();
+                case "Moderator" -> selectedNote.getAuthor() == null ? "" : selectedNote.getAuthor().getLogin();
+                case "User" -> selectedNote.getPlayer() == null ? "" : selectedNote.getPlayer().getRepresentation();
                 case "Created" -> selectedNote.getCreateTime().toString();
                 case "Updated" -> selectedNote.getUpdateTime().toString();
                 default -> "";
@@ -218,12 +224,14 @@ public class RecentNotesController implements Controller<Region> {
         if (selectedIndex >= 0) {
             UserNoteFX selectedNote = notesTable.getItems().get(selectedIndex);
 
+            String authorLogin = selectedNote.getAuthor() == null ? "" : selectedNote.getAuthor().getLogin();
+            String playerRepr = selectedNote.getPlayer() == null ? "" : selectedNote.getPlayer().getRepresentation();
             String contentString = String.format("%s %s %s %s %s %s ",
                     selectedNote.getCreateTime(),
                     selectedNote.getUpdateTime(),
                     selectedNote.getId(),
-                    selectedNote.getAuthor().getLogin(),
-                    selectedNote.getPlayer().getRepresentation(),
+                    authorLogin,
+                    playerRepr,
                     selectedNote.getNote());
 
             Clipboard clipboard = Clipboard.getSystemClipboard();

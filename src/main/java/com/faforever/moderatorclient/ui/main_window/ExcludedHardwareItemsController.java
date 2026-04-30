@@ -176,7 +176,7 @@ public class ExcludedHardwareItemsController implements Controller<VBox> {
         try {
             openPath(folder);
         } catch (IOException e) {
-            log.error("Failed to open folder: {}", e.getMessage());
+            log.error("Failed to open folder", e);
         }
     }
 
@@ -222,7 +222,7 @@ public class ExcludedHardwareItemsController implements Controller<VBox> {
                 Platform.runLater(() -> excludedItemsList.add(newItem));
                 log.debug("Added new excluded item: {}", newItem);
             } catch (IOException e) {
-                log.error("Failed to save excluded item: {}", e.getMessage());
+                log.error("Failed to save excluded item", e);
             }
         });
     }
@@ -242,7 +242,7 @@ public class ExcludedHardwareItemsController implements Controller<VBox> {
                 Platform.runLater(() -> excludedItemsList.remove(selected));
                 log.debug("Removed excluded item: {}", selected);
             } catch (IOException e) {
-                log.error("Failed to remove excluded item: {}", e.getMessage());
+                log.error("Failed to remove excluded item", e);
             }
         });
     }
@@ -272,7 +272,7 @@ public class ExcludedHardwareItemsController implements Controller<VBox> {
                     log.warn("Excluded item already exists: {}", newItem);
                 }
             } catch (IOException e) {
-                log.error("Failed to save excluded item: {}", e.getMessage());
+                log.error("Failed to save excluded item", e);
             }
         });
     }
@@ -291,7 +291,7 @@ public class ExcludedHardwareItemsController implements Controller<VBox> {
                     fieldsMap.forEach((key, field) -> validateField(field, key, field.getText()));
                 });
             } catch (IOException e) {
-                log.error("Failed to load excluded items: {}", e.getMessage());
+                log.error("Failed to load excluded items", e);
                 Platform.runLater(() -> statsExcludedItemsLabel.setText("Error loading items."));
             }
         });
@@ -319,7 +319,7 @@ public class ExcludedHardwareItemsController implements Controller<VBox> {
         try {
             openPath(EXCLUDED_ITEMS_FILE);
         } catch (IOException e) {
-            log.error("Failed to open excluded_items.json: {}", e.getMessage());
+            log.error("Failed to open excluded_items.json", e);
             showAlert(Alert.AlertType.ERROR, "Open File Failed",
                     "Could not open JSON file:\n" + e.getMessage());
         }
@@ -341,7 +341,7 @@ public class ExcludedHardwareItemsController implements Controller<VBox> {
             showAlert(Alert.AlertType.INFORMATION, "Backup Created",
                     "Backup successfully created at:\n" + backupPath.toAbsolutePath());
         } catch (IOException e) {
-            log.error("Failed to create backup: {}", e.getMessage());
+            log.error("Failed to create backup", e);
             showAlert(Alert.AlertType.ERROR, "Backup Failed",
                     "An error occurred while creating the backup:\n" + e.getMessage());
         }
