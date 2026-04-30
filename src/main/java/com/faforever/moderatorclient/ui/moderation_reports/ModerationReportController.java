@@ -1115,14 +1115,6 @@ public class ModerationReportController implements Controller<Region> {
         ViewHelper.buildModerationReportTableView(reportTableView, sortedItemList, this::showChatLog);
         statusChoiceBox.getSelectionModel().selectedItemProperty().addListener(observable -> renewFilter());
         playerNameFilterTextField.textProperty().addListener(observable -> renewFilter());
-        reportTableView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
-            try {
-                updateReportDetails(newValue);
-            } catch (Exception e) {
-                log.debug(String.valueOf(e));
-                resetButtonsToInvalidState();
-            }
-        });
     }
 
     public static void setSysClipboardText(String writeMe) {
