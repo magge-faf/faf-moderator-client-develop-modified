@@ -1219,15 +1219,27 @@ public class ModerationReportController implements Controller<Region> {
             // Step 2: Load all reports in background
             moderationReportService.getAllReportsPaged(fullPageSize, batchSize)
                     .thenAccept(allReports -> Platform.runLater(() -> {
+                        ModerationReportFX previousSelection = reportTableView.getSelectionModel().getSelectedItem();
+                        String previousSelectionId = previousSelection != null ? previousSelection.getId() : null;
+
                         itemList.clear();
                         itemList.addAll(allReports);
 
                         cachedReports.setAll(allReports);
                         processStatisticsModerator(allReports);
                         showInTableRepeatedOffenders(allReports);
-
                         totalReportsLoaded.set(allReports.size());
                         log.debug("All reports loaded. Total count: {}", allReports.size());
+
+                        if (previousSelectionId != null) {
+                            allReports.stream()
+                                    .filter(r -> previousSelectionId.equals(r.getId()))
+                                    .findFirst()
+                                    .ifPresent(r -> Platform.runLater(() -> {
+                                        reportTableView.getSelectionModel().select(r);
+                                        reportTableView.scrollTo(r);
+                                    }));
+                        }
                     }))
                     .exceptionally(throwable -> {
                         log.error("Error loading all reports", throwable);
