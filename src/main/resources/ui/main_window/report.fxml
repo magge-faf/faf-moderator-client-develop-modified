@@ -18,6 +18,9 @@
 <?import javafx.scene.text.TextFlow?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TitledPane?>
+<?import javafx.scene.canvas.Canvas?>
+<?import javafx.scene.Group?>
+<?import javafx.scene.control.Slider?>
 <?import javafx.scene.control.TextFormatter?>
 <SplitPane fx:id="root" dividerPositions="0.25" orientation="VERTICAL" xmlns="http://javafx.com/javafx/11.0.1"
            xmlns:fx="http://javafx.com/fxml/1"
@@ -79,6 +82,20 @@
             <ScrollPane prefHeight="200.0" prefWidth="200.0">
                 <TextFlow fx:id="moderatorEventTextFlow" prefHeight="200.0" prefWidth="200.0"/>
             </ScrollPane>
+        </Tab>
+        <Tab text="Map Drawings">
+            <VBox>
+                <HBox spacing="10" alignment="CENTER_LEFT" style="-fx-padding: 6;">
+                    <Label text="Time:"/>
+                    <Slider fx:id="paintingTimeSlider" HBox.hgrow="ALWAYS" min="0" max="100" value="100"/>
+                    <Label fx:id="paintingTimeLabel" text="00:00:00" minWidth="70"/>
+                </HBox>
+                <ScrollPane fitToWidth="false" fitToHeight="false" VBox.vgrow="ALWAYS">
+                    <Group>
+                        <Canvas fx:id="paintingCanvas" width="600" height="600"/>
+                    </Group>
+                </ScrollPane>
+            </VBox>
         </Tab>
         <Tab text="Most Reported Accounts">
             <TableView fx:id="mostReportedAccountsTableView">

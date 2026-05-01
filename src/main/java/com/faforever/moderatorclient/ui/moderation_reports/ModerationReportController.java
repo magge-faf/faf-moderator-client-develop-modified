@@ -8,6 +8,7 @@ import com.faforever.commons.replay.ReplayDataParser;
 import com.faforever.commons.replay.ReplayMetadata;
 import com.faforever.commons.replay.GameOption;
 import com.faforever.commons.replay.body.Event;
+import com.faforever.commons.replay.shared.LuaData;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.BanService;
 import com.faforever.moderatorclient.api.domain.ModerationReportService;
@@ -47,8 +48,13 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.*;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyCode;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Region;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.StrokeLineCap;
+import javafx.scene.shape.StrokeLineJoin;
 import javafx.stage.Stage;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -157,6 +163,14 @@ public class ModerationReportController implements Controller<Region> {
     public Button useTemplateWithReasonsButton;
     @FXML
     public TextFlow moderatorEventTextFlow;
+    @FXML
+    public Canvas paintingCanvas;
+    @FXML
+    public Slider paintingTimeSlider;
+    @FXML
+    public Label paintingTimeLabel;
+    private List<PaintingBrushStroke> currentPaintingStrokes = new ArrayList<>();
+    private float paintingMinX, paintingMinZ, paintingMaxX, paintingMaxZ;
     @FXML
     public TextField getModeratorEventsForReplayIdTextField;
     @FXML
@@ -1091,6 +1105,16 @@ public class ModerationReportController implements Controller<Region> {
                 column.setId(column.getText().replaceAll("\\s+", "")); // e.g., "Last Login" -> "LastLogin"
             }
         });
+
+        paintingTimeSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
+            long seconds = newVal.longValue();
+            paintingTimeLabel.setText(formatDurationHMS(seconds));
+            java.time.Duration limit = java.time.Duration.ofSeconds(seconds);
+            List<PaintingBrushStroke> visible = currentPaintingStrokes.stream()
+                    .filter(s -> s.time().compareTo(limit) <= 0)
+                    .collect(Collectors.toList());
+            renderPaintingStrokes(visible);
+        });
     }
 
     private void initializeItemMapAndListeners() {
@@ -1627,6 +1651,28 @@ public class ModerationReportController implements Controller<Region> {
             List<ModeratorEvent> moderatorEvents = replayDataParser.getModeratorEvents();
             showModeratorEvent(moderatorEvents, playerInfoMap);
 
+            List<PaintingBrushStroke> paintingStrokes = extractPaintingStrokes(replayDataParser);
+            Platform.runLater(() -> {
+                currentPaintingStrokes = paintingStrokes;
+                paintingMinX = Float.MAX_VALUE; paintingMaxX = -Float.MAX_VALUE;
+                paintingMinZ = Float.MAX_VALUE; paintingMaxZ = -Float.MAX_VALUE;
+                for (PaintingBrushStroke s : paintingStrokes) {
+                    for (float[] pt : s.points()) {
+                        if (pt[0] < paintingMinX) paintingMinX = pt[0];
+                        if (pt[0] > paintingMaxX) paintingMaxX = pt[0];
+                        if (pt[1] < paintingMinZ) paintingMinZ = pt[1];
+                        if (pt[1] > paintingMaxZ) paintingMaxZ = pt[1];
+                    }
+                }
+                long maxSec = paintingStrokes.isEmpty() ? 0
+                        : paintingStrokes.stream().mapToLong(s -> s.time().getSeconds()).max().orElse(0);
+                paintingTimeSlider.setMin(0);
+                paintingTimeSlider.setMax(Math.max(maxSec, 1));
+                paintingTimeSlider.setValue(maxSec);
+                paintingTimeLabel.setText(formatDurationHMS(maxSec));
+                renderPaintingStrokes(paintingStrokes);
+            });
+
             chatLogFiltered.append("\n").append(promptAI);
 
             for (String line : filteredChatLog.split("\n")) {
@@ -1871,6 +1917,154 @@ public class ModerationReportController implements Controller<Region> {
 
             textFlow.getChildren().add(eventFlow);
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Painting brush stroke visualization
+    // -------------------------------------------------------------------------
+
+    private record PaintingBrushStroke(
+            java.time.Duration time, String playerName, String adapterIdentifier, int shareId, List<float[]> points) {}
+
+    private static final Color[] PAINTING_PLAYER_COLORS = {
+        Color.CORNFLOWERBLUE, Color.TOMATO,       Color.LIMEGREEN,    Color.GOLD,
+        Color.ORANGE,         Color.MEDIUMPURPLE,  Color.CYAN,         Color.HOTPINK,
+        Color.WHITE,          Color.SPRINGGREEN,   Color.DEEPSKYBLUE,  Color.CRIMSON,
+        Color.ORCHID,         Color.TURQUOISE,     Color.YELLOWGREEN,  Color.KHAKI
+    };
+
+    private List<PaintingBrushStroke> extractPaintingStrokes(ReplayDataParser parser) {
+        int tick = 0;
+        int commandSource = -1;
+        List<PaintingBrushStroke> strokes = new ArrayList<>();
+        Map<Integer, Map<String, Object>> armies = parser.getArmies();
+
+        for (Event event : parser.getEvents()) {
+            switch (event) {
+                case Event.Advance(int n) -> tick += n;
+                case Event.SetCommandSource(int p) -> commandSource = p;
+                case Event.LuaSimCallback(String func, LuaData.Table params, Event.CommandUnits cu)
+                        when func.equals("SharePaintingBrushStroke") -> {
+
+                    LuaData.Table shareable = params.getTable("ShareablePainting");
+                    if (shareable == null) break;
+
+                    String adapterId = shareable.getString("PaintingAdapterIdentifier");
+                    LuaData.Table samples = shareable.getTable("Samples");
+                    Integer shareId = shareable.getInteger("ShareId");
+                    String peerName = shareable.getString("PeerName");
+
+                    // Samples are interleaved triplets: x1,y1,z1, x2,y2,z2, ...
+                    List<float[]> points = new ArrayList<>();
+                    if (samples != null) {
+                        int count = samples.value().size();
+                        for (int i = 1; i + 2 <= count; i += 3) {
+                            Float x = floatByLuaIndex(samples, i);
+                            Float z = floatByLuaIndex(samples, i + 2);
+                            if (x != null && z != null) points.add(new float[]{x, z});
+                        }
+                    }
+
+                    String playerName = "Unknown";
+                    if (peerName != null && !peerName.isEmpty()) {
+                        playerName = peerName;
+                    } else {
+                        Map<String, Object> army = armies.get(commandSource);
+                        if (army != null && army.get("PlayerName") instanceof String s) playerName = s;
+                    }
+
+                    strokes.add(new PaintingBrushStroke(
+                            java.time.Duration.ofSeconds(tick / 10L),
+                            playerName,
+                            adapterId != null ? adapterId : "default",
+                            shareId != null ? shareId : 0,
+                            points
+                    ));
+                }
+                default -> {}
+            }
+        }
+        return strokes;
+    }
+
+    /** LoadUtils stores numeric Lua keys as String.valueOf(float), e.g. "1.0", "2.0". */
+    private Float floatByLuaIndex(LuaData.Table table, int index) {
+        Float v = table.getFloat(String.valueOf((float) index));
+        if (v != null) return v;
+        return table.getFloat(String.valueOf(index));
+    }
+
+    private void renderPaintingStrokes(List<PaintingBrushStroke> strokes) {
+        GraphicsContext gc = paintingCanvas.getGraphicsContext2D();
+        double w = paintingCanvas.getWidth();
+        double h = paintingCanvas.getHeight();
+
+        gc.setFill(Color.rgb(28, 33, 38));
+        gc.fillRect(0, 0, w, h);
+
+        if (currentPaintingStrokes.isEmpty()) {
+            gc.setFill(Color.GRAY);
+            gc.setFont(javafx.scene.text.Font.font(14));
+            gc.fillText("No painting strokes found in this replay.", 20, h / 2);
+            return;
+        }
+
+        // Use globally-computed bounds so scale stays stable when filtering by time
+        float range = Math.max(Math.max(paintingMaxX - paintingMinX, paintingMaxZ - paintingMinZ), 1f);
+        double padding = 24;
+        double scale = (Math.min(w, h) - 2 * padding) / range;
+
+        // Assign one color per player using all strokes for a stable legend
+        Map<String, Color> playerColors = new LinkedHashMap<>();
+        int idx = 0;
+        for (PaintingBrushStroke s : currentPaintingStrokes) {
+            playerColors.putIfAbsent(s.playerName(),
+                    PAINTING_PLAYER_COLORS[idx++ % PAINTING_PLAYER_COLORS.length]);
+        }
+
+        // Draw the visible (filtered) strokes
+        gc.setLineWidth(2.0);
+        gc.setLineCap(StrokeLineCap.ROUND);
+        gc.setLineJoin(StrokeLineJoin.ROUND);
+        for (PaintingBrushStroke stroke : strokes) {
+            List<float[]> pts = stroke.points();
+            if (pts.isEmpty()) continue;
+            Color c = playerColors.getOrDefault(stroke.playerName(), Color.WHITE);
+            if (pts.size() == 1) {
+                gc.setFill(c);
+                double cx = padding + (pts.get(0)[0] - paintingMinX) * scale;
+                double cy = padding + (pts.get(0)[1] - paintingMinZ) * scale;
+                gc.fillOval(cx - 3, cy - 3, 6, 6);
+                continue;
+            }
+            gc.setStroke(c);
+            gc.beginPath();
+            gc.moveTo(padding + (pts.get(0)[0] - paintingMinX) * scale,
+                      padding + (pts.get(0)[1] - paintingMinZ) * scale);
+            for (int i = 1; i < pts.size(); i++) {
+                gc.lineTo(padding + (pts.get(i)[0] - paintingMinX) * scale,
+                          padding + (pts.get(i)[1] - paintingMinZ) * scale);
+            }
+            gc.stroke();
+        }
+
+        // Legend (top-right corner)
+        double legendX = w - 170;
+        double legendY = padding;
+        gc.setFont(javafx.scene.text.Font.font(12));
+        for (Map.Entry<String, Color> entry : playerColors.entrySet()) {
+            gc.setFill(entry.getValue());
+            gc.fillRoundRect(legendX, legendY, 14, 14, 4, 4);
+            gc.fillText(entry.getKey(), legendX + 18, legendY + 12);
+            legendY += 20;
+        }
+    }
+
+    private static String formatDurationHMS(long totalSeconds) {
+        long hh = totalSeconds / 3600;
+        long mm = (totalSeconds % 3600) / 60;
+        long ss = totalSeconds % 60;
+        return String.format("%02d:%02d:%02d", hh, mm, ss);
     }
 
     private String generateChatLog(ReplayDataParser replayDataParser) {
