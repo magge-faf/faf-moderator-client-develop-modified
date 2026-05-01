@@ -18,7 +18,6 @@ import lombok.Getter;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpEntity;
@@ -28,6 +27,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.DefaultUriBuilderFactory;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestOperations;
@@ -55,7 +55,6 @@ public class FafApiCommunicationService {
     private final JsonApiMessageConverter jsonApiMessageConverter;
     private final JsonApiErrorHandler jsonApiErrorHandler;
     private final CycleAvoidingMappingContext cycleAvoidingMappingContext;
-    private final RestTemplateBuilder restTemplateBuilder;
     private final ApiHistoryService apiHistoryService;
     private EnvironmentProperties environmentProperties;
     private final CountDownLatch authorizedLatch;
@@ -73,7 +72,6 @@ public class FafApiCommunicationService {
             HmacHeaderInterceptor hmacHeaderInterceptor,
             ApplicationEventPublisher applicationEventPublisher,
             CycleAvoidingMappingContext cycleAvoidingMappingContext,
-            RestTemplateBuilder restTemplateBuilder,
             JsonApiMessageConverter jsonApiMessageConverter,
             JsonApiErrorHandler jsonApiErrorHandler,
             EnvironmentProperties environmentProperties,
@@ -86,7 +84,6 @@ public class FafApiCommunicationService {
         this.jsonApiMessageConverter = jsonApiMessageConverter;
         this.jsonApiErrorHandler = jsonApiErrorHandler;
         this.oAuthTokenInterceptor = oAuthTokenInterceptor;
-        this.restTemplateBuilder = restTemplateBuilder;
         this.environmentProperties = environmentProperties;
         this.apiHistoryService = apiHistoryService;
 
@@ -114,42 +111,44 @@ public class FafApiCommunicationService {
     public void authorize(HydraAuthorizedEvent event) {
         meResult = null;
 
-        restTemplate = restTemplateBuilder
-                .requestFactory(JdkClientHttpRequestFactory.class)
-                .additionalMessageConverters(jsonApiMessageConverter).readTimeout(Duration.ofMinutes(5))
-                .errorHandler(jsonApiErrorHandler)
-                .rootUri(environmentProperties.getBaseUrl())
-                .interceptors(List.of(oAuthTokenInterceptor, hmacHeaderInterceptor,
-                        (request, body, execution) -> {
-                            HttpHeaders headers = request.getHeaders();
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory();
+        requestFactory.setReadTimeout(Duration.ofMinutes(5));
 
-                            List<String> contentTypes = headers.get(HttpHeaders.CONTENT_TYPE);
-                            if (contentTypes != null && contentTypes.stream()
-                                    .anyMatch(MediaType.APPLICATION_JSON_VALUE::equalsIgnoreCase)) {
-                                headers.setAccept(Collections.singletonList(MediaType.valueOf("application/vnd.api+json")));
-                                if (request.getMethod() == HttpMethod.POST || request.getMethod() == HttpMethod.PATCH || request.getMethod() == HttpMethod.PUT) {
-                                    headers.setContentType(MediaType.APPLICATION_JSON);
-                                }
-                            }
-                            return execution.execute(request, body);
-                        },
-                        (request, body, execution) -> {
-                            long start = System.currentTimeMillis();
-                            String method = request.getMethod().name();
-                            java.net.URI uri = request.getURI();
-                            String path = uri.getPath() + (uri.getQuery() != null ? "?" + uri.getQuery() : "");
-                            try {
-                                var response = execution.execute(request, body);
-                                long duration = System.currentTimeMillis() - start;
-                                apiHistoryService.record(method, path, response.getStatusCode().value(), duration, response.getStatusCode().is2xxSuccessful());
-                                return response;
-                            } catch (Exception e) {
-                                long duration = System.currentTimeMillis() - start;
-                                apiHistoryService.record(method, path, 0, duration, false);
-                                throw e;
-                            }
+        restTemplate = new RestTemplate(requestFactory);
+        restTemplate.getMessageConverters().add(0, jsonApiMessageConverter);
+        restTemplate.setErrorHandler(jsonApiErrorHandler);
+        restTemplate.setUriTemplateHandler(new DefaultUriBuilderFactory(environmentProperties.getBaseUrl()));
+        restTemplate.setInterceptors(List.of(oAuthTokenInterceptor, hmacHeaderInterceptor,
+                (request, body, execution) -> {
+                    HttpHeaders headers = request.getHeaders();
+
+                    List<String> contentTypes = headers.get(HttpHeaders.CONTENT_TYPE);
+                    if (contentTypes != null && contentTypes.stream()
+                            .anyMatch(MediaType.APPLICATION_JSON_VALUE::equalsIgnoreCase)) {
+                        headers.setAccept(Collections.singletonList(MediaType.valueOf("application/vnd.api+json")));
+                        if (request.getMethod() == HttpMethod.POST || request.getMethod() == HttpMethod.PATCH || request.getMethod() == HttpMethod.PUT) {
+                            headers.setContentType(MediaType.APPLICATION_JSON);
                         }
-                )).build();
+                    }
+                    return execution.execute(request, body);
+                },
+                (request, body, execution) -> {
+                    long start = System.currentTimeMillis();
+                    String method = request.getMethod().name();
+                    java.net.URI uri = request.getURI();
+                    String path = uri.getPath() + (uri.getQuery() != null ? "?" + uri.getQuery() : "");
+                    try {
+                        var response = execution.execute(request, body);
+                        long duration = System.currentTimeMillis() - start;
+                        apiHistoryService.record(method, path, response.getStatusCode().value(), duration, response.getStatusCode().is2xxSuccessful());
+                        return response;
+                    } catch (Exception e) {
+                        long duration = System.currentTimeMillis() - start;
+                        apiHistoryService.record(method, path, 0, duration, false);
+                        throw e;
+                    }
+                }
+        ));
 
         try {
             meResult = getOne("/me", MeResult.class);

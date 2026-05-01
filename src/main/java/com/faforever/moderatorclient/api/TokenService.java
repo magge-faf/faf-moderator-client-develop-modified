@@ -10,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
@@ -20,6 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
+import org.springframework.web.util.DefaultUriBuilderFactory;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AccessTokenResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
@@ -45,11 +45,10 @@ public class TokenService {
 
     public void prepare(EnvironmentProperties environmentProperties) {
         this.environmentProperties = environmentProperties;
-        this.restTemplate = new RestTemplateBuilder()
-                .requestFactory(JdkClientHttpRequestFactory.class)
-                .additionalInterceptors(hmacHeaderInterceptor)
-                .rootUri(environmentProperties.getOauthBaseUrl())
-                .build();
+        RestTemplate rt = new RestTemplate(new JdkClientHttpRequestFactory());
+        rt.setUriTemplateHandler(new DefaultUriBuilderFactory(environmentProperties.getOauthBaseUrl()));
+        rt.setInterceptors(List.of(hmacHeaderInterceptor));
+        this.restTemplate = rt;
     }
 
     @SneakyThrows

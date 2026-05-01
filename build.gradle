@@ -77,7 +77,6 @@ dependencies {
     implementation 'org.json:json:20250107'
     implementation 'org.apache.httpcomponents.core5:httpcore5:5.4.2'
     implementation 'org.apache.httpcomponents.client5:httpclient5:5.6.1'
-    implementation 'org.openjfx:javafx-controls:26.0.1'
 }
 
 application {
