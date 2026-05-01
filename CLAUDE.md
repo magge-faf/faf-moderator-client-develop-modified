@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**FAF Moderator Client** is a Spring Boot 3.4.2 + JavaFX 21 desktop application for moderating the [FAForever](https://faforever.com) gaming community platform. It communicates with the FAF API via JSON:API protocol, authenticates via OAuth2 (Hydra), and supports three environments: production, test, and localhost.
+**FAF Moderator Client** is a Spring Boot 4.0.6 + JavaFX 21 desktop application for moderating the [FAForever](https://faforever.com) gaming community platform. It communicates with the FAF API via JSON:API protocol, authenticates via OAuth2 (Hydra), and supports three environments: production, test, and localhost.
 
 ## Build Commands
 
@@ -62,12 +62,13 @@ API Layer      — FafApiCommunicationService (single entry point for all HTTP c
 ### API Layer (`api/`)
 
 `FafApiCommunicationService` is the single HTTP client:
-- Uses Spring `RestTemplate` + Apache HttpClient
+- Uses Spring `RestTemplate` with `JdkClientHttpRequestFactory` (Java built-in HTTP client)
 - JSON:API protocol via the `jasminb` library
 - OAuth2 bearer token injected via interceptor; auto-refreshes on expiry (`TokenExpiredEvent`)
 - Rate-limited to 50 req/sec (Guava `RateLimiter`; configurable per environment up to 90/min)
 - HMAC header signing for sensitive operations (key in `application.yml`)
 - Query building via Elide `ElideNavigator` (see `ElideNavigatorTest` for examples)
+- Root URI set via `DefaultUriBuilderFactory`; `RestTemplate` wired manually (Spring Boot 4.0 removed `RestTemplateBuilder` and `JacksonAutoConfiguration`)
 
 ### DTO Mapping (`mapstruct/`)
 
@@ -78,6 +79,7 @@ MapStruct mappers convert between JSON:API domain objects (from `faf-java-common
 - `ApplicationProperties` (`@ConfigurationProperties`) exposes typed access to `application.yml`
 - `LocalPreferences` persists user settings (theme, last-used tabs, etc.) to `client-prefs.json` in the working directory
 - Three Spring profiles map to three FAF environments: `prod`, `test`, `local`
+- `JsonApiConfig` explicitly defines the `ObjectMapper` bean (with `JavaTimeModule`, `Jdk8Module`, `NON_NULL` serialization, and `FAIL_ON_UNKNOWN_PROPERTIES` disabled) — Spring Boot 4.0 no longer auto-configures Jackson
 
 ## Key Files
 
@@ -96,6 +98,6 @@ The test suite is minimal — a Spring context load test and `ElideNavigatorTest
 
 ## Dependency Notes
 
-- `faf-java-commons` and `faf-java-api` are pulled from JitPack (`com.github.FAForever`)
+- `faf-java-commons` (`com.faforever.commons:api` and `com.faforever.commons:data`) is pulled from JitPack using commit-based version strings (e.g. `20260407-92612a0`)
 - Lombok requires annotation processing enabled in the IDE
 - MapStruct annotation processor must also be enabled (both declared in `annotationProcessor` config)
