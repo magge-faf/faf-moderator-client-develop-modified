@@ -616,22 +616,41 @@ public class ViewHelper {
         });
 
         if (uiService != null) {
-            ContextMenu contextMenu = new ContextMenu();
-            cell.setContextMenu(contextMenu);
-            contextMenu.setOnShowing(event -> {
-                contextMenu.getItems().clear();
+            cell.addEventFilter(ContextMenuEvent.CONTEXT_MENU_REQUESTED, event -> {
+                event.consume();
+                TableView<?> tv = cell.getTableView();
+                ContextMenu tableMenu = tv != null ? tv.getContextMenu() : null;
+                if (tableMenu == null) return;
+
                 List<PlayerFX> players = playersSupplier.get();
-                if (players == null || players.isEmpty()) return;
-                if (players.size() == 1) {
-                    buildNoteMenuItems(contextMenu.getItems(), players.get(0), userService, uiService);
-                } else {
-                    for (PlayerFX player : players) {
-                        if (player == null) continue;
-                        Menu playerMenu = new Menu(player.getLogin() != null ? player.getLogin() : "?");
-                        buildNoteMenuItems(playerMenu.getItems(), player, userService, uiService);
-                        contextMenu.getItems().add(playerMenu);
+                List<MenuItem> noteItems = new ArrayList<>();
+
+                if (players != null && !players.isEmpty()) {
+                    noteItems.add(new SeparatorMenuItem());
+                    if (players.size() == 1) {
+                        buildNoteMenuItems(noteItems, players.get(0), userService, uiService);
+                    } else {
+                        for (PlayerFX player : players) {
+                            if (player == null) continue;
+                            Menu playerMenu = new Menu(player.getLogin() != null ? player.getLogin() : "?");
+                            buildNoteMenuItems(playerMenu.getItems(), player, userService, uiService);
+                            noteItems.add(playerMenu);
+                        }
                     }
                 }
+
+                if (!noteItems.isEmpty()) {
+                    tableMenu.getItems().addAll(noteItems);
+                    tableMenu.addEventHandler(javafx.stage.WindowEvent.WINDOW_HIDDEN, new javafx.event.EventHandler<javafx.stage.WindowEvent>() {
+                        @Override
+                        public void handle(javafx.stage.WindowEvent e) {
+                            tableMenu.getItems().removeAll(noteItems);
+                            tableMenu.removeEventHandler(javafx.stage.WindowEvent.WINDOW_HIDDEN, this);
+                        }
+                    });
+                }
+
+                tableMenu.show(cell, event.getScreenX(), event.getScreenY());
             });
         }
     }
@@ -652,7 +671,7 @@ public class ViewHelper {
     }
 
     private static void buildNoteMenuItems(
-            ObservableList<MenuItem> items,
+            List<MenuItem> items,
             PlayerFX player,
             UserService userService,
             UiService uiService
