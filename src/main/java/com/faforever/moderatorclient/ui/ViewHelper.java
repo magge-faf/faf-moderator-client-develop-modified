@@ -266,7 +266,7 @@ public class ViewHelper {
         applyCopyContextMenus(tableView, extractors);
     }
 
-    public static void buildBanTableView(TableView<BanInfoFX> tableView, ObservableList<BanInfoFX> data, boolean showAffectedPlayerInfo, LocalPreferences localPreferences) {
+    public static void buildBanTableView(TableView<BanInfoFX> tableView, ObservableList<BanInfoFX> data, boolean showAffectedPlayerInfo, LocalPreferences localPreferences, @Nullable UserService userService, @Nullable UiService uiService) {
         tableView.setItems(data);
         HashMap<TableColumn<BanInfoFX, ?>, Function<BanInfoFX, ?>> extractors = new HashMap<>();
 
@@ -309,17 +309,27 @@ public class ViewHelper {
             TableColumn<BanInfoFX, String> affectedPlayerColumn = new TableColumn<>("Affected Player");
             affectedPlayerColumn.setCellValueFactory(o -> o.getValue().getPlayer().representationProperty());
 
-            affectedPlayerColumn.setCellFactory(column -> new TableCell<>() {
-                @Override
-                protected void updateItem(String item, boolean empty) {
-                    super.updateItem(item, empty);
-
-                    if (!empty && getTableRow() != null && getTableRow().getItem() != null) {
-                        PlayerFX player = getTableRow().getItem().getPlayer();
-                        setStyle(getBanColor(player));
+            affectedPlayerColumn.setCellFactory(column -> {
+                TableCell<BanInfoFX, String> cell = new TableCell<>() {
+                    @Override
+                    protected void updateItem(String item, boolean empty) {
+                        super.updateItem(item, empty);
+                        if (!empty && getTableRow() != null && getTableRow().getItem() != null) {
+                            PlayerFX player = getTableRow().getItem().getPlayer();
+                            setStyle(getBanColor(player));
+                        }
+                        setText(item);
                     }
-                    setText(item);
+                };
+                if (userService != null) {
+                    installNoteTooltipAndMenu(cell, () -> {
+                        TableRow<BanInfoFX> row = cell.getTableRow();
+                        BanInfoFX ban = row != null ? row.getItem() : null;
+                        PlayerFX player = ban != null ? ban.getPlayer() : null;
+                        return player != null ? List.of(player) : Collections.emptyList();
+                    }, userService, uiService);
                 }
+                return cell;
             });
 
             tableView.getColumns().add(affectedPlayerColumn);
@@ -543,7 +553,12 @@ public class ViewHelper {
         };
     }
 
-    private static void installNoteTooltip(TableCell<PlayerFX, ?> cell, UserService userService) {
+    private static <T> void installNoteTooltipAndMenu(
+            TableCell<T, ?> cell,
+            Supplier<List<PlayerFX>> playersSupplier,
+            UserService userService,
+            @Nullable UiService uiService
+    ) {
         Tooltip tooltip = new Tooltip();
         tooltip.setMaxWidth(400);
         tooltip.setWrapText(true);
@@ -551,46 +566,165 @@ public class ViewHelper {
         cell.setTooltip(tooltip);
 
         cell.addEventHandler(MouseEvent.MOUSE_ENTERED, event -> {
-            TableRow<PlayerFX> row = cell.getTableRow();
-            PlayerFX player = row != null ? row.getItem() : null;
-            if (player == null || player.getId() == null) {
+            List<PlayerFX> players = playersSupplier.get();
+            if (players == null || players.isEmpty()) {
                 tooltip.setText("");
                 return;
             }
-            String id = player.getId();
-            List<UserNoteFX> cached = noteCache.get(id);
-            if (cached != null) {
-                tooltip.setText(formatNotes(cached));
+            List<String> ids = players.stream()
+                    .filter(p -> p != null && p.getId() != null)
+                    .map(PlayerFX::getId)
+                    .toList();
+            if (ids.isEmpty()) {
+                tooltip.setText("");
                 return;
             }
-            if (noteLoadingInFlight.add(id)) {
-                tooltip.setText("Loading notes…");
-                CompletableFuture.supplyAsync(() -> userService.getUserNotes(id))
-                        .thenAccept(notes -> Platform.runLater(() -> {
-                            noteCache.put(id, notes);
-                            noteLoadingInFlight.remove(id);
-                            TableRow<PlayerFX> currentRow = cell.getTableRow();
-                            PlayerFX current = currentRow != null ? currentRow.getItem() : null;
-                            if (current != null && id.equals(current.getId())) {
-                                tooltip.setText(formatNotes(notes));
-                            }
-                        }))
-                        .exceptionally(e -> {
-                            noteLoadingInFlight.remove(id);
-                            log.warn("Failed to load notes for player {}", id, e);
-                            Platform.runLater(() -> {
-                                TableRow<PlayerFX> currentRow = cell.getTableRow();
-                                PlayerFX current = currentRow != null ? currentRow.getItem() : null;
-                                if (current != null && id.equals(current.getId())) {
-                                    tooltip.setText("Failed to load notes");
+            if (ids.stream().allMatch(noteCache::containsKey)) {
+                tooltip.setText(buildMultiPlayerNoteText(players));
+                return;
+            }
+            tooltip.setText("Loading notes…");
+            ids.stream()
+                    .filter(id -> !noteCache.containsKey(id) && noteLoadingInFlight.add(id))
+                    .forEach(id -> CompletableFuture.supplyAsync(() -> userService.getUserNotes(id))
+                            .thenAccept(notes -> Platform.runLater(() -> {
+                                noteCache.put(id, notes);
+                                noteLoadingInFlight.remove(id);
+                                List<PlayerFX> current = playersSupplier.get();
+                                if (current != null && current.stream().anyMatch(p -> id.equals(p != null ? p.getId() : null))) {
+                                    List<String> currentIds = current.stream()
+                                            .filter(p -> p != null && p.getId() != null)
+                                            .map(PlayerFX::getId)
+                                            .toList();
+                                    if (currentIds.stream().allMatch(noteCache::containsKey)) {
+                                        tooltip.setText(buildMultiPlayerNoteText(current));
+                                    }
                                 }
-                            });
+                            }))
+                            .exceptionally(e -> {
+                                noteLoadingInFlight.remove(id);
+                                log.warn("Failed to load notes for player {}", id, e);
+                                Platform.runLater(() -> {
+                                    List<PlayerFX> current = playersSupplier.get();
+                                    if (current != null && current.stream().anyMatch(p -> id.equals(p != null ? p.getId() : null))) {
+                                        tooltip.setText("Failed to load notes");
+                                    }
+                                });
+                                return null;
+                            })
+                    );
+        });
+
+        if (uiService != null) {
+            ContextMenu contextMenu = new ContextMenu();
+            cell.setContextMenu(contextMenu);
+            contextMenu.setOnShowing(event -> {
+                contextMenu.getItems().clear();
+                List<PlayerFX> players = playersSupplier.get();
+                if (players == null || players.isEmpty()) return;
+                if (players.size() == 1) {
+                    buildNoteMenuItems(contextMenu.getItems(), players.get(0), userService, uiService);
+                } else {
+                    for (PlayerFX player : players) {
+                        if (player == null) continue;
+                        Menu playerMenu = new Menu(player.getLogin() != null ? player.getLogin() : "?");
+                        buildNoteMenuItems(playerMenu.getItems(), player, userService, uiService);
+                        contextMenu.getItems().add(playerMenu);
+                    }
+                }
+            });
+        }
+    }
+
+    private static String buildMultiPlayerNoteText(List<PlayerFX> players) {
+        if (players.size() == 1) {
+            PlayerFX p = players.get(0);
+            if (p == null || p.getId() == null) return "No notes";
+            return formatNotes(noteCache.getOrDefault(p.getId(), Collections.emptyList()));
+        }
+        StringBuilder sb = new StringBuilder();
+        for (PlayerFX p : players) {
+            if (p == null || p.getId() == null) continue;
+            sb.append("[").append(p.getLogin()).append("]\n");
+            sb.append(formatNotes(noteCache.getOrDefault(p.getId(), Collections.emptyList()))).append("\n\n");
+        }
+        return sb.toString().trim();
+    }
+
+    private static void buildNoteMenuItems(
+            ObservableList<MenuItem> items,
+            PlayerFX player,
+            UserService userService,
+            UiService uiService
+    ) {
+        if (player == null || player.getId() == null) return;
+        MenuItem addItem = new MenuItem("Add note");
+        addItem.setOnAction(e -> openNoteDialog(null, player, userService, uiService));
+        items.add(addItem);
+        List<UserNoteFX> notes = noteCache.get(player.getId());
+        if (notes != null && !notes.isEmpty()) {
+            items.add(new SeparatorMenuItem());
+            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            notes.stream()
+                    .sorted(Comparator.<UserNoteFX, OffsetDateTime>comparing(
+                            n -> n.getCreateTime() != null ? n.getCreateTime() : OffsetDateTime.MIN)
+                            .reversed())
+                    .forEach(note -> {
+                        String date = note.getCreateTime() != null ? fmt.format(note.getCreateTime()) : "?";
+                        String author = note.getAuthor() != null ? note.getAuthor().getLogin() : "?";
+                        String label = "[" + date + "] " + author + ": " + truncateNote(note.getNote(), 40);
+                        MenuItem editItem = new MenuItem("Edit: " + label);
+                        editItem.setOnAction(e -> openNoteDialog(note, player, userService, uiService));
+                        items.add(editItem);
+                        MenuItem deleteItem = new MenuItem("Delete: " + label);
+                        deleteItem.setOnAction(e -> deleteNote(note, player, userService));
+                        items.add(deleteItem);
+                    });
+        }
+    }
+
+    private static void openNoteDialog(
+            @Nullable UserNoteFX note,
+            PlayerFX player,
+            UserService userService,
+            UiService uiService
+    ) {
+        UserNoteController controller = uiService.loadFxml("ui/userNote.fxml");
+        if (note == null) {
+            UserNoteFX newNote = new UserNoteFX();
+            newNote.setPlayer(player);
+            controller.setUserNoteFX(newNote);
+            controller.addPostedListener(posted -> noteCache.remove(player.getId()));
+        } else {
+            controller.setUserNoteFX(note);
+        }
+        Stage stage = new Stage();
+        stage.setTitle(note == null ? "Add note" : "Edit note");
+        stage.setScene(new Scene(controller.getRoot()));
+        stage.showAndWait();
+        noteCache.remove(player.getId());
+    }
+
+    private static void deleteNote(UserNoteFX note, PlayerFX player, UserService userService) {
+        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        confirm.setTitle("Delete note");
+        confirm.setHeaderText("Delete note?");
+        confirm.setContentText(note.getNote());
+        confirm.showAndWait().ifPresent(result -> {
+            if (result == ButtonType.OK) {
+                CompletableFuture.runAsync(() -> userService.deleteUserNote(note.getId()))
+                        .thenRun(() -> Platform.runLater(() -> noteCache.remove(player.getId())))
+                        .exceptionally(e -> {
+                            log.warn("Failed to delete note {}", note.getId(), e);
                             return null;
                         });
-            } else {
-                tooltip.setText("Loading notes…");
             }
         });
+    }
+
+    private static String truncateNote(String text, int maxLen) {
+        if (text == null) return "";
+        return text.length() <= maxLen ? text : text.substring(0, maxLen) + "…";
     }
 
     private static String formatNotes(List<UserNoteFX> notes) {
@@ -704,7 +838,7 @@ public class ViewHelper {
      */
     public static void buildUserTableView(PlatformService platformService, TableView<PlayerFX> tableView, ObservableList<PlayerFX> allData,
                                           Consumer<PlayerFX> onAddBan, Consumer<PlayerFX> onForceRename, boolean showUidData,
-                                          FafApiCommunicationService communicationService, @Nullable UserService userService) {
+                                          FafApiCommunicationService communicationService, @Nullable UserService userService, @Nullable UiService uiService) {
         if ("buildModerationReportTableView".equals(tableView.getId())) {
             addScrollListener(tableView, allData);
             tableView.setItems(FXCollections.observableArrayList());
@@ -742,7 +876,11 @@ public class ViewHelper {
                 }
             };
             if (userService != null) {
-                installNoteTooltip(cell, userService);
+                installNoteTooltipAndMenu(cell, () -> {
+                    TableRow<PlayerFX> row = cell.getTableRow();
+                    PlayerFX player = row != null ? row.getItem() : null;
+                    return player != null ? List.of(player) : Collections.emptyList();
+                }, userService, uiService);
             }
             return cell;
         });
@@ -2601,7 +2739,9 @@ public class ViewHelper {
     public static void buildModerationReportTableView(
             TableView<ModerationReportFX> tableView,
             ObservableList<ModerationReportFX> items,
-            Consumer<ModerationReportFX> onChatLog
+            Consumer<ModerationReportFX> onChatLog,
+            @Nullable UserService userService,
+            @Nullable UiService uiService
     ) {
         tableView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         tableView.setItems(items);
@@ -2659,16 +2799,24 @@ public class ViewHelper {
         reporterColumn.setCellFactory(tableColumn -> ViewHelper.playerFXCellFactory(tableColumn, PlayerFX::getLogin));
         reporterColumn.setCellValueFactory(param -> new SimpleObjectProperty<>(param.getValue().getReporter()));
 
-        reporterColumn.setCellFactory(column -> new TableCell<>() {
-            @Override
-            protected void updateItem(PlayerFX item, boolean empty) {
-                super.updateItem(item, empty);
-
-                if (!empty && item != null) {
-                    setStyle(getBanColor(item));
+        reporterColumn.setCellFactory(column -> {
+            TableCell<ModerationReportFX, PlayerFX> cell = new TableCell<>() {
+                @Override
+                protected void updateItem(PlayerFX item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (!empty && item != null) {
+                        setStyle(getBanColor(item));
+                    }
+                    setText(item == null ? "" : item.getLogin());
                 }
-                setText(item == null ? "" : item.getLogin());
+            };
+            if (userService != null) {
+                installNoteTooltipAndMenu(cell, () -> {
+                    PlayerFX player = cell.getItem();
+                    return player != null ? List.of(player) : Collections.emptyList();
+                }, userService, uiService);
             }
+            return cell;
         });
 
         reporterColumn.setId("reporterColumn");
@@ -2683,43 +2831,52 @@ public class ViewHelper {
                 )
         );
 
-        reportedUsersColumn.setCellFactory(column -> new TableCell<>() {
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
+        reportedUsersColumn.setCellFactory(column -> {
+            TableCell<ModerationReportFX, String> cell = new TableCell<>() {
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
 
-                if (!empty && getTableRow() != null && getTableRow().getItem() != null) {
-                    ModerationReportFX report = getTableRow().getItem();
+                    if (!empty && getTableRow() != null && getTableRow().getItem() != null) {
+                        ModerationReportFX report = getTableRow().getItem();
 
-                    boolean isTemporarilyBanned = report.getReportedUsers().stream()
-                            .flatMap(user -> user.getBans().stream().reduce((first, second) -> second).stream())
-                            .anyMatch(banInfo -> banInfo.getBanStatus() == BanStatus.BANNED
-                                    && banInfo.getDuration() != BanDurationType.PERMANENT);
+                        boolean isTemporarilyBanned = report.getReportedUsers().stream()
+                                .flatMap(user -> user.getBans().stream().reduce((first, second) -> second).stream())
+                                .anyMatch(banInfo -> banInfo.getBanStatus() == BanStatus.BANNED
+                                        && banInfo.getDuration() != BanDurationType.PERMANENT);
 
-                    boolean expiredBans = report.getReportedUsers().stream()
-                            .flatMap(user -> user.getBans().stream().reduce((first, second) -> second).stream())
-                            .anyMatch(banInfo -> banInfo.getBanStatus() == BanStatus.EXPIRED
-                                    || banInfo.getBanStatus() == BanStatus.DISABLED);
+                        boolean expiredBans = report.getReportedUsers().stream()
+                                .flatMap(user -> user.getBans().stream().reduce((first, second) -> second).stream())
+                                .anyMatch(banInfo -> banInfo.getBanStatus() == BanStatus.EXPIRED
+                                        || banInfo.getBanStatus() == BanStatus.DISABLED);
 
-                    boolean permanentBan = report.getReportedUsers().stream()
-                            .flatMap(user -> user.getBans().isEmpty() ? Stream.empty() : Stream.of(user.getBans().getLast()))
-                            .anyMatch(banInfo -> banInfo.getLevel() == BanLevel.GLOBAL
-                                    && banInfo.getBanStatus() == BanStatus.BANNED
-                                    && banInfo.getDuration() == BanDurationType.PERMANENT);
+                        boolean permanentBan = report.getReportedUsers().stream()
+                                .flatMap(user -> user.getBans().isEmpty() ? Stream.empty() : Stream.of(user.getBans().getLast()))
+                                .anyMatch(banInfo -> banInfo.getLevel() == BanLevel.GLOBAL
+                                        && banInfo.getBanStatus() == BanStatus.BANNED
+                                        && banInfo.getDuration() == BanDurationType.PERMANENT);
 
-                    setStyle("-fx-text-fill: white;");
+                        setStyle("-fx-text-fill: white;");
 
-                    if (permanentBan) {
-                        setStyle("-fx-text-fill: red;");
-                    } else if (expiredBans) {
-                        setStyle("-fx-text-fill: lightgreen;");
-                    } else if (isTemporarilyBanned) {
-                        setStyle("-fx-text-fill: orange;");
+                        if (permanentBan) {
+                            setStyle("-fx-text-fill: red;");
+                        } else if (expiredBans) {
+                            setStyle("-fx-text-fill: lightgreen;");
+                        } else if (isTemporarilyBanned) {
+                            setStyle("-fx-text-fill: orange;");
+                        }
                     }
-
+                    setText(item);
                 }
-                setText(item);
+            };
+            if (userService != null) {
+                installNoteTooltipAndMenu(cell, () -> {
+                    TableRow<ModerationReportFX> row = cell.getTableRow();
+                    ModerationReportFX report = row != null ? row.getItem() : null;
+                    return report != null ? new ArrayList<>(report.getReportedUsers()) : Collections.emptyList();
+                }, userService, uiService);
             }
+            return cell;
         });
         tableView.getColumns().add(reportedUsersColumn);
         reportedUsersColumn.setId("reportedUsersColumn");

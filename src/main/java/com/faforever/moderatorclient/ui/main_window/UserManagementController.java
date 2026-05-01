@@ -423,10 +423,10 @@ public class UserManagementController implements Controller<SplitPane> {
 
     private void setupTableViews() {
         ViewHelper.buildUserTableView(platformService, userSearchTableView, users, null,
-                playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), true, communicationService, userService);
+                playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), true, communicationService, userService, uiService);
         ViewHelper.buildNotesTableView(userNoteTableView, userNotes, false);
         ViewHelper.buildNameHistoryTableView(userNameHistoryTableView, nameRecords);
-        ViewHelper.buildBanTableView(userBansTableView, bans, false, localPreferences);
+        ViewHelper.buildBanTableView(userBansTableView, bans, false, localPreferences, userService, uiService);
         ViewHelper.buildPlayersGamesTable(userLastGamesTable, replayDownLoadFormat, platformService);
         ViewHelper.buildUserAvatarsTableView(userAvatarsTableView, avatarAssignments);
         ViewHelper.buildUserGroupsTableView(userGroupsTableView, userGroups);

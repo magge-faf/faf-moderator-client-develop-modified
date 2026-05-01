@@ -73,7 +73,7 @@ public class BansController implements Controller<HBox> {
         filteredList = new FilteredList<>(itemList);
         SortedList<BanInfoFX> sortedItemList = new SortedList<>(filteredList);
         sortedItemList.comparatorProperty().bind(banTableView.comparatorProperty());
-        ViewHelper.buildBanTableView(banTableView, sortedItemList, true, localPreferences);
+        ViewHelper.buildBanTableView(banTableView, sortedItemList, true, localPreferences, userService, uiService);
         banTableView.getColumns().forEach(column -> {
             if (column.getId() == null || column.getId().isEmpty()) {
                 column.setId(column.getText().replaceAll("\\s+", ""));

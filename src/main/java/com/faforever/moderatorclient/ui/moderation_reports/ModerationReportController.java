@@ -927,7 +927,7 @@ public class ModerationReportController implements Controller<Region> {
 
     private void initializeUserTableView() {
         ViewHelper.buildUserTableView(platformService, reportedPlayerTableView, reportedPlayersOfCurrentlySelectedReport, this::addBan,
-                playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), false, fafApiCommunicationService, userService);
+                playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), false, fafApiCommunicationService, userService, uiService);
         Platform.runLater(() -> {
             loadColumnLayout(reportTableView, localPreferences);
             loadSplitPanePositions(root, localPreferences);
@@ -1138,7 +1138,7 @@ public class ModerationReportController implements Controller<Region> {
         renewFilter();
         SortedList<ModerationReportFX> sortedItemList = new SortedList<>(filteredItemList);
         sortedItemList.comparatorProperty().bind(reportTableView.comparatorProperty());
-        ViewHelper.buildModerationReportTableView(reportTableView, sortedItemList, this::showChatLog);
+        ViewHelper.buildModerationReportTableView(reportTableView, sortedItemList, this::showChatLog, userService, uiService);
         statusChoiceBox.getSelectionModel().selectedItemProperty().addListener(observable -> renewFilter());
         playerNameFilterTextField.textProperty().addListener(observable -> renewFilter());
     }
