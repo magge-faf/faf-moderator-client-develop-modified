@@ -17,12 +17,21 @@ import com.faforever.moderatorclient.ui.main_window.*;
 import com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController;
 import javafx.application.Platform;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Label;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.image.Image;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import java.awt.Desktop;
+import java.net.URI;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
@@ -433,37 +442,37 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     private void showUpdatePopup(String latestVersion) {
         String downloadUrl = "https://github.com/magge-faf/faf-moderator-client-develop-modified/releases/latest";
 
-        javafx.scene.control.Dialog<Void> dialog = new javafx.scene.control.Dialog<>();
-        dialog.setTitle("Update available");
-        dialog.setHeaderText("A new version is available: " + latestVersion);
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Update Available");
+        alert.setHeaderText("Version " + latestVersion + " is available");
 
-        // TextField to show the URL (copyable)
-        javafx.scene.control.TextField linkField = new javafx.scene.control.TextField(downloadUrl);
-        linkField.setEditable(false);
-        linkField.setFocusTraversable(false);
+        Label message = new Label(
+                "You are running " + ApplicationVersion.CURRENT_VERSION + ".\n" +
+                "Download the latest release to get the newest features and fixes."
+        );
+        message.setWrapText(true);
+        alert.getDialogPane().setContent(new VBox(message));
 
-        // Button to copy the URL
-        javafx.scene.control.Button copyButton = new javafx.scene.control.Button("Copy Download Link");
-        copyButton.setOnAction(e -> {
-            javafx.scene.input.Clipboard clipboard = javafx.scene.input.Clipboard.getSystemClipboard();
-            javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
-            content.putString(downloadUrl);
-            clipboard.setContent(content);
+        ButtonType openButton = new ButtonType("Open Download Page", ButtonBar.ButtonData.OK_DONE);
+        ButtonType remindButton = new ButtonType("Remind Me in 3 Days", ButtonBar.ButtonData.CANCEL_CLOSE);
+        alert.getButtonTypes().setAll(openButton, remindButton);
+
+        String stylesheet = localPreferences.getTabSettings().isDarkModeCheckBox()
+                ? "/style/main-dark.css" : "/style/main-light.css";
+        alert.getDialogPane().getStylesheets().add(
+                Objects.requireNonNull(getClass().getResource(stylesheet)).toExternalForm()
+        );
+
+        alert.showAndWait().ifPresent(result -> {
+            if (result == openButton) {
+                try {
+                    Desktop.getDesktop().browse(new URI(downloadUrl));
+                } catch (Exception e) {
+                    log.warn("Failed to open download page", e);
+                }
+            }
         });
 
-        javafx.scene.layout.VBox content = new javafx.scene.layout.VBox(10, linkField, copyButton);
-        dialog.getDialogPane().setContent(content);
-
-        // Only one button to dismiss the dialog
-        javafx.scene.control.ButtonType remindLaterButton = new javafx.scene.control.ButtonType(
-                "Remind Me In 3 Days Again",
-                javafx.scene.control.ButtonBar.ButtonData.OK_DONE
-        );
-        dialog.getDialogPane().getButtonTypes().add(remindLaterButton);
-
-        dialog.showAndWait();
-
-        // Save the reminder timestamp
         localPreferences.getVersionReminder().setLastReminderEpoch(System.currentTimeMillis());
         try {
             localPreferencesReaderWriter.write(localPreferences);
