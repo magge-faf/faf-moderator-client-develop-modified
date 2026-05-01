@@ -21,6 +21,8 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
@@ -75,6 +77,18 @@ public class UserService {
 
         List<Player> allPlayers = fafApi.getPage(Player.class, navigator, environmentProperties.getMaxPageSize(), 1, Collections.emptyMap());
 
+        return playerMapper.mapToFx(allPlayers);
+    }
+
+    public List<PlayerFX> findUsersByAttributeIn(@NotNull String attribute, @NotNull Collection<String> values) {
+        if (values.isEmpty()) return Collections.emptyList();
+        if (values.size() == 1) return findUsersByAttribute(attribute, values.iterator().next());
+        log.debug("Batch-searching for players by attribute '{}' with {} values", attribute, values.size());
+        ElideNavigatorOnCollection<Player> navigator = ElideNavigator.of(Player.class)
+                .collection()
+                .setFilter(ElideNavigator.qBuilder().string(attribute).in(new ArrayList<>(values)));
+        addModeratorIncludes(navigator);
+        List<Player> allPlayers = fafApi.getAll(Player.class, navigator);
         return playerMapper.mapToFx(allPlayers);
     }
 
