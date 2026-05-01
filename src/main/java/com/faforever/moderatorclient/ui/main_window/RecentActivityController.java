@@ -70,7 +70,7 @@ public class RecentActivityController implements Controller<VBox> {
         refreshLatestRegistrationsButton.setOnAction(event -> refreshLatestRegistrationsExtendedStats());
         if (checkPermissionForTab(GroupPermission.ROLE_READ_ACCOUNT_PRIVATE_DETAILS, latestRegistrationsTab)) {
             ViewHelper.buildUserTableView(platformService, userRegistrationFeedTableView, users, this::addBan,
-                    playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), true, communicationService);
+                    playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), true, communicationService, userService);
         }
 
         if (checkPermissionForTab(GroupPermission.ROLE_READ_TEAMKILL_REPORT, latestTeamkillsTab)) {

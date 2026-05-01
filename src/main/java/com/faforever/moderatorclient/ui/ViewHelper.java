@@ -5,6 +5,7 @@ import com.faforever.commons.api.dto.*;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.MessagesService;
 import com.faforever.moderatorclient.api.domain.TutorialService;
+import com.faforever.moderatorclient.api.domain.UserService;
 import com.faforever.moderatorclient.api.domain.VotingService;
 import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.ui.caches.LargeThumbnailCache;
@@ -60,7 +61,10 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
+import javafx.application.Platform;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -77,6 +81,9 @@ public class ViewHelper {
     private static LargeThumbnailCache largeThumbnailCache;
 
     private static SmurfManagementController smurfManagementController;
+
+    private static final java.util.Map<String, List<UserNoteFX>> noteCache = new ConcurrentHashMap<>();
+    private static final Set<String> noteLoadingInFlight = ConcurrentHashMap.newKeySet();
 
     @Autowired
     public ViewHelper(SmurfManagementController smurfManagementController) {
@@ -536,6 +543,72 @@ public class ViewHelper {
         };
     }
 
+    private static void installNoteTooltip(TableCell<PlayerFX, ?> cell, UserService userService) {
+        Tooltip tooltip = new Tooltip();
+        tooltip.setMaxWidth(400);
+        tooltip.setWrapText(true);
+        tooltip.setShowDelay(javafx.util.Duration.millis(500));
+        cell.setTooltip(tooltip);
+
+        cell.addEventHandler(MouseEvent.MOUSE_ENTERED, event -> {
+            TableRow<PlayerFX> row = cell.getTableRow();
+            PlayerFX player = row != null ? row.getItem() : null;
+            if (player == null || player.getId() == null) {
+                tooltip.setText("");
+                return;
+            }
+            String id = player.getId();
+            List<UserNoteFX> cached = noteCache.get(id);
+            if (cached != null) {
+                tooltip.setText(formatNotes(cached));
+                return;
+            }
+            if (noteLoadingInFlight.add(id)) {
+                tooltip.setText("Loading notes…");
+                CompletableFuture.supplyAsync(() -> userService.getUserNotes(id))
+                        .thenAccept(notes -> Platform.runLater(() -> {
+                            noteCache.put(id, notes);
+                            noteLoadingInFlight.remove(id);
+                            TableRow<PlayerFX> currentRow = cell.getTableRow();
+                            PlayerFX current = currentRow != null ? currentRow.getItem() : null;
+                            if (current != null && id.equals(current.getId())) {
+                                tooltip.setText(formatNotes(notes));
+                            }
+                        }))
+                        .exceptionally(e -> {
+                            noteLoadingInFlight.remove(id);
+                            log.warn("Failed to load notes for player {}", id, e);
+                            Platform.runLater(() -> {
+                                TableRow<PlayerFX> currentRow = cell.getTableRow();
+                                PlayerFX current = currentRow != null ? currentRow.getItem() : null;
+                                if (current != null && id.equals(current.getId())) {
+                                    tooltip.setText("Failed to load notes");
+                                }
+                            });
+                            return null;
+                        });
+            } else {
+                tooltip.setText("Loading notes…");
+            }
+        });
+    }
+
+    private static String formatNotes(List<UserNoteFX> notes) {
+        if (notes.isEmpty()) return "No notes";
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        return notes.stream()
+                .sorted(Comparator.<UserNoteFX, OffsetDateTime>comparing(
+                        n -> n.getCreateTime() != null ? n.getCreateTime() : OffsetDateTime.MIN)
+                        .reversed())
+                .map(n -> {
+                    String date = n.getCreateTime() != null ? fmt.format(n.getCreateTime()) : "?";
+                    String author = n.getAuthor() != null && n.getAuthor().getLogin() != null
+                            ? n.getAuthor().getLogin() : "?";
+                    return "[" + date + "] " + author + ": " + n.getNote();
+                })
+                .collect(Collectors.joining("\n\n"));
+    }
+
     public static void loadForceRenameDialog(UiService uiService, PlayerFX playerFX) {
         ForceRenameController forceRenameController = uiService.loadFxml("ui/forceRename.fxml");
         forceRenameController.setPlayer(playerFX);
@@ -631,7 +704,7 @@ public class ViewHelper {
      */
     public static void buildUserTableView(PlatformService platformService, TableView<PlayerFX> tableView, ObservableList<PlayerFX> allData,
                                           Consumer<PlayerFX> onAddBan, Consumer<PlayerFX> onForceRename, boolean showUidData,
-                                          FafApiCommunicationService communicationService) {
+                                          FafApiCommunicationService communicationService, @Nullable UserService userService) {
         if ("buildModerationReportTableView".equals(tableView.getId())) {
             addScrollListener(tableView, allData);
             tableView.setItems(FXCollections.observableArrayList());
@@ -655,18 +728,23 @@ public class ViewHelper {
         TableColumn<PlayerFX, String> nameColumn = new TableColumn<>("Name");
         nameColumn.setCellValueFactory(o -> o.getValue().loginProperty());
 
-        nameColumn.setCellFactory(column -> new TableCell<>() {
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-
-                if (!empty && getTableRow() != null && getTableRow().getItem() != null) {
-                    PlayerFX player = getTableRow().getItem();
-                    String color = getBanColor(player);
-                    setStyle(color);
+        nameColumn.setCellFactory(column -> {
+            TableCell<PlayerFX, String> cell = new TableCell<>() {
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    if (!empty && getTableRow() != null && getTableRow().getItem() != null) {
+                        PlayerFX player = getTableRow().getItem();
+                        String color = getBanColor(player);
+                        setStyle(color);
+                    }
+                    setText(item);
                 }
-                setText(item);
+            };
+            if (userService != null) {
+                installNoteTooltip(cell, userService);
             }
+            return cell;
         });
 
         nameColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->

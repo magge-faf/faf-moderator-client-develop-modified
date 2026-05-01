@@ -12,6 +12,7 @@ import com.faforever.commons.replay.shared.LuaData;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.BanService;
 import com.faforever.moderatorclient.api.domain.ModerationReportService;
+import com.faforever.moderatorclient.api.domain.UserService;
 import com.faforever.moderatorclient.config.TemplateAndReasonConfig;
 import com.faforever.moderatorclient.ui.*;
 import com.faforever.moderatorclient.ui.domain.BanInfoFX;
@@ -107,6 +108,7 @@ public class ModerationReportController implements Controller<Region> {
             .followRedirects(HttpClient.Redirect.ALWAYS)
             .build();
     private final BanService banService;
+    private final UserService userService;
     public Button createReportForumButton;
     public TableColumn lastActivity;
     @FXML
@@ -925,7 +927,7 @@ public class ModerationReportController implements Controller<Region> {
 
     private void initializeUserTableView() {
         ViewHelper.buildUserTableView(platformService, reportedPlayerTableView, reportedPlayersOfCurrentlySelectedReport, this::addBan,
-                playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), false, fafApiCommunicationService);
+                playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), false, fafApiCommunicationService, userService);
         Platform.runLater(() -> {
             loadColumnLayout(reportTableView, localPreferences);
             loadSplitPanePositions(root, localPreferences);
