@@ -1360,50 +1360,16 @@ public class UserManagementController implements Controller<SplitPane> {
         }
 
         if (snapPromptOnThreshold && users.size() > snapThreshold) {
-            final CountDownLatch latch = new CountDownLatch(1);
-            final AtomicReference<ButtonType> userChoice = new AtomicReference<>();
-            List<PlayerFX> finalUsers = List.copyOf(users);
-            Platform.runLater(() -> {
-                Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-                alert.setTitle("Threshold exceeded for number of matches detected");
-                alert.setContentText(String.format(
-                        "Found %d accounts matching [%s] batch (%d values), exceeding threshold of %d.\n\nContinue or cancel?",
-                        finalUsers.size(), displayAttr, toProcess.size(), snapThreshold));
-                ButtonType continueButton = new ButtonType("Continue");
-                ButtonType detailsButton  = new ButtonType("Show Related Accounts");
-                ButtonType cancelButton   = new ButtonType("Cancel Process");
-                alert.getButtonTypes().setAll(continueButton, detailsButton, cancelButton);
-                DialogPane dialogPane = alert.getDialogPane();
-                dialogPane.addEventFilter(KeyEvent.KEY_PRESSED, Event::consume);
-                while (true) {
-                    Optional<ButtonType> result = alert.showAndWait();
-                    if (result.isPresent()) {
-                        ButtonType chosen = result.get();
-                        if (chosen == detailsButton) {
-                            showUserDetailsWindow(finalUsers);
-                            ((Button) dialogPane.lookupButton(detailsButton)).setDisable(true);
-                        } else {
-                            userChoice.set(chosen);
-                            break;
-                        }
-                    } else {
-                        userChoice.set(cancelButton);
-                        break;
-                    }
-                }
-                latch.countDown();
-            });
-            try {
-                latch.await();
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return;
+            // Batch exceeded threshold — fall back to per-value so each hot value
+            // can be individually excluded, continued, or used to cancel.
+            updateSmurfVillageLogTextArea(String.format(
+                    "\n  [%s] batch returned %d results (threshold: %d) — switching to per-value for exclusion control",
+                    displayAttr, users.size(), snapThreshold));
+            for (String value : toProcess) {
+                if (cancelRequestedByUser) return;
+                processSingleValue(value, property, displayAttr, cumulativeAccounts, currentPlayer, excludedItems);
             }
-            if (userChoice.get() != null && "Cancel Process".equals(userChoice.get().getText())) {
-                cancelRequestedByUser = true;
-                updateSmurfVillageLogTextArea("\t\t User canceled operation.\n");
-                return;
-            }
+            return;
         }
 
         String currentPlayerId = currentPlayer != null ? currentPlayer.getId() : null;
@@ -1445,6 +1411,144 @@ public class UserManagementController implements Controller<SplitPane> {
                 } else if (ban.getExpiresAt() == null) {
                     banInfo = "PERM-BANNED";
                     prefix = "-";
+                } else {
+                    banInfo = "TEMP-BANNED until " + ban.getExpiresAt()
+                            .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+                    prefix = "~";
+                }
+                activeLines.add(String.format("\n    %s  %s  id: %s   %s",
+                        prefix, user.getLogin(), user.getId(), banInfo));
+                addPlayerDirectlyToTable(user);
+                cumulativeAccounts.add(user.getId());
+            }
+            if (!activeLines.isEmpty()) {
+                if (snapOnlyShowActive && !headerEmitted) localLog.append(headerLine);
+                activeLines.forEach(localLog::append);
+            }
+        }
+
+        if (localLog.length() > 0) updateSmurfVillageLogTextArea(localLog.toString());
+    }
+
+    private void processSingleValue(String value, String property, String displayAttr,
+                                     Set<String> cumulativeAccounts, PlayerFX currentPlayer,
+                                     List<Map<String, Object>> excludedItems) {
+        if (cancelRequestedByUser) return;
+
+        Platform.runLater(() -> statusTextFieldProcessingItem.setText(displayAttr + ": [" + value + "]"));
+
+        try {
+            synchronized (pauseLock) {
+                while (isPaused) pauseLock.wait();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+        }
+
+        List<PlayerFX> foundUsers;
+        try {
+            foundUsers = userService.findUsersByAttribute(property, value);
+        } catch (HttpClientErrorException e) {
+            updateSmurfVillageLogTextArea(String.format(
+                    "\t\t ERROR fetching users for [%s] = [%s]: %s\n", displayAttr, value, e.getMessage()));
+            return;
+        }
+
+        String currentPlayerId = currentPlayer != null ? currentPlayer.getId() : null;
+
+        Map<String, PlayerFX> deduplicated = new LinkedHashMap<>();
+        for (PlayerFX p : foundUsers) {
+            if (p.getId() != null) deduplicated.putIfAbsent(p.getId(), p);
+        }
+
+        List<PlayerFX> otherAccounts = deduplicated.values().stream()
+                .filter(p -> !p.getId().equals(currentPlayerId))
+                .toList();
+
+        if (snapPromptOnThreshold && otherAccounts.size() > snapThreshold) {
+            boolean decided = false;
+            while (!decided && !cancelRequestedByUser) {
+                CountDownLatch latch = new CountDownLatch(1);
+                AtomicReference<String> choice = new AtomicReference<>("continue");
+                List<PlayerFX> snapshot = new ArrayList<>(otherAccounts);
+
+                Platform.runLater(() -> {
+                    Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+                    alert.setTitle("Threshold Exceeded");
+                    alert.setHeaderText(String.format("[%s] = [%s]%nReturned %d results (threshold: %d)",
+                            displayAttr, value, snapshot.size(), snapThreshold));
+                    alert.setContentText("How do you want to handle this value?");
+
+                    ButtonType addToExclude = new ButtonType("Add to exclusion list and skip");
+                    ButtonType continueBtn  = new ButtonType("Continue");
+                    ButtonType showAccounts = new ButtonType("Show Related Accounts");
+                    ButtonType cancelProcess = new ButtonType("Cancel Process", ButtonBar.ButtonData.CANCEL_CLOSE);
+
+                    alert.getButtonTypes().setAll(addToExclude, continueBtn, showAccounts, cancelProcess);
+                    Optional<ButtonType> result = alert.showAndWait();
+
+                    if (result.isPresent()) {
+                        if      (result.get() == addToExclude)  choice.set("exclude");
+                        else if (result.get() == continueBtn)   choice.set("continue");
+                        else if (result.get() == showAccounts)  choice.set("show");
+                        else                                     choice.set("cancel");
+                    }
+                    latch.countDown();
+                });
+
+                try { latch.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
+
+                switch (choice.get()) {
+                    case "cancel" -> { cancelRequestedByUser = true; return; }
+                    case "exclude" -> {
+                        Map<String, Object> newExcluded = new LinkedHashMap<>();
+                        newExcluded.put(property, value);
+                        newExcluded.put("AddedOn", LocalDateTime.now().toString());
+                        excludedItems.add(newExcluded);
+                        excludedHardwareItemsController.saveExcludedItem(newExcluded);
+                        updateSmurfVillageLogTextArea(String.format(
+                                "\n  EXCLUDED: [%s] = [%s] (added to exclusion list)", displayAttr, value));
+                        return;
+                    }
+                    case "show" -> {
+                        CountDownLatch showLatch = new CountDownLatch(1);
+                        List<PlayerFX> showSnapshot = snapshot;
+                        Platform.runLater(() -> { showUserDetailsWindow(showSnapshot); showLatch.countDown(); });
+                        try { showLatch.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
+                        // loop back — dialog re-shows
+                    }
+                    default -> decided = true; // "continue"
+                }
+            }
+            if (cancelRequestedByUser) return;
+        }
+
+        String headerLine = String.format("\n  [%s]  %s", displayAttr, value);
+        StringBuilder localLog = new StringBuilder();
+        boolean headerEmitted = false;
+
+        if (!snapOnlyShowActive) {
+            localLog.append(headerLine);
+            headerEmitted = true;
+        }
+
+        if (otherAccounts.isEmpty()) {
+            if (!snapOnlyShowActive) localLog.append("   (no matches)");
+        } else {
+            if (currentPlayer != null) addPlayerDirectlyToTable(currentPlayer);
+            List<String> activeLines = new ArrayList<>();
+            for (PlayerFX user : otherAccounts) {
+                BanInfoFX ban = user.getBans().stream()
+                        .filter(b -> b.getBanStatus() == BanStatus.BANNED)
+                        .findFirst().orElse(null);
+                if (snapOnlyShowActive && ban != null) continue;
+                String banInfo;
+                String prefix;
+                if (ban == null) {
+                    banInfo = "ACTIVE"; prefix = "+";
+                } else if (ban.getExpiresAt() == null) {
+                    banInfo = "PERM-BANNED"; prefix = "-";
                 } else {
                     banInfo = "TEMP-BANNED until " + ban.getExpiresAt()
                             .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
