@@ -223,9 +223,9 @@
                 <!-- Ping of Type -->
                 <Label text="Show Ping of Type Events:"/>
                 <HBox spacing="5">
-                    <CheckBox fx:id="showPingMoveCheckBox" text="Move"/>
-                    <CheckBox fx:id="showPingAttackCheckBox" text="Attack"/>
-                    <CheckBox fx:id="showPingAlertCheckBox" text="Alert"/>
+                    <CheckBox fx:id="pingOfTypeMoveFilterCheckBox" text="Move"/>
+                    <CheckBox fx:id="pingOfTypeAttackFilterCheckBox" text="Attack"/>
+                    <CheckBox fx:id="pingOfTypeAlertFilterCheckBox" text="Alert"/>
                     <CheckBox fx:id="showTextMarkersCheckBox" text="Text Markers"/>
                 </HBox>
                 <Separator/>

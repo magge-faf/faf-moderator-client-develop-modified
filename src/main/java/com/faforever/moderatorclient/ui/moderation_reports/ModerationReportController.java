@@ -177,11 +177,12 @@ public class ModerationReportController implements Controller<Region> {
     public TextField getModeratorEventsForReplayIdTextField;
     @FXML
     public Button getModeratorEventsReplayIdButton;
-    public CheckBox showPingMoveCheckBox;
     @FXML
-    public CheckBox showPingAttackCheckBox;
+    public CheckBox pingOfTypeMoveFilterCheckBox;
     @FXML
-    public CheckBox showPingAlertCheckBox;
+    public CheckBox pingOfTypeAttackFilterCheckBox;
+    @FXML
+    public CheckBox pingOfTypeAlertFilterCheckBox;
     @FXML
     public CheckBox showSelfDestructionUnitsCheckBox;
     @FXML
@@ -1074,9 +1075,9 @@ public class ModerationReportController implements Controller<Region> {
         showNotifyChatMessages.setSelected(tabReports.isAutoLoadChatLogCheckBox());
         autoLoadChatLogCheckBox.setSelected(tabReports.isAutoLoadChatLogCheckBox());
         showFocusArmyFromCheckBox.setSelected(tabReports.isShowFocusArmyFromCheckBox());
-        showPingAlertCheckBox.setSelected(tabReports.isPingOfTypeAlertFilterCheckBox());
-        showPingMoveCheckBox.setSelected(tabReports.isPingOfTypeMoveFilterCheckBox());
-        showPingAttackCheckBox.setSelected(tabReports.isPingOfTypeAttackFilterCheckBox());
+        pingOfTypeAlertFilterCheckBox.setSelected(tabReports.isPingOfTypeAlertFilterCheckBox());
+        pingOfTypeMoveFilterCheckBox.setSelected(tabReports.isPingOfTypeMoveFilterCheckBox());
+        pingOfTypeAttackFilterCheckBox.setSelected(tabReports.isPingOfTypeAttackFilterCheckBox());
         showSelfDestructionUnitsCheckBox.setSelected(tabReports.isShowSelfDestructionUnitsCheckBox());
         showTextMarkersCheckBox.setSelected(tabReports.isTextMarkerTypeFilterCheckBox());
         thresholdToShowSelfDestructionUnitsEventTextField.setText(tabReports.getThresholdToShowSelfDestructionUnitsEventTextField());
