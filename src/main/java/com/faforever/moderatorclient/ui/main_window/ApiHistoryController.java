@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.format.DateTimeFormatter;
+import java.util.Objects;
 
 @Component
 @RequiredArgsConstructor
@@ -79,13 +80,16 @@ public class ApiHistoryController implements Controller<VBox> {
         int code = item.getStatusCode();
         String status = code == 0 ? "ERROR" : String.valueOf(code);
 
+        String method = Objects.toString(item.getMethod(), "");
+        String url    = Objects.toString(item.getUrl(), "");
+
         menu.getItems().addAll(
             copyItem("Copy Time",     time),
-            copyItem("Copy Method",   item.getMethod()),
-            copyItem("Copy URL",      item.getUrl()),
+            copyItem("Copy Method",   method),
+            copyItem("Copy URL",      url),
             copyItem("Copy Status",   status),
             copyItem("Copy Duration", item.getDurationMs() + " ms"),
-            copyItem("Copy Row",      String.join("\t", time, item.getMethod(), item.getUrl(), status, item.getDurationMs() + " ms"))
+            copyItem("Copy Row",      String.join("\t", time, method, url, status, item.getDurationMs() + " ms"))
         );
         return menu;
     }

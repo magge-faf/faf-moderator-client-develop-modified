@@ -1473,7 +1473,13 @@ public class ModerationReportController implements Controller<Region> {
         boolean selfDestructionFilter = settings.isShowSelfDestructionUnitsCheckBox();
         boolean focusArmyFromFilter = settings.isShowFocusArmyFromCheckBox();
         boolean textMarkerTypeFilter = settings.isTextMarkerTypeFilterCheckBox();
-        int thresholdToShowSelfDestructionUnitsEvent = Integer.parseInt(settings.getThresholdToShowSelfDestructionUnitsEventTextField());
+        int thresholdRaw;
+        try {
+            thresholdRaw = Integer.parseInt(settings.getThresholdToShowSelfDestructionUnitsEventTextField());
+        } catch (NumberFormatException e) {
+            thresholdRaw = Integer.MAX_VALUE;
+        }
+        final int thresholdToShowSelfDestructionUnitsEvent = thresholdRaw;
 
         String moderatorEventsLog = moderatorEvents.stream()
                 .filter(event -> {
