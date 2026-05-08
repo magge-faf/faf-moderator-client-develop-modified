@@ -5,9 +5,13 @@ import com.faforever.moderatorclient.api.ApiHistoryService;
 import com.faforever.moderatorclient.ui.Controller;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.fxml.FXML;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.VBox;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -54,15 +58,46 @@ public class ApiHistoryController implements Controller<VBox> {
                 super.updateItem(item, empty);
                 if (item == null || empty) {
                     setStyle("");
-                } else if (!item.isSuccess()) {
-                    setStyle("-fx-background-color: #ffdddd;");
+                    setContextMenu(null);
                 } else {
-                    setStyle("");
+                    if (!item.isSuccess()) {
+                        setStyle("-fx-background-color: #ffdddd;");
+                    } else {
+                        setStyle("");
+                    }
+                    setContextMenu(buildContextMenu(item));
                 }
             }
         });
 
         historyTable.setItems(apiHistoryService.getHistory());
+    }
+
+    private ContextMenu buildContextMenu(ApiCallRecord item) {
+        ContextMenu menu = new ContextMenu();
+        String time = item.getTime().format(TIME_FMT);
+        int code = item.getStatusCode();
+        String status = code == 0 ? "ERROR" : String.valueOf(code);
+
+        menu.getItems().addAll(
+            copyItem("Copy Time",     time),
+            copyItem("Copy Method",   item.getMethod()),
+            copyItem("Copy URL",      item.getUrl()),
+            copyItem("Copy Status",   status),
+            copyItem("Copy Duration", item.getDurationMs() + " ms"),
+            copyItem("Copy Row",      String.join("\t", time, item.getMethod(), item.getUrl(), status, item.getDurationMs() + " ms"))
+        );
+        return menu;
+    }
+
+    private MenuItem copyItem(String label, String value) {
+        MenuItem item = new MenuItem(label);
+        item.setOnAction(e -> {
+            ClipboardContent content = new ClipboardContent();
+            content.putString(value);
+            Clipboard.getSystemClipboard().setContent(content);
+        });
+        return item;
     }
 
     @FXML
