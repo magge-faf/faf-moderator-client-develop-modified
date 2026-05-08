@@ -1493,13 +1493,17 @@ public class ModerationReportController implements Controller<Region> {
                     if (!focusArmyFromFilter && message.contains("focus army from")) filterOut = true;
                     if (!textMarkerTypeFilter && message.contains("Created a marker with the text")) filterOut = true;
 
-                    if (!selfDestructionFilter && message.contains("Self-destructed")) {
-                        Pattern pattern = Pattern.compile("Self-destructed (\\d+) units");
-                        Matcher matcher = pattern.matcher(message);
-                        if (matcher.find()) {
-                            int unitsDestroyed = Integer.parseInt(matcher.group(1));
-                            if (unitsDestroyed < thresholdToShowSelfDestructionUnitsEvent) {
-                                filterOut = true;
+                    if (message.contains("Self-destructed")) {
+                        if (!selfDestructionFilter) {
+                            filterOut = true;
+                        } else {
+                            Pattern pattern = Pattern.compile("Self-destructed (\\d+) units");
+                            Matcher matcher = pattern.matcher(message);
+                            if (matcher.find()) {
+                                int unitsDestroyed = Integer.parseInt(matcher.group(1));
+                                if (unitsDestroyed < thresholdToShowSelfDestructionUnitsEvent) {
+                                    filterOut = true;
+                                }
                             }
                         }
                     }
