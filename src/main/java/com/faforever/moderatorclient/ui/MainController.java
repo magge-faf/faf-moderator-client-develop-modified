@@ -30,8 +30,6 @@ import javafx.stage.Stage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import java.awt.Desktop;
-import java.net.URI;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
@@ -54,6 +52,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     private final FafApiCommunicationService fafApiCommunicationService;
     private final FafUserCommunicationService fafUserCommunicationService;
     private final UiService uiService;
+    private final PlatformService platformService;
     public TabPane root;
     public Tab userManagementTab;
     public Tab matchmakerMapPoolTab;
@@ -465,11 +464,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
 
         alert.showAndWait().ifPresent(result -> {
             if (result == openButton) {
-                try {
-                    Desktop.getDesktop().browse(new URI(downloadUrl));
-                } catch (Exception e) {
-                    log.warn("Failed to open download page", e);
-                }
+                platformService.showDocument(downloadUrl);
             }
         });
 
