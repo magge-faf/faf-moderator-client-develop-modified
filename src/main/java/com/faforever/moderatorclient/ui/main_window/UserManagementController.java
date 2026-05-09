@@ -193,6 +193,7 @@ public class UserManagementController implements Controller<SplitPane> {
     public CheckBox includeManufacturerCheckBox;
     public CheckBox includeIPCheckBox;
     public CheckBox onlyShowActiveAccountsCheckBox;
+    public CheckBox suppressNoRelatedAccountsCheckBox;
 
     @Value("${faforever.vault.replay-download-url-format}")
     private String replayDownLoadFormat;
@@ -1831,7 +1832,7 @@ public class UserManagementController implements Controller<SplitPane> {
         snapIncludeManufacturer  = includeManufacturerCheckBox.isSelected();
         snapPromptOnThreshold    = promptUserOnThresholdExceededSmurfVillageLookupCheckBox.isSelected();
         snapOnlyShowActive       = onlyShowActiveAccountsCheckBox.isSelected();
-        snapSuppressCleanOutput  = false;
+        snapSuppressCleanOutput  = suppressNoRelatedAccountsCheckBox.isSelected();
         try {
             snapThreshold = Integer.parseInt(maxMatchesBeforePromptSmurfVillageLookupTextField.getText().trim());
         } catch (NumberFormatException e) {

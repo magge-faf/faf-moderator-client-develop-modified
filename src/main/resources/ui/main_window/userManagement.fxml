@@ -111,6 +111,8 @@
                                 <Label text="Expert Settings"/>
                                 <CheckBox fx:id="onlyShowActiveAccountsCheckBox"
                                           text="Only Show Unbanned (Active) Accounts"/>
+                                <CheckBox fx:id="suppressNoRelatedAccountsCheckBox"
+                                          text="Suppress &quot;no related accounts&quot; and &quot;Checking PlayerID&quot; lines"/>
                                 <CheckBox fx:id="catchFirstLayerSmurfsOnlyCheckBox"
                                           text="Limit to First Layer Accounts (See Tooltip)">
                                     <tooltip>
