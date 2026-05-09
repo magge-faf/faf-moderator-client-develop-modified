@@ -1878,9 +1878,6 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     public void updateModeratorEventToColorTextFlow(TextFlow textFlow, String moderatorEvents, String reporterName, String offenderName) {
-        String colorOffender = "LIGHTCORAL";
-        String colorReporter = "LIGHTBLUE";
-
         if (textFlow == null) {
             return;
         }
@@ -1901,31 +1898,25 @@ public class ModerationReportController implements Controller<Region> {
                     String namePart = rest.substring(0, colonIndex).trim();
                     String eventMessage = rest.substring(colonIndex + 1).trim();
 
-                    Text timestampText = new Text(timestamp);
-                    timestampText.setStyle("-fx-fill: white;");
-
-                    Text nameText = new Text(namePart + ": ");
+                    Color nameColor;
                     if (namePart.equalsIgnoreCase(reporterName)) {
-                        nameText.setStyle("-fx-fill: " + colorReporter + ";");
+                        nameColor = Color.LIGHTBLUE;
                     } else if (namePart.equalsIgnoreCase(offenderName)) {
-                        nameText.setStyle("-fx-fill: " + colorOffender + ";");
+                        nameColor = Color.LIGHTCORAL;
                     } else {
-                        nameText.setStyle("-fx-fill: white;");
+                        nameColor = Color.WHITE;
                     }
 
-                    Text defaultMessageText = new Text(eventMessage);
-                    defaultMessageText.setStyle("-fx-fill: white;");
-
-                    eventFlow.getChildren().addAll(timestampText, nameText, defaultMessageText);
+                    eventFlow.getChildren().addAll(
+                            styledText(timestamp, Color.GRAY),
+                            styledText(namePart + ": ", nameColor),
+                            styledText(eventMessage, Color.WHITE)
+                    );
                 } else {
-                    Text fallbackText = new Text(event);
-                    fallbackText.setStyle("-fx-fill: white;");
-                    eventFlow.getChildren().add(fallbackText);
+                    eventFlow.getChildren().add(styledText(event, Color.WHITE));
                 }
             } else {
-                Text fallbackText = new Text(event);
-                fallbackText.setStyle("-fx-fill: white;");
-                eventFlow.getChildren().add(fallbackText);
+                eventFlow.getChildren().add(styledText(event, Color.WHITE));
             }
 
             textFlow.getChildren().add(eventFlow);
