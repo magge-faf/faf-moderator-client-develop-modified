@@ -2,6 +2,7 @@ package com.faforever.moderatorclient.ui.main_window;
 
 import com.faforever.moderatorclient.api.domain.TutorialService;
 import com.faforever.moderatorclient.api.domain.events.MessagesChangedEvent;
+import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.ui.CategoryAddController;
 import com.faforever.moderatorclient.ui.Controller;
 import com.faforever.moderatorclient.ui.TutorialAddController;
@@ -34,6 +35,7 @@ import java.util.HashMap;
 public class TutorialController implements Controller<Node> {
     private final UiService uiService;
     private final TutorialService tutorialService;
+    private final LocalPreferences localPreferences;
     private final ObservableList<TutorialFx> tutorialList = FXCollections.observableArrayList();
     private final FilteredList<TutorialFx> filterTutorials = new FilteredList(tutorialList);
     private final HashMap<TutorialFx, WeakChangeListener<Boolean>> weakChangeListenersByTutorial = new HashMap<>();
@@ -146,6 +148,19 @@ public class TutorialController implements Controller<Node> {
         ViewHelper.buildCategoryTable(categoryTableView, tutorialService, this::onRefreshCategorys);
         setUpTutorialFilter();
         addTutorialButton.disableProperty().bind(categoryTableView.getSelectionModel().selectedItemProperty().isNull());
+        ViewHelper.ensureColumnIds(tutorialTableView);
+        ViewHelper.ensureColumnIds(categoryTableView);
+        LocalPreferences.TabTutorial tab = localPreferences.getTabTutorial();
+        Platform.runLater(() -> {
+            ViewHelper.loadColumnLayout(tutorialTableView, tab.getTutorialTableColumnWidths(), tab.getTutorialTableColumnOrder());
+            ViewHelper.loadColumnLayout(categoryTableView, tab.getCategoryTableColumnWidths(), tab.getCategoryTableColumnOrder());
+        });
+    }
+
+    public void onSave() {
+        LocalPreferences.TabTutorial tab = localPreferences.getTabTutorial();
+        ViewHelper.saveColumnLayout(tutorialTableView, tab.getTutorialTableColumnWidths(), tab.getTutorialTableColumnOrder());
+        ViewHelper.saveColumnLayout(categoryTableView, tab.getCategoryTableColumnWidths(), tab.getCategoryTableColumnOrder());
     }
 
     public void onRefresh() {

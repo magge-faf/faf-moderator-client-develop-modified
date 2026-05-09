@@ -4,12 +4,14 @@ import com.faforever.commons.api.dto.GroupPermission;
 import com.faforever.commons.api.dto.Mod;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.ModService;
+import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.mapstruct.ModMapper;
 import com.faforever.moderatorclient.mapstruct.ModVersionMapper;
 import com.faforever.moderatorclient.ui.Controller;
 import com.faforever.moderatorclient.ui.ViewHelper;
 import com.faforever.moderatorclient.ui.domain.ModFX;
 import com.faforever.moderatorclient.ui.domain.ModVersionFX;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
@@ -36,6 +38,7 @@ public class ModVaultController implements Controller<SplitPane> {
     private final ModService modService;
     private final ModMapper modMapper;
     private final ModVersionMapper modVersionMapper;
+    private final LocalPreferences localPreferences;
     private final ObservableList<ModFX> mods = FXCollections.observableArrayList();
     private final ObservableList<ModVersionFX> modVersions = FXCollections.observableArrayList();
 
@@ -65,6 +68,13 @@ public class ModVaultController implements Controller<SplitPane> {
     public void initialize() {
         ViewHelper.buildModTableView(modSearchTableView, mods);
         ViewHelper.buildModVersionTableView(modVersionTableView, modVersions);
+        ViewHelper.ensureColumnIds(modSearchTableView);
+        ViewHelper.ensureColumnIds(modVersionTableView);
+        LocalPreferences.TabModVault tab = localPreferences.getTabModVault();
+        Platform.runLater(() -> {
+            ViewHelper.loadColumnLayout(modSearchTableView, tab.getModSearchTableColumnWidths(), tab.getModSearchTableColumnOrder());
+            ViewHelper.loadColumnLayout(modVersionTableView, tab.getModVersionTableColumnWidths(), tab.getModVersionTableColumnOrder());
+        });
 
         canEdit = communicationService.hasPermission(GroupPermission.ROLE_ADMIN_MOD);
 
@@ -155,5 +165,11 @@ public class ModVaultController implements Controller<SplitPane> {
 
         mod.setRecommended(!mod.isRecommended());
         modService.patchMod(modMapper.map(mod));
+    }
+
+    public void onSave() {
+        LocalPreferences.TabModVault tab = localPreferences.getTabModVault();
+        ViewHelper.saveColumnLayout(modSearchTableView, tab.getModSearchTableColumnWidths(), tab.getModSearchTableColumnOrder());
+        ViewHelper.saveColumnLayout(modVersionTableView, tab.getModVersionTableColumnWidths(), tab.getModVersionTableColumnOrder());
     }
 }

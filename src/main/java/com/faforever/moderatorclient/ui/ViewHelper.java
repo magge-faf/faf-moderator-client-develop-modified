@@ -3374,4 +3374,51 @@ public class ViewHelper {
         return color;
     }
 
+    public static void ensureColumnIds(TableView<?> tableView) {
+        tableView.getColumns().forEach(col -> {
+            if (col.getId() == null || col.getId().isEmpty()) {
+                col.setId(col.getText().replaceAll("\\s+", ""));
+            }
+        });
+    }
+
+    public static void saveColumnLayout(TableView<?> tableView, java.util.Map<String, Double> widths, List<String> order) {
+        if (tableView == null || widths == null || order == null) return;
+        widths.clear();
+        order.clear();
+        for (TableColumn<?, ?> column : tableView.getColumns()) {
+            saveColumnLayoutRecursive(column, widths, order);
+        }
+    }
+
+    private static void saveColumnLayoutRecursive(TableColumn<?, ?> column, java.util.Map<String, Double> widths, List<String> order) {
+        if (column.getId() != null && !column.getId().isEmpty()) {
+            widths.put(column.getId(), column.getWidth());
+            order.add(column.getId());
+        }
+        for (TableColumn<?, ?> sub : column.getColumns()) {
+            saveColumnLayoutRecursive(sub, widths, order);
+        }
+    }
+
+    public static void loadColumnLayout(TableView<?> tableView, java.util.Map<String, Double> widths, List<String> order) {
+        if (tableView == null) return;
+        if (order != null && !order.isEmpty()) {
+            tableView.getColumns().sort(Comparator.comparingInt(col -> {
+                int idx = order.indexOf(col.getId());
+                return idx >= 0 ? idx : Integer.MAX_VALUE;
+            }));
+        }
+        if (widths != null) {
+            for (TableColumn<?, ?> column : tableView.getColumns()) {
+                if (column.getId() != null && widths.containsKey(column.getId())) {
+                    if (column.prefWidthProperty().isBound()) {
+                        column.prefWidthProperty().unbind();
+                    }
+                    column.setPrefWidth(widths.get(column.getId()));
+                }
+            }
+        }
+    }
+
 }

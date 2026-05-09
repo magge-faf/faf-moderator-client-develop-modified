@@ -4,6 +4,7 @@ import com.faforever.commons.api.dto.GroupPermission;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.MapService;
 import com.faforever.moderatorclient.api.domain.UserService;
+import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.ui.*;
 import com.faforever.moderatorclient.ui.domain.*;
 import javafx.application.Platform;
@@ -34,6 +35,7 @@ public class RecentActivityController implements Controller<VBox> {
     private final FafApiCommunicationService communicationService;
     private final UiService uiService;
     private final PlatformService platformService;
+    private final LocalPreferences localPreferences;
 
     public VBox root;
     public Tab statsRegistrationsTab;
@@ -68,17 +70,24 @@ public class RecentActivityController implements Controller<VBox> {
     public void initialize() {
         refreshLatestRegistrationsExtendedStats();
         refreshLatestRegistrationsButton.setOnAction(event -> refreshLatestRegistrationsExtendedStats());
+        LocalPreferences.TabRecentActivity tab = localPreferences.getTabRecentActivity();
         if (checkPermissionForTab(GroupPermission.ROLE_READ_ACCOUNT_PRIVATE_DETAILS, latestRegistrationsTab)) {
             ViewHelper.buildUserTableView(platformService, userRegistrationFeedTableView, users, this::addBan,
                     playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), true, communicationService, userService, uiService);
+            ViewHelper.ensureColumnIds(userRegistrationFeedTableView);
+            Platform.runLater(() -> ViewHelper.loadColumnLayout(userRegistrationFeedTableView, tab.getUserRegistrationFeedTableColumnWidths(), tab.getUserRegistrationFeedTableColumnOrder()));
         }
 
         if (checkPermissionForTab(GroupPermission.ROLE_READ_TEAMKILL_REPORT, latestTeamkillsTab)) {
             ViewHelper.buildTeamkillTableView(teamkillFeedTableView, teamkills, true);
+            ViewHelper.ensureColumnIds(teamkillFeedTableView);
+            Platform.runLater(() -> ViewHelper.loadColumnLayout(teamkillFeedTableView, tab.getTeamkillFeedTableColumnWidths(), tab.getTeamkillFeedTableColumnOrder()));
         }
 
         if (checkPermissionForTab(GroupPermission.ROLE_ADMIN_MAP, latestMapUploadsTab)) {
             ViewHelper.buildMapFeedTableView(mapUploadFeedTableView, mapVersions, this::toggleHide);
+            ViewHelper.ensureColumnIds(mapUploadFeedTableView);
+            Platform.runLater(() -> ViewHelper.loadColumnLayout(mapUploadFeedTableView, tab.getMapUploadFeedTableColumnWidths(), tab.getMapUploadFeedTableColumnOrder()));
         }
     }
 
@@ -176,5 +185,12 @@ public class RecentActivityController implements Controller<VBox> {
         };
 
         new Thread(task).start();
+    }
+
+    public void onSave() {
+        LocalPreferences.TabRecentActivity tab = localPreferences.getTabRecentActivity();
+        ViewHelper.saveColumnLayout(userRegistrationFeedTableView, tab.getUserRegistrationFeedTableColumnWidths(), tab.getUserRegistrationFeedTableColumnOrder());
+        ViewHelper.saveColumnLayout(teamkillFeedTableView, tab.getTeamkillFeedTableColumnWidths(), tab.getTeamkillFeedTableColumnOrder());
+        ViewHelper.saveColumnLayout(mapUploadFeedTableView, tab.getMapUploadFeedTableColumnWidths(), tab.getMapUploadFeedTableColumnOrder());
     }
 }

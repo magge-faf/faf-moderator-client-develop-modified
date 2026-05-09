@@ -1,6 +1,7 @@
 package com.faforever.moderatorclient.ui;
 
 import com.faforever.moderatorclient.api.domain.MessagesService;
+import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.ui.domain.MessageFx;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -32,6 +33,7 @@ public class MessagesController implements Controller<HBox> {
     public TableView<MessageFx> messageTableView;
     private final MessagesService messagesService;
     private final UiService uiService;
+    private final LocalPreferences localPreferences;
     public TextField filter;
     public RadioButton valueRadioButton;
     public RadioButton keyRadioButton;
@@ -43,6 +45,11 @@ public class MessagesController implements Controller<HBox> {
         ViewHelper.buildMessagesTable(messageTableView, messagesService, log);
         messageFxes = FXCollections.observableArrayList();
         setUpFilter();
+        ViewHelper.ensureColumnIds(messageTableView);
+        LocalPreferences.TabMessages tab = localPreferences.getTabMessages();
+        Platform.runLater(() ->
+            ViewHelper.loadColumnLayout(messageTableView, tab.getMessageTableColumnWidths(), tab.getMessageTableColumnOrder())
+        );
     }
 
     private void setUpFilter() {
@@ -89,6 +96,11 @@ public class MessagesController implements Controller<HBox> {
         newCategoryDialog.setTitle("Add new message");
         newCategoryDialog.setScene(new Scene(messageAddController.getRoot()));
         newCategoryDialog.showAndWait();
+    }
+
+    public void onSave() {
+        LocalPreferences.TabMessages tab = localPreferences.getTabMessages();
+        ViewHelper.saveColumnLayout(messageTableView, tab.getMessageTableColumnWidths(), tab.getMessageTableColumnOrder());
     }
 
     @Override

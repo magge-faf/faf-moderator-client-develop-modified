@@ -2,8 +2,11 @@ package com.faforever.moderatorclient.ui.main_window;
 
 import com.faforever.moderatorclient.api.ApiCallRecord;
 import com.faforever.moderatorclient.api.ApiHistoryService;
+import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.ui.Controller;
+import com.faforever.moderatorclient.ui.ViewHelper;
 import javafx.beans.property.SimpleStringProperty;
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.MenuItem;
@@ -24,6 +27,7 @@ import java.util.Objects;
 public class ApiHistoryController implements Controller<VBox> {
 
     private final ApiHistoryService apiHistoryService;
+    private final LocalPreferences localPreferences;
 
     @FXML public VBox root;
     @FXML public TableView<ApiCallRecord> historyTable;
@@ -72,6 +76,9 @@ public class ApiHistoryController implements Controller<VBox> {
         });
 
         historyTable.setItems(apiHistoryService.getHistory());
+        ViewHelper.ensureColumnIds(historyTable);
+        LocalPreferences.TabApiHistory tab = localPreferences.getTabApiHistory();
+        Platform.runLater(() -> ViewHelper.loadColumnLayout(historyTable, tab.getHistoryTableColumnWidths(), tab.getHistoryTableColumnOrder()));
     }
 
     private ContextMenu buildContextMenu(ApiCallRecord item) {
@@ -102,6 +109,11 @@ public class ApiHistoryController implements Controller<VBox> {
             Clipboard.getSystemClipboard().setContent(content);
         });
         return item;
+    }
+
+    public void onSave() {
+        LocalPreferences.TabApiHistory tab = localPreferences.getTabApiHistory();
+        ViewHelper.saveColumnLayout(historyTable, tab.getHistoryTableColumnWidths(), tab.getHistoryTableColumnOrder());
     }
 
     @FXML

@@ -5,6 +5,7 @@ import com.faforever.moderatorclient.api.domain.VotingService;
 import com.faforever.moderatorclient.ui.domain.VotingChoiceFX;
 import com.faforever.moderatorclient.ui.domain.VotingQuestionFX;
 import com.faforever.moderatorclient.ui.domain.VotingSubjectFX;
+import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.ui.Controller;
 import com.faforever.moderatorclient.ui.UiService;
 import com.faforever.moderatorclient.ui.ViewHelper;
@@ -18,6 +19,7 @@ import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.collections.transformation.SortedList;
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -43,6 +45,7 @@ public class VotingController implements Controller<SplitPane> {
     private final FilteredList<VotingChoiceFX> filteredChoices;
     private final ObservableList<VotingChoiceFX> rawChoices;
     private final UiService uiService;
+    private final LocalPreferences localPreferences;
 
     public SplitPane root;
     public TableView<VotingSubjectFX> subjectTable;
@@ -55,9 +58,10 @@ public class VotingController implements Controller<SplitPane> {
     public Button deleteChoiceButton;
     public Button addChoiceButton;
 
-    public VotingController(VotingService votingService, UiService uiService) {
+    public VotingController(VotingService votingService, UiService uiService, LocalPreferences localPreferences) {
         this.votingService = votingService;
         this.uiService = uiService;
+        this.localPreferences = localPreferences;
 
         rawSubjects = FXCollections.observableArrayList();
         sortedSubjects = new SortedList<>(rawSubjects);
@@ -112,6 +116,16 @@ public class VotingController implements Controller<SplitPane> {
         ViewHelper.buildChoiceTable(choiceTable, votingService, log, this::onRefreshChoices);
         choiceTable.setItems(filteredChoices);
         onRefreshChoices();
+
+        ViewHelper.ensureColumnIds(subjectTable);
+        ViewHelper.ensureColumnIds(questionTable);
+        ViewHelper.ensureColumnIds(choiceTable);
+        LocalPreferences.TabVoting tab = localPreferences.getTabVoting();
+        Platform.runLater(() -> {
+            ViewHelper.loadColumnLayout(subjectTable, tab.getSubjectTableColumnWidths(), tab.getSubjectTableColumnOrder());
+            ViewHelper.loadColumnLayout(questionTable, tab.getQuestionTableColumnWidths(), tab.getQuestionTableColumnOrder());
+            ViewHelper.loadColumnLayout(choiceTable, tab.getChoiceTableColumnWidths(), tab.getChoiceTableColumnOrder());
+        });
     }
 
     //region subjects
@@ -223,5 +237,12 @@ public class VotingController implements Controller<SplitPane> {
         onRefreshQuestions();
         onRefreshChoices();
         onRefreshSubjects();
+    }
+
+    public void onSave() {
+        LocalPreferences.TabVoting tab = localPreferences.getTabVoting();
+        ViewHelper.saveColumnLayout(subjectTable, tab.getSubjectTableColumnWidths(), tab.getSubjectTableColumnOrder());
+        ViewHelper.saveColumnLayout(questionTable, tab.getQuestionTableColumnWidths(), tab.getQuestionTableColumnOrder());
+        ViewHelper.saveColumnLayout(choiceTable, tab.getChoiceTableColumnWidths(), tab.getChoiceTableColumnOrder());
     }
 }

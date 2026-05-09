@@ -4,12 +4,14 @@ import com.faforever.commons.api.dto.GroupPermission;
 import com.faforever.commons.api.dto.Map;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.MapService;
+import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.mapstruct.MapMapper;
 import com.faforever.moderatorclient.mapstruct.MapVersionMapper;
 import com.faforever.moderatorclient.ui.Controller;
 import com.faforever.moderatorclient.ui.ViewHelper;
 import com.faforever.moderatorclient.ui.domain.MapFX;
 import com.faforever.moderatorclient.ui.domain.MapVersionFX;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
@@ -38,6 +40,7 @@ public class MapVaultController implements Controller<SplitPane> {
     private final MapService mapService;
     private final MapMapper mapMapper;
     private final MapVersionMapper mapVersionMapper;
+    private final LocalPreferences localPreferences;
     private final ObservableList<MapFX> maps = FXCollections.observableArrayList();
     private final ObservableList<MapVersionFX> mapVersions = FXCollections.observableArrayList();
 
@@ -67,6 +70,13 @@ public class MapVaultController implements Controller<SplitPane> {
     public void initialize() {
         ViewHelper.buildMapTableView(mapSearchTableView, maps);
         ViewHelper.buildMapVersionTableView(mapVersionTableView, mapVersions);
+        ViewHelper.ensureColumnIds(mapSearchTableView);
+        ViewHelper.ensureColumnIds(mapVersionTableView);
+        LocalPreferences.TabMapVault tab = localPreferences.getTabMapVault();
+        Platform.runLater(() -> {
+            ViewHelper.loadColumnLayout(mapSearchTableView, tab.getMapSearchTableColumnWidths(), tab.getMapSearchTableColumnOrder());
+            ViewHelper.loadColumnLayout(mapVersionTableView, tab.getMapVersionTableColumnWidths(), tab.getMapVersionTableColumnOrder());
+        });
 
         canEdit = communicationService.hasPermission(GroupPermission.ROLE_ADMIN_MAP);
 
@@ -155,5 +165,11 @@ public class MapVaultController implements Controller<SplitPane> {
 
         map.setRecommended(!map.isRecommended());
         mapService.patchMap(mapMapper.map(map));
+    }
+
+    public void onSave() {
+        LocalPreferences.TabMapVault tab = localPreferences.getTabMapVault();
+        ViewHelper.saveColumnLayout(mapSearchTableView, tab.getMapSearchTableColumnWidths(), tab.getMapSearchTableColumnOrder());
+        ViewHelper.saveColumnLayout(mapVersionTableView, tab.getMapVersionTableColumnWidths(), tab.getMapVersionTableColumnOrder());
     }
 }

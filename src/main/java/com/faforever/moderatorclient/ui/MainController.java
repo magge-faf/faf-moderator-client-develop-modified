@@ -378,6 +378,15 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         userManagementController.onSave();
         bansController.onSave();
         recentNotesController.onSave();
+        if (avatarsController != null) avatarsController.onSave();
+        if (mapVaultController != null) mapVaultController.onSave();
+        if (modVaultController != null) modVaultController.onSave();
+        if (votingController != null) votingController.onSave();
+        if (tutorialController != null) tutorialController.onSave();
+        if (messagesController != null) messagesController.onSave();
+        if (userGroupsController != null) userGroupsController.onSave();
+        if (recentActivityController != null) recentActivityController.onSave();
+        if (apiHistoryController != null) apiHistoryController.onSave();
         localPreferencesReaderWriter.write(localPreferences);
         log.info("Local preferences saved successfully.");
     }

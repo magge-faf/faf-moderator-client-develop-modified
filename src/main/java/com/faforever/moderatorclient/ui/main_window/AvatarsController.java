@@ -3,6 +3,7 @@ package com.faforever.moderatorclient.ui.main_window;
 import com.faforever.commons.api.dto.Avatar;
 import com.faforever.moderatorclient.api.domain.AvatarService;
 import com.faforever.moderatorclient.config.EnvironmentProperties;
+import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.mapstruct.AvatarMapper;
 import com.faforever.moderatorclient.ui.AvatarInfoController;
 import com.faforever.moderatorclient.ui.Controller;
@@ -39,6 +40,7 @@ public class AvatarsController implements Controller<SplitPane> {
     private final UiService uiService;
     private final AvatarService avatarService;
     private final AvatarMapper avatarMapper;
+    private final LocalPreferences localPreferences;
     private final ObservableList<AvatarFX> avatars = FXCollections.observableArrayList();
     private final ObservableList<AvatarAssignmentFX> avatarAssignments = FXCollections.observableArrayList();
 
@@ -69,6 +71,13 @@ public class AvatarsController implements Controller<SplitPane> {
         UrlImageViewTableCell.loadProgressLabel = avatarLoadProgressLabel;
         ViewHelper.buildAvatarTableView(avatarTableView, avatars);
         ViewHelper.buildAvatarAssignmentTableView(avatarAssignmentTableView, avatarAssignments, this::removeAvatarFromPlayer);
+        ViewHelper.ensureColumnIds(avatarTableView);
+        ViewHelper.ensureColumnIds(avatarAssignmentTableView);
+        LocalPreferences.TabAvatars tab = localPreferences.getTabAvatars();
+        Platform.runLater(() -> {
+            ViewHelper.loadColumnLayout(avatarTableView, tab.getAvatarTableColumnWidths(), tab.getAvatarTableColumnOrder());
+            ViewHelper.loadColumnLayout(avatarAssignmentTableView, tab.getAvatarAssignmentTableColumnWidths(), tab.getAvatarAssignmentTableColumnOrder());
+        });
 
         editAvatarButton.disableProperty().bind(avatarTableView.getSelectionModel().selectedItemProperty().isNull());
         deleteAvatarButton.disableProperty().bind(avatarTableView.getSelectionModel().selectedItemProperty().isNull());
@@ -218,6 +227,12 @@ public class AvatarsController implements Controller<SplitPane> {
         } else {
             ViewHelper.errorDialog("Deleting avatar failed", "You can't remove an avatar as long as it has assignments.");
         }
+    }
+
+    public void onSave() {
+        LocalPreferences.TabAvatars tab = localPreferences.getTabAvatars();
+        ViewHelper.saveColumnLayout(avatarTableView, tab.getAvatarTableColumnWidths(), tab.getAvatarTableColumnOrder());
+        ViewHelper.saveColumnLayout(avatarAssignmentTableView, tab.getAvatarAssignmentTableColumnWidths(), tab.getAvatarAssignmentTableColumnOrder());
     }
 
     private void loadAvatarImageAsync(AvatarFX avatar) {

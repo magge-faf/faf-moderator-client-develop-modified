@@ -21,6 +21,15 @@ public class LocalPreferences {
     private TabEditModerationReport tabEditModerationReport = new TabEditModerationReport();
     private TabRecentNotes tabRecentNotes = new TabRecentNotes();
     private TabBans tabBans = new TabBans();
+    private TabAvatars tabAvatars = new TabAvatars();
+    private TabMapVault tabMapVault = new TabMapVault();
+    private TabModVault tabModVault = new TabModVault();
+    private TabVoting tabVoting = new TabVoting();
+    private TabTutorial tabTutorial = new TabTutorial();
+    private TabMessages tabMessages = new TabMessages();
+    private TabUserGroups tabUserGroups = new TabUserGroups();
+    private TabRecentActivity tabRecentActivity = new TabRecentActivity();
+    private TabApiHistory tabApiHistory = new TabApiHistory();
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     @Data
@@ -77,6 +86,20 @@ public class LocalPreferences {
         Map<String, Double> userSearchTableTableColumnWidthsTabUserManagement = new HashMap<>();
         List<String> userSearchTableColumnOrderTabUserManagement = new ArrayList<>();
         List<Double> rootSplitPaneDividerPositionsTabUserManagement = new ArrayList<>();
+        Map<String, Double> userBansTableColumnWidths = new HashMap<>();
+        List<String> userBansTableColumnOrder = new ArrayList<>();
+        Map<String, Double> userNoteTableColumnWidths = new HashMap<>();
+        List<String> userNoteTableColumnOrder = new ArrayList<>();
+        Map<String, Double> userNameHistoryTableColumnWidths = new HashMap<>();
+        List<String> userNameHistoryTableColumnOrder = new ArrayList<>();
+        Map<String, Double> userLastGamesTableColumnWidths = new HashMap<>();
+        List<String> userLastGamesTableColumnOrder = new ArrayList<>();
+        Map<String, Double> userAvatarsTableColumnWidths = new HashMap<>();
+        List<String> userAvatarsTableColumnOrder = new ArrayList<>();
+        Map<String, Double> userGroupsTableColumnWidths = new HashMap<>();
+        List<String> userGroupsTableColumnOrder = new ArrayList<>();
+        Map<String, Double> permissionsTableColumnWidths = new HashMap<>();
+        List<String> permissionsTableColumnOrder = new ArrayList<>();
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -154,5 +177,90 @@ public class LocalPreferences {
     public static class TabBans {
         Map<String, Double> columnWidthsTabBans = new HashMap<>();
         List<String> columnOrderTabBans = new ArrayList<>();
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @Data
+    public static class TabAvatars {
+        Map<String, Double> avatarTableColumnWidths = new HashMap<>();
+        List<String> avatarTableColumnOrder = new ArrayList<>();
+        Map<String, Double> avatarAssignmentTableColumnWidths = new HashMap<>();
+        List<String> avatarAssignmentTableColumnOrder = new ArrayList<>();
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @Data
+    public static class TabMapVault {
+        Map<String, Double> mapSearchTableColumnWidths = new HashMap<>();
+        List<String> mapSearchTableColumnOrder = new ArrayList<>();
+        Map<String, Double> mapVersionTableColumnWidths = new HashMap<>();
+        List<String> mapVersionTableColumnOrder = new ArrayList<>();
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @Data
+    public static class TabModVault {
+        Map<String, Double> modSearchTableColumnWidths = new HashMap<>();
+        List<String> modSearchTableColumnOrder = new ArrayList<>();
+        Map<String, Double> modVersionTableColumnWidths = new HashMap<>();
+        List<String> modVersionTableColumnOrder = new ArrayList<>();
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @Data
+    public static class TabVoting {
+        Map<String, Double> subjectTableColumnWidths = new HashMap<>();
+        List<String> subjectTableColumnOrder = new ArrayList<>();
+        Map<String, Double> questionTableColumnWidths = new HashMap<>();
+        List<String> questionTableColumnOrder = new ArrayList<>();
+        Map<String, Double> choiceTableColumnWidths = new HashMap<>();
+        List<String> choiceTableColumnOrder = new ArrayList<>();
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @Data
+    public static class TabTutorial {
+        Map<String, Double> tutorialTableColumnWidths = new HashMap<>();
+        List<String> tutorialTableColumnOrder = new ArrayList<>();
+        Map<String, Double> categoryTableColumnWidths = new HashMap<>();
+        List<String> categoryTableColumnOrder = new ArrayList<>();
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @Data
+    public static class TabMessages {
+        Map<String, Double> messageTableColumnWidths = new HashMap<>();
+        List<String> messageTableColumnOrder = new ArrayList<>();
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @Data
+    public static class TabUserGroups {
+        Map<String, Double> groupsTableColumnWidths = new HashMap<>();
+        List<String> groupsTableColumnOrder = new ArrayList<>();
+        Map<String, Double> groupPermissionsTableColumnWidths = new HashMap<>();
+        List<String> groupPermissionsTableColumnOrder = new ArrayList<>();
+        Map<String, Double> groupChildrenTableColumnWidths = new HashMap<>();
+        List<String> groupChildrenTableColumnOrder = new ArrayList<>();
+        Map<String, Double> membersTableColumnWidths = new HashMap<>();
+        List<String> membersTableColumnOrder = new ArrayList<>();
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @Data
+    public static class TabRecentActivity {
+        Map<String, Double> userRegistrationFeedTableColumnWidths = new HashMap<>();
+        List<String> userRegistrationFeedTableColumnOrder = new ArrayList<>();
+        Map<String, Double> teamkillFeedTableColumnWidths = new HashMap<>();
+        List<String> teamkillFeedTableColumnOrder = new ArrayList<>();
+        Map<String, Double> mapUploadFeedTableColumnWidths = new HashMap<>();
+        List<String> mapUploadFeedTableColumnOrder = new ArrayList<>();
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @Data
+    public static class TabApiHistory {
+        Map<String, Double> historyTableColumnWidths = new HashMap<>();
+        List<String> historyTableColumnOrder = new ArrayList<>();
     }
 }

@@ -1,6 +1,7 @@
 package com.faforever.moderatorclient.ui.main_window;
 
 import com.faforever.moderatorclient.api.domain.PermissionService;
+import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.ui.AddGroupController;
 import com.faforever.moderatorclient.ui.Controller;
 import com.faforever.moderatorclient.ui.GroupAddChildController;
@@ -29,6 +30,7 @@ import org.springframework.util.Assert;
 public class UserGroupsController implements Controller<HBox> {
     private final PermissionService permissionService;
     private final UiService uiService;
+    private final LocalPreferences localPreferences;
 
     public HBox root;
     public TableView<UserGroupFX> groupsTableView;
@@ -47,6 +49,17 @@ public class UserGroupsController implements Controller<HBox> {
         ViewHelper.buildUserPermissionsTableView(groupPermissionsTableView, groupPermissions);
         ViewHelper.buildUserGroupsTableView(groupChildrenTableView, childUserGroups);
         ViewHelper.buildSimpleUserTableView(membersTableView, members);
+        ViewHelper.ensureColumnIds(groupsTableView);
+        ViewHelper.ensureColumnIds(groupPermissionsTableView);
+        ViewHelper.ensureColumnIds(groupChildrenTableView);
+        ViewHelper.ensureColumnIds(membersTableView);
+        LocalPreferences.TabUserGroups tab = localPreferences.getTabUserGroups();
+        Platform.runLater(() -> {
+            ViewHelper.loadColumnLayout(groupsTableView, tab.getGroupsTableColumnWidths(), tab.getGroupsTableColumnOrder());
+            ViewHelper.loadColumnLayout(groupPermissionsTableView, tab.getGroupPermissionsTableColumnWidths(), tab.getGroupPermissionsTableColumnOrder());
+            ViewHelper.loadColumnLayout(groupChildrenTableView, tab.getGroupChildrenTableColumnWidths(), tab.getGroupChildrenTableColumnOrder());
+            ViewHelper.loadColumnLayout(membersTableView, tab.getMembersTableColumnWidths(), tab.getMembersTableColumnOrder());
+        });
         permissionService.getAllUserGroups().thenAccept(userGroups -> Platform.runLater(() -> this.userGroups.addAll(userGroups)));
         groupsTableView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
             groupPermissions.clear();
@@ -166,5 +179,13 @@ public class UserGroupsController implements Controller<HBox> {
         }
 
         members.remove(selectedMember);
+    }
+
+    public void onSave() {
+        LocalPreferences.TabUserGroups tab = localPreferences.getTabUserGroups();
+        ViewHelper.saveColumnLayout(groupsTableView, tab.getGroupsTableColumnWidths(), tab.getGroupsTableColumnOrder());
+        ViewHelper.saveColumnLayout(groupPermissionsTableView, tab.getGroupPermissionsTableColumnWidths(), tab.getGroupPermissionsTableColumnOrder());
+        ViewHelper.saveColumnLayout(groupChildrenTableView, tab.getGroupChildrenTableColumnWidths(), tab.getGroupChildrenTableColumnOrder());
+        ViewHelper.saveColumnLayout(membersTableView, tab.getMembersTableColumnWidths(), tab.getMembersTableColumnOrder());
     }
 }

@@ -308,15 +308,26 @@ public class UserManagementController implements Controller<SplitPane> {
             includeManufacturerCheckBox.setSelected(newState);
         });
 
-        userSearchTableView.getColumns().forEach(column -> {
-            if (column.getId() == null) {
-                column.setId(column.getText().replaceAll("\\s+", ""));
-            }
-        });
+        ViewHelper.ensureColumnIds(userSearchTableView);
+        ViewHelper.ensureColumnIds(userBansTableView);
+        ViewHelper.ensureColumnIds(userNoteTableView);
+        ViewHelper.ensureColumnIds(userNameHistoryTableView);
+        ViewHelper.ensureColumnIds(userLastGamesTable);
+        ViewHelper.ensureColumnIds(userAvatarsTableView);
+        ViewHelper.ensureColumnIds(userGroupsTableView);
+        ViewHelper.ensureColumnIds(permissionsTableView);
 
         Platform.runLater(() -> {
+            LocalPreferences.TabUserManagement tab = localPreferences.getTabUserManagement();
             loadColumnLayout(userSearchTableView, localPreferences);
             loadSplitPanePositions(root, localPreferences);
+            ViewHelper.loadColumnLayout(userBansTableView, tab.getUserBansTableColumnWidths(), tab.getUserBansTableColumnOrder());
+            ViewHelper.loadColumnLayout(userNoteTableView, tab.getUserNoteTableColumnWidths(), tab.getUserNoteTableColumnOrder());
+            ViewHelper.loadColumnLayout(userNameHistoryTableView, tab.getUserNameHistoryTableColumnWidths(), tab.getUserNameHistoryTableColumnOrder());
+            ViewHelper.loadColumnLayout(userLastGamesTable, tab.getUserLastGamesTableColumnWidths(), tab.getUserLastGamesTableColumnOrder());
+            ViewHelper.loadColumnLayout(userAvatarsTableView, tab.getUserAvatarsTableColumnWidths(), tab.getUserAvatarsTableColumnOrder());
+            ViewHelper.loadColumnLayout(userGroupsTableView, tab.getUserGroupsTableColumnWidths(), tab.getUserGroupsTableColumnOrder());
+            ViewHelper.loadColumnLayout(permissionsTableView, tab.getPermissionsTableColumnWidths(), tab.getPermissionsTableColumnOrder());
             StartupSyncBans();
 
             int smurfCount = bansController.loadExistingBannedUserIds(SmurfManagementController.SMURF_MANAGEMENT_USERS_JSON_PATH).size();
@@ -2224,6 +2235,14 @@ public class UserManagementController implements Controller<SplitPane> {
     public void onSave() {
         saveColumnLayout(userSearchTableView, localPreferences);
         saveSplitPanePositions(root, localPreferences);
+        LocalPreferences.TabUserManagement tab = localPreferences.getTabUserManagement();
+        ViewHelper.saveColumnLayout(userBansTableView, tab.getUserBansTableColumnWidths(), tab.getUserBansTableColumnOrder());
+        ViewHelper.saveColumnLayout(userNoteTableView, tab.getUserNoteTableColumnWidths(), tab.getUserNoteTableColumnOrder());
+        ViewHelper.saveColumnLayout(userNameHistoryTableView, tab.getUserNameHistoryTableColumnWidths(), tab.getUserNameHistoryTableColumnOrder());
+        ViewHelper.saveColumnLayout(userLastGamesTable, tab.getUserLastGamesTableColumnWidths(), tab.getUserLastGamesTableColumnOrder());
+        ViewHelper.saveColumnLayout(userAvatarsTableView, tab.getUserAvatarsTableColumnWidths(), tab.getUserAvatarsTableColumnOrder());
+        ViewHelper.saveColumnLayout(userGroupsTableView, tab.getUserGroupsTableColumnWidths(), tab.getUserGroupsTableColumnOrder());
+        ViewHelper.saveColumnLayout(permissionsTableView, tab.getPermissionsTableColumnWidths(), tab.getPermissionsTableColumnOrder());
     }
 }
 
