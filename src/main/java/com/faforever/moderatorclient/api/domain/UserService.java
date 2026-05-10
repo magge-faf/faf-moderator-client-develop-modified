@@ -186,6 +186,8 @@ public class UserService {
 
     public String createUserNote(UserNote userNote) {
         log.debug("Creating userNote: {}", userNote);
+        userNote.setPlayer(shallowPlayer(userNote.getPlayer()));
+        userNote.setAuthor(shallowPlayer(userNote.getAuthor()));
         return fafApi.post(ElideNavigator.of(UserNote.class).collection(), userNote).getId();
     }
 
@@ -197,7 +199,16 @@ public class UserService {
 
     public UserNoteFX patchUserNote(UserNote userNote) {
         log.debug("Patching UserNote of id: {}", userNote.getId());
+        userNote.setPlayer(shallowPlayer(userNote.getPlayer()));
+        userNote.setAuthor(shallowPlayer(userNote.getAuthor()));
         return userNoteMapper.map(fafApi.patch(ElideNavigator.of(UserNote.class).id(userNote.getId()), userNote));
+    }
+
+    private Player shallowPlayer(Player player) {
+        if (player == null) return null;
+        Player shallow = new Player();
+        shallow.setId(player.getId());
+        return shallow;
     }
 
     public void updatePlayer(String id, String newName) {
