@@ -928,7 +928,7 @@ public class ModerationReportController implements Controller<Region> {
 
     private void initializeUserTableView() {
         ViewHelper.buildUserTableView(platformService, reportedPlayerTableView, reportedPlayersOfCurrentlySelectedReport, this::addBan,
-                playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), false, fafApiCommunicationService, userService, uiService);
+                playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), false, fafApiCommunicationService, userService, uiService, null);
         Platform.runLater(() -> {
             loadColumnLayout(reportTableView, localPreferences);
             loadSplitPanePositions(root, localPreferences);

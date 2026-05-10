@@ -24,6 +24,7 @@ import javafx.beans.property.ReadOnlyIntegerWrapper;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.ObservableSet;
@@ -35,7 +36,9 @@ import javafx.scene.control.cell.TreeItemPropertyValueFactory;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.*;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
 import java.time.Duration;
@@ -857,7 +860,8 @@ public class ViewHelper {
      */
     public static void buildUserTableView(PlatformService platformService, TableView<PlayerFX> tableView, ObservableList<PlayerFX> allData,
                                           Consumer<PlayerFX> onAddBan, Consumer<PlayerFX> onForceRename, boolean showUidData,
-                                          FafApiCommunicationService communicationService, @Nullable UserService userService, @Nullable UiService uiService) {
+                                          FafApiCommunicationService communicationService, @Nullable UserService userService, @Nullable UiService uiService,
+                                          @Nullable StringProperty highlightTerm) {
         if ("buildModerationReportTableView".equals(tableView.getId())) {
             addScrollListener(tableView, allData);
             tableView.setItems(FXCollections.observableArrayList());
@@ -969,6 +973,7 @@ public class ViewHelper {
                                             .map(DateTimeFormatter.ISO_LOCAL_DATE_TIME::format)
                                             .collect(Collectors.joining("\n")),
                             o.getValue().getUniqueIdAssignments()));
+                    uidCreatedAt.setCellFactory(uidHighlightCellFactory(highlightTerm));
                     uidCreatedAt.setMinWidth(40);
                     tableView.getColumns().add(uidCreatedAt);
                     extractors.put(uidCreatedAt, playerFX -> playerFX.getUniqueIdAssignments().stream()
@@ -983,6 +988,7 @@ public class ViewHelper {
                                             .map(DateTimeFormatter.ISO_LOCAL_DATE_TIME::format)
                                             .collect(Collectors.joining("\n")),
                             o.getValue().getUniqueIdAssignments()));
+                    uidLastUsedAt.setCellFactory(uidHighlightCellFactory(highlightTerm));
                     uidLastUsedAt.setMinWidth(40);
                     tableView.getColumns().add(uidLastUsedAt);
                     extractors.put(uidLastUsedAt, playerFX -> playerFX.getUniqueIdAssignments().stream()
@@ -1032,6 +1038,7 @@ public class ViewHelper {
                                             .map(UniqueIdFx::getHash)
                                             .collect(Collectors.joining("\n")),
                             o.getValue().getUniqueIdAssignments()));
+                    hashColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
                     hashColumn.setMinWidth(40);
                     tableView.getColumns().add(hashColumn);
                     extractors.put(hashColumn, playerFX -> playerFX.getUniqueIdAssignments().stream()
@@ -1045,6 +1052,7 @@ public class ViewHelper {
                                             .map(UniqueIdFx::getUuid)
                                             .collect(Collectors.joining("\n")),
                             o.getValue().getUniqueIdAssignments()));
+                    uuidColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
                     uuidColumn.setMinWidth(40);
                     tableView.getColumns().add(uuidColumn);
                     extractors.put(uuidColumn, playerFX -> playerFX.getUniqueIdAssignments().stream()
@@ -1058,6 +1066,7 @@ public class ViewHelper {
                                             .map(UniqueIdFx::getMemorySerialNumber)
                                             .collect(Collectors.joining("\n")),
                             o.getValue().getUniqueIdAssignments()));
+                    memorySerialColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
                     memorySerialColumn.setMinWidth(40);
                     tableView.getColumns().add(memorySerialColumn);
                     extractors.put(memorySerialColumn, playerFX -> playerFX.getUniqueIdAssignments().stream()
@@ -1071,6 +1080,7 @@ public class ViewHelper {
                                             .map(UniqueIdFx::getDeviceId)
                                             .collect(Collectors.joining("\n")),
                             o.getValue().getUniqueIdAssignments()));
+                    deviceIdColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
                     deviceIdColumn.setMinWidth(40);
                     tableView.getColumns().add(deviceIdColumn);
                     extractors.put(deviceIdColumn, playerFX -> playerFX.getUniqueIdAssignments().stream()
@@ -1084,6 +1094,7 @@ public class ViewHelper {
                                             .map(UniqueIdFx::getManufacturer)
                                             .collect(Collectors.joining("\n")),
                             o.getValue().getUniqueIdAssignments()));
+                    manufacturerColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
                     manufacturerColumn.setMinWidth(40);
                     tableView.getColumns().add(manufacturerColumn);
                     extractors.put(manufacturerColumn, playerFX -> playerFX.getUniqueIdAssignments().stream()
@@ -1097,6 +1108,7 @@ public class ViewHelper {
                                             .map(UniqueIdFx::getName)
                                             .collect(Collectors.joining("\n")),
                             o.getValue().getUniqueIdAssignments()));
+                    cpuNameColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
                     cpuNameColumn.setMinWidth(40);
                     tableView.getColumns().add(cpuNameColumn);
                     extractors.put(cpuNameColumn, playerFX -> playerFX.getUniqueIdAssignments().stream()
@@ -1110,6 +1122,8 @@ public class ViewHelper {
                                             .map(UniqueIdFx::getProcessorId)
                                             .collect(Collectors.joining("\n")),
                             o.getValue().getUniqueIdAssignments()));
+                    processorIdColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
+                    processorIdColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
                     processorIdColumn.setMinWidth(40);
                     tableView.getColumns().add(processorIdColumn);
                     extractors.put(processorIdColumn, playerFX -> playerFX.getUniqueIdAssignments().stream()
@@ -1123,6 +1137,7 @@ public class ViewHelper {
                                             .map(UniqueIdFx::getSerialNumber)
                                             .collect(Collectors.joining("\n")),
                             o.getValue().getUniqueIdAssignments()));
+                    serialColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
                     serialColumn.setMinWidth(200);
                     tableView.getColumns().add(serialColumn);
                     extractors.put(serialColumn, playerFX -> playerFX.getUniqueIdAssignments().stream()
@@ -1136,11 +1151,16 @@ public class ViewHelper {
                                             .map(UniqueIdFx::getVolumeSerialNumber)
                                             .collect(Collectors.joining("\n")),
                             o.getValue().getUniqueIdAssignments()));
+                    volumeSerialNumber.setCellFactory(uidHighlightCellFactory(highlightTerm));
                     volumeSerialNumber.setMinWidth(40);
                     tableView.getColumns().add(volumeSerialNumber);
                     extractors.put(volumeSerialNumber, playerFX -> playerFX.getUniqueIdAssignments().stream()
                             .map(UniqueIdAssignmentFx::getUniqueId)
                             .map(UniqueIdFx::getVolumeSerialNumber).collect(Collectors.toList()));
+                }
+
+                if (highlightTerm != null) {
+                    highlightTerm.addListener((obs, old, nv) -> tableView.refresh());
                 }
             }
 
@@ -1456,6 +1476,57 @@ public class ViewHelper {
         }
 
         return false;
+    }
+
+    private static Callback<TableColumn<PlayerFX, String>, TableCell<PlayerFX, String>> uidHighlightCellFactory(
+            @Nullable StringProperty highlightTerm) {
+        return col -> new TableCell<>() {
+            private final VBox vbox = new VBox();
+
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                    setGraphic(null);
+                    return;
+                }
+                String term = highlightTerm != null ? highlightTerm.get() : null;
+                if (term == null || term.isBlank() || !item.contains(term)) {
+                    setGraphic(null);
+                    setText(item);
+                    return;
+                }
+                vbox.getChildren().clear();
+                for (String line : item.split("\n", -1)) {
+                    vbox.getChildren().add(buildRow(line, term));
+                }
+                setText(null);
+                setGraphic(vbox);
+            }
+
+            private HBox buildRow(String line, String term) {
+                HBox row = new HBox();
+                int idx = line.indexOf(term);
+                if (idx < 0) {
+                    row.getChildren().add(plainText(line));
+                } else {
+                    if (idx > 0) row.getChildren().add(plainText(line.substring(0, idx)));
+                    Text hl = new Text(line.substring(idx, idx + term.length()));
+                    hl.setStyle("-fx-font-weight: bold; -fx-fill: #ff8c00;");
+                    row.getChildren().add(hl);
+                    if (idx + term.length() < line.length())
+                        row.getChildren().add(plainText(line.substring(idx + term.length())));
+                }
+                return row;
+            }
+
+            private Text plainText(String text) {
+                Text t = new Text(text);
+                t.fillProperty().bind(textFillProperty());
+                return t;
+            }
+        };
     }
 
     /**

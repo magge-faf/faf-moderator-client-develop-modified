@@ -175,6 +175,7 @@ public class UserManagementController implements Controller<SplitPane> {
     private final ObservableList<GroupPermissionFX> groupPermissions = FXCollections.observableArrayList();
 
     private final Map<String, String> searchUserPropertyMapping = new LinkedHashMap<>();
+    private final SimpleStringProperty searchHighlightTerm = new SimpleStringProperty();
     @FXML
     public TextArea searchHistoryTextArea;
     @FXML
@@ -435,7 +436,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
     private void setupTableViews() {
         ViewHelper.buildUserTableView(platformService, userSearchTableView, users, null,
-                playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), true, communicationService, userService, uiService);
+                playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), true, communicationService, userService, uiService, searchHighlightTerm);
         ViewHelper.buildNotesTableView(userNoteTableView, userNotes, false);
         ViewHelper.buildNameHistoryTableView(userNameHistoryTableView, nameRecords);
         ViewHelper.buildBanTableView(userBansTableView, bans, false, localPreferences, userService, uiService);
@@ -594,6 +595,7 @@ public class UserManagementController implements Controller<SplitPane> {
     public void onUserSearch() {
         users.clear();
         userSearchTableView.getSortOrder().clear();
+        searchHighlightTerm.set(null);
 
         String searchParameter = searchUserPropertyMapping.get(searchUserProperties.getValue());
         String searchPattern = userSearchTextField.getText();
@@ -636,6 +638,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
         searchTask.setOnSucceeded(event -> {
             users.addAll(searchTask.getValue());
+            searchHighlightTerm.set(finalSearchPattern);
 
             String userSearchText = userSearchTextField.getText();
             String currentHistory = searchHistoryTextArea.getText();

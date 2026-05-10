@@ -73,7 +73,7 @@ public class RecentActivityController implements Controller<VBox> {
         LocalPreferences.TabRecentActivity tab = localPreferences.getTabRecentActivity();
         if (checkPermissionForTab(GroupPermission.ROLE_READ_ACCOUNT_PRIVATE_DETAILS, latestRegistrationsTab)) {
             ViewHelper.buildUserTableView(platformService, userRegistrationFeedTableView, users, this::addBan,
-                    playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), true, communicationService, userService, uiService);
+                    playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), true, communicationService, userService, uiService, null);
             ViewHelper.ensureColumnIds(userRegistrationFeedTableView);
             Platform.runLater(() -> ViewHelper.loadColumnLayout(userRegistrationFeedTableView, tab.getUserRegistrationFeedTableColumnWidths(), tab.getUserRegistrationFeedTableColumnOrder()));
         }
