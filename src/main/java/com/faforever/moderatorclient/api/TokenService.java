@@ -53,19 +53,30 @@ public class TokenService {
 
     @SneakyThrows
     public String getRefreshedTokenValue() {
-        if (tokenCache.getAccessToken().getExpiresAt().isBefore(Instant.now())) {
+        if (tokenCache == null) {
+            throw new IllegalStateException("Token cache is null — authorize() must be called before requesting tokens");
+        }
+        Instant expiresAt = tokenCache.getAccessToken().getExpiresAt();
+        if (expiresAt == null || expiresAt.isBefore(Instant.now())) {
             log.info("Token expired, requesting new with refresh token");
             loginWithRefreshToken(tokenCache.getRefreshToken().getTokenValue(), false);
         } else {
-            log.trace("Token still valid for {} seconds", Duration.between(Instant.now(), tokenCache.getAccessToken().getExpiresAt()).getSeconds());
+            log.trace("Token still valid for {} seconds", Duration.between(Instant.now(), expiresAt).getSeconds());
         }
 
         return tokenCache.getAccessToken().getTokenValue();
     }
 
     public String getHmac() {
+        if (tokenCache == null) {
+            throw new IllegalStateException("Token cache is null — cannot extract HMAC before login");
+        }
         var claims = extractCustomClaims(tokenCache.getAccessToken().getTokenValue());
+        @SuppressWarnings("unchecked")
         var extensions = (Map<String, Object>) claims.get("ext");
+        if (extensions == null) {
+            return null;
+        }
         return (String) extensions.get("hmac");
     }
 
@@ -100,9 +111,14 @@ public class TokenService {
     }
 
     private void parseResponse(Map<String, Object> responseBody) {
-        String accessToken = (String) responseBody.get("access_token");
+        Object accessTokenObj = responseBody.get("access_token");
+        Object expiresInObj = responseBody.get("expires_in");
+        if (accessTokenObj == null || expiresInObj == null) {
+            throw new IllegalStateException("OAuth token response is missing required fields (access_token or expires_in)");
+        }
+        String accessToken = (String) accessTokenObj;
         String refreshToken = (String) responseBody.get("refresh_token");
-        long expiresIn = Long.parseLong(responseBody.get("expires_in").toString());
+        long expiresIn = Long.parseLong(expiresInObj.toString());
 
         tokenCache = OAuth2AccessTokenResponse.withToken(accessToken)
                 .tokenType(OAuth2AccessToken.TokenType.BEARER)

@@ -353,7 +353,11 @@ public class MainController implements Controller<TabPane>, DisposableBean {
             Stage loginDialog = new Stage();
             loginDialog.setOnCloseRequest(event -> System.exit(0));
             loginDialog.setTitle("FAF Moderator Client");
-            loginDialog.getIcons().add(new Image(Objects.requireNonNull(this.getClass().getResourceAsStream("/media/favicon.png"))));
+            try (var iconStream = Objects.requireNonNull(this.getClass().getResourceAsStream("/media/favicon.png"))) {
+                loginDialog.getIcons().add(new Image(iconStream));
+            } catch (java.io.IOException e) {
+                log.warn("Failed to load application icon", e);
+            }
 
             Scene scene = new Scene(loginController.getRoot());
             String stylesheet = "/style/main-light.css";
@@ -373,11 +377,11 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     @Override
     public void destroy() {
         log.info("Application exit received: saving local preferences to disk.");
-        settingsController.onSave();
-        moderationReportController.onSave();
-        userManagementController.onSave();
-        bansController.onSave();
-        recentNotesController.onSave();
+        if (settingsController != null) settingsController.onSave();
+        if (moderationReportController != null) moderationReportController.onSave();
+        if (userManagementController != null) userManagementController.onSave();
+        if (bansController != null) bansController.onSave();
+        if (recentNotesController != null) recentNotesController.onSave();
         if (avatarsController != null) avatarsController.onSave();
         if (mapVaultController != null) mapVaultController.onSave();
         if (modVaultController != null) modVaultController.onSave();
@@ -423,7 +427,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
             return;
         }
 
-        new Thread(() -> {
+        Thread versionCheckThread = new Thread(() -> {
             try {
                 String url = "https://api.github.com/repos/magge-faf/faf-moderator-client-develop-modified/releases/latest";
                 var conn = new java.net.URL(url).openConnection();
@@ -440,7 +444,9 @@ public class MainController implements Controller<TabPane>, DisposableBean {
             } catch (Exception e) {
                 log.warn("Failed to check for new version", e);
             }
-        }).start();
+        });
+        versionCheckThread.setDaemon(true);
+        versionCheckThread.start();
     }
 
     private boolean isNewerVersion(String latest) {

@@ -47,7 +47,8 @@ public class BanInfoFX extends AbstractEntityFX {
                             if (getDuration() == BanDurationType.PERMANENT) {
                                 return BanStatus.BANNED;
                             }
-                            return getExpiresAt().isAfter(OffsetDateTime.now())
+                            OffsetDateTime expires = getExpiresAt();
+                            return expires != null && expires.isAfter(OffsetDateTime.now())
                                     ? BanStatus.BANNED
                                     : BanStatus.EXPIRED;
                         },

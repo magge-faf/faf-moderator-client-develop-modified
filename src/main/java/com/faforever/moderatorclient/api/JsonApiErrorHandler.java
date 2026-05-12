@@ -17,6 +17,7 @@ import org.springframework.web.client.DefaultResponseErrorHandler;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
+import java.util.Collections;
 
 @Component
 @Slf4j
@@ -35,7 +36,8 @@ public class JsonApiErrorHandler extends DefaultResponseErrorHandler {
             try {
                 jsonApiMessageConverter.readInternal(Errors.class, response);
             } catch (ResourceParseException e) {
-                throw new ApiException(e.getErrors().getErrors());
+                var errors = e.getErrors();
+                throw new ApiException(errors != null ? errors.getErrors() : Collections.emptyList());
             }
         }
         super.handleError(response, statusCode, url, method);

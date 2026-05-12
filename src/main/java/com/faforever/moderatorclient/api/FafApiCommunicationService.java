@@ -42,8 +42,6 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
 
-import com.google.common.util.concurrent.RateLimiter;
-
 @Service
 @Slf4j
 public class FafApiCommunicationService {
@@ -62,8 +60,6 @@ public class FafApiCommunicationService {
     private MeResult meResult;
     private RestTemplate restTemplate;
     private int maxRequests;
-
-    private static final RateLimiter rateLimiter = RateLimiter.create(50);
 
     public FafApiCommunicationService(
             @Qualifier("defaultResourceConverter") ResourceConverter defaultResourceConverter,
@@ -97,8 +93,8 @@ public class FafApiCommunicationService {
     public void initialize(EnvironmentProperties environmentProperties) {
         this.environmentProperties = environmentProperties;
         maxRequests = environmentProperties.getMaxRequestsToServerPerMinute();
+        effectiveMaxRequestsPerMinute = maxRequests;
         log.info("Setting max requests to server per minute to {}", maxRequests);
-        rateLimiter.setRate(maxRequests / 60.0);
     }
 
     public boolean hasPermission(String... permissionTechnicalName) {
@@ -163,34 +159,33 @@ public class FafApiCommunicationService {
     private static final Deque<Long> requestTimestamps = new ConcurrentLinkedDeque<>();
     private static final long ONE_MINUTE_IN_MILLIS = 60_000;
     private static final int MAX_REQUESTS_PER_MINUTE = 90;
+    private static volatile int effectiveMaxRequestsPerMinute = MAX_REQUESTS_PER_MINUTE;
 
     public static synchronized void checkRateLimit() {
         long currentTime = System.currentTimeMillis();
 
-        // Remove timestamps older than one minute
         while (!requestTimestamps.isEmpty() && currentTime - requestTimestamps.peek() > ONE_MINUTE_IN_MILLIS) {
             requestTimestamps.poll();
         }
 
-        // If we hit the limit, wait until at least one slot frees up
-        if (requestTimestamps.size() >= MAX_REQUESTS_PER_MINUTE) {
+        // Wait in a loop until a slot is available. Using wait() releases the monitor while
+        // sleeping so other threads can enter the method and check the limit concurrently.
+        while (requestTimestamps.size() >= effectiveMaxRequestsPerMinute) {
             long waitTime = requestTimestamps.peek() + ONE_MINUTE_IN_MILLIS - currentTime;
             if (waitTime > 0) {
                 try {
-                    Thread.sleep(waitTime);
+                    FafApiCommunicationService.class.wait(waitTime);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
+                    return;
                 }
             }
-
-            // Clean up again after sleeping
             currentTime = System.currentTimeMillis();
             while (!requestTimestamps.isEmpty() && currentTime - requestTimestamps.peek() > ONE_MINUTE_IN_MILLIS) {
                 requestTimestamps.poll();
             }
         }
 
-        // Register this request
         requestTimestamps.add(System.currentTimeMillis());
     }
 
