@@ -68,7 +68,7 @@ public class AvatarsController implements Controller<SplitPane> {
 
     @FXML
     public void initialize() {
-        UrlImageViewTableCell.loadProgressLabel = avatarLoadProgressLabel;
+        UrlImageViewTableCell.setLoadProgressLabel(avatarLoadProgressLabel);
         ViewHelper.buildAvatarTableView(avatarTableView, avatars);
         ViewHelper.buildAvatarAssignmentTableView(avatarAssignmentTableView, avatarAssignments, this::removeAvatarFromPlayer);
         ViewHelper.ensureColumnIds(avatarTableView);
@@ -110,8 +110,7 @@ public class AvatarsController implements Controller<SplitPane> {
     public void refreshAvatars() {
         avatars.clear();
         avatarAssignments.clear();
-        UrlImageViewTableCell.totalRequested = 0;
-        UrlImageViewTableCell.totalCompleted = 0;
+        UrlImageViewTableCell.resetCounters();
         UrlImageViewTableCell.updateProgressLabel();
         avatarTableView.setPlaceholder(new ProgressIndicator());
 
@@ -245,21 +244,27 @@ public class AvatarsController implements Controller<SplitPane> {
             return;
         }
 
-        if (!UrlImageViewTableCell.loadingUrls.add(cacheKey)) return;
+        if (!UrlImageViewTableCell.tryAddLoadingUrl(cacheKey)) return;
 
-        UrlImageViewTableCell.imageLoadExecutor.submit(() -> {
+        UrlImageViewTableCell.submitImageLoad(() -> {
             try {
                 Image img = new Image(avatar.getUrl(), true);
-                AvatarCache.getInstance().put(cacheKey, img);
-                img.progressProperty().addListener((obs, oldProg, newProg) -> {
-                    if (newProg.doubleValue() >= 1.0) {
-                        Platform.runLater(() -> avatar.setImage(img));
+                Platform.runLater(() -> {
+                    img.progressProperty().addListener((obs, oldProg, newProg) -> {
+                        if (newProg.doubleValue() >= 1.0 && !img.isError()) {
+                            avatar.setImage(img);
+                            AvatarCache.getInstance().put(cacheKey, img);
+                        }
+                    });
+                    if (img.getProgress() >= 1.0 && !img.isError()) {
+                        avatar.setImage(img);
+                        AvatarCache.getInstance().put(cacheKey, img);
                     }
                 });
             } catch (Exception e) {
                 log.debug("Failed to load avatar image from {}: {}", avatar.getUrl(), e.getMessage());
             } finally {
-                UrlImageViewTableCell.loadingUrls.remove(cacheKey);
+                UrlImageViewTableCell.removeLoadingUrl(cacheKey);
             }
         });
     }

@@ -330,7 +330,7 @@ public class UserManagementController implements Controller<SplitPane> {
             ViewHelper.loadColumnLayout(userAvatarsTableView, tab.getUserAvatarsTableColumnWidths(), tab.getUserAvatarsTableColumnOrder());
             ViewHelper.loadColumnLayout(userGroupsTableView, tab.getUserGroupsTableColumnWidths(), tab.getUserGroupsTableColumnOrder());
             ViewHelper.loadColumnLayout(permissionsTableView, tab.getPermissionsTableColumnWidths(), tab.getPermissionsTableColumnOrder());
-            StartupSyncBans();
+            startupSyncBans();
 
             int smurfCount = bansController.loadExistingBannedUserIds(SmurfManagementController.SMURF_MANAGEMENT_USERS_JSON_PATH).size();
             checkSmurfManagementAccountsButton.setText("Run Smurf Management: " + smurfCount);
@@ -480,7 +480,7 @@ public class UserManagementController implements Controller<SplitPane> {
         featuredModFilterChoiceBox.getSelectionModel().select(0);
     }
 
-    private void StartupSyncBans() {
+    private void startupSyncBans() {
         int smurfCount = bansController.loadExistingBannedUserIds(SmurfManagementController.SMURF_MANAGEMENT_USERS_JSON_PATH).size();
         checkSmurfManagementAccountsButton.setText("Run Smurf Management: " + smurfCount);
     }

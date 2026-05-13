@@ -37,17 +37,6 @@ public class MapVersionFX extends AbstractEntityFX {
         map = new SimpleObjectProperty<>();
     }
 
-//
-//    @Relationship("statistics")
-//    private MapVersionStatistics statistics;
-//
-//    @Nullable
-//    @Relationship("ladder1v1Map")
-//    private Ladder1v1Map ladder1v1Map;
-//
-//    @Relationship("reviews")
-//    private List<MapVersionReview> reviews;
-
     public String getDescription() {
         return description.get();
     }

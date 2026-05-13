@@ -131,12 +131,13 @@ public class ViewHelper {
             Object o = supplier.get();
 
             if (o != null) {
-                if (o.toString().charAt(0) == '[' && o.toString().charAt(o.toString().length() - 1) == ']') {
-                    String modifiedString = o.toString().substring(1, o.toString().length() - 1);
+                String str = o.toString();
+                if (str.startsWith("[") && str.endsWith("]")) {
+                    String modifiedString = str.substring(1, str.length() - 1);
                     modifiedString = modifiedString.replace(", ", "\n");
                     content.putString(modifiedString);
                 } else {
-                    content.putString(o.toString());
+                    content.putString(str);
                 }
                 clipboard.setContent(content);
             }

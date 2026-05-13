@@ -1,6 +1,5 @@
 package com.faforever.moderatorclient.ui.data_cells;
 
-import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.ui.caches.AvatarCache;
 import com.faforever.moderatorclient.ui.domain.AvatarAssignmentFX;
 import com.faforever.moderatorclient.ui.domain.AvatarFX;
@@ -18,27 +17,50 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 public class UrlImageViewTableCell<T> extends TableCell<T, String> {
     private final ImageView imageView = new ImageView();
 
     private static final int MAX_THREADS = 2;
-    private static int threadCounter = 0;
-    public static final ExecutorService imageLoadExecutor =
+    private static final AtomicInteger threadCounter = new AtomicInteger(0);
+    private static final AtomicInteger totalRequested = new AtomicInteger(0);
+    private static final AtomicInteger totalCompleted = new AtomicInteger(0);
+
+    private static final ExecutorService imageLoadExecutor =
             Executors.newFixedThreadPool(MAX_THREADS, r -> {
                 Thread t = new Thread(r);
                 t.setDaemon(true);
-                t.setName("AvatarImageLoader-" + (++threadCounter));
+                t.setName("AvatarImageLoader-" + threadCounter.incrementAndGet());
                 return t;
             });
 
-    public static final Set<String> loadingUrls = ConcurrentHashMap.newKeySet();
-    public static final Map<String, Future<?>> runningTasks = new ConcurrentHashMap<>();
+    private static final Set<String> loadingUrls = ConcurrentHashMap.newKeySet();
+    private static final Map<String, Future<?>> runningTasks = new ConcurrentHashMap<>();
 
-    public static Label loadProgressLabel;
-    public static int totalRequested = 0;
-    public static int totalCompleted = 0;
+    private static Label loadProgressLabel;
+
+    public static void setLoadProgressLabel(Label label) {
+        loadProgressLabel = label;
+    }
+
+    public static void resetCounters() {
+        totalRequested.set(0);
+        totalCompleted.set(0);
+    }
+
+    public static boolean tryAddLoadingUrl(String cacheKey) {
+        return loadingUrls.add(cacheKey);
+    }
+
+    public static void removeLoadingUrl(String cacheKey) {
+        loadingUrls.remove(cacheKey);
+    }
+
+    public static Future<?> submitImageLoad(Runnable task) {
+        return imageLoadExecutor.submit(task);
+    }
 
     @Override
     protected void updateItem(String item, boolean empty) {
@@ -53,7 +75,7 @@ public class UrlImageViewTableCell<T> extends TableCell<T, String> {
         AvatarFX avatar;
 
         if (rowItem instanceof AvatarAssignmentFX assignmentFX) {
-            avatar = assignmentFX.getAvatar(); // <-- method to get AvatarFX from AvatarAssignmentFX
+            avatar = assignmentFX.getAvatar();
         } else if (rowItem instanceof AvatarFX avatarFX) {
             avatar = avatarFX;
         } else {
@@ -76,7 +98,7 @@ public class UrlImageViewTableCell<T> extends TableCell<T, String> {
         String cacheKey = cacheKeyFrom(item, rowItem);
 
         if (loadingUrls.add(cacheKey)) {
-            totalRequested++;
+            totalRequested.incrementAndGet();
             updateProgressLabel();
 
             Future<?> previous = runningTasks.get(cacheKey);
@@ -84,19 +106,29 @@ public class UrlImageViewTableCell<T> extends TableCell<T, String> {
                 previous.cancel(true);
             }
 
+            final AvatarFX capturedAvatar = avatar;
             Future<?> future = imageLoadExecutor.submit(() -> {
                 try {
                     Image img = new Image(item, true);
-                    AvatarCache.getInstance().put(cacheKey, img);
 
-                    img.progressProperty().addListener((obs, oldProg, newProg) -> {
-                        if (newProg.doubleValue() >= 1.0) {
-                            Platform.runLater(() -> {
-                                avatar.setImage(img);
-                                totalCompleted++;
+                    // Set up the listener on the FX thread to avoid a race where the image
+                    // finishes loading before the listener is attached.
+                    Platform.runLater(() -> {
+                        img.progressProperty().addListener((obs, oldProg, newProg) -> {
+                            if (newProg.doubleValue() >= 1.0 && !img.isError()) {
+                                capturedAvatar.setImage(img);
+                                totalCompleted.incrementAndGet();
                                 updateProgressLabel();
-                            });
+                            }
+                        });
+                        // Handle the case where the image was already fully loaded by the time
+                        // the listener was added.
+                        if (img.getProgress() >= 1.0 && !img.isError()) {
+                            capturedAvatar.setImage(img);
+                            totalCompleted.incrementAndGet();
+                            updateProgressLabel();
                         }
+                        AvatarCache.getInstance().put(cacheKey, img);
                     });
 
                 } catch (Exception e) {
@@ -114,7 +146,7 @@ public class UrlImageViewTableCell<T> extends TableCell<T, String> {
     public static void updateProgressLabel() {
         if (loadProgressLabel != null) {
             Platform.runLater(() ->
-                    loadProgressLabel.setText("Previews requested: " + totalRequested + ", loaded: " + totalCompleted));
+                    loadProgressLabel.setText("Previews requested: " + totalRequested.get() + ", loaded: " + totalCompleted.get()));
         }
     }
 

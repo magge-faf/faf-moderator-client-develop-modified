@@ -12,8 +12,6 @@ import com.faforever.moderatorclient.ui.StageHolder;
 import com.faforever.moderatorclient.ui.UiService;
 import com.faforever.moderatorclient.ui.main_window.UserManagementController;
 import com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController;
-import javafx.animation.KeyFrame;
-import javafx.animation.Timeline;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -23,7 +21,6 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.image.Image;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
-import javafx.util.Duration;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
@@ -59,7 +56,6 @@ public class FafModeratorClientApplication extends Application {
     @Autowired
     private LocalPreferencesReaderWriter localPreferencesReaderWriter;
 
-    private Timeline timeline;
     private Stage primaryStage;
 
     private long fetchingDurationMillis = 0;
@@ -208,32 +204,12 @@ public class FafModeratorClientApplication extends Application {
     }
 
     private void startFetchingPattern() {
-        if (timeline != null) {
-            if (timeline.getStatus() == Timeline.Status.RUNNING) return;
-            timeline.stop();
-        }
-
-        final long[] counterSeconds = {0};
+        if (hasFetchedReports) return;
         lastRefreshedTime = System.currentTimeMillis();
         hasFetchedReports = true;
-
-        timeline = new Timeline(new KeyFrame(Duration.seconds(1), event -> {
-            counterSeconds[0]++;
-            updateWindowTitle(primaryStage,
-                    System.currentTimeMillis() - counterSeconds[0] * 1000,
-                    FafApiCommunicationService.getRequestsInLastMinute(),
-                    FafApiCommunicationService.getRequestsPerSecondRolling(3),
-                    FafApiCommunicationService.getCooldownRemainingMillis());
-        }));
-        timeline.setCycleCount(Timeline.INDEFINITE);
-        timeline.play();
     }
 
     private void stopFetchingPattern() {
-        if (timeline != null) {
-            timeline.stop();
-            timeline = null;
-        }
         if (hasFetchedReports) {
             fetchingDurationMillis = System.currentTimeMillis() - lastRefreshedTime;
             hasFetchedReports = false;

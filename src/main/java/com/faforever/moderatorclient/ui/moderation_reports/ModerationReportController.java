@@ -21,6 +21,7 @@ import com.faforever.moderatorclient.ui.domain.ModerationReportFX;
 import com.faforever.moderatorclient.ui.domain.PlayerFX;
 import com.faforever.moderatorclient.config.local.LocalPreferences;
 import javafx.animation.KeyFrame;
+import javafx.animation.PauseTransition;
 import javafx.animation.Timeline;
 import javafx.collections.*;
 import javafx.scene.input.Clipboard;
@@ -81,7 +82,6 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.*;
-import java.util.Timer;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -297,13 +297,9 @@ public class ModerationReportController implements Controller<Region> {
             Clipboard.getSystemClipboard().setContent(clipboardContent);
 
             useTemplateWithoutReasonsButton.setText("Copied");
-            Timer timer = new Timer();
-            timer.schedule(new TimerTask() {
-                @Override
-                public void run() {
-                    Platform.runLater(() -> useTemplateWithoutReasonsButton.setText("Template No Reasons"));
-                }
-            }, 750);
+            PauseTransition pause = new PauseTransition(Duration.millis(750));
+            pause.setOnFinished(e -> useTemplateWithoutReasonsButton.setText("Template No Reasons"));
+            pause.play();
         } catch (NullPointerException e) {
             log.debug("NPE in template-without-reasons (nothing selected?)", e);
         }
@@ -417,14 +413,9 @@ public class ModerationReportController implements Controller<Region> {
                     useTemplateWithReasonsButton.setText("Copied");
                     templateStage.close();
 
-                    // Reset button text after a delay
-                    Timer timer = new Timer();
-                    timer.schedule(new TimerTask() {
-                        @Override
-                        public void run() {
-                            Platform.runLater(() -> useTemplateWithReasonsButton.setText("Template With Reasons"));
-                        }
-                    }, 750);
+                    PauseTransition pause = new PauseTransition(Duration.millis(750));
+                    pause.setOnFinished(e -> useTemplateWithReasonsButton.setText("Template With Reasons"));
+                    pause.play();
                 });
             });
         } catch (Exception e) {
@@ -688,13 +679,9 @@ public class ModerationReportController implements Controller<Region> {
             Clipboard.getSystemClipboard().setContent(clipboardContent);
 
             referenceOnlyButton.setText("Copied");
-            Timer timer = new Timer();
-            timer.schedule(new TimerTask() {
-                @Override
-                public void run() {
-                    Platform.runLater(() -> referenceOnlyButton.setText("Reference Only"));
-                }
-            }, 750);
+            PauseTransition pause = new PauseTransition(Duration.millis(750));
+            pause.setOnFinished(e -> referenceOnlyButton.setText("Reference Only"));
+            pause.play();
         } catch (NullPointerException e) {
             log.debug("NPE in reference-only button (nothing selected?)", e);
         }
