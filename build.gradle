@@ -74,6 +74,7 @@ dependencies {
     implementation("org.openjfx:javafx-media:${javafxVersion}:${javafxPlatform}")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.21.3")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     implementation 'org.json:json:20251224'
     implementation 'org.apache.httpcomponents.core5:httpcore5:5.4.2'
     implementation 'org.apache.httpcomponents.client5:httpclient5:5.6.1'
@@ -113,14 +114,16 @@ static def dateVersion() {
 version = project.hasProperty('version') ? project.property('version') : dateVersion()
 
 processResources {
+    def resolvedVersion = version
     filesMatching("**/application.properties") {
-        expand(version: project.version)
+        expand(version: resolvedVersion)
     }
 }
 
 tasks.register("generateVersionClass") {
     def outputDir = layout.buildDirectory.dir("generated/sources/version")
-    inputs.property("version", project.version)
+    def resolvedVersion = version
+    inputs.property("version", resolvedVersion)
     outputs.dir(outputDir)
 
     doLast {
@@ -129,7 +132,7 @@ tasks.register("generateVersionClass") {
         def file = new File(dir, "${pkg.replace('.', '/')}/ApplicationVersion.java")
 
         def date = new SimpleDateFormat("yyyy-MM-dd").format(new Date())
-        def version = project.version == "snapshot" ? date : project.version
+        def version = resolvedVersion == "snapshot" ? date : resolvedVersion
 
         file.parentFile.mkdirs()
         file.text = """package ${pkg};
@@ -146,5 +149,9 @@ public class ApplicationVersion {
 
 sourceSets.main.java.srcDir(layout.buildDirectory.dir("generated/sources/version"))
 compileJava.dependsOn(tasks.named("generateVersionClass"))
+
+test {
+    useJUnitPlatform()
+}
 
 version = project.hasProperty('version') ? project.property('version') : dateVersion()
