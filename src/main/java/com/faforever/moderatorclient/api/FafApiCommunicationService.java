@@ -398,7 +398,6 @@ public class FafApiCommunicationService {
         }
     }
 
-    //TODO check if worth it to save API requests
     @SuppressWarnings("unchecked")
     @SneakyThrows
     public <T extends ElideEntity> List<T> getPageForSmurfVillageLookup(Class<T> clazz,

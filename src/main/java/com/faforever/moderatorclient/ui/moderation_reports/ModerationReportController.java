@@ -578,8 +578,6 @@ public class ModerationReportController implements Controller<Region> {
 
         content.append("\n\n");
 
-        // TODO u call getlatest ban here and on initial = twice server requets. use cached bans from first ban
-
         /*banService.getLatestBans().thenAccept(banInfos -> {
             if (banInfos.isEmpty()) {
                 log.warn("No ban information retrieved.");
@@ -702,7 +700,6 @@ public class ModerationReportController implements Controller<Region> {
         }
     }
 
-    // TODO refactor with setter getter and use Integer
     public static class ModeratorStatistics {
         private final StringProperty moderator;
         private final LongProperty completedReports;
@@ -1531,7 +1528,7 @@ public class ModerationReportController implements Controller<Region> {
                                 String fromPlayer = playerInfoMap.getOrDefault(fromArmy, new PlayerInfo(-1, "Unknown Player")).getPlayerName();
                                 String toPlayer = playerInfoMap.getOrDefault(toArmy, new PlayerInfo(-1, "Unknown Player")).getPlayerName();
 
-                                if (fromPlayer == null) return null; // Filter out events with null source TODO Fallback Value (Spectator Slot Probably)
+                                if (fromPlayer == null) return null;
 
                                 formattedMessage = String.format(
                                         "focus army from %d (%s) to %d (%s) via ConExecute",
@@ -1653,7 +1650,6 @@ public class ModerationReportController implements Controller<Region> {
             String filteredChatLog = filterAndAppendChatLog(chatLog);
             chatLogFiltered.append(filteredChatLog);
 
-            //TODO It seems armies map/PlayerInfo are 0-based, but raw player index data from moderatorEvent is 1-based, need to debug this
             Map<Integer, PlayerInfo> playerInfoMap = replayDataParser.getArmies().entrySet().stream()
                     .filter(entry -> entry.getValue().containsKey("PlayerName"))
                     .collect(Collectors.toMap(
@@ -2131,7 +2127,7 @@ public class ModerationReportController implements Controller<Region> {
 
     public List<String> processReplayForQuitEventsPlayers(List<Event> events, Map<Integer, Map<String, Object>> armies) {
         int ticks = 0;
-        int playerIndexFromArmiesMap = -1; // TODO: -1 could represent spectators; need to double-check
+        int playerIndexFromArmiesMap = -1;
 
         Map<Integer, PlayerInfo> playerInfoMap = armies.entrySet().stream()
                 .filter(entry -> entry.getValue().containsKey("PlayerName"))

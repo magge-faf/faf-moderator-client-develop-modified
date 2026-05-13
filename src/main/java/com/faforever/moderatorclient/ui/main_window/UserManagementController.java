@@ -486,8 +486,7 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     private void initializeSearchProperties() {
-        //TODO check OM how it can be better
-        searchUserPropertyMapping.put("All In One", "allInOne");
+            searchUserPropertyMapping.put("All In One", "allInOne");
         searchUserPropertyMapping.put("Name", "login");
         searchUserPropertyMapping.put("User ID", "id");
         searchUserPropertyMapping.put("Previous Name", "names.name");
@@ -1088,7 +1087,6 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
 
-    //TODO refactor with localpref
     public void addListeners() {
         minimizeSearchHistoryButton.setOnAction(event -> {
             handleMinimizeSearchHistory();

@@ -12,7 +12,6 @@ public class MapVersionFX extends AbstractEntityFX {
     private final IntegerProperty height;
     private final ObjectProperty<ComparableVersion> version;
     private final StringProperty folderName;
-    // TODO name consistently with folderName
     private final StringProperty filename;
     private final BooleanProperty ranked;
     private final BooleanProperty hidden;

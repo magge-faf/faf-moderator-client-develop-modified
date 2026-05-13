@@ -225,8 +225,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         if (checkPermissionForTab(reportTab, GroupPermission.ROLE_ADMIN_MODERATION_REPORT)) {
             moderationReportController = uiService.loadFxml("ui/main_window/report.fxml");
             reportTab.setContent(moderationReportController.getRoot());
-            initLoading(reportTab); //TODO
-            //initLoading(reportTab, moderationReportController::onRefreshAllReports);
+            initLoading(reportTab);
         }
     }
 
