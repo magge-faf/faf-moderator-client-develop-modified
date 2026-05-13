@@ -9,6 +9,8 @@
       spacing="10" style="-fx-padding: 20 0 0 0;">
     <HBox spacing="10" alignment="CENTER_LEFT">
         <Button fx:id="refreshLatestRegistrationsButton" text="Refresh Latest 10k Registrations"/>
+        <Button fx:id="refreshLatestTeamkillsButton" text="Refresh Latest Teamkills"/>
+        <Button fx:id="refreshLatestMapUploadsButton" text="Refresh Latest Map Uploads"/>
     </HBox>
 
     <TabPane fx:id="recentActivityTabPane" tabClosingPolicy="UNAVAILABLE" VBox.vgrow="ALWAYS">
@@ -25,7 +27,6 @@
         </Tab>
 
         <Tab fx:id="statsRegistrationsTab" text="Stats Registrations">
-            <TableView fx:id="statsRegistrationsTableView" VBox.vgrow="ALWAYS"/>
             <TextArea fx:id="statsLatestRegistrations" editable="false"/>
         </Tab>
     </TabPane>

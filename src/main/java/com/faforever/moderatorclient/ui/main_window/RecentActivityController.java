@@ -39,9 +39,9 @@ public class RecentActivityController implements Controller<VBox> {
 
     public VBox root;
     public Tab statsRegistrationsTab;
-    public TableView statsRegistrationsTableView;
-    @FXML
-    public Button refreshLatestRegistrationsButton;
+    @FXML public Button refreshLatestRegistrationsButton;
+    @FXML private Button refreshLatestTeamkillsButton;
+    @FXML private Button refreshLatestMapUploadsButton;
 
     @FXML private Tab latestRegistrationsTab;
     @FXML private Tab latestTeamkillsTab;
@@ -82,12 +82,20 @@ public class RecentActivityController implements Controller<VBox> {
             ViewHelper.buildTeamkillTableView(teamkillFeedTableView, teamkills, true);
             ViewHelper.ensureColumnIds(teamkillFeedTableView);
             Platform.runLater(() -> ViewHelper.loadColumnLayout(teamkillFeedTableView, tab.getTeamkillFeedTableColumnWidths(), tab.getTeamkillFeedTableColumnOrder()));
+            refreshLatestTeamkillsButton.setOnAction(event -> refreshLatestTeamkills());
+            refreshLatestTeamkills();
+        } else {
+            refreshLatestTeamkillsButton.setDisable(true);
         }
 
         if (checkPermissionForTab(GroupPermission.ROLE_ADMIN_MAP, latestMapUploadsTab)) {
             ViewHelper.buildMapFeedTableView(mapUploadFeedTableView, mapVersions, this::toggleHide);
             ViewHelper.ensureColumnIds(mapUploadFeedTableView);
             Platform.runLater(() -> ViewHelper.loadColumnLayout(mapUploadFeedTableView, tab.getMapUploadFeedTableColumnWidths(), tab.getMapUploadFeedTableColumnOrder()));
+            refreshLatestMapUploadsButton.setOnAction(event -> refreshLatestMapUploads());
+            refreshLatestMapUploads();
+        } else {
+            refreshLatestMapUploadsButton.setDisable(true);
         }
     }
 
@@ -184,6 +192,32 @@ public class RecentActivityController implements Controller<VBox> {
             }
         };
 
+        new Thread(task).start();
+    }
+
+    @FXML
+    public void refreshLatestTeamkills() {
+        Task<List<TeamkillFX>> task = new Task<>() {
+            @Override
+            protected List<TeamkillFX> call() {
+                return userService.findLatestTeamkills();
+            }
+        };
+        task.setOnSucceeded(event -> Platform.runLater(() -> teamkills.setAll(task.getValue())));
+        task.setOnFailed(event -> log.error("Failed to load latest teamkills", task.getException()));
+        new Thread(task).start();
+    }
+
+    @FXML
+    public void refreshLatestMapUploads() {
+        Task<List<MapVersionFX>> task = new Task<>() {
+            @Override
+            protected List<MapVersionFX> call() {
+                return mapService.findLatestMapVersions();
+            }
+        };
+        task.setOnSucceeded(event -> Platform.runLater(() -> mapVersions.setAll(task.getValue())));
+        task.setOnFailed(event -> log.error("Failed to load latest map uploads", task.getException()));
         new Thread(task).start();
     }
 
