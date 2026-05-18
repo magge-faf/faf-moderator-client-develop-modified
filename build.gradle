@@ -132,7 +132,7 @@ tasks.register("generateVersionClass") {
         def file = new File(dir, "${pkg.replace('.', '/')}/ApplicationVersion.java")
 
         def date = new SimpleDateFormat("yyyy-MM-dd").format(new Date())
-        def version = resolvedVersion == "snapshot" ? date : resolvedVersion
+        def version = resolvedVersion == "snapshot" ? date : resolvedVersion.replaceFirst(/^v/, '')
 
         file.parentFile.mkdirs()
         file.text = """package ${pkg};
