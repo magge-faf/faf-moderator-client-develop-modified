@@ -8,27 +8,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build Commands
 
-Requires specifying the JavaFX platform explicitly (not needed on macOS — auto-detected):
+The JavaFX platform is auto-detected for all OSes (Windows, Linux, Mac/Mac-aarch64) via `gradle.properties` default. Override only if detection fails:
 
 ```bash
-./gradlew -PjavafxPlatform=win build      # Windows
-./gradlew -PjavafxPlatform=linux build    # Linux
-./gradlew -PjavafxPlatform=win test       # Run all tests
-./gradlew -PjavafxPlatform=win test --tests "com.faforever.moderatorclient.SomeTest"  # Single test
-./gradlew -PjavafxPlatform=win shadowJar  # Build fat JAR for distribution
+./gradlew build                           # Auto-detects platform
+./gradlew test                            # Run all tests
+./gradlew test --tests "com.faforever.moderatorclient.SomeTest"  # Single test
+./gradlew shadowJar                       # Build fat JAR for distribution
+./gradlew -PjavafxPlatform=win build      # Override platform explicitly if needed
 ```
 
 The Shadow plugin produces a platform-classified ZIP archive for distribution.
 
 ## Running the Application
 
-Set the active Spring profile to select the environment (`prod`, `test`, or `local`). Add as a VM option:
+The environment (production, test, localhost) is selected at runtime via the login screen dropdown — there are no Spring profile files. All three environments are defined in a single `src/main/resources/application.yml` under `faforever.environments` keys (`faforever.com`, `test.faforever.com`, `localhost:8010`).
 
-```
--Dspring.profiles.active=test
-```
-
-Environment endpoints, OAuth client IDs, and rate limits are configured per-profile in `src/main/resources/application.yml`.
+The last-used environment is persisted by `LocalPreferences`.
 
 ## Architecture
 
@@ -65,7 +61,7 @@ API Layer      — FafApiCommunicationService (single entry point for all HTTP c
 - Uses Spring `RestTemplate` with `JdkClientHttpRequestFactory` (Java built-in HTTP client)
 - JSON:API protocol via the `jasminb` library
 - OAuth2 bearer token injected via interceptor; auto-refreshes on expiry (`TokenExpiredEvent`)
-- Rate-limited to 50 req/sec (Guava `RateLimiter`; configurable per environment up to 90/min)
+- Rate-limited to 90 req/min via a custom sliding-window implementation (`checkRateLimit()` in `FafApiCommunicationService`)
 - HMAC header signing for sensitive operations (key in `application.yml`)
 - Query building via Elide `ElideNavigator` (see `ElideNavigatorTest` for examples)
 - Root URI set via `DefaultUriBuilderFactory`; `RestTemplate` wired manually (Spring Boot 4.0 removed `RestTemplateBuilder` and `JacksonAutoConfiguration`)
@@ -78,7 +74,7 @@ MapStruct mappers convert between JSON:API domain objects (from `faf-java-common
 
 - `ApplicationProperties` (`@ConfigurationProperties`) exposes typed access to `application.yml`
 - `LocalPreferences` persists user settings (theme, last-used tabs, etc.) to `client-prefs.json` in the working directory
-- Three Spring profiles map to three FAF environments: `prod`, `test`, `local`
+- Three FAF environments (`faforever.com`, `test.faforever.com`, `localhost:8010`) are defined in `application.yml` — no Spring profile files exist; environment selection is UI-driven
 - `JsonApiConfig` explicitly defines the `ObjectMapper` bean (with `JavaTimeModule`, `Jdk8Module`, `NON_NULL` serialization, and `FAIL_ON_UNKNOWN_PROPERTIES` disabled) — Spring Boot 4.0 no longer auto-configures Jackson
 
 ## Key Files

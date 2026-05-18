@@ -1,4 +1,7 @@
-# FAF Moderator Client [![Build](https://github.com/FAForever/faf-moderator-client/actions/workflows/build.yml/badge.svg)](https://github.com/FAForever/faf-moderator-client/actions/workflows/build.yml)
+# FAF Moderator Client
+
+[![Build](https://github.com/FAForever/faf-moderator-client/actions/workflows/build.yml/badge.svg)](https://github.com/FAForever/faf-moderator-client/actions/workflows/build.yml) [![License](https://img.shields.io/github/license/magge-faf/faf-moderator-client-develop-modified)](https://github.com/magge-faf/faf-moderator-client-develop-modified/blob/master/LICENSE) ![Java](https://img.shields.io/badge/Java-21-blue?logo=openjdk) ![Gradle](https://img.shields.io/badge/Gradle-9.5-02303A?logo=gradle)
+
 This application enables faforever.com moderators to perform administrative actions. This involves:
 - managing of users, user groups and permissions
 - uploading and assigning avatars
