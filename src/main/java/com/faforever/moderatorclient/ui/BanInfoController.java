@@ -238,7 +238,16 @@ public class BanInfoController implements Controller<Pane> {
             }
         } else {
             log.debug("Updating ban id '{}'", banInfo.getId());
-            banService.patchBanInfo(banInfo);
+            if (banInfo.getRevokeTime() == null) {
+                // Active ban: revoke old entry and create a new one so all fields are persisted
+                String newBanId = banService.revokeThenCreateBan(banInfo);
+                BanInfoFX loadedBanInfo = banService.getBanInfoById(newBanId);
+                if (postedListener != null) {
+                    postedListener.accept(loadedBanInfo);
+                }
+            } else {
+                banService.patchBanInfo(banInfo);
+            }
         }
         close();
     }

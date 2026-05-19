@@ -16,6 +16,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Service;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -44,6 +46,21 @@ public class BanService {
         BanInfo banInfo = banInfoMapper.map(banInfoFX);
         fafUser.post(REVOKE_ENDPOINT, RevokeRefreshTokenRequest.allClientsOf(banInfo.getPlayer().getId()));
         return fafApi.post(ElideNavigator.of(BanInfo.class).collection(), banInfo).getId();
+    }
+
+    public String revokeThenCreateBan(@NotNull BanInfoFX banInfoFX) {
+        BanInfo mapped = banInfoMapper.map(banInfoFX);
+
+        BanInfo revokeDto = new BanInfo();
+        revokeDto.setId(banInfoFX.getId());
+        revokeDto.setPlayer(mapped.getPlayer());
+        revokeDto.setRevokeReason("Ban updated by moderator");
+        revokeDto.setRevokeTime(OffsetDateTime.now(ZoneOffset.UTC));
+        updateBan(revokeDto);
+
+        mapped.setId(null);
+        fafUser.post(REVOKE_ENDPOINT, RevokeRefreshTokenRequest.allClientsOf(mapped.getPlayer().getId()));
+        return fafApi.post(ElideNavigator.of(BanInfo.class).collection(), mapped).getId();
     }
 
     public void updateBan(BanInfo banInfoUpdate) {
