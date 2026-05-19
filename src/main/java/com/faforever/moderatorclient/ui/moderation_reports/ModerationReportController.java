@@ -1569,8 +1569,9 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private String formatChatHeader(ModerationReportFX report, GameFX game) {
-        return format("CHAT LOG -- Report ID {0} -- Replay ID {1} -- Title \"{2}\"\n\n",
-                report.getId(), game.getId(), game.getName());
+        String validity = game.getValidity() != null ? game.getValidity().name() : "UNKNOWN";
+        return format("CHAT LOG -- Report ID {0} -- Replay ID {1} -- Title \"{2}\" -- Rank Status: {3}\n\n",
+                report.getId(), game.getId(), game.getName(), validity);
     }
 
     private Path createTempFile(GameFX game) {
