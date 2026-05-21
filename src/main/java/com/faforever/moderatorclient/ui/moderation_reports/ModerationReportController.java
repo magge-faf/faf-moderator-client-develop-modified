@@ -277,11 +277,23 @@ public class ModerationReportController implements Controller<Region> {
                     .uri(URI.create(replayUrl))
                     .build();
 
-            httpClient.send(request, HttpResponse.BodyHandlers.ofFile(tempFilePath));
+            HttpResponse<Path> response = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(tempFilePath));
 
-            Desktop.getDesktop().open(tempFilePath.toFile());
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                Desktop.getDesktop().open(tempFilePath.toFile());
+            } else {
+                log.error("Failed to download replay {}: HTTP {}", replayId, response.statusCode());
+                Files.deleteIfExists(tempFilePath);
+            }
         } catch (IOException | InterruptedException e) {
             log.error("Failed to start replay {} from {}", replayId, replayUrl, e);
+            if (tempFilePath != null) {
+                try {
+                    Files.deleteIfExists(tempFilePath);
+                } catch (IOException cleanupException) {
+                    log.warn("Failed to delete temp file {}", tempFilePath, cleanupException);
+                }
+            }
             if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
@@ -2312,10 +2324,33 @@ public class ModerationReportController implements Controller<Region> {
             return;
         }
 
-        if ("Microsoft Edge".equalsIgnoreCase(browser)) {
-            Runtime.getRuntime().exec(new String[]{"cmd", "/c", "start", "microsoft-edge:" + url});
-        } else {
-            Runtime.getRuntime().exec(new String[]{"cmd", "/c", "start", browser, url});
+        // Use Desktop.browse() when available to avoid command injection risks
+        try {
+            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+                Desktop.getDesktop().browse(URI.create(url));
+            } else {
+                // Fallback to ProcessBuilder with strict validation for Windows-specific browser launch
+                List<String> allowedBrowsers = Arrays.asList("chrome", "firefox", "Microsoft Edge", "edge", "msedge", "iexplore");
+                String lowerBrowser = browser.toLowerCase();
+
+                boolean isAllowed = allowedBrowsers.stream().anyMatch(allowed -> lowerBrowser.contains(allowed.toLowerCase()));
+
+                if (!isAllowed) {
+                    log.warn("Browser not in allow-list: {}", browser);
+                    throw new SecurityException("Browser not permitted: " + browser);
+                }
+
+                ProcessBuilder pb;
+                if ("Microsoft Edge".equalsIgnoreCase(browser)) {
+                    pb = new ProcessBuilder("cmd", "/c", "start", "microsoft-edge:" + url);
+                } else {
+                    pb = new ProcessBuilder("cmd", "/c", "start", browser, url);
+                }
+                pb.start();
+            }
+        } catch (Exception e) {
+            log.error("Failed to open forum URL in browser", e);
+            throw new IOException("Failed to open forum URL", e);
         }
     }
 

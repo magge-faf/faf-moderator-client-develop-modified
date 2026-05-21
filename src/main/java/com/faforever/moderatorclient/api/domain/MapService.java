@@ -23,6 +23,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -224,7 +225,7 @@ public class MapService {
 
     public List<ComparableVersion> getGeneratorVersions() {
         ComparableVersion minVersion = new ComparableVersion(minGeneratorVersion);
-        RestTemplate restTemplate = new RestTemplate();
+        RestTemplate restTemplate = new RestTemplate(new JdkClientHttpRequestFactory());
 
         RequestEntity<Void> entity = RequestEntity.get(URI.create(generatorVersionsURL))
                 .header("Accept", "application/vnd.github.v3+json")
