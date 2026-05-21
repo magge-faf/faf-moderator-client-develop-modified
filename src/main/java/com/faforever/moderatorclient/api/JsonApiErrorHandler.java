@@ -4,7 +4,7 @@ package com.faforever.moderatorclient.api;
 import com.faforever.commons.api.dto.ApiException;
 import com.github.jasminb.jsonapi.exceptions.ResourceParseException;
 import com.github.jasminb.jsonapi.models.errors.Errors;
-import com.google.common.base.Charsets;
+import java.nio.charset.StandardCharsets;
 import com.google.common.io.CharStreams;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpMethod;
@@ -30,9 +30,9 @@ public class JsonApiErrorHandler extends DefaultResponseErrorHandler {
 
     @Override
     protected void handleError(ClientHttpResponse response, HttpStatusCode statusCode, URI url, HttpMethod method) throws IOException {
-        log.warn("Api call returned with error code '{}' and body '{}'", statusCode, CharStreams.toString(new InputStreamReader(response.getBody(), Charsets.UTF_8)));
+        log.warn("Api call returned with error code '{}' and body '{}'", statusCode, CharStreams.toString(new InputStreamReader(response.getBody(), StandardCharsets.UTF_8)));
 
-        if (statusCode == HttpStatus.UNPROCESSABLE_ENTITY) {
+        if (statusCode == HttpStatus.UNPROCESSABLE_CONTENT) {
             try {
                 jsonApiMessageConverter.readInternal(Errors.class, response);
             } catch (ResourceParseException e) {

@@ -37,7 +37,7 @@ public class TutorialController implements Controller<Node> {
     private final TutorialService tutorialService;
     private final LocalPreferences localPreferences;
     private final ObservableList<TutorialFx> tutorialList = FXCollections.observableArrayList();
-    private final FilteredList<TutorialFx> filterTutorials = new FilteredList(tutorialList);
+    private final FilteredList<TutorialFx> filterTutorials = new FilteredList<>(tutorialList);
     private final HashMap<TutorialFx, WeakChangeListener<Boolean>> weakChangeListenersByTutorial = new HashMap<>();
 
     public SplitPane root;

@@ -771,6 +771,7 @@ public class ModerationReportController implements Controller<Region> {
 
     private void processStatisticsModerator(List<ModerationReportFX> reps) {
         Task<Void> task = new Task<>() {
+            @SuppressWarnings("unchecked")
             @Override
             protected Void call() {
                 ArrayList<ModerationReportFX> reports = Lists.newArrayList(reps.iterator());
@@ -2311,15 +2312,11 @@ public class ModerationReportController implements Controller<Region> {
             return;
         }
 
-        String cmd;
-
         if ("Microsoft Edge".equalsIgnoreCase(browser)) {
-            cmd = "cmd /c start microsoft-edge:" + url;
+            Runtime.getRuntime().exec(new String[]{"cmd", "/c", "start", "microsoft-edge:" + url});
         } else {
-            cmd = "cmd /c start " + browser + " \"" + url + "\"";
+            Runtime.getRuntime().exec(new String[]{"cmd", "/c", "start", browser, url});
         }
-
-        Runtime.getRuntime().exec(cmd);
     }
 
     public record ModeratorActivity(String moderator, long completedReports, long discardedReports) {

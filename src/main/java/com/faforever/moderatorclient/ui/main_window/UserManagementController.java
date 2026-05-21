@@ -1586,6 +1586,7 @@ public class UserManagementController implements Controller<SplitPane> {
         if (localLog.length() > 0) updateSmurfVillageLogTextArea(localLog.toString());
     }
 
+    @SuppressWarnings("unchecked")
     private void showUserDetailsWindow(List<PlayerFX> users) {
         Stage detailsStage = new Stage();
         detailsStage.setTitle("Related Accounts");
@@ -1631,7 +1632,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
         table.getColumns().addAll(nameCol, idCol, banStatusCol, lastLoginCol);
         table.setItems(FXCollections.observableArrayList(users));
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
 
         Label label = new Label(String.format("Found %d related accounts:", users.size()));
         label.setStyle("-fx-font-weight: bold; -fx-padding: 5 0 5 0;");

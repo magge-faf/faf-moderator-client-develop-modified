@@ -437,7 +437,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         Thread versionCheckThread = new Thread(() -> {
             try {
                 String url = "https://api.github.com/repos/magge-faf/faf-moderator-client-develop-modified/releases/latest";
-                var conn = new java.net.URL(url).openConnection();
+                var conn = new java.net.URI(url).toURL().openConnection();
                 conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
                 conn.setRequestProperty("User-Agent", "Java-Client");
 

@@ -21,12 +21,12 @@ import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpMethod;
+import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestTemplate;
+
+import java.net.URI;
 
 import java.util.Collections;
 import java.util.List;
@@ -226,11 +226,11 @@ public class MapService {
         ComparableVersion minVersion = new ComparableVersion(minGeneratorVersion);
         RestTemplate restTemplate = new RestTemplate();
 
-        LinkedMultiValueMap<String, String> headers = new LinkedMultiValueMap<>();
-        headers.add("Accept", "application/vnd.github.v3+json");
-        HttpEntity<String> entity = new HttpEntity<>(null, headers);
+        RequestEntity<Void> entity = RequestEntity.get(URI.create(generatorVersionsURL))
+                .header("Accept", "application/vnd.github.v3+json")
+                .build();
 
-        ResponseEntity<List<GithubGeneratorRelease>> response = restTemplate.exchange(generatorVersionsURL, HttpMethod.GET, entity, new ParameterizedTypeReference<List<GithubGeneratorRelease>>() {});
+        ResponseEntity<List<GithubGeneratorRelease>> response = restTemplate.exchange(entity, new ParameterizedTypeReference<List<GithubGeneratorRelease>>() {});
         List<GithubGeneratorRelease> releases = response.getBody();
         if (releases != null) {
             return releases.stream()
