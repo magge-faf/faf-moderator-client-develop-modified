@@ -60,6 +60,8 @@ public class ListViewMapCell extends ListCell<MapPoolAssignmentFX> {
                     mLLoader.load();
                 } catch (IOException e) {
                     log.error("Failed to load poolListItem.fxml", e);
+                    mLLoader = null; // Reset to allow retry on next update
+                    return; // Exit early to avoid NPE accessing uninitialized FXML fields
                 }
             }
             if (mapPoolAssignmentFX.getMapVersion() != null) {

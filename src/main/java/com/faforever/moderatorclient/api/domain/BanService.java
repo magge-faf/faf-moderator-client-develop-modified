@@ -51,16 +51,24 @@ public class BanService {
     public String revokeThenCreateBan(@NotNull BanInfoFX banInfoFX) {
         BanInfo mapped = banInfoMapper.map(banInfoFX);
 
-        BanInfo revokeDto = new BanInfo();
-        revokeDto.setId(banInfoFX.getId());
-        revokeDto.setPlayer(mapped.getPlayer());
-        revokeDto.setRevokeReason("Ban updated by moderator");
-        revokeDto.setRevokeTime(OffsetDateTime.now(ZoneOffset.UTC));
-        updateBan(revokeDto);
-
+        // Create the new ban first to ensure atomicity
         mapped.setId(null);
-        fafUser.post(REVOKE_ENDPOINT, RevokeRefreshTokenRequest.allClientsOf(mapped.getPlayer().getId()));
-        return fafApi.post(ElideNavigator.of(BanInfo.class).collection(), mapped).getId();
+        String newBanId = fafApi.post(ElideNavigator.of(BanInfo.class).collection(), mapped).getId();
+
+        // Only after successful creation, revoke the old ban
+        try {
+            BanInfo revokeDto = new BanInfo();
+            revokeDto.setId(banInfoFX.getId());
+            revokeDto.setPlayer(mapped.getPlayer());
+            revokeDto.setRevokeReason("Ban updated by moderator");
+            revokeDto.setRevokeTime(OffsetDateTime.now(ZoneOffset.UTC));
+            updateBan(revokeDto);
+        } catch (Exception e) {
+            log.error("Failed to revoke old ban {} after creating new ban {}", banInfoFX.getId(), newBanId, e);
+            throw e;
+        }
+
+        return newBanId;
     }
 
     public void updateBan(BanInfo banInfoUpdate) {

@@ -2261,8 +2261,18 @@ public class UserManagementController implements Controller<SplitPane> {
                 if (limit <= 0) limit = Integer.MAX_VALUE;
             } catch (NumberFormatException ignored) {}
         }
-        // Games are sorted newest-first; take first <limit> entries = the most recent ones
-        List<GamePlayerStatsFX> games = allLoaded.stream().limit(limit).toList();
+        // Create defensive copy and sort by game start time (newest-first) to ensure most recent games are analyzed
+        List<GamePlayerStatsFX> games = allLoaded.stream()
+                .sorted((g1, g2) -> {
+                    OffsetDateTime t1 = g1.getGame() != null ? g1.getGame().getStartTime() : null;
+                    OffsetDateTime t2 = g2.getGame() != null ? g2.getGame().getStartTime() : null;
+                    if (t1 == null && t2 == null) return 0;
+                    if (t1 == null) return 1;
+                    if (t2 == null) return -1;
+                    return t2.compareTo(t1); // Descending order (newest first)
+                })
+                .limit(limit)
+                .toList();
 
         List<GamePlayerStatsFX> ratedGames = games.stream()
                 .filter(g -> g.ratingChangeProperty().get() != null)
