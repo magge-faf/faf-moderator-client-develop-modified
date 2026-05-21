@@ -14,6 +14,7 @@ repositories {
 compileJava() {
     options.compilerArgs << "-Amapstruct.defaultComponentModel=jsr330"
     options.compilerArgs << "-Amapstruct.unmappedTargetPolicy=IGNORE"
+    options.compilerArgs << "-Xlint:deprecation"
 }
 
 project.ext.javafxPlatform = "${javafxPlatform}"
@@ -87,7 +88,7 @@ application {
 group = 'com.faforever'
 description = 'faf-moderator-client'
 
-tasks.withType(JavaCompile) {
+tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     sourceCompatibility = '21'
 }
