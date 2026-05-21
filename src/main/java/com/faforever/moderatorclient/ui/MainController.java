@@ -155,8 +155,10 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     }
 
     private void initExcludedHardwareItemsTab() {
-        excludedHardwareItemsController = uiService.loadFxml("ui/main_window/excludedHardwareItems.fxml");
-        excludedHardwareItemsTab.setContent(excludedHardwareItemsController.getRoot());
+        if (checkPermissionForTab(excludedHardwareItemsTab, GroupPermission.ROLE_ADMIN_MODERATION_REPORT)) {
+            excludedHardwareItemsController = uiService.loadFxml("ui/main_window/excludedHardwareItems.fxml");
+            excludedHardwareItemsTab.setContent(excludedHardwareItemsController.getRoot());
+        }
     }
 
     private void initApiHistoryTab() {
@@ -176,18 +178,24 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     }
 
     private void initReportStatisticsTab() {
-        reportStatisticsController = uiService.loadFxml("ui/main_window/reportStatisticsTab.fxml");
-        reportStatisticsTab.setContent(reportStatisticsController.getRoot());
+        if (checkPermissionForTab(reportStatisticsTab, GroupPermission.ROLE_ADMIN_MODERATION_REPORT)) {
+            reportStatisticsController = uiService.loadFxml("ui/main_window/reportStatisticsTab.fxml");
+            reportStatisticsTab.setContent(reportStatisticsController.getRoot());
+        }
     }
 
     private void initSmurfControllerTab() {
-        smurfManagementController = uiService.loadFxml("ui/main_window/smurfManagementTab.fxml");
-        smurfManagementControllerTab.setContent(smurfManagementController.getRoot());
+        if (checkPermissionForTab(smurfManagementControllerTab, GroupPermission.ROLE_ADMIN_MODERATION_REPORT)) {
+            smurfManagementController = uiService.loadFxml("ui/main_window/smurfManagementTab.fxml");
+            smurfManagementControllerTab.setContent(smurfManagementController.getRoot());
+        }
     }
 
     private void initRecentNotesTab() {
-        recentNotesController = uiService.loadFxml("ui/main_window/recentNotesTab.fxml");
-        recentNotesTab.setContent(recentNotesController.getRoot());
+        if (checkPermissionForTab(recentNotesTab, GroupPermission.ROLE_ADMIN_MODERATION_REPORT)) {
+            recentNotesController = uiService.loadFxml("ui/main_window/recentNotesTab.fxml");
+            recentNotesTab.setContent(recentNotesController.getRoot());
+        }
     }
 
     private void initLoading(Tab tab, Runnable loadingFunction) {
