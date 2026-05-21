@@ -251,19 +251,26 @@ public class ModerationReportController implements Controller<Region> {
         setSysClipboardText(copyGameIdButton.getId());
     }
 
-    public void onStartReplay() throws IOException, InterruptedException {
+    public void onStartReplay() {
         String replayId = startReplayButton.getId();
-        String replayUrl = "https://replay.faforever.com/" + replayId;
-        Path tempFilePath = Files.createTempFile("faf_replay_", ".fafreplay");
+        String replayUrl = String.format(replayDownLoadFormat, replayId);
+        Path tempFilePath = null;
+        try {
+            tempFilePath = Files.createTempFile("faf_replay_", ".fafreplay");
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(replayUrl))
-                .build();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(replayUrl))
+                    .build();
 
-        httpClient.send(request, HttpResponse.BodyHandlers.ofFile(tempFilePath));
+            httpClient.send(request, HttpResponse.BodyHandlers.ofFile(tempFilePath));
 
-        String cmd = "cmd /c " + tempFilePath;
-        Runtime.getRuntime().exec(cmd);
+            Desktop.getDesktop().open(tempFilePath.toFile());
+        } catch (IOException | InterruptedException e) {
+            log.error("Failed to start replay {} from {}", replayId, replayUrl, e);
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 
     private void removeTrailingComma(StringBuilder sb) {
@@ -273,36 +280,34 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     public void onUseTemplateWithoutReasonsButton() {
-        try {
-            ObservableList<ModerationReportFX> selectedItems = reportTableView.getSelectionModel().getSelectedItems();
-
-            String selectedReportIds = selectedItems.stream()
-                    .map(item -> String.valueOf(item.getId()))
-                    .collect(Collectors.joining(","));
-
-            String selectedGameIds = selectedItems.stream()
-                    .map(ModerationReportFX::getGame)
-                    .filter(Objects::nonNull)
-                    .map(game -> String.valueOf(game.getId()))
-                    .distinct()
-                    .collect(Collectors.joining(","));
-
-            removeTrailingComma(new StringBuilder(selectedReportIds));
-            removeTrailingComma(new StringBuilder(selectedGameIds));
-
-            String result;
-            result = selectedReportIds + "\n\n" + "DAY_NUMBER day ban - ReplayID " + selectedGameIds + " - SOME_REASON";
-            ClipboardContent clipboardContent = new ClipboardContent();
-            clipboardContent.putString(result);
-            Clipboard.getSystemClipboard().setContent(clipboardContent);
-
-            useTemplateWithoutReasonsButton.setText("Copied");
-            PauseTransition pause = new PauseTransition(Duration.millis(750));
-            pause.setOnFinished(e -> useTemplateWithoutReasonsButton.setText("Template No Reasons"));
-            pause.play();
-        } catch (NullPointerException e) {
-            log.debug("NPE in template-without-reasons (nothing selected?)", e);
+        ObservableList<ModerationReportFX> selectedItems = reportTableView.getSelectionModel().getSelectedItems();
+        if (selectedItems == null || selectedItems.isEmpty()) {
+            return;
         }
+
+        String selectedReportIds = selectedItems.stream()
+                .map(item -> String.valueOf(item.getId()))
+                .collect(Collectors.joining(","));
+
+        String selectedGameIds = selectedItems.stream()
+                .map(ModerationReportFX::getGame)
+                .filter(Objects::nonNull)
+                .map(game -> String.valueOf(game.getId()))
+                .distinct()
+                .collect(Collectors.joining(","));
+
+        removeTrailingComma(new StringBuilder(selectedReportIds));
+        removeTrailingComma(new StringBuilder(selectedGameIds));
+
+        String result = selectedReportIds + "\n\n" + "DAY_NUMBER day ban - ReplayID " + selectedGameIds + " - SOME_REASON";
+        ClipboardContent clipboardContent = new ClipboardContent();
+        clipboardContent.putString(result);
+        Clipboard.getSystemClipboard().setContent(clipboardContent);
+
+        useTemplateWithoutReasonsButton.setText("Copied");
+        PauseTransition pause = new PauseTransition(Duration.millis(750));
+        pause.setOnFinished(e -> useTemplateWithoutReasonsButton.setText("Template No Reasons"));
+        pause.play();
     }
 
     public void onUseTemplateWithReasonsButton() {
@@ -649,42 +654,40 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     public void onReferenceOnly() {
-        try {
-            ObservableList<ModerationReportFX> selectedItems = reportTableView.getSelectionModel().getSelectedItems();
-
-            String selectedReportIds = selectedItems.stream()
-                    .map(item -> String.valueOf(item.getId()))
-                    .collect(Collectors.joining(","));
-
-            String selectedGameIds = selectedItems.stream()
-                    .map(ModerationReportFX::getGame)
-                    .filter(Objects::nonNull)
-                    .map(game -> String.valueOf(game.getId()))
-                    .distinct()
-                    .collect(Collectors.joining(","));
-
-            removeTrailingComma(new StringBuilder(selectedReportIds));
-            removeTrailingComma(new StringBuilder(selectedGameIds));
-
-            String result;
-
-            if (selectedGameIds.isEmpty()) {
-                result = selectedReportIds + "\n\n" + "Reference - REFERENCE_REASON";
-            } else {
-                result = selectedReportIds + "\n\n" + "Reference - ReplayID " + selectedGameIds + " - REFERENCE_REASON";
-            }
-
-            ClipboardContent clipboardContent = new ClipboardContent();
-            clipboardContent.putString(result);
-            Clipboard.getSystemClipboard().setContent(clipboardContent);
-
-            referenceOnlyButton.setText("Copied");
-            PauseTransition pause = new PauseTransition(Duration.millis(750));
-            pause.setOnFinished(e -> referenceOnlyButton.setText("Reference Only"));
-            pause.play();
-        } catch (NullPointerException e) {
-            log.debug("NPE in reference-only button (nothing selected?)", e);
+        ObservableList<ModerationReportFX> selectedItems = reportTableView.getSelectionModel().getSelectedItems();
+        if (selectedItems == null || selectedItems.isEmpty()) {
+            return;
         }
+
+        String selectedReportIds = selectedItems.stream()
+                .map(item -> String.valueOf(item.getId()))
+                .collect(Collectors.joining(","));
+
+        String selectedGameIds = selectedItems.stream()
+                .map(ModerationReportFX::getGame)
+                .filter(Objects::nonNull)
+                .map(game -> String.valueOf(game.getId()))
+                .distinct()
+                .collect(Collectors.joining(","));
+
+        removeTrailingComma(new StringBuilder(selectedReportIds));
+        removeTrailingComma(new StringBuilder(selectedGameIds));
+
+        String result;
+        if (selectedGameIds.isEmpty()) {
+            result = selectedReportIds + "\n\n" + "Reference - REFERENCE_REASON";
+        } else {
+            result = selectedReportIds + "\n\n" + "Reference - ReplayID " + selectedGameIds + " - REFERENCE_REASON";
+        }
+
+        ClipboardContent clipboardContent = new ClipboardContent();
+        clipboardContent.putString(result);
+        Clipboard.getSystemClipboard().setContent(clipboardContent);
+
+        referenceOnlyButton.setText("Copied");
+        PauseTransition pause = new PauseTransition(Duration.millis(750));
+        pause.setOnFinished(e -> referenceOnlyButton.setText("Reference Only"));
+        pause.play();
     }
 
     public static class ModeratorStatistics {
