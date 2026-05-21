@@ -69,6 +69,7 @@ public class JavaFXMapper {
 //        return value.get();
 //    }
 
+    @SuppressWarnings("unchecked")
     @ObjectFactory
     public <T> ObservableSet<T> createObservableSet() {
         return FXCollections.observableSet();

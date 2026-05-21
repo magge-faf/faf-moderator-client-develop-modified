@@ -142,6 +142,7 @@ public class BansController implements Controller<HBox> {
         openBanDialog(new BanInfoFX(), true);
     }
 
+    @SuppressWarnings("unchecked")
     public void onSearch() {
         List<BanInfoFX> banInfoFXES = ((Supplier<List<BanInfoFX>>) filterGroup.getSelectedToggle().getUserData()).get();
         itemList.setAll(banInfoFXES);
@@ -160,6 +161,7 @@ public class BansController implements Controller<HBox> {
         startSyncTask(PATH_TEMP_BANNED_USERS_JSON, BanDurationType.TEMPORARY, onComplete);
     }
 
+    @SuppressWarnings("unchecked")
     private void startSyncTask(Path destinationPath, BanDurationType banDurationType, Runnable onComplete) {
         BansController thisController = this;
 
@@ -284,6 +286,7 @@ public class BansController implements Controller<HBox> {
         }
     }
 
+    @SuppressWarnings("unchecked")
     public Set<String> loadExistingBannedUserIds(Path filePath) {
         Set<String> userIds = new HashSet<>();
         File bannedUsersFile = filePath.toFile();

@@ -101,6 +101,7 @@ public class ViewHelper {
      * @param tableView  that the context menu will be added to
      * @param extractors contains a map of columns to copy along with a value extraction function
      */
+    @SuppressWarnings("unchecked")
     public static <T> ContextMenu applyCopyContextMenus(TableView<T> tableView, java.util.Map<TableColumn<T, ?>, Function<T, ?>> extractors) {
         ContextMenu contextMenu = tableView.getContextMenu() == null ? new ContextMenu() : tableView.getContextMenu();
 

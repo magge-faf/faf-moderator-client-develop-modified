@@ -40,6 +40,7 @@ import java.util.Map;
 public class CycleAvoidingMappingContext {
     private Map<Object, Object> knownInstances = new IdentityHashMap<>();
 
+    @SuppressWarnings("unchecked")
     @BeforeMapping
     public <T> T getMappedInstance(Object source, @TargetType Class<T> targetType) {
         return (T) knownInstances.get(source);

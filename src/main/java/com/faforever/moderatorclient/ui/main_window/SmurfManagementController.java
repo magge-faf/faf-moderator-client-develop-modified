@@ -128,6 +128,7 @@ public class SmurfManagementController implements Controller<VBox> {
         }
     }
 
+    @SuppressWarnings("unchecked")
     public TableView<UserDataController> createSmurfManagementTable() {
         TableView<UserDataController> table = new TableView<>();
 
@@ -365,6 +366,7 @@ public class SmurfManagementController implements Controller<VBox> {
         stage.show();
     }
 
+    @SuppressWarnings("unchecked")
     private TableView<Map<String, Object>> createHwTable(UserDataController user) {
         TableView<Map<String, Object>> table = new TableView<>();
         table.getColumns().addAll(

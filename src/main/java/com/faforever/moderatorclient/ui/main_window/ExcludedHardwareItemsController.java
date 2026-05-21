@@ -97,6 +97,7 @@ public class ExcludedHardwareItemsController implements Controller<VBox> {
         fieldsMap.put("uniqueIdAssignments.uniqueId.memorySerialNumber", memorySerialNumberField);
     }
 
+    @SuppressWarnings("unchecked")
     private void setupTable() {
         excludedItemsList = FXCollections.observableArrayList();
         filteredExcludedItems = new FilteredList<>(excludedItemsList, p -> true);

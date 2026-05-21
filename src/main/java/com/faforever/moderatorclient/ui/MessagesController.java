@@ -52,6 +52,7 @@ public class MessagesController implements Controller<HBox> {
         );
     }
 
+    @SuppressWarnings("unchecked")
     private void setUpFilter() {
         filteredItemList = new FilteredList<>(messageFxes);
         SortedList<MessageFx> sortedList = new SortedList<>(filteredItemList);
