@@ -153,8 +153,8 @@ public class ReplayAnalysisController implements Controller<VBox> {
             );
             return response.getBody();
         } catch (HttpServerErrorException e) {
-            System.err.println("Error fetching replays: " + e.getMessage());
-            System.err.println("Response body: " + e.getResponseBodyAsString());
+            log.error("Error fetching replays: {}", e.getMessage());
+            log.error("Response body: {}", e.getResponseBodyAsString());
             return null;
         }
     }

@@ -15,12 +15,14 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.Pane;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 
 @Component
+@Slf4j
 @RequiredArgsConstructor
 public class ListViewMapCell extends ListCell<MapPoolAssignmentFX> {
 
@@ -57,7 +59,7 @@ public class ListViewMapCell extends ListCell<MapPoolAssignmentFX> {
                 try {
                     mLLoader.load();
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    log.error("Failed to load poolListItem.fxml", e);
                 }
             }
             if (mapPoolAssignmentFX.getMapVersion() != null) {

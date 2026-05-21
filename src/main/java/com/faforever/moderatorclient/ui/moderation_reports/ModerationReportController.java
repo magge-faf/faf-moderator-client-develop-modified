@@ -82,6 +82,8 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -98,6 +100,19 @@ import static java.text.MessageFormat.format;
 @Slf4j
 @RequiredArgsConstructor
 public class ModerationReportController implements Controller<Region> {
+    private static final String CHEATS_ENABLED_KEY = "CheatsEnabled";
+    private static final String VICTORY_KEY = "Victory";
+    private static final String SHARE_KEY = "Share";
+    private static final String COMMON_ARMY_KEY = "CommonArmy";
+    private static final String DEMORALIZATION = "demoralization";
+    private static final String ASSASSINATION = "Assassination (default)";
+    private static final String OFF_STRING = "Off";
+    private static final ExecutorService BACKGROUND_EXECUTOR = Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r);
+        t.setDaemon(true);
+        return t;
+    });
+
     private final ObjectMapper objectMapper;
     private final ModerationReportService moderationReportService;
     private final UiService uiService;
@@ -525,7 +540,7 @@ public class ModerationReportController implements Controller<Region> {
                 return null;
             }
         };
-        new Thread(task).start();
+        BACKGROUND_EXECUTOR.submit(task);
     }
 
     public void onModeratorEventsReplayIdButton() {
@@ -861,7 +876,7 @@ public class ModerationReportController implements Controller<Region> {
                 return null;
             }
         };
-        new Thread(task).start();
+        BACKGROUND_EXECUTOR.submit(task);
     }
 
     @Getter
@@ -1444,7 +1459,7 @@ public class ModerationReportController implements Controller<Region> {
                 return null;
             }
         };
-        new Thread(task).start();
+        BACKGROUND_EXECUTOR.submit(task);
     }
 
     private void showModeratorEvent(List<ModeratorEvent> moderatorEvents, Map<Integer, PlayerInfo> playerInfoMap) {
@@ -2181,14 +2196,6 @@ public class ModerationReportController implements Controller<Region> {
 
         List<String> playerQuitGameMessages = processReplayForQuitEventsPlayers(events, armies);
         DesyncResult desyncResult = checkReplayEventsForDesync(events);
-
-        final String CHEATS_ENABLED_KEY = "CheatsEnabled";
-        final String VICTORY_KEY = "Victory";
-        final String SHARE_KEY = "Share";
-        final String COMMON_ARMY_KEY = "CommonArmy";
-        final String DEMORALIZATION = "demoralization";
-        final String ASSASSINATION = "Assassination (default)";
-        final String OFF_STRING = "Off";
 
         String commonArmy = getValueForKey(gameOptions, COMMON_ARMY_KEY);
         String cheatsEnabled = getValueForKey(gameOptions, CHEATS_ENABLED_KEY);

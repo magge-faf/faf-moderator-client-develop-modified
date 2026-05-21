@@ -32,6 +32,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -39,6 +41,12 @@ import java.util.stream.Collectors;
 @Slf4j
 @RequiredArgsConstructor
 public class BansController implements Controller<HBox> {
+    private static final ExecutorService BACKGROUND_EXECUTOR = Executors.newCachedThreadPool(r -> {
+        Thread t = new Thread(r);
+        t.setDaemon(true);
+        return t;
+    });
+
     private final UiService uiService;
     private final BanService banService;
     public HBox root;
@@ -236,9 +244,7 @@ public class BansController implements Controller<HBox> {
             if (onComplete != null) onComplete.run();
         });
 
-        Thread thread = new Thread(syncTask);
-        thread.setDaemon(true);
-        thread.start();
+        BACKGROUND_EXECUTOR.submit(syncTask);
     }
 
     public void onSave() {

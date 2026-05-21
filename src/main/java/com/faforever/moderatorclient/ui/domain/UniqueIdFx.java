@@ -37,7 +37,6 @@ public class UniqueIdFx extends AbstractEntityFX {
 
 
     public String getHash() {
-        //System.out.println(hash.get());
         return hash.get();
     }
 
