@@ -29,6 +29,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.ObservableSet;
 import javafx.collections.transformation.SortedList;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.CheckBoxTableCell;
@@ -838,14 +839,16 @@ public class ViewHelper {
     private static final int PAGE_SIZE = 100;
 
     private static void addScrollListener(TableView<PlayerFX> tableView, ObservableList<PlayerFX> allData) {
+        Label loadingPlaceholder = new Label("Loading…");
         tableView.setOnScroll(event -> {
-            if (event.getDeltaY() < 0) { // Scroll down
+            if (event.getDeltaY() < 0) {
                 int currentSize = tableView.getItems().size();
                 if (currentSize < allData.size()) {
-                    // Load more users if available
+                    Node previousPlaceholder = tableView.getPlaceholder();
+                    tableView.setPlaceholder(loadingPlaceholder);
                     int nextPageEnd = Math.min(currentSize + PAGE_SIZE, allData.size());
-                    ObservableList<PlayerFX> moreData = FXCollections.observableArrayList(allData.subList(currentSize, nextPageEnd));
-                    tableView.getItems().addAll(moreData);
+                    tableView.getItems().addAll(allData.subList(currentSize, nextPageEnd));
+                    tableView.setPlaceholder(previousPlaceholder);
                 }
             }
         });
