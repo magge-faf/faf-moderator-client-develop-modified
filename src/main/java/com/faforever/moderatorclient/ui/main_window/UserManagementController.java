@@ -223,6 +223,7 @@ public class UserManagementController implements Controller<SplitPane> {
     public Button newBanButton;
     public Button editBanButton;
     public TableView<PlayerFX> userSearchTableView;
+    public Button compareUidsButton;
     public TableView<NameRecordFX> userNameHistoryTableView;
     public TableView<BanInfoFX> userBansTableView;
     public TableView<TeamkillFX> userTeamkillsTableView;
@@ -528,6 +529,7 @@ public class UserManagementController implements Controller<SplitPane> {
     private void onSelectedUser() {
         ObservableList<PlayerFX> selectedUsers = userSearchTableView.getSelectionModel().getSelectedItems();
         newBanButton.setDisable(selectedUsers == null || selectedUsers.isEmpty());
+        compareUidsButton.setDisable(selectedUsers == null || selectedUsers.size() < 2);
 
         if (selectedUsers == null || selectedUsers.isEmpty()) {
             lastSelectedUserId = null;
@@ -2477,6 +2479,121 @@ public class UserManagementController implements Controller<SplitPane> {
             pane.getStylesheets().add(resource.toExternalForm());
         }
     }
+
+    public void onCompareUids() {
+        List<PlayerFX> selected = List.copyOf(userSearchTableView.getSelectionModel().getSelectedItems());
+        if (selected.size() < 2) return;
+
+        // field label -> value -> (player name -> latest assignment timestamp)
+        Map<String, Map<String, Map<String, OffsetDateTime>>> byField = new LinkedHashMap<>();
+        for (String label : new String[]{"Hash", "UUID", "Volume S/N", "Memory S/N", "Serial Number",
+                "Processor ID", "Device ID", "CPU Name", "Manufacturer", "BIOS Version"}) {
+            byField.put(label, new LinkedHashMap<>());
+        }
+
+        for (PlayerFX player : selected) {
+            String playerName = player.getRepresentation();
+            for (UniqueIdAssignmentFx assignment : player.getUniqueIdAssignments()) {
+                UniqueIdFx uid = assignment.getUniqueId();
+                if (uid == null) continue;
+                OffsetDateTime ts = assignment.getUpdateTime();
+                recordUidValue(byField, "Hash",         uid.getHash(),              playerName, ts);
+                recordUidValue(byField, "UUID",         uid.getUuid(),              playerName, ts);
+                recordUidValue(byField, "Volume S/N",   uid.getVolumeSerialNumber(), playerName, ts);
+                recordUidValue(byField, "Memory S/N",   uid.getMemorySerialNumber(), playerName, ts);
+                recordUidValue(byField, "Serial Number",uid.getSerialNumber(),       playerName, ts);
+                recordUidValue(byField, "Processor ID", uid.getProcessorId(),        playerName, ts);
+                recordUidValue(byField, "Device ID",    uid.getDeviceId(),           playerName, ts);
+                recordUidValue(byField, "CPU Name",     uid.getName(),               playerName, ts);
+                recordUidValue(byField, "Manufacturer", uid.getManufacturer(),       playerName, ts);
+                recordUidValue(byField, "BIOS Version", uid.getSMBIOSBIOSVersion(),  playerName, ts);
+            }
+        }
+
+        List<SharedUidEntry> entries = new ArrayList<>();
+        for (Map.Entry<String, Map<String, Map<String, OffsetDateTime>>> fieldEntry : byField.entrySet()) {
+            for (Map.Entry<String, Map<String, OffsetDateTime>> valueEntry : fieldEntry.getValue().entrySet()) {
+                Map<String, OffsetDateTime> players = valueEntry.getValue();
+                if (players.size() < 2) continue;
+                OffsetDateTime lastSeen = players.values().stream()
+                        .filter(Objects::nonNull)
+                        .max(Comparator.naturalOrder())
+                        .orElse(null);
+                entries.add(new SharedUidEntry(
+                        fieldEntry.getKey(), valueEntry.getKey(),
+                        String.join(", ", players.keySet()), lastSeen));
+            }
+        }
+
+        showUidComparisonWindow(selected, entries);
+    }
+
+    private void recordUidValue(Map<String, Map<String, Map<String, OffsetDateTime>>> byField,
+                                String field, String value, String playerName, OffsetDateTime ts) {
+        if (value == null || value.isBlank()) return;
+        byField.get(field)
+               .computeIfAbsent(value, k -> new LinkedHashMap<>())
+               .merge(playerName, ts, (a, b) -> {
+                   if (a == null) return b;
+                   if (b == null) return a;
+                   return b.isAfter(a) ? b : a;
+               });
+    }
+
+    @SuppressWarnings("unchecked")
+    private void showUidComparisonWindow(List<PlayerFX> players, List<SharedUidEntry> entries) {
+        String names = players.stream().map(PlayerFX::getRepresentation).collect(Collectors.joining(", "));
+        Stage stage = new Stage();
+        stage.setTitle("UID Comparison — " + names);
+
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+        TableColumn<SharedUidEntry, String> fieldCol = new TableColumn<>("Field");
+        fieldCol.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().fieldLabel()));
+        fieldCol.setPrefWidth(110);
+
+        TableColumn<SharedUidEntry, String> valueCol = new TableColumn<>("Value");
+        valueCol.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().value()));
+        valueCol.setPrefWidth(260);
+
+        TableColumn<SharedUidEntry, String> sharedByCol = new TableColumn<>("Shared By");
+        sharedByCol.setCellValueFactory(d -> new SimpleStringProperty(d.getValue().sharedBy()));
+        sharedByCol.setPrefWidth(200);
+
+        TableColumn<SharedUidEntry, String> lastSeenCol = new TableColumn<>("Last Seen");
+        lastSeenCol.setCellValueFactory(d -> {
+            OffsetDateTime ts = d.getValue().lastSeen();
+            return new SimpleStringProperty(ts != null ? ts.format(fmt) : "—");
+        });
+        lastSeenCol.setPrefWidth(130);
+
+        TableView<SharedUidEntry> table = new TableView<>();
+        table.getColumns().addAll(fieldCol, valueCol, sharedByCol, lastSeenCol);
+        table.setItems(FXCollections.observableArrayList(entries));
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+        VBox.setVgrow(table, javafx.scene.layout.Priority.ALWAYS);
+
+        String summary = entries.isEmpty()
+                ? "No shared UID identifiers found between the selected accounts."
+                : String.format("Found %d shared identifier(s) across %d selected accounts:", entries.size(), players.size());
+        Label label = new Label(summary);
+        label.setStyle("-fx-font-weight: bold; -fx-padding: 5 0 5 0;");
+
+        Button closeButton = new Button("Close");
+        closeButton.setOnAction(e -> stage.close());
+        HBox buttonBox = new HBox(closeButton);
+        buttonBox.setAlignment(Pos.CENTER_RIGHT);
+        buttonBox.setPadding(new Insets(10, 0, 0, 0));
+
+        VBox layout = new VBox(10, label, table, buttonBox);
+        layout.setPadding(new Insets(10));
+
+        stage.setScene(new Scene(layout, 820, 460));
+        stage.initModality(Modality.APPLICATION_MODAL);
+        stage.showAndWait();
+    }
+
+    private record SharedUidEntry(String fieldLabel, String value, String sharedBy, OffsetDateTime lastSeen) {}
 
     public void onSave() {
         saveColumnLayout(userSearchTableView, localPreferences);
