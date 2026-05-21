@@ -28,6 +28,7 @@ import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.ObservableSet;
+import javafx.collections.transformation.SortedList;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.CheckBoxTableCell;
@@ -967,35 +968,49 @@ public class ViewHelper {
         {
             {
                 if (showUidData) {
-                    TableColumn<PlayerFX, String> uidCreatedAt = new TableColumn<>("UID created");
-                    uidCreatedAt.setCellValueFactory(o -> Bindings.createStringBinding(() ->
-                                    o.getValue().getUniqueIdAssignments().stream()
-                                            .map(UniqueIdAssignmentFx::getCreateTime)
-                                            .map(DateTimeFormatter.ISO_LOCAL_DATE_TIME::format)
-                                            .collect(Collectors.joining("\n")),
-                            o.getValue().getUniqueIdAssignments()));
+                    DateTimeFormatter uidDateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+                    // Shared sort order for in-cell UID lines; both columns use the same instance
+                    // so line N in "UID Created" always matches line N in "UID Last Used"
+                    var uidSortOrder = new SimpleObjectProperty<Comparator<UniqueIdAssignmentFx>>(null);
+
+                    TableColumn<PlayerFX, String> uidCreatedAt = new TableColumn<>("UID Created");
+                    uidCreatedAt.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
+                        List<UniqueIdAssignmentFx> list = new ArrayList<>(o.getValue().getUniqueIdAssignments());
+                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+                        return list.stream()
+                                .map(a -> a.getCreateTime() != null ? uidDateFmt.format(a.getCreateTime()) : "?")
+                                .collect(Collectors.joining("\n"));
+                    }, o.getValue().getUniqueIdAssignments(), uidSortOrder));
                     uidCreatedAt.setCellFactory(uidHighlightCellFactory(highlightTerm));
                     uidCreatedAt.setMinWidth(40);
                     tableView.getColumns().add(uidCreatedAt);
-                    extractors.put(uidCreatedAt, playerFX -> playerFX.getUniqueIdAssignments().stream()
-                            .map(UniqueIdAssignmentFx::getCreateTime)
-                            .map(DateTimeFormatter.ISO_LOCAL_DATE_TIME::format)
-                            .collect(Collectors.toList()));
+                    extractors.put(uidCreatedAt, playerFX -> {
+                        List<UniqueIdAssignmentFx> list = new ArrayList<>(playerFX.getUniqueIdAssignments());
+                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+                        return list.stream()
+                                .map(a -> a.getCreateTime() != null ? uidDateFmt.format(a.getCreateTime()) : "?")
+                                .collect(Collectors.toList());
+                    });
 
-                    TableColumn<PlayerFX, String> uidLastUsedAt = new TableColumn<>("UID last used");
-                    uidLastUsedAt.setCellValueFactory(o -> Bindings.createStringBinding(() ->
-                                    o.getValue().getUniqueIdAssignments().stream()
-                                            .map(UniqueIdAssignmentFx::getUpdateTime)
-                                            .map(DateTimeFormatter.ISO_LOCAL_DATE_TIME::format)
-                                            .collect(Collectors.joining("\n")),
-                            o.getValue().getUniqueIdAssignments()));
+                    TableColumn<PlayerFX, String> uidLastUsedAt = new TableColumn<>("UID Last Used");
+                    uidLastUsedAt.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
+                        List<UniqueIdAssignmentFx> list = new ArrayList<>(o.getValue().getUniqueIdAssignments());
+                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+                        return list.stream()
+                                .map(a -> a.getUpdateTime() != null ? uidDateFmt.format(a.getUpdateTime()) : "?")
+                                .collect(Collectors.joining("\n"));
+                    }, o.getValue().getUniqueIdAssignments(), uidSortOrder));
                     uidLastUsedAt.setCellFactory(uidHighlightCellFactory(highlightTerm));
                     uidLastUsedAt.setMinWidth(40);
                     tableView.getColumns().add(uidLastUsedAt);
-                    extractors.put(uidLastUsedAt, playerFX -> playerFX.getUniqueIdAssignments().stream()
-                            .map(UniqueIdAssignmentFx::getUpdateTime)
-                            .map(DateTimeFormatter.ISO_LOCAL_DATE_TIME::format)
-                            .collect(Collectors.toList()));
+                    extractors.put(uidLastUsedAt, playerFX -> {
+                        List<UniqueIdAssignmentFx> list = new ArrayList<>(playerFX.getUniqueIdAssignments());
+                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+                        return list.stream()
+                                .map(a -> a.getUpdateTime() != null ? uidDateFmt.format(a.getUpdateTime()) : "?")
+                                .collect(Collectors.toList());
+                    });
 
                     TableColumn<PlayerFX, String> accountLinkColumn = new TableColumn<>("Account Link");
                     accountLinkColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
@@ -1033,131 +1048,164 @@ public class ViewHelper {
 
 
                     TableColumn<PlayerFX, String> hashColumn = new TableColumn<>("Hash");
-                    hashColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
-                                    o.getValue().getUniqueIdAssignments().stream()
-                                            .map(UniqueIdAssignmentFx::getUniqueId)
-                                            .map(UniqueIdFx::getHash)
-                                            .collect(Collectors.joining("\n")),
-                            o.getValue().getUniqueIdAssignments()));
+                    hashColumn.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
+                        List<UniqueIdAssignmentFx> list = new ArrayList<>(o.getValue().getUniqueIdAssignments());
+                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+                        return list.stream().map(a -> a.getUniqueId().getHash()).collect(Collectors.joining("\n"));
+                    }, o.getValue().getUniqueIdAssignments(), uidSortOrder));
                     hashColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
                     hashColumn.setMinWidth(40);
                     tableView.getColumns().add(hashColumn);
-                    extractors.put(hashColumn, playerFX -> playerFX.getUniqueIdAssignments().stream()
-                            .map(UniqueIdAssignmentFx::getUniqueId)
-                            .map(UniqueIdFx::getHash).collect(Collectors.toList()));
+                    extractors.put(hashColumn, playerFX -> {
+                        List<UniqueIdAssignmentFx> list = new ArrayList<>(playerFX.getUniqueIdAssignments());
+                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+                        return list.stream().map(a -> a.getUniqueId().getHash()).collect(Collectors.toList());
+                    });
 
                     TableColumn<PlayerFX, String> uuidColumn = new TableColumn<>("UUID");
-                    uuidColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
-                                    o.getValue().getUniqueIdAssignments().stream()
-                                            .map(UniqueIdAssignmentFx::getUniqueId)
-                                            .map(UniqueIdFx::getUuid)
-                                            .collect(Collectors.joining("\n")),
-                            o.getValue().getUniqueIdAssignments()));
+                    uuidColumn.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
+                        List<UniqueIdAssignmentFx> list = new ArrayList<>(o.getValue().getUniqueIdAssignments());
+                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+                        return list.stream().map(a -> a.getUniqueId().getUuid()).collect(Collectors.joining("\n"));
+                    }, o.getValue().getUniqueIdAssignments(), uidSortOrder));
                     uuidColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
                     uuidColumn.setMinWidth(40);
                     tableView.getColumns().add(uuidColumn);
-                    extractors.put(uuidColumn, playerFX -> playerFX.getUniqueIdAssignments().stream()
-                            .map(UniqueIdAssignmentFx::getUniqueId)
-                            .map(UniqueIdFx::getUuid).collect(Collectors.toList()));
+                    extractors.put(uuidColumn, playerFX -> {
+                        List<UniqueIdAssignmentFx> list = new ArrayList<>(playerFX.getUniqueIdAssignments());
+                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+                        return list.stream().map(a -> a.getUniqueId().getUuid()).collect(Collectors.toList());
+                    });
 
                     TableColumn<PlayerFX, String> memorySerialColumn = new TableColumn<>("Memory S/N");
-                    memorySerialColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
-                                    o.getValue().getUniqueIdAssignments().stream()
-                                            .map(UniqueIdAssignmentFx::getUniqueId)
-                                            .map(UniqueIdFx::getMemorySerialNumber)
-                                            .collect(Collectors.joining("\n")),
-                            o.getValue().getUniqueIdAssignments()));
+                    memorySerialColumn.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
+                        List<UniqueIdAssignmentFx> list = new ArrayList<>(o.getValue().getUniqueIdAssignments());
+                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+                        return list.stream().map(a -> a.getUniqueId().getMemorySerialNumber()).collect(Collectors.joining("\n"));
+                    }, o.getValue().getUniqueIdAssignments(), uidSortOrder));
                     memorySerialColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
                     memorySerialColumn.setMinWidth(40);
                     tableView.getColumns().add(memorySerialColumn);
-                    extractors.put(memorySerialColumn, playerFX -> playerFX.getUniqueIdAssignments().stream()
-                            .map(UniqueIdAssignmentFx::getUniqueId)
-                            .map(UniqueIdFx::getMemorySerialNumber).collect(Collectors.toList()));
+                    extractors.put(memorySerialColumn, playerFX -> {
+                        List<UniqueIdAssignmentFx> list = new ArrayList<>(playerFX.getUniqueIdAssignments());
+                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+                        return list.stream().map(a -> a.getUniqueId().getMemorySerialNumber()).collect(Collectors.toList());
+                    });
 
                     TableColumn<PlayerFX, String> deviceIdColumn = new TableColumn<>("Device ID");
-                    deviceIdColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
-                                    o.getValue().getUniqueIdAssignments().stream()
-                                            .map(UniqueIdAssignmentFx::getUniqueId)
-                                            .map(UniqueIdFx::getDeviceId)
-                                            .collect(Collectors.joining("\n")),
-                            o.getValue().getUniqueIdAssignments()));
+                    deviceIdColumn.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
+                        List<UniqueIdAssignmentFx> list = new ArrayList<>(o.getValue().getUniqueIdAssignments());
+                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+                        return list.stream().map(a -> a.getUniqueId().getDeviceId()).collect(Collectors.joining("\n"));
+                    }, o.getValue().getUniqueIdAssignments(), uidSortOrder));
                     deviceIdColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
                     deviceIdColumn.setMinWidth(40);
                     tableView.getColumns().add(deviceIdColumn);
-                    extractors.put(deviceIdColumn, playerFX -> playerFX.getUniqueIdAssignments().stream()
-                            .map(UniqueIdAssignmentFx::getUniqueId)
-                            .map(UniqueIdFx::getDeviceId).collect(Collectors.toList()));
+                    extractors.put(deviceIdColumn, playerFX -> {
+                        List<UniqueIdAssignmentFx> list = new ArrayList<>(playerFX.getUniqueIdAssignments());
+                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+                        return list.stream().map(a -> a.getUniqueId().getDeviceId()).collect(Collectors.toList());
+                    });
 
                     TableColumn<PlayerFX, String> manufacturerColumn = new TableColumn<>("Manufacturer");
-                    manufacturerColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
-                                    o.getValue().getUniqueIdAssignments().stream()
-                                            .map(UniqueIdAssignmentFx::getUniqueId)
-                                            .map(UniqueIdFx::getManufacturer)
-                                            .collect(Collectors.joining("\n")),
-                            o.getValue().getUniqueIdAssignments()));
+                    manufacturerColumn.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
+                        List<UniqueIdAssignmentFx> list = new ArrayList<>(o.getValue().getUniqueIdAssignments());
+                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+                        return list.stream().map(a -> a.getUniqueId().getManufacturer()).collect(Collectors.joining("\n"));
+                    }, o.getValue().getUniqueIdAssignments(), uidSortOrder));
                     manufacturerColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
                     manufacturerColumn.setMinWidth(40);
                     tableView.getColumns().add(manufacturerColumn);
-                    extractors.put(manufacturerColumn, playerFX -> playerFX.getUniqueIdAssignments().stream()
-                            .map(UniqueIdAssignmentFx::getUniqueId)
-                            .map(UniqueIdFx::getManufacturer).collect(Collectors.toList()));
+                    extractors.put(manufacturerColumn, playerFX -> {
+                        List<UniqueIdAssignmentFx> list = new ArrayList<>(playerFX.getUniqueIdAssignments());
+                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+                        return list.stream().map(a -> a.getUniqueId().getManufacturer()).collect(Collectors.toList());
+                    });
 
                     TableColumn<PlayerFX, String> cpuNameColumn = new TableColumn<>("CPU Name");
-                    cpuNameColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
-                                    o.getValue().getUniqueIdAssignments().stream()
-                                            .map(UniqueIdAssignmentFx::getUniqueId)
-                                            .map(UniqueIdFx::getName)
-                                            .collect(Collectors.joining("\n")),
-                            o.getValue().getUniqueIdAssignments()));
+                    cpuNameColumn.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
+                        List<UniqueIdAssignmentFx> list = new ArrayList<>(o.getValue().getUniqueIdAssignments());
+                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+                        return list.stream().map(a -> a.getUniqueId().getName()).collect(Collectors.joining("\n"));
+                    }, o.getValue().getUniqueIdAssignments(), uidSortOrder));
                     cpuNameColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
                     cpuNameColumn.setMinWidth(40);
                     tableView.getColumns().add(cpuNameColumn);
-                    extractors.put(cpuNameColumn, playerFX -> playerFX.getUniqueIdAssignments().stream()
-                            .map(UniqueIdAssignmentFx::getUniqueId)
-                            .map(UniqueIdFx::getName).collect(Collectors.toList()));
+                    extractors.put(cpuNameColumn, playerFX -> {
+                        List<UniqueIdAssignmentFx> list = new ArrayList<>(playerFX.getUniqueIdAssignments());
+                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+                        return list.stream().map(a -> a.getUniqueId().getName()).collect(Collectors.toList());
+                    });
 
                     TableColumn<PlayerFX, String> processorIdColumn = new TableColumn<>("Processor Id");
-                    processorIdColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
-                                    o.getValue().getUniqueIdAssignments().stream()
-                                            .map(UniqueIdAssignmentFx::getUniqueId)
-                                            .map(UniqueIdFx::getProcessorId)
-                                            .collect(Collectors.joining("\n")),
-                            o.getValue().getUniqueIdAssignments()));
-                    processorIdColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
+                    processorIdColumn.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
+                        List<UniqueIdAssignmentFx> list = new ArrayList<>(o.getValue().getUniqueIdAssignments());
+                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+                        return list.stream().map(a -> a.getUniqueId().getProcessorId()).collect(Collectors.joining("\n"));
+                    }, o.getValue().getUniqueIdAssignments(), uidSortOrder));
                     processorIdColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
                     processorIdColumn.setMinWidth(40);
                     tableView.getColumns().add(processorIdColumn);
-                    extractors.put(processorIdColumn, playerFX -> playerFX.getUniqueIdAssignments().stream()
-                            .map(UniqueIdAssignmentFx::getUniqueId)
-                            .map(UniqueIdFx::getProcessorId).collect(Collectors.toList()));
+                    extractors.put(processorIdColumn, playerFX -> {
+                        List<UniqueIdAssignmentFx> list = new ArrayList<>(playerFX.getUniqueIdAssignments());
+                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+                        return list.stream().map(a -> a.getUniqueId().getProcessorId()).collect(Collectors.toList());
+                    });
 
                     TableColumn<PlayerFX, String> serialColumn = new TableColumn<>("S/N");
-                    serialColumn.setCellValueFactory(o -> Bindings.createStringBinding(() ->
-                                    o.getValue().getUniqueIdAssignments().stream()
-                                            .map(UniqueIdAssignmentFx::getUniqueId)
-                                            .map(UniqueIdFx::getSerialNumber)
-                                            .collect(Collectors.joining("\n")),
-                            o.getValue().getUniqueIdAssignments()));
+                    serialColumn.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
+                        List<UniqueIdAssignmentFx> list = new ArrayList<>(o.getValue().getUniqueIdAssignments());
+                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+                        return list.stream().map(a -> a.getUniqueId().getSerialNumber()).collect(Collectors.joining("\n"));
+                    }, o.getValue().getUniqueIdAssignments(), uidSortOrder));
                     serialColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
                     serialColumn.setMinWidth(200);
                     tableView.getColumns().add(serialColumn);
-                    extractors.put(serialColumn, playerFX -> playerFX.getUniqueIdAssignments().stream()
-                            .map(UniqueIdAssignmentFx::getUniqueId)
-                            .map(UniqueIdFx::getSerialNumber).collect(Collectors.toList()));
+                    extractors.put(serialColumn, playerFX -> {
+                        List<UniqueIdAssignmentFx> list = new ArrayList<>(playerFX.getUniqueIdAssignments());
+                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+                        return list.stream().map(a -> a.getUniqueId().getSerialNumber()).collect(Collectors.toList());
+                    });
 
                     TableColumn<PlayerFX, String> volumeSerialNumber = new TableColumn<>("Volume S/N");
-                    volumeSerialNumber.setCellValueFactory(o -> Bindings.createStringBinding(() ->
-                                    o.getValue().getUniqueIdAssignments().stream()
-                                            .map(UniqueIdAssignmentFx::getUniqueId)
-                                            .map(UniqueIdFx::getVolumeSerialNumber)
-                                            .collect(Collectors.joining("\n")),
-                            o.getValue().getUniqueIdAssignments()));
+                    volumeSerialNumber.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
+                        List<UniqueIdAssignmentFx> list = new ArrayList<>(o.getValue().getUniqueIdAssignments());
+                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+                        return list.stream().map(a -> a.getUniqueId().getVolumeSerialNumber()).collect(Collectors.joining("\n"));
+                    }, o.getValue().getUniqueIdAssignments(), uidSortOrder));
                     volumeSerialNumber.setCellFactory(uidHighlightCellFactory(highlightTerm));
                     volumeSerialNumber.setMinWidth(40);
                     tableView.getColumns().add(volumeSerialNumber);
-                    extractors.put(volumeSerialNumber, playerFX -> playerFX.getUniqueIdAssignments().stream()
-                            .map(UniqueIdAssignmentFx::getUniqueId)
-                            .map(UniqueIdFx::getVolumeSerialNumber).collect(Collectors.toList()));
+                    extractors.put(volumeSerialNumber, playerFX -> {
+                        List<UniqueIdAssignmentFx> list = new ArrayList<>(playerFX.getUniqueIdAssignments());
+                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+                        return list.stream().map(a -> a.getUniqueId().getVolumeSerialNumber()).collect(Collectors.toList());
+                    });
+
+                    // Clicking "UID Created" or "UID Last Used" sorts lines within each cell.
+                    // Both columns share uidSortOrder, so line N always stays paired across both.
+                    // Clicking any other column header sorts the rows normally.
+                    tableView.setSortPolicy(tv -> {
+                        Optional<TableColumn<PlayerFX, ?>> uidColOpt = tv.getSortOrder().stream()
+                                .filter(c -> c == uidCreatedAt || c == uidLastUsedAt)
+                                .findFirst();
+                        if (uidColOpt.isPresent()) {
+                            TableColumn<PlayerFX, ?> col = uidColOpt.get();
+                            boolean asc = col.getSortType() == TableColumn.SortType.ASCENDING;
+                            Comparator<UniqueIdAssignmentFx> base = Comparator.comparing(
+                                    col == uidCreatedAt
+                                            ? UniqueIdAssignmentFx::getCreateTime
+                                            : UniqueIdAssignmentFx::getUpdateTime,
+                                    Comparator.nullsLast(Comparator.naturalOrder()));
+                            uidSortOrder.set(asc ? base : base.reversed());
+                            return true;
+                        }
+                        uidSortOrder.set(null);
+                        if (tv.getComparator() != null) {
+                            FXCollections.sort(tv.getItems(), tv.getComparator());
+                        }
+                        return true;
+                    });
                 }
 
                 if (highlightTerm != null) {
