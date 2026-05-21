@@ -243,6 +243,8 @@
                     <Button fx:id="checkSharedGamesButton" text="Check for Shared Games (Last 1,000)"
                             onAction="#onCheckSharedGames" mnemonicParsing="false"/>
                     <Label fx:id="progressLabelSharedGames" visible="false" minWidth="150"/>
+                    <Separator orientation="VERTICAL"/>
+                    <Button text="Check Rating Manipulation" onAction="#onCheckRatingManipulation" mnemonicParsing="false"/>
                 </HBox>
 
                 <TableView fx:id="userLastGamesTable" maxHeight="1.7976931348623157E308"

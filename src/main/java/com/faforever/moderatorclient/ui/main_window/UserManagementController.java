@@ -2,6 +2,7 @@ package com.faforever.moderatorclient.ui.main_window;
 
 import com.faforever.commons.api.dto.BanStatus;
 import com.faforever.commons.api.dto.GroupPermission;
+import com.faforever.commons.api.dto.Validity;
 import com.faforever.commons.api.update.AvatarAssignmentUpdate;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.AvatarService;
@@ -2231,6 +2232,165 @@ public class UserManagementController implements Controller<SplitPane> {
             log.debug("Loaded SplitPane positions: {}", positions);
         } else {
             log.debug("No saved SplitPane positions to load.");
+        }
+    }
+
+    public void onCheckRatingManipulation() {
+        List<GamePlayerStatsFX> games = new ArrayList<>(userLastGamesTable.getItems());
+        if (games.isEmpty()) {
+            Alert warn = new Alert(Alert.AlertType.WARNING, "No game data loaded. Select a player first.", ButtonType.OK);
+            warn.setTitle("Rating Manipulation Check");
+            applyDialogStylesheet(warn);
+            warn.showAndWait();
+            return;
+        }
+
+        List<GamePlayerStatsFX> ratedGames = games.stream()
+                .filter(g -> g.ratingChangeProperty().get() != null)
+                .toList();
+
+        if (ratedGames.isEmpty()) {
+            Alert warn = new Alert(Alert.AlertType.WARNING, "No rating journal data available for the loaded games.", ButtonType.OK);
+            warn.setTitle("Rating Manipulation Check");
+            applyDialogStylesheet(warn);
+            warn.showAndWait();
+            return;
+        }
+
+        String playerName = ratedGames.stream()
+                .map(g -> g.getPlayer() != null ? g.getPlayer().getLogin() : null)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse("Unknown");
+
+        int flagCount = 0;
+        StringBuilder report = new StringBuilder();
+        report.append(String.format("Analyzed %d games (%d with rating data) for: %s%n%n", games.size(), ratedGames.size(), playerName));
+        report.append(String.format("%-8s %-45s %s%n", "Status", "Check", "Value"));
+        report.append("─".repeat(90)).append("\n");
+
+        // Check 1: Loss rate
+        long losses = ratedGames.stream()
+                .filter(g -> g.ratingChangeProperty().get().doubleValue() < 0)
+                .count();
+        double lossRate = (double) losses / ratedGames.size() * 100.0;
+        boolean lossRateFlag = lossRate > 70.0;
+        if (lossRateFlag) flagCount++;
+        report.append(formatCheckLine(lossRateFlag,
+                "Loss Rate (threshold: >70%)",
+                String.format("%.1f%% (%d / %d games)", lossRate, losses, ratedGames.size())));
+
+        // Check 2: Net rating trend across analyzed games
+        List<GamePlayerStatsFX> withFullRating = ratedGames.stream()
+                .filter(g -> g.beforeRatingProperty().get() != null && g.afterRatingProperty().get() != null)
+                .toList();
+        int netRatingChange = 0;
+        boolean netRatingFlag = false;
+        if (!withFullRating.isEmpty()) {
+            // games are sorted newest-first; last entry = oldest game
+            int newestAfter = withFullRating.get(0).afterRatingProperty().get();
+            int oldestBefore = withFullRating.get(withFullRating.size() - 1).beforeRatingProperty().get();
+            netRatingChange = newestAfter - oldestBefore;
+            netRatingFlag = netRatingChange < -200;
+            if (netRatingFlag) flagCount++;
+        }
+        report.append(formatCheckLine(netRatingFlag,
+                "Net Rating Change (threshold: <-200)",
+                String.format("%+d points", netRatingChange)));
+
+        // Check 3: Max consecutive loss streak
+        int maxStreak = 0, currentStreak = 0;
+        for (GamePlayerStatsFX g : ratedGames) {
+            if (g.ratingChangeProperty().get().doubleValue() < 0) {
+                currentStreak++;
+                maxStreak = Math.max(maxStreak, currentStreak);
+            } else {
+                currentStreak = 0;
+            }
+        }
+        boolean streakFlag = maxStreak >= 10;
+        if (streakFlag) flagCount++;
+        report.append(formatCheckLine(streakFlag,
+                "Longest Consecutive Loss Streak (threshold: >=10)",
+                maxStreak + " games in a row"));
+
+        // Check 4: Heavy per-game rating drops
+        long heavyDrops = ratedGames.stream()
+                .filter(g -> g.ratingChangeProperty().get().doubleValue() <= -20)
+                .count();
+        boolean heavyDropFlag = heavyDrops >= 10;
+        if (heavyDropFlag) flagCount++;
+        report.append(formatCheckLine(heavyDropFlag,
+                "Games With Drop >=-20 Rating (threshold: >=10 games)",
+                heavyDrops + " games"));
+
+        // Check 5: Invalid game ratio
+        long invalidCount = games.stream()
+                .filter(g -> g.getGame() != null
+                        && g.getGame().getValidity() != null
+                        && g.getGame().getValidity() != Validity.VALID)
+                .count();
+        double invalidRate = (double) invalidCount / games.size() * 100.0;
+        boolean invalidFlag = invalidRate > 15.0;
+        if (invalidFlag) flagCount++;
+        report.append(formatCheckLine(invalidFlag,
+                "Invalid Games Ratio (threshold: >15%)",
+                String.format("%.1f%% (%d / %d games)", invalidRate, invalidCount, games.size())));
+
+        // Check 6: Low/zero score pattern
+        List<GamePlayerStatsFX> scoredGames = games.stream()
+                .filter(g -> g.getScore() != null)
+                .toList();
+        if (!scoredGames.isEmpty()) {
+            long lowScoreCount = scoredGames.stream()
+                    .filter(g -> g.getScore() <= 0)
+                    .count();
+            double lowScoreRate = (double) lowScoreCount / scoredGames.size() * 100.0;
+            boolean lowScoreFlag = lowScoreRate > 40.0;
+            if (lowScoreFlag) flagCount++;
+            report.append(formatCheckLine(lowScoreFlag,
+                    "Low/Zero Score Games (threshold: >40%)",
+                    String.format("%.1f%% (%d / %d scored games)", lowScoreRate, lowScoreCount, scoredGames.size())));
+        }
+
+        report.append("─".repeat(90)).append("\n");
+
+        String verdict;
+        if (flagCount == 0) {
+            verdict = "VERDICT: CLEAN — No suspicious patterns detected.";
+        } else if (flagCount <= 2) {
+            verdict = String.format("VERDICT: SUSPICIOUS — %d indicator(s) flagged. Manual review recommended.", flagCount);
+        } else {
+            verdict = String.format("VERDICT: HIGH RISK — %d indicators flagged. Strong signs of rating manipulation.", flagCount);
+        }
+        report.append("\n").append(verdict).append("\n");
+
+        TextArea textArea = new TextArea(report.toString());
+        textArea.setEditable(false);
+        textArea.setWrapText(false);
+        textArea.setStyle("-fx-font-family: monospace; -fx-font-size: 12;");
+        textArea.setPrefWidth(800);
+        textArea.setPrefHeight(380);
+
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Rating Manipulation Analysis");
+        alert.setHeaderText(null);
+        alert.getDialogPane().setContent(textArea);
+        alert.getDialogPane().setPrefWidth(840);
+        applyDialogStylesheet(alert);
+        alert.showAndWait();
+    }
+
+    private static String formatCheckLine(boolean flagged, String checkName, String value) {
+        return String.format("[%-4s]  %-45s %s%n", flagged ? "FLAG" : "OK", checkName, value);
+    }
+
+    private void applyDialogStylesheet(Alert alert) {
+        String stylesheet = localPreferences.getTabSettings().isDarkModeCheckBox()
+                ? "/style/main-dark.css" : "/style/main-light.css";
+        var resource = getClass().getResource(stylesheet);
+        if (resource != null) {
+            alert.getDialogPane().getStylesheets().add(resource.toExternalForm());
         }
     }
 
