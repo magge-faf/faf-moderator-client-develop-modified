@@ -4,6 +4,9 @@ import com.faforever.commons.api.dto.BanStatus;
 import com.faforever.commons.api.dto.GroupPermission;
 import com.faforever.commons.api.dto.Validity;
 import com.faforever.commons.api.update.AvatarAssignmentUpdate;
+import javafx.scene.chart.LineChart;
+import javafx.scene.chart.NumberAxis;
+import javafx.scene.chart.XYChart;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.AvatarService;
 import com.faforever.moderatorclient.api.domain.PermissionService;
@@ -119,7 +122,8 @@ public class UserManagementController implements Controller<SplitPane> {
             statusTextFieldProcessingPlayerID,
             statusTextFieldProcessingItem,
             playerIDField1SharedGamesTextfield,
-            playerIDField2SharedGamesTextfield;
+            playerIDField2SharedGamesTextfield,
+            ratingCheckGamesCountField;
 
     @FXML
     public CheckBox
@@ -2236,8 +2240,8 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     public void onCheckRatingManipulation() {
-        List<GamePlayerStatsFX> games = new ArrayList<>(userLastGamesTable.getItems());
-        if (games.isEmpty()) {
+        List<GamePlayerStatsFX> allLoaded = new ArrayList<>(userLastGamesTable.getItems());
+        if (allLoaded.isEmpty()) {
             Alert warn = new Alert(Alert.AlertType.WARNING, "No game data loaded. Select a player first.", ButtonType.OK);
             warn.setTitle("Rating Manipulation Check");
             applyDialogStylesheet(warn);
@@ -2245,12 +2249,24 @@ public class UserManagementController implements Controller<SplitPane> {
             return;
         }
 
+        // Determine how many games to analyse
+        int limit = Integer.MAX_VALUE;
+        String countText = ratingCheckGamesCountField.getText().trim();
+        if (!countText.isEmpty()) {
+            try {
+                limit = Integer.parseInt(countText);
+                if (limit <= 0) limit = Integer.MAX_VALUE;
+            } catch (NumberFormatException ignored) {}
+        }
+        // Games are sorted newest-first; take first <limit> entries = the most recent ones
+        List<GamePlayerStatsFX> games = allLoaded.stream().limit(limit).toList();
+
         List<GamePlayerStatsFX> ratedGames = games.stream()
                 .filter(g -> g.ratingChangeProperty().get() != null)
                 .toList();
 
         if (ratedGames.isEmpty()) {
-            Alert warn = new Alert(Alert.AlertType.WARNING, "No rating journal data available for the loaded games.", ButtonType.OK);
+            Alert warn = new Alert(Alert.AlertType.WARNING, "No rating journal data available for the selected games.", ButtonType.OK);
             warn.setTitle("Rating Manipulation Check");
             applyDialogStylesheet(warn);
             warn.showAndWait();
@@ -2265,7 +2281,8 @@ public class UserManagementController implements Controller<SplitPane> {
 
         int flagCount = 0;
         StringBuilder report = new StringBuilder();
-        report.append(String.format("Analyzed %d games (%d with rating data) for: %s%n%n", games.size(), ratedGames.size(), playerName));
+        report.append(String.format("Analyzed %d games (%d with rating data) for: %s%n%n",
+                games.size(), ratedGames.size(), playerName));
         report.append(String.format("%-8s %-45s %s%n", "Status", "Check", "Value"));
         report.append("─".repeat(90)).append("\n");
 
@@ -2287,7 +2304,7 @@ public class UserManagementController implements Controller<SplitPane> {
         int netRatingChange = 0;
         boolean netRatingFlag = false;
         if (!withFullRating.isEmpty()) {
-            // games are sorted newest-first; last entry = oldest game
+            // games sorted newest-first; last entry = oldest
             int newestAfter = withFullRating.get(0).afterRatingProperty().get();
             int oldestBefore = withFullRating.get(withFullRating.size() - 1).beforeRatingProperty().get();
             netRatingChange = newestAfter - oldestBefore;
@@ -2321,7 +2338,7 @@ public class UserManagementController implements Controller<SplitPane> {
         boolean heavyDropFlag = heavyDrops >= 10;
         if (heavyDropFlag) flagCount++;
         report.append(formatCheckLine(heavyDropFlag,
-                "Games With Drop >=-20 Rating (threshold: >=10 games)",
+                "Games With Drop >= -20 Rating (threshold: >=10 games)",
                 heavyDrops + " games"));
 
         // Check 5: Invalid game ratio
@@ -2365,20 +2382,82 @@ public class UserManagementController implements Controller<SplitPane> {
         }
         report.append("\n").append(verdict).append("\n");
 
+        // --- Analysis tab ---
         TextArea textArea = new TextArea(report.toString());
         textArea.setEditable(false);
         textArea.setWrapText(false);
         textArea.setStyle("-fx-font-family: monospace; -fx-font-size: 12;");
-        textArea.setPrefWidth(800);
-        textArea.setPrefHeight(380);
+        textArea.setPrefWidth(840);
+        textArea.setPrefHeight(420);
 
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("Rating Manipulation Analysis");
-        alert.setHeaderText(null);
-        alert.getDialogPane().setContent(textArea);
-        alert.getDialogPane().setPrefWidth(840);
-        applyDialogStylesheet(alert);
-        alert.showAndWait();
+        // --- Rating History chart tab ---
+        // Reverse so index 0 = oldest game (left of chart)
+        List<GamePlayerStatsFX> chronological = new ArrayList<>(games);
+        Collections.reverse(chronological);
+
+        NumberAxis xAxis = new NumberAxis();
+        xAxis.setLabel("Game (oldest → newest)");
+        xAxis.setTickLabelsVisible(false);
+        xAxis.setMinorTickVisible(false);
+        xAxis.setAutoRanging(true);
+
+        NumberAxis yAxis = new NumberAxis();
+        yAxis.setLabel("Rating");
+        yAxis.setAutoRanging(true);
+        yAxis.setForceZeroInRange(false);
+
+        LineChart<Number, Number> chart = new LineChart<>(xAxis, yAxis);
+        chart.setTitle("Rating History — " + playerName + " (last " + games.size() + " games)");
+        chart.setAnimated(false);
+        chart.setLegendVisible(false);
+        chart.setCreateSymbols(games.size() <= 150);
+        chart.setPrefWidth(840);
+        chart.setPrefHeight(420);
+
+        XYChart.Series<Number, Number> series = new XYChart.Series<>();
+        int gameNum = 1;
+        for (GamePlayerStatsFX g : chronological) {
+            Integer before = g.beforeRatingProperty().get();
+            if (before != null) {
+                XYChart.Data<Number, Number> point = new XYChart.Data<>(gameNum, before);
+                series.getData().add(point);
+            }
+            gameNum++;
+        }
+        // Append final afterRating of the newest game so the line reaches the current rating
+        if (!chronological.isEmpty()) {
+            Integer afterLast = chronological.get(chronological.size() - 1).afterRatingProperty().get();
+            if (afterLast != null) {
+                series.getData().add(new XYChart.Data<>(gameNum, afterLast));
+            }
+        }
+        chart.getData().add(series);
+
+        // Tooltips on data points (added after node is created)
+        for (XYChart.Data<Number, Number> dp : series.getData()) {
+            dp.nodeProperty().addListener((obs, oldNode, node) -> {
+                if (node != null) {
+                    Tooltip.install(node, new Tooltip("Game " + dp.getXValue() + ": " + dp.getYValue().intValue()));
+                }
+            });
+        }
+
+        // --- Tabbed dialog ---
+        Tab analysisTab = new Tab("Analysis", textArea);
+        analysisTab.setClosable(false);
+        Tab chartTab = new Tab("Rating History", chart);
+        chartTab.setClosable(false);
+
+        TabPane tabPane = new TabPane(analysisTab, chartTab);
+
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Rating Manipulation Analysis — " + playerName);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        dialog.getDialogPane().setContent(tabPane);
+        dialog.getDialogPane().setPrefWidth(880);
+        dialog.getDialogPane().setPrefHeight(510);
+        applyDialogStylesheet(dialog.getDialogPane());
+        dialog.showAndWait();
     }
 
     private static String formatCheckLine(boolean flagged, String checkName, String value) {
@@ -2386,11 +2465,15 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     private void applyDialogStylesheet(Alert alert) {
+        applyDialogStylesheet(alert.getDialogPane());
+    }
+
+    private void applyDialogStylesheet(javafx.scene.control.DialogPane pane) {
         String stylesheet = localPreferences.getTabSettings().isDarkModeCheckBox()
                 ? "/style/main-dark.css" : "/style/main-light.css";
         var resource = getClass().getResource(stylesheet);
         if (resource != null) {
-            alert.getDialogPane().getStylesheets().add(resource.toExternalForm());
+            pane.getStylesheets().add(resource.toExternalForm());
         }
     }
 

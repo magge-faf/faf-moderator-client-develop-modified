@@ -244,6 +244,9 @@
                             onAction="#onCheckSharedGames" mnemonicParsing="false"/>
                     <Label fx:id="progressLabelSharedGames" visible="false" minWidth="150"/>
                     <Separator orientation="VERTICAL"/>
+                    <Label text="Last"/>
+                    <TextField fx:id="ratingCheckGamesCountField" prefWidth="55" text="100" promptText="all"/>
+                    <Label text="games"/>
                     <Button text="Check Rating Manipulation" onAction="#onCheckRatingManipulation" mnemonicParsing="false"/>
                 </HBox>
 
