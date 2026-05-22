@@ -36,7 +36,7 @@ public class BanService {
     public void patchBanInfo(@NotNull BanInfoFX banInfoFX) {
         BanInfo banInfo = banInfoMapper.map(banInfoFX);
         log.debug("Patching BanInfo of id: {}", banInfo.getId());
-        fafUser.post(REVOKE_ENDPOINT, RevokeRefreshTokenRequest.allClientsOf(banInfo.getPlayer().getId()));
+        tryRevokeTokens(banInfo.getPlayer().getId());
         banInfo.setAuthor(null);
         banInfo.setPlayer(null);
         fafApi.patch(ElideNavigator.of(BanInfo.class).id(banInfo.getId()), banInfo);
@@ -44,7 +44,7 @@ public class BanService {
 
     public String createBan(@NotNull BanInfoFX banInfoFX) {
         BanInfo banInfo = banInfoMapper.map(banInfoFX);
-        fafUser.post(REVOKE_ENDPOINT, RevokeRefreshTokenRequest.allClientsOf(banInfo.getPlayer().getId()));
+        tryRevokeTokens(banInfo.getPlayer().getId());
         return fafApi.post(ElideNavigator.of(BanInfo.class).collection(), banInfo).getId();
     }
 
@@ -76,8 +76,18 @@ public class BanService {
         ElideNavigatorOnId<BanInfo> navigator = ElideNavigator.of(BanInfo.class)
                 .id(banInfoUpdate.getId());
 
-        fafUser.post(REVOKE_ENDPOINT, RevokeRefreshTokenRequest.allClientsOf(banInfoUpdate.getPlayer().getId()));
+        tryRevokeTokens(banInfoUpdate.getPlayer().getId());
         fafApi.patch(navigator, banInfoUpdate);
+    }
+
+    private void tryRevokeTokens(String playerId) {
+        try {
+            fafUser.post(REVOKE_ENDPOINT, RevokeRefreshTokenRequest.allClientsOf(playerId));
+        } catch (Exception e) {
+            // Token revocation is best-effort; Cloudflare may block the request if no recent browser session
+            // exists for this IP. The ban/patch still proceeds — the player's tokens will expire naturally.
+            log.warn("Failed to revoke tokens for player {} (ban will still be applied): {}", playerId, e.getMessage());
+        }
     }
 
     public CompletableFuture<List<BanInfoFX>> getLatestBans() {
