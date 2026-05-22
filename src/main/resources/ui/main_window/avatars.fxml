@@ -7,7 +7,7 @@
     <items>
         <VBox>
             <children>
-                <HBox maxHeight="1.7976931348623157E308">
+                <HBox maxHeight="1.7976931348623157E308" VBox.vgrow="ALWAYS">
                     <children>
                         <VBox maxHeight="1.7976931348623157E308">
                             <children>
