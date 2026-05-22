@@ -187,6 +187,18 @@ public class ViewHelper {
         tableView.getColumns().add(urlColumn);
         extractors.put(urlColumn, AvatarFX::getUrl);
 
+        TableColumn<AvatarFX, Number> assignmentsColumn = new TableColumn<>("Assignments");
+        assignmentsColumn.setCellValueFactory(o -> Bindings.size(o.getValue().getAssignments()));
+        assignmentsColumn.setMinWidth(90);
+        tableView.getColumns().add(assignmentsColumn);
+
+        TableColumn<AvatarFX, Number> inUseColumn = new TableColumn<>("In use");
+        inUseColumn.setCellValueFactory(o -> Bindings.createIntegerBinding(
+                () -> (int) o.getValue().getAssignments().stream().filter(AvatarAssignmentFX::isSelected).count(),
+                o.getValue().getAssignments()));
+        inUseColumn.setMinWidth(60);
+        tableView.getColumns().add(inUseColumn);
+
         applyCopyContextMenus(tableView, extractors);
     }
 
@@ -975,8 +987,12 @@ public class ViewHelper {
                     DateTimeFormatter uidDateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
                     // Shared sort order for in-cell UID lines; both columns use the same instance
-                    // so line N in "UID Created" always matches line N in "UID Last Used"
-                    var uidSortOrder = new SimpleObjectProperty<Comparator<UniqueIdAssignmentFx>>(null);
+                    // so line N in "UID Created" always matches line N in "UID Last Used".
+                    // Default: descending by updateTime (newest UID Last Used first).
+                    Comparator<UniqueIdAssignmentFx> defaultUidSort = Comparator.comparing(
+                            UniqueIdAssignmentFx::getUpdateTime,
+                            Comparator.nullsLast(Comparator.naturalOrder())).reversed();
+                    var uidSortOrder = new SimpleObjectProperty<Comparator<UniqueIdAssignmentFx>>(defaultUidSort);
 
                     TableColumn<PlayerFX, String> uidCreatedAt = new TableColumn<>("UID Created");
                     uidCreatedAt.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
@@ -1204,7 +1220,7 @@ public class ViewHelper {
                             uidSortOrder.set(asc ? base : base.reversed());
                             return true;
                         }
-                        uidSortOrder.set(null);
+                        uidSortOrder.set(defaultUidSort);
                         if (tv.getComparator() != null) {
                             FXCollections.sort(tv.getItems(), tv.getComparator());
                         }
