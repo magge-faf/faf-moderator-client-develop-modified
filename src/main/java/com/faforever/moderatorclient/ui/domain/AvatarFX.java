@@ -47,7 +47,7 @@ public class AvatarFX extends AbstractEntityFX {
         return tooltip;
     }
 
-    public List<AvatarAssignmentFX> getAssignments() {
+    public ObservableList<AvatarAssignmentFX> getAssignments() {
         return assignments;
     }
 
