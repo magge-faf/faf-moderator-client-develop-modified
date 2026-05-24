@@ -81,12 +81,11 @@ public class BanService {
     }
 
     private void tryRevokeTokens(String playerId) {
-        try {
-            fafUser.post(REVOKE_ENDPOINT, RevokeRefreshTokenRequest.allClientsOf(playerId));
-        } catch (Exception e) {
-            // Token revocation is best-effort; Cloudflare may block the request if no recent browser session
-            // exists for this IP. The ban/patch still proceeds — the player's tokens will expire naturally.
-            log.warn("Failed to revoke tokens for player {} (ban will still be applied): {}", playerId, e.getMessage());
+        // Best-effort: Cloudflare may block Java HTTP clients that haven't passed a browser challenge.
+        // The ban is always applied — tokens will expire naturally if revocation is blocked.
+        boolean revoked = fafUser.tryPost(REVOKE_ENDPOINT, RevokeRefreshTokenRequest.allClientsOf(playerId));
+        if (!revoked) {
+            log.warn("Failed to revoke tokens for player {} (ban will still be applied)", playerId);
         }
     }
 
