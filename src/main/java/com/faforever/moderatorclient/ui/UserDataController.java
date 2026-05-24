@@ -1,6 +1,8 @@
 package com.faforever.moderatorclient.ui;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
@@ -76,124 +78,94 @@ public class UserDataController {
     }
 
     // --- Typed classes for UserInfo ---
-    @Getter
-    @Setter
-    @ToString
+    @Getter @Setter @ToString @NoArgsConstructor @AllArgsConstructor
     public static class EmailEntry {
         private String email;
         private String addedOn;
     }
 
-    @Getter
-    @Setter
-    @ToString
+    @Getter @Setter @ToString @NoArgsConstructor @AllArgsConstructor
     public static class UserAgentEntry {
         private String userAgent;
         private String addedOn;
     }
 
     // --- Typed classes for AccountHistory ---
-    @Getter
-    @Setter
-    @ToString
+    @Getter @Setter @ToString
     public static class HistoryEntry {
         private String action;
         private String timestamp;
         private String description;
     }
 
-    @Getter
-    @Setter
-    @ToString
+    @Getter @Setter @ToString @NoArgsConstructor @AllArgsConstructor
     public static class LoginEntry {
         private String ip;
         private String addedOn;
     }
 
     // --- Typed classes for HardwareInfo ---
-    @Getter
-    @Setter
-    @ToString
+    @Getter @Setter @ToString @NoArgsConstructor @AllArgsConstructor
     public static class IpAddressEntry {
         private String ip;
         private String addedOn;
     }
 
-    @Getter
-    @Setter
-    @ToString
+    @Getter @Setter @ToString @NoArgsConstructor @AllArgsConstructor
     public static class UuidEntry {
         private String uuid;
         private String addedOn;
     }
 
-    @Getter
-    @Setter
-    @ToString
+    @Getter @Setter @ToString @NoArgsConstructor @AllArgsConstructor
     public static class DeviceIdEntry {
         private String deviceId;
         private String addedOn;
     }
 
-    @Getter
-    @Setter
-    @ToString
+    @Getter @Setter @ToString @NoArgsConstructor @AllArgsConstructor
     public static class SerialNumberEntry {
         private String serialNumber;
         private String addedOn;
     }
 
-    @Getter
-    @Setter
-    @ToString
+    @Getter @Setter @ToString @NoArgsConstructor @AllArgsConstructor
     public static class ProcessorIdEntry {
         private String processorId;
         private String addedOn;
     }
 
-    @Getter
-    @Setter
-    @ToString
+    @Getter @Setter @ToString @NoArgsConstructor @AllArgsConstructor
     public static class CpuNameEntry {
         private String cpuName;
         private String addedOn;
     }
 
-    @Getter
-    @Setter
-    @ToString
+    @Getter @Setter @ToString @NoArgsConstructor @AllArgsConstructor
     public static class BiosVersionEntry {
         private String biosVersion;
         private String addedOn;
     }
 
-    @Getter
-    @Setter
-    @ToString
+    @Getter @Setter @ToString @NoArgsConstructor @AllArgsConstructor
     public static class ManufacturerEntry {
         private String manufacturer;
         private String addedOn;
     }
 
-    @Getter
-    @Setter
-    @ToString
+    @Getter @Setter @ToString @NoArgsConstructor @AllArgsConstructor
     public static class HashEntry {
         private String hash;
         private String addedOn;
     }
 
-    @Getter
-    @Setter
-    @ToString
+    @Getter @Setter @ToString @NoArgsConstructor @AllArgsConstructor
     public static class MemorySerialNumberEntry {
         private String memorySerialNumber;
         private String addedOn;
     }
 
-    @Getter
-    @Setter
-    @ToString
+    @Getter @Setter @ToString @NoArgsConstructor @AllArgsConstructor
     public static class VolumeSerialNumberEntry {
         private String volumeSerialNumber;
         private String addedOn;

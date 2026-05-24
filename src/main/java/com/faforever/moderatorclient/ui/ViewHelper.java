@@ -70,6 +70,8 @@ import javafx.application.Platform;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import com.faforever.moderatorclient.ui.domain.UniqueIdFx;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -89,6 +91,10 @@ public class ViewHelper {
 
     private static final java.util.Map<String, List<UserNoteFX>> noteCache = new ConcurrentHashMap<>();
     private static final Set<String> noteLoadingInFlight = ConcurrentHashMap.newKeySet();
+
+    private static final DateTimeFormatter DT_DATETIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final DateTimeFormatter DT_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final DateTimeFormatter DT_UID = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     @Autowired
     public ViewHelper(SmurfManagementController smurfManagementController) {
@@ -395,34 +401,13 @@ public class ViewHelper {
         extractors.put(revocationAtColumn, BanInfoFX::getRevokeTime);
 
         TableColumn<BanInfoFX, OffsetDateTime> changeTimeColumn = new TableColumn<>("Created Time");
-        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-        changeTimeColumn.setCellFactory(column -> new TableCell<BanInfoFX, OffsetDateTime>() {
-            @Override
-            protected void updateItem(OffsetDateTime item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                } else {
-                    setText(item.format(dateFormatter));
-                }
-            }
-        });
+        changeTimeColumn.setCellFactory(offsetDateTimeCellFactory(DT_DATETIME));
         changeTimeColumn.setCellValueFactory(new PropertyValueFactory<>("createTime"));
         changeTimeColumn.setMinWidth(180);
         tableView.getColumns().add(changeTimeColumn);
 
         TableColumn<BanInfoFX, OffsetDateTime> updateTimeColumn = new TableColumn<>("Update Time");
-        updateTimeColumn.setCellFactory(column -> new TableCell<BanInfoFX, OffsetDateTime>() {
-            @Override
-            protected void updateItem(OffsetDateTime item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                } else {
-                    setText(item.format(dateFormatter));
-                }
-            }
-        });
+        updateTimeColumn.setCellFactory(offsetDateTimeCellFactory(DT_DATETIME));
         updateTimeColumn.setCellValueFactory(new PropertyValueFactory<>("updateTime"));
         updateTimeColumn.setMinWidth(180);
         tableView.getColumns().add(updateTimeColumn);
@@ -442,19 +427,7 @@ public class ViewHelper {
         extractors.put(idColumn, NameRecordFX::getId);
 
         TableColumn<NameRecordFX, OffsetDateTime> changeTimeColumn = new TableColumn<>("Change Time");
-        changeTimeColumn.setCellFactory(column -> new TableCell<NameRecordFX, OffsetDateTime>() {
-            DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-
-            @Override
-            protected void updateItem(OffsetDateTime item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                } else {
-                    setText(item.format(dateFormatter));
-                }
-            }
-        });
+        changeTimeColumn.setCellFactory(offsetDateTimeCellFactory(DT_DATETIME));
         changeTimeColumn.setCellValueFactory(o -> o.getValue().changeTimeProperty());
         changeTimeColumn.setMinWidth(180);
         tableView.getColumns().add(changeTimeColumn);
@@ -702,13 +675,12 @@ public class ViewHelper {
         List<UserNoteFX> notes = noteCache.get(player.getId());
         if (notes != null && !notes.isEmpty()) {
             items.add(new SeparatorMenuItem());
-            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
             notes.stream()
                     .sorted(Comparator.<UserNoteFX, OffsetDateTime>comparing(
                             n -> n.getCreateTime() != null ? n.getCreateTime() : OffsetDateTime.MIN)
                             .reversed())
                     .forEach(note -> {
-                        String date = note.getCreateTime() != null ? fmt.format(note.getCreateTime()) : "?";
+                        String date = note.getCreateTime() != null ? DT_DATE.format(note.getCreateTime()) : "?";
                         String author = note.getAuthor() != null ? note.getAuthor().getLogin() : "?";
                         String label = "[" + date + "] " + author + ": " + truncateNote(note.getNote(), 40);
                         MenuItem editItem = new MenuItem("Edit: " + label);
@@ -767,13 +739,12 @@ public class ViewHelper {
 
     private static String formatNotes(List<UserNoteFX> notes) {
         if (notes.isEmpty()) return "No notes";
-        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         return notes.stream()
                 .sorted(Comparator.<UserNoteFX, OffsetDateTime>comparing(
                         n -> n.getCreateTime() != null ? n.getCreateTime() : OffsetDateTime.MIN)
                         .reversed())
                 .map(n -> {
-                    String date = n.getCreateTime() != null ? fmt.format(n.getCreateTime()) : "?";
+                    String date = n.getCreateTime() != null ? DT_DATE.format(n.getCreateTime()) : "?";
                     String author = n.getAuthor() != null && n.getAuthor().getLogin() != null
                             ? n.getAuthor().getLogin() : "?";
                     return "[" + date + "] " + author + ": " + n.getNote();
@@ -941,19 +912,7 @@ public class ViewHelper {
         extractors.put(emailColumn, PlayerFX::getEmail);
 
         TableColumn<PlayerFX, OffsetDateTime> createTimeColumn = new TableColumn<>("Registration Date");
-        createTimeColumn.setCellFactory(col -> new TableCell<>() {
-            private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-
-            @Override
-            protected void updateItem(OffsetDateTime item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                } else {
-                    setText(formatter.format(item));
-                }
-            }
-        });
+        createTimeColumn.setCellFactory(offsetDateTimeCellFactory(DT_DATETIME));
 
         createTimeColumn.setCellValueFactory(o -> o.getValue().createTimeProperty());
         createTimeColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
@@ -966,25 +925,13 @@ public class ViewHelper {
         lastLoginColumn.prefWidthProperty().bind(Bindings.createDoubleBinding(() ->
                 calculateMaxTextWidthPlayerFX(tableView.getItems(), PlayerFX::getLastLogin), tableView.getItems()));
 
-        lastLoginColumn.setCellFactory(col -> new TableCell<>() {
-            private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-
-            @Override
-            protected void updateItem(OffsetDateTime item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                } else {
-                    setText(formatter.format(item));
-                }
-            }
-        });
+        lastLoginColumn.setCellFactory(offsetDateTimeCellFactory(DT_DATETIME));
         tableView.getColumns().add(lastLoginColumn);
 
         {
             {
                 if (showUidData) {
-                    DateTimeFormatter uidDateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+                    DateTimeFormatter uidDateFmt = DT_UID;
 
                     // Shared sort order for in-cell UID lines; both columns use the same instance
                     // so line N in "UID Created" always matches line N in "UID Last Used".
@@ -1067,140 +1014,15 @@ public class ViewHelper {
                     extractors.put(userAgentColumn, PlayerFX::getUserAgent);
 
 
-                    TableColumn<PlayerFX, String> hashColumn = new TableColumn<>("Hash");
-                    hashColumn.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
-                        List<UniqueIdAssignmentFx> list = new ArrayList<>(o.getValue().getUniqueIdAssignments());
-                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
-                        return list.stream().map(a -> a.getUniqueId().getHash()).collect(Collectors.joining("\n"));
-                    }, o.getValue().getUniqueIdAssignments(), uidSortOrder));
-                    hashColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
-                    hashColumn.setMinWidth(40);
-                    tableView.getColumns().add(hashColumn);
-                    extractors.put(hashColumn, playerFX -> {
-                        List<UniqueIdAssignmentFx> list = new ArrayList<>(playerFX.getUniqueIdAssignments());
-                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
-                        return list.stream().map(a -> a.getUniqueId().getHash()).collect(Collectors.toList());
-                    });
-
-                    TableColumn<PlayerFX, String> uuidColumn = new TableColumn<>("UUID");
-                    uuidColumn.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
-                        List<UniqueIdAssignmentFx> list = new ArrayList<>(o.getValue().getUniqueIdAssignments());
-                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
-                        return list.stream().map(a -> a.getUniqueId().getUuid()).collect(Collectors.joining("\n"));
-                    }, o.getValue().getUniqueIdAssignments(), uidSortOrder));
-                    uuidColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
-                    uuidColumn.setMinWidth(40);
-                    tableView.getColumns().add(uuidColumn);
-                    extractors.put(uuidColumn, playerFX -> {
-                        List<UniqueIdAssignmentFx> list = new ArrayList<>(playerFX.getUniqueIdAssignments());
-                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
-                        return list.stream().map(a -> a.getUniqueId().getUuid()).collect(Collectors.toList());
-                    });
-
-                    TableColumn<PlayerFX, String> memorySerialColumn = new TableColumn<>("Memory S/N");
-                    memorySerialColumn.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
-                        List<UniqueIdAssignmentFx> list = new ArrayList<>(o.getValue().getUniqueIdAssignments());
-                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
-                        return list.stream().map(a -> a.getUniqueId().getMemorySerialNumber()).collect(Collectors.joining("\n"));
-                    }, o.getValue().getUniqueIdAssignments(), uidSortOrder));
-                    memorySerialColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
-                    memorySerialColumn.setMinWidth(40);
-                    tableView.getColumns().add(memorySerialColumn);
-                    extractors.put(memorySerialColumn, playerFX -> {
-                        List<UniqueIdAssignmentFx> list = new ArrayList<>(playerFX.getUniqueIdAssignments());
-                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
-                        return list.stream().map(a -> a.getUniqueId().getMemorySerialNumber()).collect(Collectors.toList());
-                    });
-
-                    TableColumn<PlayerFX, String> deviceIdColumn = new TableColumn<>("Device ID");
-                    deviceIdColumn.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
-                        List<UniqueIdAssignmentFx> list = new ArrayList<>(o.getValue().getUniqueIdAssignments());
-                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
-                        return list.stream().map(a -> a.getUniqueId().getDeviceId()).collect(Collectors.joining("\n"));
-                    }, o.getValue().getUniqueIdAssignments(), uidSortOrder));
-                    deviceIdColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
-                    deviceIdColumn.setMinWidth(40);
-                    tableView.getColumns().add(deviceIdColumn);
-                    extractors.put(deviceIdColumn, playerFX -> {
-                        List<UniqueIdAssignmentFx> list = new ArrayList<>(playerFX.getUniqueIdAssignments());
-                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
-                        return list.stream().map(a -> a.getUniqueId().getDeviceId()).collect(Collectors.toList());
-                    });
-
-                    TableColumn<PlayerFX, String> manufacturerColumn = new TableColumn<>("Manufacturer");
-                    manufacturerColumn.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
-                        List<UniqueIdAssignmentFx> list = new ArrayList<>(o.getValue().getUniqueIdAssignments());
-                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
-                        return list.stream().map(a -> a.getUniqueId().getManufacturer()).collect(Collectors.joining("\n"));
-                    }, o.getValue().getUniqueIdAssignments(), uidSortOrder));
-                    manufacturerColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
-                    manufacturerColumn.setMinWidth(40);
-                    tableView.getColumns().add(manufacturerColumn);
-                    extractors.put(manufacturerColumn, playerFX -> {
-                        List<UniqueIdAssignmentFx> list = new ArrayList<>(playerFX.getUniqueIdAssignments());
-                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
-                        return list.stream().map(a -> a.getUniqueId().getManufacturer()).collect(Collectors.toList());
-                    });
-
-                    TableColumn<PlayerFX, String> cpuNameColumn = new TableColumn<>("CPU Name");
-                    cpuNameColumn.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
-                        List<UniqueIdAssignmentFx> list = new ArrayList<>(o.getValue().getUniqueIdAssignments());
-                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
-                        return list.stream().map(a -> a.getUniqueId().getName()).collect(Collectors.joining("\n"));
-                    }, o.getValue().getUniqueIdAssignments(), uidSortOrder));
-                    cpuNameColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
-                    cpuNameColumn.setMinWidth(40);
-                    tableView.getColumns().add(cpuNameColumn);
-                    extractors.put(cpuNameColumn, playerFX -> {
-                        List<UniqueIdAssignmentFx> list = new ArrayList<>(playerFX.getUniqueIdAssignments());
-                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
-                        return list.stream().map(a -> a.getUniqueId().getName()).collect(Collectors.toList());
-                    });
-
-                    TableColumn<PlayerFX, String> processorIdColumn = new TableColumn<>("Processor Id");
-                    processorIdColumn.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
-                        List<UniqueIdAssignmentFx> list = new ArrayList<>(o.getValue().getUniqueIdAssignments());
-                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
-                        return list.stream().map(a -> a.getUniqueId().getProcessorId()).collect(Collectors.joining("\n"));
-                    }, o.getValue().getUniqueIdAssignments(), uidSortOrder));
-                    processorIdColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
-                    processorIdColumn.setMinWidth(40);
-                    tableView.getColumns().add(processorIdColumn);
-                    extractors.put(processorIdColumn, playerFX -> {
-                        List<UniqueIdAssignmentFx> list = new ArrayList<>(playerFX.getUniqueIdAssignments());
-                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
-                        return list.stream().map(a -> a.getUniqueId().getProcessorId()).collect(Collectors.toList());
-                    });
-
-                    TableColumn<PlayerFX, String> serialColumn = new TableColumn<>("S/N");
-                    serialColumn.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
-                        List<UniqueIdAssignmentFx> list = new ArrayList<>(o.getValue().getUniqueIdAssignments());
-                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
-                        return list.stream().map(a -> a.getUniqueId().getSerialNumber()).collect(Collectors.joining("\n"));
-                    }, o.getValue().getUniqueIdAssignments(), uidSortOrder));
-                    serialColumn.setCellFactory(uidHighlightCellFactory(highlightTerm));
-                    serialColumn.setMinWidth(200);
-                    tableView.getColumns().add(serialColumn);
-                    extractors.put(serialColumn, playerFX -> {
-                        List<UniqueIdAssignmentFx> list = new ArrayList<>(playerFX.getUniqueIdAssignments());
-                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
-                        return list.stream().map(a -> a.getUniqueId().getSerialNumber()).collect(Collectors.toList());
-                    });
-
-                    TableColumn<PlayerFX, String> volumeSerialNumber = new TableColumn<>("Volume S/N");
-                    volumeSerialNumber.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
-                        List<UniqueIdAssignmentFx> list = new ArrayList<>(o.getValue().getUniqueIdAssignments());
-                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
-                        return list.stream().map(a -> a.getUniqueId().getVolumeSerialNumber()).collect(Collectors.joining("\n"));
-                    }, o.getValue().getUniqueIdAssignments(), uidSortOrder));
-                    volumeSerialNumber.setCellFactory(uidHighlightCellFactory(highlightTerm));
-                    volumeSerialNumber.setMinWidth(40);
-                    tableView.getColumns().add(volumeSerialNumber);
-                    extractors.put(volumeSerialNumber, playerFX -> {
-                        List<UniqueIdAssignmentFx> list = new ArrayList<>(playerFX.getUniqueIdAssignments());
-                        if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
-                        return list.stream().map(a -> a.getUniqueId().getVolumeSerialNumber()).collect(Collectors.toList());
-                    });
+                    addUidStringColumn(tableView, extractors, "Hash",        40,  a -> a.getUniqueId().getHash(),               uidSortOrder, highlightTerm);
+                    addUidStringColumn(tableView, extractors, "UUID",        40,  a -> a.getUniqueId().getUuid(),               uidSortOrder, highlightTerm);
+                    addUidStringColumn(tableView, extractors, "Memory S/N",  40,  a -> a.getUniqueId().getMemorySerialNumber(), uidSortOrder, highlightTerm);
+                    addUidStringColumn(tableView, extractors, "Device ID",   40,  a -> a.getUniqueId().getDeviceId(),           uidSortOrder, highlightTerm);
+                    addUidStringColumn(tableView, extractors, "Manufacturer",40,  a -> a.getUniqueId().getManufacturer(),       uidSortOrder, highlightTerm);
+                    addUidStringColumn(tableView, extractors, "CPU Name",    40,  a -> a.getUniqueId().getName(),               uidSortOrder, highlightTerm);
+                    addUidStringColumn(tableView, extractors, "Processor Id",40,  a -> a.getUniqueId().getProcessorId(),        uidSortOrder, highlightTerm);
+                    addUidStringColumn(tableView, extractors, "S/N",         200, a -> a.getUniqueId().getSerialNumber(),       uidSortOrder, highlightTerm);
+                    addUidStringColumn(tableView, extractors, "Volume S/N",  40,  a -> a.getUniqueId().getVolumeSerialNumber(), uidSortOrder, highlightTerm);
 
                     // Clicking "UID Created" or "UID Last Used" sorts lines within each cell.
                     // Both columns share uidSortOrder, so line N always stays paired across both.
@@ -1435,66 +1257,17 @@ public class ViewHelper {
         List<UserDataController.VolumeSerialNumberEntry> volumeList = new ArrayList<>();
 
         for (UniqueIdAssignmentFx item : playerFX.getUniqueIdAssignments()) {
-            if (item.getUniqueId().getUuid() != null && !item.getUniqueId().getUuid().isEmpty()) {
-                UserDataController.UuidEntry e = new UserDataController.UuidEntry();
-                e.setUuid(item.getUniqueId().getUuid());
-                e.setAddedOn(timestamp);
-                uuidList.add(e);
-            }
-            if (item.getUniqueId().getDeviceId() != null && !item.getUniqueId().getDeviceId().isEmpty()) {
-                UserDataController.DeviceIdEntry e = new UserDataController.DeviceIdEntry();
-                e.setDeviceId(item.getUniqueId().getDeviceId());
-                e.setAddedOn(timestamp);
-                deviceIdList.add(e);
-            }
-            if (item.getUniqueId().getSerialNumber() != null && !item.getUniqueId().getSerialNumber().isEmpty()) {
-                UserDataController.SerialNumberEntry e = new UserDataController.SerialNumberEntry();
-                e.setSerialNumber(item.getUniqueId().getSerialNumber());
-                e.setAddedOn(timestamp);
-                serialList.add(e);
-            }
-            if (item.getUniqueId().getProcessorId() != null && !item.getUniqueId().getProcessorId().isEmpty()) {
-                UserDataController.ProcessorIdEntry e = new UserDataController.ProcessorIdEntry();
-                e.setProcessorId(item.getUniqueId().getProcessorId());
-                e.setAddedOn(timestamp);
-                processorList.add(e);
-            }
-            if (item.getUniqueId().getName() != null && !item.getUniqueId().getName().isEmpty()) {
-                UserDataController.CpuNameEntry e = new UserDataController.CpuNameEntry();
-                e.setCpuName(item.getUniqueId().getName());
-                e.setAddedOn(timestamp);
-                cpuList.add(e);
-            }
-            if (item.getUniqueId().getSMBIOSBIOSVersion() != null && !item.getUniqueId().getSMBIOSBIOSVersion().isEmpty()) {
-                UserDataController.BiosVersionEntry e = new UserDataController.BiosVersionEntry();
-                e.setBiosVersion(item.getUniqueId().getSMBIOSBIOSVersion());
-                e.setAddedOn(timestamp);
-                biosList.add(e);
-            }
-            if (item.getUniqueId().getManufacturer() != null && !item.getUniqueId().getManufacturer().isEmpty()) {
-                UserDataController.ManufacturerEntry e = new UserDataController.ManufacturerEntry();
-                e.setManufacturer(item.getUniqueId().getManufacturer());
-                e.setAddedOn(timestamp);
-                manufacturerList.add(e);
-            }
-            if (item.getUniqueId().getHash() != null && !item.getUniqueId().getHash().isEmpty()) {
-                UserDataController.HashEntry e = new UserDataController.HashEntry();
-                e.setHash(item.getUniqueId().getHash());
-                e.setAddedOn(timestamp);
-                hashList.add(e);
-            }
-            if (item.getUniqueId().getMemorySerialNumber() != null && !item.getUniqueId().getMemorySerialNumber().isEmpty()) {
-                UserDataController.MemorySerialNumberEntry e = new UserDataController.MemorySerialNumberEntry();
-                e.setMemorySerialNumber(item.getUniqueId().getMemorySerialNumber());
-                e.setAddedOn(timestamp);
-                memoryList.add(e);
-            }
-            if (item.getUniqueId().getVolumeSerialNumber() != null && !item.getUniqueId().getVolumeSerialNumber().isEmpty()) {
-                UserDataController.VolumeSerialNumberEntry e = new UserDataController.VolumeSerialNumberEntry();
-                e.setVolumeSerialNumber(item.getUniqueId().getVolumeSerialNumber());
-                e.setAddedOn(timestamp);
-                volumeList.add(e);
-            }
+            UniqueIdFx uid = item.getUniqueId();
+            addIfNonEmpty(uid.getUuid(),               timestamp, uuidList,       UserDataController.UuidEntry::new);
+            addIfNonEmpty(uid.getDeviceId(),            timestamp, deviceIdList,   UserDataController.DeviceIdEntry::new);
+            addIfNonEmpty(uid.getSerialNumber(),        timestamp, serialList,     UserDataController.SerialNumberEntry::new);
+            addIfNonEmpty(uid.getProcessorId(),         timestamp, processorList,  UserDataController.ProcessorIdEntry::new);
+            addIfNonEmpty(uid.getName(),                timestamp, cpuList,        UserDataController.CpuNameEntry::new);
+            addIfNonEmpty(uid.getSMBIOSBIOSVersion(),   timestamp, biosList,       UserDataController.BiosVersionEntry::new);
+            addIfNonEmpty(uid.getManufacturer(),        timestamp, manufacturerList, UserDataController.ManufacturerEntry::new);
+            addIfNonEmpty(uid.getHash(),                timestamp, hashList,       UserDataController.HashEntry::new);
+            addIfNonEmpty(uid.getMemorySerialNumber(),  timestamp, memoryList,     UserDataController.MemorySerialNumberEntry::new);
+            addIfNonEmpty(uid.getVolumeSerialNumber(),  timestamp, volumeList,     UserDataController.VolumeSerialNumberEntry::new);
         }
 
         hardware.setUuidEntries(uuidList);
@@ -1545,6 +1318,47 @@ public class ViewHelper {
         }
 
         return false;
+    }
+
+    private static <T> Callback<TableColumn<T, OffsetDateTime>, TableCell<T, OffsetDateTime>> offsetDateTimeCellFactory(DateTimeFormatter fmt) {
+        return col -> new TableCell<>() {
+            @Override
+            protected void updateItem(OffsetDateTime item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? null : fmt.format(item));
+            }
+        };
+    }
+
+    private static TableColumn<PlayerFX, String> addUidStringColumn(
+            TableView<PlayerFX> tableView,
+            HashMap<TableColumn<PlayerFX, ?>, Function<PlayerFX, ?>> extractors,
+            String title,
+            double minWidth,
+            Function<UniqueIdAssignmentFx, String> fieldGetter,
+            SimpleObjectProperty<Comparator<UniqueIdAssignmentFx>> uidSortOrder,
+            @Nullable StringProperty highlightTerm) {
+        TableColumn<PlayerFX, String> col = new TableColumn<>(title);
+        col.setCellValueFactory(o -> Bindings.createStringBinding(() -> {
+            List<UniqueIdAssignmentFx> list = new ArrayList<>(o.getValue().getUniqueIdAssignments());
+            if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+            return list.stream().map(fieldGetter).collect(Collectors.joining("\n"));
+        }, o.getValue().getUniqueIdAssignments(), uidSortOrder));
+        col.setCellFactory(uidHighlightCellFactory(highlightTerm));
+        col.setMinWidth(minWidth);
+        tableView.getColumns().add(col);
+        extractors.put(col, playerFX -> {
+            List<UniqueIdAssignmentFx> list = new ArrayList<>(playerFX.getUniqueIdAssignments());
+            if (uidSortOrder.get() != null) list.sort(uidSortOrder.get());
+            return list.stream().map(fieldGetter).collect(Collectors.toList());
+        });
+        return col;
+    }
+
+    private static <E> void addIfNonEmpty(String value, String timestamp, List<E> list, BiFunction<String, String, E> creator) {
+        if (value != null && !value.isEmpty()) {
+            list.add(creator.apply(value, timestamp));
+        }
     }
 
     private static Callback<TableColumn<PlayerFX, String>, TableCell<PlayerFX, String>> uidHighlightCellFactory(
@@ -3139,20 +2953,7 @@ public class ViewHelper {
         extractors.put(lastModeratorColumn, reportFx -> reportFx.getLastModerator() == null ? null : reportFx.getLastModerator().getLogin());
 
         TableColumn<ModerationReportFX, OffsetDateTime> createTimeColumn = new TableColumn<>("Create time");
-
-        createTimeColumn.setCellFactory(col -> new TableCell<>() {
-            private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-
-            @Override
-            protected void updateItem(OffsetDateTime item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                } else {
-                    setText(formatter.format(item));
-                }
-            }
-        });
+        createTimeColumn.setCellFactory(offsetDateTimeCellFactory(DT_DATETIME));
 
         createTimeColumn.setCellValueFactory(param -> param.getValue().createTimeProperty());
         createTimeColumn.setId("createTimeColumn");
