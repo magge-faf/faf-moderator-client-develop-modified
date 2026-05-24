@@ -167,6 +167,10 @@ public class GameFX extends AbstractEntityFX {
     }
 
     public String getReplayUrl(String baseUrlFormat) {
-        return String.format(baseUrlFormat, id.get());
+        String idValue = id.get();
+        if (idValue == null) {
+            return null;
+        }
+        return String.format(baseUrlFormat, idValue);
     }
 }
