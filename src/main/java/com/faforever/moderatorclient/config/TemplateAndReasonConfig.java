@@ -13,10 +13,6 @@ public class TemplateAndReasonConfig {
     private String days;
     private String format;
 
-    @Setter
-    @Getter
     private List<TemplateAndReasonConfig> templates;
-    @Setter
-    @Getter
     private List<String> reasons;
 }
