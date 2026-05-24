@@ -1315,13 +1315,17 @@ public class ModerationReportController implements Controller<Region> {
             return;
         }
 
-        if (selectedItems.size() > 5) {
-            if (!showConfirmationDialog(selectedItems.size())) {
+        // Snapshot before any dialogs — showAndWait() pumps the event loop and a
+        // background refresh could clear itemList and reset the selection mid-wait.
+        List<ModerationReportFX> snapshot = new ArrayList<>(selectedItems);
+
+        if (snapshot.size() > 5) {
+            if (!showConfirmationDialog(snapshot.size())) {
                 return;
             }
         }
 
-        openEditDialog(selectedItems);
+        openEditDialog(snapshot);
     }
 
     private boolean showConfirmationDialog(int numberOfReports) {
@@ -1367,10 +1371,10 @@ public class ModerationReportController implements Controller<Region> {
         return result.isPresent() && result.get() == confirmButtonType;
     }
 
-    private void openEditDialog(ObservableList<ModerationReportFX> selectedItems) {
+    private void openEditDialog(List<ModerationReportFX> selectedItems) {
         try {
             EditModerationReportController editModerationReportController = uiService.loadFxml("ui/edit_moderation_report.fxml");
-            editModerationReportController.setSelectedReports(new ArrayList<>(selectedItems));
+            editModerationReportController.setSelectedReports(selectedItems);
 
             Stage editDialog = new Stage();
             int numberOfReports = selectedItems.size();
