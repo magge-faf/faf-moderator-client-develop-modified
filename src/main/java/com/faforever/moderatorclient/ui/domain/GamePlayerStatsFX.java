@@ -84,24 +84,16 @@ public class GamePlayerStatsFX extends AbstractEntityFX {
         }));
     }
 
-    public int getBeforeRating() {
+    public Integer getBeforeRating() {
         return beforeRating.get();
-    }
-
-    public void setBeforeRating(int beforeRating) {
-        this.beforeRating.set(beforeRating);
     }
 
     public ObjectProperty<Integer> beforeRatingProperty() {
         return beforeRating;
     }
 
-    public int getAfterRating() {
+    public Integer getAfterRating() {
         return afterRating.get();
-    }
-
-    public void setAfterRating(int afterRating) {
-        this.afterRating.set(afterRating);
     }
 
     public ObjectProperty<Integer> afterRatingProperty() {
@@ -110,10 +102,6 @@ public class GamePlayerStatsFX extends AbstractEntityFX {
 
     public Number getRatingChange() {
         return ratingChange.get();
-    }
-
-    public void setRatingChange(int ratingChange) {
-        this.ratingChange.set(ratingChange);
     }
 
     public ObjectProperty<Number> ratingChangeProperty() {
