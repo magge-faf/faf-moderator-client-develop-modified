@@ -31,6 +31,7 @@ import org.springframework.util.Assert;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Callable;
 
 @Slf4j
 @Component
@@ -114,37 +115,18 @@ public class AvatarsController implements Controller<SplitPane> {
         UrlImageViewTableCell.updateProgressLabel();
         avatarTableView.setPlaceholder(new ProgressIndicator());
 
-        Task<List<AvatarFX>> loadAvatarsTask = new Task<>() {
-            @Override
-            protected List<AvatarFX> call() {
-                int page = 1;
-                int pageSize = environmentProperties.getMaxResultPageSizeAvatars();
-                List<Avatar> currentPage;
-                List<AvatarFX> allAvatars = FXCollections.observableArrayList();
-
-                do {
-                    currentPage = avatarService.getAllAvatarsPage(page, pageSize);
-                    List<AvatarFX> fxPage = avatarMapper.map(currentPage);
-                    allAvatars.addAll(fxPage);
-                    page++;
-                } while (currentPage.size() == pageSize);
-
-                return allAvatars;
-            }
-        };
-
-        loadAvatarsTask.setOnSucceeded(event -> {
-            avatars.setAll(loadAvatarsTask.getValue());
-            avatarTableView.getSortOrder().clear();
-        });
-
-        loadAvatarsTask.setOnFailed(e -> {
-            Throwable t = loadAvatarsTask.getException();
-            log.error("Failed to load avatars", t);
-            ViewHelper.errorDialog("Error", "Failed to load avatars: " + t.getMessage());
-        });
-
-        new Thread(loadAvatarsTask, "LoadAvatarsThread").start();
+        runAvatarTask(() -> {
+            int page = 1;
+            int pageSize = environmentProperties.getMaxResultPageSizeAvatars();
+            List<Avatar> currentPage;
+            List<AvatarFX> allAvatars = FXCollections.observableArrayList();
+            do {
+                currentPage = avatarService.getAllAvatarsPage(page, pageSize);
+                allAvatars.addAll(avatarMapper.map(currentPage));
+                page++;
+            } while (currentPage.size() == pageSize);
+            return allAvatars;
+        }, "LoadAvatarsThread", "Failed to load avatars");
     }
 
     private void openAvatarDialog(AvatarFX avatarFX, boolean isNew) {
@@ -169,35 +151,19 @@ public class AvatarsController implements Controller<SplitPane> {
         boolean byTooltip = searchAvatarsByTooltipRadioButton.isSelected();
         boolean byUser = searchAvatarsByAssignedUserRadioButton.isSelected();
 
-        Task<List<AvatarFX>> searchTask = new Task<>() {
-            @Override
-            protected List<AvatarFX> call() {
-                List<Avatar> result;
-                if (byId) {
-                    result = avatarService.findAvatarsById(pattern);
-                } else if (byTooltip) {
-                    result = avatarService.findAvatarsByTooltip(pattern);
-                } else if (byUser) {
-                    result = avatarService.findAvatarsByAssignedUser(pattern);
-                } else {
-                    result = avatarService.getAllAvatars();
-                }
-                return avatarMapper.map(result);
+        runAvatarTask(() -> {
+            List<Avatar> result;
+            if (byId) {
+                result = avatarService.findAvatarsById(pattern);
+            } else if (byTooltip) {
+                result = avatarService.findAvatarsByTooltip(pattern);
+            } else if (byUser) {
+                result = avatarService.findAvatarsByAssignedUser(pattern);
+            } else {
+                result = avatarService.getAllAvatars();
             }
-        };
-
-        searchTask.setOnSucceeded(event -> {
-            avatars.setAll(searchTask.getValue());
-            avatarTableView.getSortOrder().clear();
-        });
-
-        searchTask.setOnFailed(e -> {
-            Throwable t = searchTask.getException();
-            log.error("Avatar search failed", t);
-            ViewHelper.errorDialog("Error", "Avatar search failed: " + t.getMessage());
-        });
-
-        new Thread(searchTask, "SearchAvatarsThread").start();
+            return avatarMapper.map(result);
+        }, "SearchAvatarsThread", "Avatar search failed");
     }
 
     public void onAddAvatar() {
@@ -232,6 +198,25 @@ public class AvatarsController implements Controller<SplitPane> {
         LocalPreferences.TabAvatars tab = localPreferences.getTabAvatars();
         ViewHelper.saveColumnLayout(avatarTableView, tab.getAvatarTableColumnWidths(), tab.getAvatarTableColumnOrder());
         ViewHelper.saveColumnLayout(avatarAssignmentTableView, tab.getAvatarAssignmentTableColumnWidths(), tab.getAvatarAssignmentTableColumnOrder());
+    }
+
+    private void runAvatarTask(Callable<List<AvatarFX>> work, String threadName, String errorLabel) {
+        Task<List<AvatarFX>> task = new Task<>() {
+            @Override
+            protected List<AvatarFX> call() throws Exception {
+                return work.call();
+            }
+        };
+        task.setOnSucceeded(e -> {
+            avatars.setAll(task.getValue());
+            avatarTableView.getSortOrder().clear();
+        });
+        task.setOnFailed(e -> {
+            Throwable t = task.getException();
+            log.error("{}", errorLabel, t);
+            ViewHelper.errorDialog("Error", errorLabel + ": " + t.getMessage());
+        });
+        new Thread(task, threadName).start();
     }
 
     private void loadAvatarImageAsync(AvatarFX avatar) {
