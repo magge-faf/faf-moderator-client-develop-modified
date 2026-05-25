@@ -2,8 +2,7 @@ package com.faforever.moderatorclient.ui.domain;
 
 import javafx.beans.property.*;
 
-public class FeaturedModFX {
-    private final StringProperty id;
+public class FeaturedModFX extends AbstractEntityFX {
     private final StringProperty description;
     private final StringProperty displayName;
     private final IntegerProperty order;
@@ -14,7 +13,6 @@ public class FeaturedModFX {
     private final BooleanProperty visible;
 
     public FeaturedModFX() {
-        this.id = new SimpleStringProperty();
         this.description = new SimpleStringProperty();
         this.displayName = new SimpleStringProperty();
         this.order = new SimpleIntegerProperty();
@@ -23,18 +21,6 @@ public class FeaturedModFX {
         this.bireusUrl = new SimpleStringProperty();
         this.technicalName = new SimpleStringProperty();
         this.visible = new SimpleBooleanProperty();
-    }
-
-    public String getId() {
-        return id.get();
-    }
-
-    public void setId(String id) {
-        this.id.set(id);
-    }
-
-    public StringProperty idProperty() {
-        return id;
     }
 
     public String getDescription() {
