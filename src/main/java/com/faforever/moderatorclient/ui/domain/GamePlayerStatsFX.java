@@ -1,8 +1,8 @@
 package com.faforever.moderatorclient.ui.domain;
 
 import com.faforever.commons.api.dto.Faction;
-import javafx.beans.InvalidationListener;
 import javafx.beans.binding.Bindings;
+import javafx.collections.ListChangeListener;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -46,7 +46,7 @@ public class GamePlayerStatsFX extends AbstractEntityFX {
         ratingChange = new SimpleObjectProperty<>();
         beforeRating = new SimpleObjectProperty<>();
         afterRating = new SimpleObjectProperty<>();
-        leaderboardRatingJournals.addListener((InvalidationListener) observable -> leaderboardRatingJournals.stream().findFirst().ifPresent(ratingJournal -> {
+        leaderboardRatingJournals.addListener((ListChangeListener<LeaderboardRatingJournalFX>) change -> leaderboardRatingJournals.stream().findFirst().ifPresent(ratingJournal -> {
             beforeRating.unbind();
             afterRating.unbind();
             ratingChange.unbind();
