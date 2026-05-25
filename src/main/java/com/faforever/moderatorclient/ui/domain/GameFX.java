@@ -13,7 +13,6 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 public class GameFX extends AbstractEntityFX {
-    private final StringProperty id;
     private final StringProperty name;
     private final ObjectProperty<OffsetDateTime> startTime;
     private final ObjectProperty<OffsetDateTime> endTime;
@@ -25,7 +24,6 @@ public class GameFX extends AbstractEntityFX {
     private final ObjectProperty<MapVersionFX> mapVersion;
 
     public GameFX() {
-        id = new SimpleStringProperty();
         name = new SimpleStringProperty();
         startTime = new SimpleObjectProperty<>();
         endTime = new SimpleObjectProperty<>();
@@ -35,20 +33,6 @@ public class GameFX extends AbstractEntityFX {
         host = new SimpleObjectProperty<>();
         featuredMod = new SimpleObjectProperty<>();
         mapVersion = new SimpleObjectProperty<>();
-    }
-
-    @Override
-    public String getId() {
-        return id.get();
-    }
-
-    public void setId(String id) {
-        this.id.set(id);
-    }
-
-    @Override
-    public StringProperty idProperty() {
-        return id;
     }
 
     public String getName() {
@@ -160,7 +144,7 @@ public class GameFX extends AbstractEntityFX {
     }
 
     public String getReplayUrl(String baseUrlFormat) {
-        String idValue = id.get();
+        String idValue = getId();
         if (idValue == null) {
             return null;
         }
