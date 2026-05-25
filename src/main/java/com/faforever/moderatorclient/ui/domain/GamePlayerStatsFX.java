@@ -7,8 +7,6 @@ import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
-import javafx.beans.property.SimpleStringProperty;
-import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 
@@ -16,7 +14,6 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 public class GamePlayerStatsFX extends AbstractEntityFX {
-    private final StringProperty id;
     private final BooleanProperty ai;
     private final ObjectProperty<Faction> faction;
     private final ObjectProperty<Byte> color;
@@ -32,7 +29,6 @@ public class GamePlayerStatsFX extends AbstractEntityFX {
     private final ObservableList<LeaderboardRatingJournalFX> leaderboardRatingJournals;
 
     public GamePlayerStatsFX() {
-        id = new SimpleStringProperty();
         ai = new SimpleBooleanProperty();
         faction = new SimpleObjectProperty<>();
         color = new SimpleObjectProperty<>();
@@ -106,20 +102,6 @@ public class GamePlayerStatsFX extends AbstractEntityFX {
 
     public ObjectProperty<Number> ratingChangeProperty() {
         return ratingChange;
-    }
-
-    @Override
-    public String getId() {
-        return id.get();
-    }
-
-    public void setId(String id) {
-        this.id.set(id);
-    }
-
-    @Override
-    public StringProperty idProperty() {
-        return id;
     }
 
     public boolean isAi() {
