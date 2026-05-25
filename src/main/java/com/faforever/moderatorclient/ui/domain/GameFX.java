@@ -1,6 +1,5 @@
 package com.faforever.moderatorclient.ui.domain;
 
-import com.faforever.commons.api.dto.GameReview;
 import com.faforever.commons.api.dto.Validity;
 import com.faforever.commons.api.dto.VictoryCondition;
 import javafx.beans.property.ObjectProperty;
@@ -20,7 +19,6 @@ public class GameFX extends AbstractEntityFX {
     private final ObjectProperty<OffsetDateTime> endTime;
     private final ObjectProperty<Validity> validity;
     private final ObjectProperty<VictoryCondition> victoryCondition;
-    private final ObservableList<GameReview> reviews;
     private final ObservableList<GamePlayerStatsFX> playerStats;
     private final ObjectProperty<PlayerFX> host;
     private final ObjectProperty<FeaturedModFX> featuredMod;
@@ -33,7 +31,6 @@ public class GameFX extends AbstractEntityFX {
         endTime = new SimpleObjectProperty<>();
         validity = new SimpleObjectProperty<>();
         victoryCondition = new SimpleObjectProperty<>();
-        reviews = FXCollections.observableArrayList();
         playerStats = FXCollections.observableArrayList();
         host = new SimpleObjectProperty<>();
         featuredMod = new SimpleObjectProperty<>();
@@ -112,10 +109,6 @@ public class GameFX extends AbstractEntityFX {
 
     public ObjectProperty<VictoryCondition> victoryConditionProperty() {
         return victoryCondition;
-    }
-
-    public ObservableList<GameReview> getReviews() {
-        return reviews;
     }
 
     public ObservableList<GamePlayerStatsFX> getPlayerStats() {
