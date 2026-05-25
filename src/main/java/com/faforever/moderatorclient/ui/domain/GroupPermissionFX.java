@@ -6,12 +6,10 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableSet;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
-import lombok.Value;
 
-@Value
 @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
 @ToString(callSuper = true, onlyExplicitlyIncluded = true)
-public class GroupPermissionFX extends AbstractEntityFX{
+public class GroupPermissionFX extends AbstractEntityFX {
     @ToString.Include
     StringProperty technicalName = new SimpleStringProperty();
     StringProperty nameKey = new SimpleStringProperty();
