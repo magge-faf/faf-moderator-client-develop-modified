@@ -43,6 +43,9 @@ import javafx.scene.text.Text;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.geometry.Point2D;
+import javafx.scene.control.Spinner;
+import javafx.scene.control.SpinnerValueFactory;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
@@ -2297,116 +2300,155 @@ public class UserManagementController implements Controller<SplitPane> {
                 .findFirst()
                 .orElse("Unknown");
 
-        int flagCount = 0;
-        StringBuilder report = new StringBuilder();
-        report.append(String.format("Analyzed %d games (%d with rating data) for: %s%n%n",
-                games.size(), ratedGames.size(), playerName));
-        report.append(String.format("%-8s %-45s %s%n", "Status", "Check", "Value"));
-        report.append("─".repeat(90)).append("\n");
-
-        // Check 1: Loss rate
-        long losses = ratedGames.stream()
-                .filter(g -> g.ratingChangeProperty().get().doubleValue() < 0)
-                .count();
-        double lossRate = (double) losses / ratedGames.size() * 100.0;
-        boolean lossRateFlag = lossRate > 70.0;
-        if (lossRateFlag) flagCount++;
-        report.append(formatCheckLine(lossRateFlag,
-                "Loss Rate (threshold: >70%)",
-                String.format("%.1f%% (%d / %d games)", lossRate, losses, ratedGames.size())));
-
-        // Check 2: Net rating trend across analyzed games
-        List<GamePlayerStatsFX> withFullRating = ratedGames.stream()
-                .filter(g -> g.beforeRatingProperty().get() != null && g.afterRatingProperty().get() != null)
-                .toList();
-        int netRatingChange = 0;
-        boolean netRatingFlag = false;
-        if (!withFullRating.isEmpty()) {
-            // games sorted newest-first; last entry = oldest
-            int newestAfter = withFullRating.get(0).afterRatingProperty().get();
-            int oldestBefore = withFullRating.get(withFullRating.size() - 1).beforeRatingProperty().get();
-            netRatingChange = newestAfter - oldestBefore;
-            netRatingFlag = netRatingChange < -200;
-            if (netRatingFlag) flagCount++;
-        }
-        report.append(formatCheckLine(netRatingFlag,
-                "Net Rating Change (threshold: <-200)",
-                String.format("%+d points", netRatingChange)));
-
-        // Check 3: Max consecutive loss streak
-        int maxStreak = 0, currentStreak = 0;
-        for (GamePlayerStatsFX g : ratedGames) {
-            if (g.ratingChangeProperty().get().doubleValue() < 0) {
-                currentStreak++;
-                maxStreak = Math.max(maxStreak, currentStreak);
-            } else {
-                currentStreak = 0;
-            }
-        }
-        boolean streakFlag = maxStreak >= 10;
-        if (streakFlag) flagCount++;
-        report.append(formatCheckLine(streakFlag,
-                "Longest Consecutive Loss Streak (threshold: >=10)",
-                maxStreak + " games in a row"));
-
-        // Check 4: Heavy per-game rating drops
-        long heavyDrops = ratedGames.stream()
-                .filter(g -> g.ratingChangeProperty().get().doubleValue() <= -20)
-                .count();
-        boolean heavyDropFlag = heavyDrops >= 10;
-        if (heavyDropFlag) flagCount++;
-        report.append(formatCheckLine(heavyDropFlag,
-                "Games With Drop >= -20 Rating (threshold: >=10 games)",
-                heavyDrops + " games"));
-
-        // Check 5: Invalid game ratio
-        long invalidCount = games.stream()
-                .filter(g -> g.getGame() != null
-                        && g.getGame().getValidity() != null
-                        && g.getGame().getValidity() != Validity.VALID)
-                .count();
-        double invalidRate = (double) invalidCount / games.size() * 100.0;
-        boolean invalidFlag = invalidRate > 15.0;
-        if (invalidFlag) flagCount++;
-        report.append(formatCheckLine(invalidFlag,
-                "Invalid Games Ratio (threshold: >15%)",
-                String.format("%.1f%% (%d / %d games)", invalidRate, invalidCount, games.size())));
-
-        // Check 6: Low/zero score pattern
-        List<GamePlayerStatsFX> scoredGames = games.stream()
-                .filter(g -> g.getScore() != null)
-                .toList();
-        if (!scoredGames.isEmpty()) {
-            long lowScoreCount = scoredGames.stream()
-                    .filter(g -> g.getScore() <= 0)
-                    .count();
-            double lowScoreRate = (double) lowScoreCount / scoredGames.size() * 100.0;
-            boolean lowScoreFlag = lowScoreRate > 40.0;
-            if (lowScoreFlag) flagCount++;
-            report.append(formatCheckLine(lowScoreFlag,
-                    "Low/Zero Score Games (threshold: >40%)",
-                    String.format("%.1f%% (%d / %d scored games)", lowScoreRate, lowScoreCount, scoredGames.size())));
+        // --- Settings tab: threshold spinners ---
+        Spinner<Double> spLossRate     = new Spinner<>(new SpinnerValueFactory.DoubleSpinnerValueFactory(0, 100, 70, 5));
+        Spinner<Integer> spNetRating   = new Spinner<>(new SpinnerValueFactory.IntegerSpinnerValueFactory(-5000, -1, -200, 50));
+        Spinner<Integer> spStreak      = new Spinner<>(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 200, 10, 1));
+        Spinner<Integer> spDropPerGame = new Spinner<>(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 500, 20, 5));
+        Spinner<Integer> spDropCount   = new Spinner<>(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, 200, 10, 1));
+        Spinner<Double> spInvalidRatio = new Spinner<>(new SpinnerValueFactory.DoubleSpinnerValueFactory(0, 100, 15, 5));
+        Spinner<Double> spLowScore     = new Spinner<>(new SpinnerValueFactory.DoubleSpinnerValueFactory(0, 100, 40, 5));
+        for (Spinner<?> sp : List.of(spLossRate, spNetRating, spStreak, spDropPerGame, spDropCount, spInvalidRatio, spLowScore)) {
+            sp.setEditable(true);
+            sp.setPrefWidth(110);
         }
 
-        report.append("─".repeat(90)).append("\n");
-
-        String verdict;
-        if (flagCount == 0) {
-            verdict = "VERDICT: CLEAN — No suspicious patterns detected.";
-        } else if (flagCount <= 2) {
-            verdict = String.format("VERDICT: SUSPICIOUS — %d indicator(s) flagged. Manual review recommended.", flagCount);
-        } else {
-            verdict = String.format("VERDICT: HIGH RISK — %d indicators flagged. Strong signs of rating manipulation.", flagCount);
+        GridPane settingsGrid = new GridPane();
+        settingsGrid.setHgap(12);
+        settingsGrid.setVgap(8);
+        settingsGrid.setPadding(new Insets(16));
+        String[][] settingsRows = {
+            {"Loss Rate flag when above (%)",             "default: 70"},
+            {"Net Rating Change flag when below (pts)",   "default: −200"},
+            {"Consecutive Loss Streak flag when >= (games)", "default: 10"},
+            {"Per-game Rating Drop flag threshold (pts)", "default: 20"},
+            {"Count of such drops to flag (games)",       "default: 10"},
+            {"Invalid Games Ratio flag when above (%)",   "default: 15"},
+            {"Low/Zero Score Games flag when above (%)",  "default: 40"},
+        };
+        Spinner<?>[] spinners = {spLossRate, spNetRating, spStreak, spDropPerGame, spDropCount, spInvalidRatio, spLowScore};
+        for (int i = 0; i < settingsRows.length; i++) {
+            settingsGrid.add(new Label(settingsRows[i][0]), 0, i);
+            settingsGrid.add(spinners[i], 1, i);
+            Label hint = new Label(settingsRows[i][1]);
+            hint.setStyle("-fx-text-fill: gray; -fx-font-size: 11;");
+            settingsGrid.add(hint, 2, i);
         }
-        report.append("\n").append(verdict).append("\n");
 
         // --- Analysis tab ---
-        TextArea textArea = new TextArea(report.toString());
+        TextArea textArea = new TextArea();
         textArea.setEditable(false);
         textArea.setWrapText(false);
         textArea.setStyle("-fx-font-family: monospace; -fx-font-size: 12;");
         textArea.setPrefWidth(840);
         textArea.setPrefHeight(420);
+
+        // Recomputes the analysis text from the current spinner values and updates textArea
+        final List<GamePlayerStatsFX> gamesFinal = games;
+        final List<GamePlayerStatsFX> ratedGamesFinal = ratedGames;
+        Runnable runAnalysis = () -> {
+            double lossRatePct  = spLossRate.getValue();
+            int netRatingMin    = spNetRating.getValue();
+            int streakMin       = spStreak.getValue();
+            int dropPerGame     = spDropPerGame.getValue();
+            int dropCountMin    = spDropCount.getValue();
+            double invalidPct   = spInvalidRatio.getValue();
+            double lowScorePct  = spLowScore.getValue();
+
+            int fc = 0;
+            StringBuilder report = new StringBuilder();
+            report.append(String.format("Analyzed %d games (%d with rating data) for: %s%n%n",
+                    gamesFinal.size(), ratedGamesFinal.size(), playerName));
+            report.append(String.format("%-8s %-55s %s%n", "Status", "Check", "Value"));
+            report.append("─".repeat(100)).append("\n");
+
+            // Check 1: Loss rate
+            long losses = ratedGamesFinal.stream()
+                    .filter(g -> g.ratingChangeProperty().get().doubleValue() < 0)
+                    .count();
+            double lossRate = (double) losses / ratedGamesFinal.size() * 100.0;
+            boolean lossRateFlag = lossRate > lossRatePct;
+            if (lossRateFlag) fc++;
+            report.append(formatCheckLine(lossRateFlag,
+                    String.format("Loss Rate (threshold: >%.0f%%)", lossRatePct),
+                    String.format("%.1f%% (%d / %d games)", lossRate, losses, ratedGamesFinal.size())));
+
+            // Check 2: Net rating trend
+            List<GamePlayerStatsFX> withFull = ratedGamesFinal.stream()
+                    .filter(g -> g.beforeRatingProperty().get() != null && g.afterRatingProperty().get() != null)
+                    .toList();
+            int netRatingChange = 0;
+            boolean netRatingFlag = false;
+            if (!withFull.isEmpty()) {
+                int newestAfter = withFull.get(0).afterRatingProperty().get();
+                int oldestBefore = withFull.get(withFull.size() - 1).beforeRatingProperty().get();
+                netRatingChange = newestAfter - oldestBefore;
+                netRatingFlag = netRatingChange < netRatingMin;
+                if (netRatingFlag) fc++;
+            }
+            report.append(formatCheckLine(netRatingFlag,
+                    String.format("Net Rating Change (threshold: <%d)", netRatingMin),
+                    String.format("%+d points", netRatingChange)));
+
+            // Check 3: Max consecutive loss streak
+            int maxStreak = 0, cur = 0;
+            for (GamePlayerStatsFX g : ratedGamesFinal) {
+                if (g.ratingChangeProperty().get().doubleValue() < 0) { cur++; maxStreak = Math.max(maxStreak, cur); }
+                else cur = 0;
+            }
+            boolean streakFlag = maxStreak >= streakMin;
+            if (streakFlag) fc++;
+            report.append(formatCheckLine(streakFlag,
+                    String.format("Longest Consecutive Loss Streak (threshold: >=%d)", streakMin),
+                    maxStreak + " games in a row"));
+
+            // Check 4: Heavy per-game rating drops
+            long heavyDrops = ratedGamesFinal.stream()
+                    .filter(g -> g.ratingChangeProperty().get().doubleValue() <= -dropPerGame)
+                    .count();
+            boolean heavyDropFlag = heavyDrops >= dropCountMin;
+            if (heavyDropFlag) fc++;
+            report.append(formatCheckLine(heavyDropFlag,
+                    String.format("Games With Drop >= -%d Rating (threshold: >=%d games)", dropPerGame, dropCountMin),
+                    heavyDrops + " games"));
+
+            // Check 5: Invalid game ratio
+            long invalidCount = gamesFinal.stream()
+                    .filter(g -> g.getGame() != null
+                            && g.getGame().getValidity() != null
+                            && g.getGame().getValidity() != Validity.VALID)
+                    .count();
+            double invalidRate = (double) invalidCount / gamesFinal.size() * 100.0;
+            boolean invalidFlag = invalidRate > invalidPct;
+            if (invalidFlag) fc++;
+            report.append(formatCheckLine(invalidFlag,
+                    String.format("Invalid Games Ratio (threshold: >%.0f%%)", invalidPct),
+                    String.format("%.1f%% (%d / %d games)", invalidRate, invalidCount, gamesFinal.size())));
+
+            // Check 6: Low/zero score pattern
+            List<GamePlayerStatsFX> scoredGames = gamesFinal.stream()
+                    .filter(g -> g.getScore() != null).toList();
+            if (!scoredGames.isEmpty()) {
+                long lowScoreCount = scoredGames.stream().filter(g -> g.getScore() <= 0).count();
+                double lowScoreRate = (double) lowScoreCount / scoredGames.size() * 100.0;
+                boolean lowScoreFlag = lowScoreRate > lowScorePct;
+                if (lowScoreFlag) fc++;
+                report.append(formatCheckLine(lowScoreFlag,
+                        String.format("Low/Zero Score Games (threshold: >%.0f%%)", lowScorePct),
+                        String.format("%.1f%% (%d / %d scored games)", lowScoreRate, lowScoreCount, scoredGames.size())));
+            }
+
+            report.append("─".repeat(100)).append("\n");
+            String verdict;
+            if (fc == 0)       verdict = "VERDICT: CLEAN — No suspicious patterns detected.";
+            else if (fc <= 2)  verdict = String.format("VERDICT: SUSPICIOUS — %d indicator(s) flagged. Manual review recommended.", fc);
+            else               verdict = String.format("VERDICT: HIGH RISK — %d indicators flagged. Strong signs of rating manipulation.", fc);
+            report.append("\n").append(verdict).append("\n");
+            textArea.setText(report.toString());
+        };
+
+        runAnalysis.run();
+        for (Spinner<?> sp : spinners) sp.valueProperty().addListener((obs, o, n) -> runAnalysis.run());
 
         // --- Rating History chart tab ---
         // Reverse so index 0 = oldest game (left of chart)
@@ -2587,8 +2629,10 @@ public class UserManagementController implements Controller<SplitPane> {
         analysisTab.setClosable(false);
         Tab chartTab = new Tab("Rating History", chartContainer);
         chartTab.setClosable(false);
+        Tab settingsTab = new Tab("Settings", settingsGrid);
+        settingsTab.setClosable(false);
 
-        TabPane tabPane = new TabPane(analysisTab, chartTab);
+        TabPane tabPane = new TabPane(analysisTab, chartTab, settingsTab);
 
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.setTitle("Rating Manipulation Analysis — " + playerName);
