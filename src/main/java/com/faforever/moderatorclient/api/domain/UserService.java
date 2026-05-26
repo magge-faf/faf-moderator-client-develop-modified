@@ -145,6 +145,7 @@ public class UserService {
                 .addInclude("game.mapVersion")
                 .addInclude("game.mapVersion.map")
                 .addInclude("ratingChanges")
+                .addInclude("ratingChanges.leaderboard")
                 .addSortingRule("scoreTime", false);
         if (featuredModFX != null) {
             navigator.setFilter(ElideNavigator.qBuilder().string("game.featuredMod.technicalName").eq(featuredModFX.getTechnicalName())

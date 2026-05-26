@@ -2408,6 +2408,47 @@ public class UserManagementController implements Controller<SplitPane> {
         List<GamePlayerStatsFX> chronological = new ArrayList<>(games);
         Collections.reverse(chronological);
 
+        // Build one series per leaderboard; ratingChanges.leaderboard is now included in the API query.
+        LinkedHashMap<String, XYChart.Series<Number, Number>> seriesMap = new LinkedHashMap<>();
+        int gameNum = 1;
+        for (GamePlayerStatsFX g : chronological) {
+            for (LeaderboardRatingJournalFX journal : g.getLeaderboardRatingJournals()) {
+                LeaderboardFX lb = journal.getLeaderboard();
+                String lbName = lb != null && lb.getTechnicalName() != null ? lb.getTechnicalName()
+                        : lb != null && lb.getNameKey() != null ? lb.getNameKey()
+                        : "unknown";
+                Double beforeMean = journal.getMeanBefore();
+                Double beforeDev = journal.getDeviationBefore();
+                if (beforeMean == null || beforeDev == null) continue;
+                int beforeRating = (int) (beforeMean - 3 * beforeDev);
+                XYChart.Series<Number, Number> series = seriesMap.computeIfAbsent(lbName, n -> {
+                    XYChart.Series<Number, Number> s = new XYChart.Series<>();
+                    s.setName(n);
+                    return s;
+                });
+                series.getData().add(new XYChart.Data<>(gameNum, beforeRating));
+            }
+            gameNum++;
+        }
+        // Append final afterRating for each leaderboard from the newest game
+        if (!chronological.isEmpty()) {
+            GamePlayerStatsFX newest = chronological.get(chronological.size() - 1);
+            for (LeaderboardRatingJournalFX journal : newest.getLeaderboardRatingJournals()) {
+                LeaderboardFX lb = journal.getLeaderboard();
+                String lbName = lb != null && lb.getTechnicalName() != null ? lb.getTechnicalName()
+                        : lb != null && lb.getNameKey() != null ? lb.getNameKey()
+                        : "unknown";
+                Double afterMean = journal.getMeanAfter();
+                Double afterDev = journal.getDeviationAfter();
+                if (afterMean == null || afterDev == null) continue;
+                int afterRating = (int) (afterMean - 3 * afterDev);
+                XYChart.Series<Number, Number> s = seriesMap.get(lbName);
+                if (s != null) s.getData().add(new XYChart.Data<>(gameNum, afterRating));
+            }
+        }
+
+        int totalPoints = seriesMap.values().stream().mapToInt(s -> s.getData().size()).sum();
+
         NumberAxis xAxis = new NumberAxis();
         xAxis.setLabel("Game (oldest → newest)");
         xAxis.setTickLabelsVisible(false);
@@ -2422,37 +2463,22 @@ public class UserManagementController implements Controller<SplitPane> {
         LineChart<Number, Number> chart = new LineChart<>(xAxis, yAxis);
         chart.setTitle("Rating History — " + playerName + " (last " + games.size() + " games)");
         chart.setAnimated(false);
-        chart.setLegendVisible(false);
-        chart.setCreateSymbols(games.size() <= 150);
+        chart.setLegendVisible(seriesMap.size() > 1);
+        chart.setCreateSymbols(totalPoints <= 150);
         chart.setPrefWidth(840);
         chart.setPrefHeight(420);
-
-        XYChart.Series<Number, Number> series = new XYChart.Series<>();
-        int gameNum = 1;
-        for (GamePlayerStatsFX g : chronological) {
-            Integer before = g.beforeRatingProperty().get();
-            if (before != null) {
-                XYChart.Data<Number, Number> point = new XYChart.Data<>(gameNum, before);
-                series.getData().add(point);
-            }
-            gameNum++;
-        }
-        // Append final afterRating of the newest game so the line reaches the current rating
-        if (!chronological.isEmpty()) {
-            Integer afterLast = chronological.get(chronological.size() - 1).afterRatingProperty().get();
-            if (afterLast != null) {
-                series.getData().add(new XYChart.Data<>(gameNum, afterLast));
-            }
-        }
-        chart.getData().add(series);
+        chart.getData().addAll(seriesMap.values());
 
         // Tooltips on data points (added after node is created)
-        for (XYChart.Data<Number, Number> dp : series.getData()) {
-            dp.nodeProperty().addListener((obs, oldNode, node) -> {
-                if (node != null) {
-                    Tooltip.install(node, new Tooltip("Game " + dp.getXValue() + ": " + dp.getYValue().intValue()));
-                }
-            });
+        for (XYChart.Series<Number, Number> series : seriesMap.values()) {
+            for (XYChart.Data<Number, Number> dp : series.getData()) {
+                String label = series.getName() + ": " + dp.getYValue().intValue();
+                dp.nodeProperty().addListener((obs, oldNode, node) -> {
+                    if (node != null) {
+                        Tooltip.install(node, new Tooltip(label));
+                    }
+                });
+            }
         }
 
         // --- Tabbed dialog ---
