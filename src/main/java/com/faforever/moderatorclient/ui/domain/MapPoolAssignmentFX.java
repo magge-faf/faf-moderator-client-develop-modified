@@ -42,7 +42,7 @@ public class MapPoolAssignmentFX extends AbstractEntityFX {
     }
 
     public MapPoolAssignmentFX setWeight(Integer weight) {
-        this.weight.set(weight);
+        this.weight.set(weight != null ? weight : 0);
         return this;
     }
 
