@@ -4,6 +4,7 @@ import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
+import javafx.beans.Observable;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.image.Image;
@@ -19,7 +20,10 @@ public class AvatarFX extends AbstractEntityFX {
     public AvatarFX() {
         url = new SimpleStringProperty();
         tooltip = new SimpleStringProperty();
-        assignments = FXCollections.observableArrayList();
+        // Extractor fires list-change events when any assignment's selectedProperty toggles,
+        // so bindings that depend on this list (e.g. the "In use" column) stay up to date.
+        assignments = FXCollections.observableArrayList(
+                a -> new Observable[]{ a.selectedProperty() });
     }
 
     public String getUrl() {
