@@ -95,6 +95,11 @@ public class BansController implements Controller<HBox> {
         playerRadioButton.setUserData((Supplier<List<BanInfoFX>>) () -> banService.getBanInfoByBannedPlayerNameContains(filter.getText()));
         banIdRadioButton.setUserData((Supplier<List<BanInfoFX>>) () -> Collections.singletonList(banService.getBanInfoById(filter.getText())));
         editBanButton.disableProperty().bind(banTableView.getSelectionModel().selectedItemProperty().isNull());
+        banTableView.setOnMouseClicked(event -> {
+            if (event.getClickCount() == 2 && banTableView.getSelectionModel().getSelectedItem() != null) {
+                editBan();
+            }
+        });
         InvalidationListener onlyActiveBansChangeListener = (observable) ->
                 filteredList.setPredicate(banInfoFX -> !onlyActiveCheckBox.isSelected() || banInfoFX.getBanStatus() == BanStatus.BANNED);
         onlyActiveCheckBox.selectedProperty().addListener(onlyActiveBansChangeListener);
