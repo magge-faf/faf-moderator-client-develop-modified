@@ -112,12 +112,14 @@ public class FafUserCommunicationService {
      * Best-effort POST that never publishes a failure event or throws.
      * Returns true on success, false on any error (caller is responsible for logging).
      */
-    @SneakyThrows
     public boolean tryPost(String url, Object object) {
-        authorizedLatch.await();
         try {
+            authorizedLatch.await();
             restTemplate.postForObject(url, object, String.class);
             return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
         } catch (Exception e) {
             return false;
         }
