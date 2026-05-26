@@ -4,9 +4,6 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-
 import java.util.List;
 
 public class MapPoolFX extends AbstractEntityFX {
