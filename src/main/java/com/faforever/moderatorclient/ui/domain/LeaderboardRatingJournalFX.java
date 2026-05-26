@@ -8,6 +8,8 @@ import javafx.beans.property.SimpleObjectProperty;
  */
 public class LeaderboardRatingJournalFX extends AbstractEntityFX {
 
+  // ObjectProperty<Double> rather than DoubleProperty: null is a meaningful sentinel used
+  // by GamePlayerStatsFX bindings to indicate that rating data is not yet available.
   private final ObjectProperty<Double> meanAfter = new SimpleObjectProperty<>();
   private final ObjectProperty<Double> deviationAfter = new SimpleObjectProperty<>();
   private final ObjectProperty<Double> meanBefore = new SimpleObjectProperty<>();
