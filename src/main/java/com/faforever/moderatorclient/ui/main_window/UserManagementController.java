@@ -42,6 +42,11 @@ import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.geometry.Point2D;
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.StackPane;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Rectangle;
 import javafx.util.StringConverter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -2408,10 +2413,23 @@ public class UserManagementController implements Controller<SplitPane> {
         List<GamePlayerStatsFX> chronological = new ArrayList<>(games);
         Collections.reverse(chronological);
 
-        // Build one series per leaderboard; ratingChanges.leaderboard is now included in the API query.
+        // Build one series per leaderboard, using epoch-seconds as X so the axis shows real dates.
         LinkedHashMap<String, XYChart.Series<Number, Number>> seriesMap = new LinkedHashMap<>();
-        int gameNum = 1;
+        // Parallel map: epoch-second → formatted date string, for tooltips
+        LinkedHashMap<Long, String> epochToLabel = new LinkedHashMap<>();
+        long minEpoch = Long.MAX_VALUE;
+        long maxEpoch = Long.MIN_VALUE;
+
         for (GamePlayerStatsFX g : chronological) {
+            OffsetDateTime time = g.getScoreTime();
+            if (time == null && g.getGame() != null) time = g.getGame().getStartTime();
+            if (time == null) continue;
+            long epochSec = time.toEpochSecond();
+            minEpoch = Math.min(minEpoch, epochSec);
+            maxEpoch = Math.max(maxEpoch, epochSec);
+            epochToLabel.put(epochSec,
+                    time.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+
             for (LeaderboardRatingJournalFX journal : g.getLeaderboardRatingJournals()) {
                 LeaderboardFX lb = journal.getLeaderboard();
                 String lbName = lb != null && lb.getTechnicalName() != null ? lb.getTechnicalName()
@@ -2426,13 +2444,15 @@ public class UserManagementController implements Controller<SplitPane> {
                     s.setName(n);
                     return s;
                 });
-                series.getData().add(new XYChart.Data<>(gameNum, beforeRating));
+                series.getData().add(new XYChart.Data<>(epochSec, beforeRating));
             }
-            gameNum++;
         }
         // Append final afterRating for each leaderboard from the newest game
         if (!chronological.isEmpty()) {
             GamePlayerStatsFX newest = chronological.get(chronological.size() - 1);
+            OffsetDateTime newestTime = newest.getScoreTime();
+            if (newestTime == null && newest.getGame() != null) newestTime = newest.getGame().getStartTime();
+            long newestEpoch = newestTime != null ? newestTime.toEpochSecond() + 1 : maxEpoch + 1;
             for (LeaderboardRatingJournalFX journal : newest.getLeaderboardRatingJournals()) {
                 LeaderboardFX lb = journal.getLeaderboard();
                 String lbName = lb != null && lb.getTechnicalName() != null ? lb.getTechnicalName()
@@ -2443,17 +2463,29 @@ public class UserManagementController implements Controller<SplitPane> {
                 if (afterMean == null || afterDev == null) continue;
                 int afterRating = (int) (afterMean - 3 * afterDev);
                 XYChart.Series<Number, Number> s = seriesMap.get(lbName);
-                if (s != null) s.getData().add(new XYChart.Data<>(gameNum, afterRating));
+                if (s != null) s.getData().add(new XYChart.Data<>(newestEpoch, afterRating));
             }
         }
 
         int totalPoints = seriesMap.values().stream().mapToInt(s -> s.getData().size()).sum();
 
-        NumberAxis xAxis = new NumberAxis();
-        xAxis.setLabel("Game (oldest → newest)");
-        xAxis.setTickLabelsVisible(false);
+        // Compute tick unit: aim for ~8 labelled ticks, rounded to whole days
+        long rangeSeconds = minEpoch == Long.MAX_VALUE ? 86400L : Math.max(86400L, maxEpoch - minEpoch);
+        long tickUnit = Math.max(86400L, (rangeSeconds / 8 / 86400 + 1) * 86400L);
+        long axisMin = minEpoch == Long.MAX_VALUE ? 0L : minEpoch - 86400L;
+        long axisMax = minEpoch == Long.MAX_VALUE ? 86400L : maxEpoch + 86400L;
+
+        DateTimeFormatter axisDateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        NumberAxis xAxis = new NumberAxis(axisMin, axisMax, tickUnit);
+        xAxis.setLabel("Date");
         xAxis.setMinorTickVisible(false);
-        xAxis.setAutoRanging(true);
+        xAxis.setTickLabelRotation(40);
+        xAxis.setTickLabelFormatter(new StringConverter<>() {
+            @Override public String toString(Number v) {
+                return Instant.ofEpochSecond(v.longValue()).atZone(ZoneId.systemDefault()).format(axisDateFmt);
+            }
+            @Override public Number fromString(String s) { return null; }
+        });
 
         NumberAxis yAxis = new NumberAxis();
         yAxis.setLabel("Rating");
@@ -2466,25 +2498,94 @@ public class UserManagementController implements Controller<SplitPane> {
         chart.setLegendVisible(seriesMap.size() > 1);
         chart.setCreateSymbols(totalPoints <= 150);
         chart.setPrefWidth(840);
-        chart.setPrefHeight(420);
+        chart.setPrefHeight(440);
         chart.getData().addAll(seriesMap.values());
 
-        // Tooltips on data points (added after node is created)
+        // Tooltips: include date + leaderboard + rating
         for (XYChart.Series<Number, Number> series : seriesMap.values()) {
             for (XYChart.Data<Number, Number> dp : series.getData()) {
-                String label = series.getName() + ": " + dp.getYValue().intValue();
+                String dateLabel = epochToLabel.getOrDefault(dp.getXValue().longValue(), "");
+                String label = (dateLabel.isEmpty() ? "" : dateLabel + "\n")
+                        + series.getName() + ": " + dp.getYValue().intValue();
                 dp.nodeProperty().addListener((obs, oldNode, node) -> {
-                    if (node != null) {
-                        Tooltip.install(node, new Tooltip(label));
-                    }
+                    if (node != null) Tooltip.install(node, new Tooltip(label));
                 });
             }
         }
 
+        // Drag-select zoom: draw a selection box; on release, zoom to that region.
+        // Double-click resets to full view.
+        Rectangle selectionRect = new Rectangle(0, 0, 0, 0);
+        selectionRect.setFill(Color.CORNFLOWERBLUE.deriveColor(0, 1, 1, 0.25));
+        selectionRect.setStroke(Color.CORNFLOWERBLUE);
+        selectionRect.setStrokeWidth(1);
+        selectionRect.setVisible(false);
+        selectionRect.setMouseTransparent(true);
+        Pane overlay = new Pane(selectionRect);
+        overlay.setMouseTransparent(true);
+        StackPane chartContainer = new StackPane(chart, overlay);
+
+        final double[] dragAnchor = {0, 0};
+        chart.setOnMousePressed(e -> {
+            if (e.isPrimaryButtonDown()) {
+                dragAnchor[0] = e.getX();
+                dragAnchor[1] = e.getY();
+                selectionRect.setX(e.getX());
+                selectionRect.setY(e.getY());
+                selectionRect.setWidth(0);
+                selectionRect.setHeight(0);
+                selectionRect.setVisible(true);
+            }
+        });
+        chart.setOnMouseDragged(e -> {
+            if (e.isPrimaryButtonDown()) {
+                double x = Math.min(e.getX(), dragAnchor[0]);
+                double y = Math.min(e.getY(), dragAnchor[1]);
+                selectionRect.setX(x);
+                selectionRect.setY(y);
+                selectionRect.setWidth(Math.abs(e.getX() - dragAnchor[0]));
+                selectionRect.setHeight(Math.abs(e.getY() - dragAnchor[1]));
+            }
+        });
+        chart.setOnMouseReleased(e -> {
+            if (!selectionRect.isVisible()) return;
+            selectionRect.setVisible(false);
+            double w = selectionRect.getWidth();
+            double h = selectionRect.getHeight();
+            if (w < 10 || h < 10) return; // ignore tiny drags / clicks
+            // Convert chart-local pixel coords to data values via axis coordinate transforms
+            double x1 = selectionRect.getX();
+            double x2 = x1 + w;
+            double y1 = selectionRect.getY();
+            double y2 = y1 + h;
+            double dataX1 = xAxis.getValueForDisplay(xAxis.sceneToLocal(chart.localToScene(x1, y1)).getX()).doubleValue();
+            double dataX2 = xAxis.getValueForDisplay(xAxis.sceneToLocal(chart.localToScene(x2, y1)).getX()).doubleValue();
+            double dataY1 = yAxis.getValueForDisplay(yAxis.sceneToLocal(chart.localToScene(x1, y1)).getY()).doubleValue();
+            double dataY2 = yAxis.getValueForDisplay(yAxis.sceneToLocal(chart.localToScene(x1, y2)).getY()).doubleValue();
+            long newMin = (long) Math.min(dataX1, dataX2);
+            long newMax = (long) Math.max(dataX1, dataX2);
+            long newTickUnit = Math.max(3600L, (newMax - newMin) / 8);
+            xAxis.setLowerBound(newMin);
+            xAxis.setUpperBound(newMax);
+            xAxis.setTickUnit(newTickUnit);
+            yAxis.setAutoRanging(false);
+            yAxis.setLowerBound(Math.min(dataY1, dataY2));
+            yAxis.setUpperBound(Math.max(dataY1, dataY2));
+        });
+        // Double-click resets zoom to the full data range
+        chart.setOnMouseClicked(e -> {
+            if (e.getClickCount() == 2) {
+                xAxis.setLowerBound(axisMin);
+                xAxis.setUpperBound(axisMax);
+                xAxis.setTickUnit(tickUnit);
+                yAxis.setAutoRanging(true);
+            }
+        });
+
         // --- Tabbed dialog ---
         Tab analysisTab = new Tab("Analysis", textArea);
         analysisTab.setClosable(false);
-        Tab chartTab = new Tab("Rating History", chart);
+        Tab chartTab = new Tab("Rating History", chartContainer);
         chartTab.setClosable(false);
 
         TabPane tabPane = new TabPane(analysisTab, chartTab);
