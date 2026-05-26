@@ -91,7 +91,7 @@ public class UserDataController {
     }
 
     // --- Typed classes for AccountHistory ---
-    @Getter @Setter @ToString
+    @Getter @Setter @ToString @NoArgsConstructor @AllArgsConstructor
     public static class HistoryEntry {
         private String action;
         private String timestamp;
