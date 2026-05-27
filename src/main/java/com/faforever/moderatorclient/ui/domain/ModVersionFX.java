@@ -6,17 +6,19 @@ import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
 import org.apache.maven.artifact.versioning.ComparableVersion;
 
 import java.net.URL;
 
 public class ModVersionFX extends AbstractEntityFX {
-    private final ObjectProperty<String> uid;
+    private final StringProperty uid;
     private final ObjectProperty<ModType> type;
-    private final ObjectProperty<String> description;
+    private final StringProperty description;
     private final ObjectProperty<ComparableVersion> version;
-    private final ObjectProperty<String> filename;
-    private final ObjectProperty<String> icon;
+    private final StringProperty filename;
+    private final StringProperty icon;
     private final BooleanProperty ranked;
     private final BooleanProperty hidden;
     private final ObjectProperty<URL> thumbnailUrl;
@@ -25,12 +27,12 @@ public class ModVersionFX extends AbstractEntityFX {
 
 
     public ModVersionFX() {
-        uid = new SimpleObjectProperty<>();
+        uid = new SimpleStringProperty();
         type = new SimpleObjectProperty<>();
-        description = new SimpleObjectProperty<>();
+        description = new SimpleStringProperty();
         version = new SimpleObjectProperty<>();
-        filename = new SimpleObjectProperty<>();
-        icon = new SimpleObjectProperty<>();
+        filename = new SimpleStringProperty();
+        icon = new SimpleStringProperty();
         ranked = new SimpleBooleanProperty();
         hidden = new SimpleBooleanProperty();
         thumbnailUrl = new SimpleObjectProperty<>();
@@ -46,7 +48,7 @@ public class ModVersionFX extends AbstractEntityFX {
         this.uid.set(uid);
     }
 
-    public ObjectProperty<String> uidProperty() {
+    public StringProperty uidProperty() {
         return uid;
     }
 
@@ -70,7 +72,7 @@ public class ModVersionFX extends AbstractEntityFX {
         this.description.set(description);
     }
 
-    public ObjectProperty<String> descriptionProperty() {
+    public StringProperty descriptionProperty() {
         return description;
     }
 
@@ -94,7 +96,7 @@ public class ModVersionFX extends AbstractEntityFX {
         this.filename.set(filename);
     }
 
-    public ObjectProperty<String> filenameProperty() {
+    public StringProperty filenameProperty() {
         return filename;
     }
 
@@ -106,7 +108,7 @@ public class ModVersionFX extends AbstractEntityFX {
         this.icon.set(icon);
     }
 
-    public ObjectProperty<String> iconProperty() {
+    public StringProperty iconProperty() {
         return icon;
     }
 
