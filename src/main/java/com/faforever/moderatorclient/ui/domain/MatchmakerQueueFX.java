@@ -2,8 +2,6 @@ package com.faforever.moderatorclient.ui.domain;
 
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
 
 public class MatchmakerQueueFX extends AbstractEntityFX {
     private final StringProperty technicalName;
