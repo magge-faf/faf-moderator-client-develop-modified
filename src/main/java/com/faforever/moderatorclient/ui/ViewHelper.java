@@ -21,7 +21,6 @@ import com.faforever.moderatorclient.ui.domain.UniqueIdAssignmentFx;
 
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.ReadOnlyIntegerWrapper;
-import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
@@ -2505,8 +2504,8 @@ public class ViewHelper {
         messageTableView.setEditable(true);
         HashMap<TableColumn<MessageFx, ?>, Function<MessageFx, ?>> extractors = new HashMap<>();
 
-        TableColumn<MessageFx, Number> idColumn = new TableColumn<>("ID");
-        idColumn.setCellValueFactory(o -> new SimpleIntegerProperty(o.getValue().getId()));
+        TableColumn<MessageFx, String> idColumn = new TableColumn<>("ID");
+        idColumn.setCellValueFactory(o -> o.getValue().idProperty());
         messageTableView.getColumns().add(idColumn);
         extractors.put(idColumn, MessageFx::getId);
 
