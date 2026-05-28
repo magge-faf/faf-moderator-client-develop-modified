@@ -1,6 +1,5 @@
 package com.faforever.moderatorclient.ui.domain;
 
-import com.faforever.commons.api.dto.Tutorial;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -13,7 +12,7 @@ public class TutorialCategoryFX {
     private final IntegerProperty id;
     private final StringProperty categoryKey;
     private final StringProperty category;
-    private final ObservableList<Tutorial> tutorials;
+    private final ObservableList<TutorialFx> tutorials;
 
     public TutorialCategoryFX() {
         tutorials = FXCollections.observableArrayList();
@@ -58,7 +57,14 @@ public class TutorialCategoryFX {
         return category;
     }
 
-    public ObservableList<Tutorial> getTutorials() {
+    public ObservableList<TutorialFx> getTutorials() {
         return tutorials;
+    }
+
+    public void setTutorials(ObservableList<TutorialFx> tutorials) {
+        this.tutorials.clear();
+        if (tutorials != null) {
+            this.tutorials.addAll(tutorials);
+        }
     }
 }
