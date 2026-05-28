@@ -10,7 +10,7 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import org.apache.maven.artifact.versioning.ComparableVersion;
 
-import java.net.URL;
+import java.net.URI;
 
 public class ModVersionFX extends AbstractEntityFX {
     private final StringProperty uid;
@@ -21,8 +21,8 @@ public class ModVersionFX extends AbstractEntityFX {
     private final StringProperty icon;
     private final BooleanProperty ranked;
     private final BooleanProperty hidden;
-    private final ObjectProperty<URL> thumbnailUrl;
-    private final ObjectProperty<URL> downloadUrl;
+    private final ObjectProperty<URI> thumbnailUrl;
+    private final ObjectProperty<URI> downloadUrl;
     private final ObjectProperty<Mod> mod;
 
 
@@ -136,27 +136,27 @@ public class ModVersionFX extends AbstractEntityFX {
         return hidden;
     }
 
-    public URL getThumbnailUrl() {
+    public URI getThumbnailUrl() {
         return thumbnailUrl.get();
     }
 
-    public void setThumbnailUrl(URL thumbnailUrl) {
+    public void setThumbnailUrl(URI thumbnailUrl) {
         this.thumbnailUrl.set(thumbnailUrl);
     }
 
-    public ObjectProperty<URL> thumbnailUrlProperty() {
+    public ObjectProperty<URI> thumbnailUrlProperty() {
         return thumbnailUrl;
     }
 
-    public URL getDownloadUrl() {
+    public URI getDownloadUrl() {
         return downloadUrl.get();
     }
 
-    public void setDownloadUrl(URL downloadUrl) {
+    public void setDownloadUrl(URI downloadUrl) {
         this.downloadUrl.set(downloadUrl);
     }
 
-    public ObjectProperty<URL> downloadUrlProperty() {
+    public ObjectProperty<URI> downloadUrlProperty() {
         return downloadUrl;
     }
 
