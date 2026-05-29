@@ -19,7 +19,6 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URI;
-import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.concurrent.CompletableFuture;
@@ -98,7 +97,7 @@ public class OAuthValuesReceiver {
       Socket socket = serverSocket.accept();
       BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
       String request = reader.readLine();
-      log.info(request);
+      log.info("Received OAuth callback request: {}", formatRequestForLog(request));
 
       boolean success = false;
 
@@ -158,26 +157,27 @@ public class OAuthValuesReceiver {
 
 
   private void writeResponse(Socket socket, boolean success) throws IOException {
-    try (Writer writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()))) {
+    try (Writer writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8))) {
 
       String html;
 
       if (success) {
         try (InputStream inputStream = OAuthValuesReceiver.class.getResourceAsStream("/login_success.html")) {
-          html = new String(inputStream.readAllBytes());
+          html = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
         }
       } else {
         try (InputStream inputStream = OAuthValuesReceiver.class.getResourceAsStream("/login_failed.html")) {
-          html = new String(inputStream.readAllBytes());
+          html = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
         }
       }
 
+      int contentLength = html.getBytes(StandardCharsets.UTF_8).length;
       writer
           .append("HTTP/1.1 200 OK\r\n")
-          .append("Content-Length ")
-          .append(String.valueOf(html.length()))
+          .append("Content-Length: ")
+          .append(String.valueOf(contentLength))
           .append("\r\n")
-          .append("Content-Type: text/html\r\n")
+          .append("Content-Type: text/html; charset=UTF-8\r\n")
           .append("Connection: Closed\r\n")
           .append("\r\n")
           .append(html);
@@ -190,14 +190,29 @@ public class OAuthValuesReceiver {
     return new Values(code, codeVerifier, state, redirectUri, environmentProperties.getClientId());
   }
 
-  private String formatRequest(String request) {
-    return URLDecoder.decode(request, StandardCharsets.UTF_8);
+  private String formatRequestForLog(String request) {
+    if (request == null || request.isBlank()) {
+      return "<empty>";
+    }
+
+    String[] parts = request.split(" ");
+    if (parts.length < 2) {
+      return "<malformed>";
+    }
+
+    try {
+      URI uri = URI.create(parts[1]);
+      String path = uri.getPath() == null || uri.getPath().isBlank() ? "/" : uri.getPath();
+      return parts[0] + " " + path;
+    } catch (IllegalArgumentException e) {
+      return parts[0] + " <malformed>";
+    }
   }
 
   private String extractValue(String request, Pattern pattern) {
     Matcher matcher = pattern.matcher(request);
     if (!matcher.find()) {
-      throw new IllegalStateException("Could not extract value with pattern '" + pattern + "' from: " + formatRequest(request));
+      throw new IllegalStateException("Could not extract required OAuth callback parameter");
     }
     return matcher.group(1);
   }
@@ -205,7 +220,7 @@ public class OAuthValuesReceiver {
   private void checkForError(String request) {
     Matcher matcher = ERROR_PATTERN.matcher(request);
     if (matcher.find()) {
-      String errorMessage = "Login failed with error '" + matcher.group(1) + "'. The full request is: " + formatRequest(request);
+      String errorMessage = "Login failed with error '" + matcher.group(1) + "'";
       if (ERROR_SCOPE_DENIED.matcher(request).find()) {
         throw new KnownLoginErrorException(errorMessage, "login.scopeDenied");
       }

@@ -191,7 +191,7 @@ public class FafApiCommunicationService {
 
     public static long getCooldownRemainingMillis() {
         long now = System.currentTimeMillis();
-        if (requestTimestamps.size() < MAX_REQUESTS_PER_MINUTE) {
+        if (requestTimestamps.size() < effectiveMaxRequestsPerMinute) {
             return 0;
         }
         return Math.max(0, (requestTimestamps.peek() + ONE_MINUTE_IN_MILLIS) - now);
@@ -353,16 +353,17 @@ public class FafApiCommunicationService {
         int pageSize = environmentProperties.getMaxPageSize();
         List<T> current;
 
-        do {
-            current = getPage(clazz, routeBuilder, pageSize, page++, params);
-            result.addAll(current);
+        while (result.size() < count) {
+            int remainingCount = count - result.size();
+            int currentPageSize = Math.min(pageSize, remainingCount);
+            current = getPage(clazz, routeBuilder, currentPageSize, page++, params);
+            result.addAll(current.subList(0, Math.min(current.size(), remainingCount)));
 
             // Stop early if fewer results than a full page were returned
-            if (current.size() < pageSize) {
+            if (current.size() < currentPageSize) {
                 break;
             }
-
-        } while (!current.isEmpty() && result.size() < count);
+        }
 
         return result;
     }
