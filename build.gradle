@@ -154,5 +154,3 @@ compileJava.dependsOn(tasks.named("generateVersionClass"))
 test {
     useJUnitPlatform()
 }
-
-version = project.hasProperty('version') ? project.property('version') : dateVersion()

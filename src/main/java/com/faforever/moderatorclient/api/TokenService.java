@@ -24,6 +24,7 @@ import org.springframework.security.oauth2.core.endpoint.OAuth2AccessTokenRespon
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 
 import java.text.ParseException;
@@ -103,21 +104,22 @@ public class TokenService {
 
         Map<String, Object> responseBody = requestToken(headers, map);
         if (responseBody != null) {
-            parseResponse(responseBody);
+            parseResponse(responseBody, null);
 
             applicationEventPublisher.publishEvent(new HydraAuthorizedEvent());
         }
 
     }
 
-    private void parseResponse(Map<String, Object> responseBody) {
+    private void parseResponse(Map<String, Object> responseBody, String fallbackRefreshToken) {
         Object accessTokenObj = responseBody.get("access_token");
         Object expiresInObj = responseBody.get("expires_in");
         if (accessTokenObj == null || expiresInObj == null) {
             throw new IllegalStateException("OAuth token response is missing required fields (access_token or expires_in)");
         }
         String accessToken = (String) accessTokenObj;
-        String refreshToken = (String) responseBody.get("refresh_token");
+        String returnedRefreshToken = (String) responseBody.get("refresh_token");
+        String refreshToken = StringUtils.hasText(returnedRefreshToken) ? returnedRefreshToken : fallbackRefreshToken;
         long expiresIn = Long.parseLong(expiresInObj.toString());
 
         tokenCache = OAuth2AccessTokenResponse.withToken(accessToken)
@@ -126,9 +128,9 @@ public class TokenService {
                 .expiresIn(expiresIn)
                 .build();
 
-        if (localPreferences.getAutoLogin().isEnabled()) {
+        if (localPreferences.getAutoLogin().isEnabled() && StringUtils.hasText(returnedRefreshToken)) {
             log.info("Auto login enabled, persisting refresh token");
-            localPreferences.getAutoLogin().setRefreshToken(refreshToken);
+            localPreferences.getAutoLogin().setRefreshToken(returnedRefreshToken);
         }
         hmacHeaderInterceptor.setHmac(getHmac());
     }
@@ -146,7 +148,7 @@ public class TokenService {
         Map<String, Object> responseBody = requestToken(headers, map);
 
         if (responseBody != null) {
-            parseResponse(responseBody);
+            parseResponse(responseBody, refreshToken);
 
             if (fireEvent) {
                 applicationEventPublisher.publishEvent(new HydraAuthorizedEvent());
