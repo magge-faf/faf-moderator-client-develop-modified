@@ -148,6 +148,22 @@ class FafApiCommunicationServiceTest {
         verify(eventPublisher).publishEvent(any(com.faforever.moderatorclient.api.event.FafApiFailGetEvent.class));
     }
 
+    @Test
+    void getPageForSmurfVillageLookupPropagatesFetchFailuresAfterPublishingEvent() throws Exception {
+        ApplicationEventPublisher eventPublisher = mock();
+        FafApiCommunicationService service = new FafApiCommunicationService(null, null, null, null, eventPublisher, mock(), null, null, new EnvironmentProperties(), null);
+        authorizedLatch(service).countDown();
+
+        assertThrows(NullPointerException.class, () -> service.getPageForSmurfVillageLookup(
+                MapVersion.class,
+                ElideNavigator.of(MapVersion.class).collection(),
+                10,
+                1,
+                org.springframework.util.CollectionUtils.toMultiValueMap(Collections.emptyMap())));
+
+        verify(eventPublisher).publishEvent(any(com.faforever.moderatorclient.api.event.FafApiFailGetEvent.class));
+    }
+
     @SuppressWarnings("unchecked")
     private Deque<Long> requestTimestamps() throws Exception {
         Field field = FafApiCommunicationService.class.getDeclaredField("requestTimestamps");
