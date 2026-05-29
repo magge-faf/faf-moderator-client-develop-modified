@@ -17,7 +17,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.web.util.DefaultUriBuilderFactory;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AccessTokenResponse;
@@ -47,7 +47,10 @@ public class TokenService {
 
     public void prepare(EnvironmentProperties environmentProperties) {
         this.environmentProperties = environmentProperties;
-        RestTemplate rt = new RestTemplate(new JdkClientHttpRequestFactory());
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofSeconds(10));
+        requestFactory.setReadTimeout(Duration.ofSeconds(30));
+        RestTemplate rt = new RestTemplate(requestFactory);
         rt.setUriTemplateHandler(new DefaultUriBuilderFactory(environmentProperties.getOauthBaseUrl()));
         rt.setInterceptors(List.of(hmacHeaderInterceptor));
         this.restTemplate = rt;
