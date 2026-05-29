@@ -1,12 +1,14 @@
 package com.faforever.moderatorclient.config.local;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.prefs.Preferences;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Data
@@ -34,9 +36,26 @@ public class LocalPreferences {
     @JsonIgnoreProperties(ignoreUnknown = true)
     @Data
     public static class AutoLogin {
+        private static final Preferences CREDENTIAL_PREFERENCES = Preferences.userNodeForPackage(AutoLogin.class);
+        private static final String REFRESH_TOKEN_KEY = "refreshToken";
+
         boolean enabled;
         String environment;
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         String refreshToken;
+
+        public String getRefreshToken() {
+            return refreshToken != null ? refreshToken : CREDENTIAL_PREFERENCES.get(REFRESH_TOKEN_KEY, null);
+        }
+
+        public void setRefreshToken(String refreshToken) {
+            this.refreshToken = refreshToken;
+            if (refreshToken == null || refreshToken.isBlank()) {
+                CREDENTIAL_PREFERENCES.remove(REFRESH_TOKEN_KEY);
+            } else {
+                CREDENTIAL_PREFERENCES.put(REFRESH_TOKEN_KEY, refreshToken);
+            }
+        }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
