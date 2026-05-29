@@ -62,6 +62,9 @@ public class TutorialCategoryFX {
     }
 
     public void setTutorials(ObservableList<TutorialFx> tutorials) {
+        if (tutorials == this.tutorials) {
+            return;
+        }
         this.tutorials.clear();
         if (tutorials != null) {
             this.tutorials.addAll(tutorials);

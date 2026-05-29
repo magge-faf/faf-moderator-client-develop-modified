@@ -336,10 +336,16 @@ public class LadderMapPoolController implements Controller<SplitPane> {
     }
 
     public void onGeneratedMapButton() {
+        ComparableVersion selectedVersion = neroxisVersionComboBox.getSelectionModel().getSelectedItem();
+        if (selectedVersion == null) {
+            log.warn("No Neroxis generator version selected");
+            return;
+        }
+
         NeroxisGeneratorParams neroxisGeneratorParams = new NeroxisGeneratorParams();
         neroxisGeneratorParams.setSpawns(neroxisSpawnsSpinner.getValue());
         neroxisGeneratorParams.setSize((int) (neroxisSizeSpinner.getValue() * KM_TO_MAP_PIXELS_FACTOR));
-        neroxisGeneratorParams.setVersion(neroxisVersionComboBox.getValue().toString());
+        neroxisGeneratorParams.setVersion(selectedVersion.toString());
         MapPoolAssignment mapPoolAssignment = new MapPoolAssignment();
         mapPoolAssignment.setMapParams(neroxisGeneratorParams);
         selectedMap.setValue(mapPoolAssignmentMapper.map(mapPoolAssignment));

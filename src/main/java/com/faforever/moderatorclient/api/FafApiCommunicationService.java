@@ -356,19 +356,21 @@ public class FafApiCommunicationService {
         List<T> result = new LinkedList<>();
         int page = 1;
         int pageSize = environmentProperties.getMaxPageSize();
+        int fixedPageSize = pageSize;
         List<T> current;
 
         while (result.size() < count) {
-            int remainingCount = count - result.size();
-            int currentPageSize = Math.min(pageSize, remainingCount);
-            current = getPage(clazz, routeBuilder, currentPageSize, page++, params);
-            result.addAll(current.subList(0, Math.min(current.size(), remainingCount)));
+            current = getPage(clazz, routeBuilder, fixedPageSize, page++, params);
+            result.addAll(current);
 
             // Stop early if fewer results than a full page were returned
-            if (current.size() < currentPageSize) {
+            if (current.size() < fixedPageSize) {
                 break;
             }
         }
+
+        // Truncate to requested count
+        result = result.subList(0, Math.min(result.size(), count));
 
         return result;
     }

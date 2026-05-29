@@ -53,11 +53,17 @@ class DomainCollectionTest {
         AccountLinkFx accountLink = new AccountLinkFx();
         UniqueIdAssignmentFx uniqueIdAssignment = new UniqueIdAssignmentFx();
 
-        player.getNames().add(new NameRecordFX());
-        player.getBans().add(new BanInfoFX());
-        player.getAvatarAssignments().add(new AvatarAssignmentFX());
-        player.getAccountLinks().add(new AccountLinkFx());
-        player.getUniqueIdAssignments().add(new UniqueIdAssignmentFx());
+        NameRecordFX oldName = new NameRecordFX();
+        BanInfoFX oldBan = new BanInfoFX();
+        AvatarAssignmentFX oldAvatarAssignment = new AvatarAssignmentFX();
+        AccountLinkFx oldAccountLink = new AccountLinkFx();
+        UniqueIdAssignmentFx oldUniqueIdAssignment = new UniqueIdAssignmentFx();
+
+        player.getNames().add(oldName);
+        player.getBans().add(oldBan);
+        player.getAvatarAssignments().add(oldAvatarAssignment);
+        player.getAccountLinks().add(oldAccountLink);
+        player.getUniqueIdAssignments().add(oldUniqueIdAssignment);
 
         player.setNames(FXCollections.observableArrayList(name));
         player.setBans(FXCollections.observableArrayList(ban));
@@ -68,8 +74,12 @@ class DomainCollectionTest {
         assertThat(player.getNames(), contains(name));
         assertThat(player.getBans(), contains(ban));
         assertThat(player.getAvatarAssignments(), contains(avatarAssignment));
+        assertThat(player.getAccountLinks().size(), is(1));
         assertThat(player.getAccountLinks().contains(accountLink), is(true));
+        assertThat(player.getAccountLinks().contains(oldAccountLink), is(false));
+        assertThat(player.getUniqueIdAssignments().size(), is(1));
         assertThat(player.getUniqueIdAssignments().contains(uniqueIdAssignment), is(true));
+        assertThat(player.getUniqueIdAssignments().contains(oldUniqueIdAssignment), is(false));
 
         player.setNames(null);
         player.setBans(null);

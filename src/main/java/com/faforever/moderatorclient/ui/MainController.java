@@ -205,7 +205,11 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         tab.setOnSelectionChanged(event -> {
             if (tab.isSelected() && !dataLoadingState.getOrDefault(tab, false)) {
                 dataLoadingState.put(tab, true);
-                loadingFunction.run();
+                try {
+                    loadingFunction.run();
+                } catch (RuntimeException e) {
+                    log.error("Error during tab initialization for {}", tab.getId(), e);
+                }
             }
         });
     }

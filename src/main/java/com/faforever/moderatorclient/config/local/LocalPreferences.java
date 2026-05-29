@@ -38,6 +38,7 @@ public class LocalPreferences {
     public static class AutoLogin {
         private static final Preferences CREDENTIAL_PREFERENCES = Preferences.userNodeForPackage(AutoLogin.class);
         private static final String REFRESH_TOKEN_KEY = "refreshToken";
+        private static final String ENCRYPTED_TOKEN_KEY = "encryptedRefreshToken";
 
         boolean enabled;
         String environment;
@@ -45,16 +46,89 @@ public class LocalPreferences {
         String refreshToken;
 
         public String getRefreshToken() {
-            return refreshToken != null ? refreshToken : CREDENTIAL_PREFERENCES.get(REFRESH_TOKEN_KEY, null);
+            // First check if there's a legacy plaintext token in the JSON field
+            if (refreshToken != null) {
+                return refreshToken;
+            }
+
+            // Try to get from encrypted Preferences store
+            String encryptedToken = CREDENTIAL_PREFERENCES.get(ENCRYPTED_TOKEN_KEY, null);
+            if (encryptedToken != null) {
+                return decryptToken(encryptedToken);
+            }
+
+            // Fallback to legacy plaintext Preferences (for migration)
+            return CREDENTIAL_PREFERENCES.get(REFRESH_TOKEN_KEY, null);
         }
 
         public void setRefreshToken(String refreshToken) {
-            this.refreshToken = refreshToken;
-            if (refreshToken == null || refreshToken.isBlank()) {
-                CREDENTIAL_PREFERENCES.remove(REFRESH_TOKEN_KEY);
-            } else {
-                CREDENTIAL_PREFERENCES.put(REFRESH_TOKEN_KEY, refreshToken);
+            // Migrate legacy plaintext token from JSON field if present
+            if (this.refreshToken != null && !this.refreshToken.isBlank()) {
+                // Clear the JSON field by setting it to null
+                this.refreshToken = null;
             }
+
+            if (refreshToken == null || refreshToken.isBlank()) {
+                CREDENTIAL_PREFERENCES.remove(ENCRYPTED_TOKEN_KEY);
+                CREDENTIAL_PREFERENCES.remove(REFRESH_TOKEN_KEY);
+                this.refreshToken = null;
+            } else {
+                // Store encrypted in Preferences
+                String encrypted = encryptToken(refreshToken);
+                CREDENTIAL_PREFERENCES.put(ENCRYPTED_TOKEN_KEY, encrypted);
+                // Remove legacy plaintext entry
+                CREDENTIAL_PREFERENCES.remove(REFRESH_TOKEN_KEY);
+                // Don't store in JSON field
+                this.refreshToken = null;
+            }
+        }
+
+        private String encryptToken(String token) {
+            try {
+                // Use a simple XOR cipher with a system-derived key
+                // This is not cryptographically strong but better than plaintext
+                String key = getSystemKey();
+                byte[] tokenBytes = token.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                byte[] keyBytes = key.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                byte[] encrypted = new byte[tokenBytes.length];
+
+                for (int i = 0; i < tokenBytes.length; i++) {
+                    encrypted[i] = (byte) (tokenBytes[i] ^ keyBytes[i % keyBytes.length]);
+                }
+
+                return java.util.Base64.getEncoder().encodeToString(encrypted);
+            } catch (Exception e) {
+                // Fallback to plaintext if encryption fails
+                return token;
+            }
+        }
+
+        private String decryptToken(String encryptedToken) {
+            try {
+                String key = getSystemKey();
+                byte[] encrypted = java.util.Base64.getDecoder().decode(encryptedToken);
+                byte[] keyBytes = key.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                byte[] decrypted = new byte[encrypted.length];
+
+                for (int i = 0; i < encrypted.length; i++) {
+                    decrypted[i] = (byte) (encrypted[i] ^ keyBytes[i % keyBytes.length]);
+                }
+
+                return new String(decrypted, java.nio.charset.StandardCharsets.UTF_8);
+            } catch (Exception e) {
+                // Return null if decryption fails
+                return null;
+            }
+        }
+
+        private String getSystemKey() {
+            // Generate a key from system properties to make it hardware-specific
+            String osName = System.getProperty("os.name", "");
+            String osVersion = System.getProperty("os.version", "");
+            String userName = System.getProperty("user.name", "");
+            String userHome = System.getProperty("user.home", "");
+
+            return osName + osVersion + userName + userHome + "faf-moderator-salt";
         }
     }
 

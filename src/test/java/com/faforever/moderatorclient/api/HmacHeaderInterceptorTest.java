@@ -32,7 +32,7 @@ class HmacHeaderInterceptorTest {
         MockClientHttpRequest request = new MockClientHttpRequest();
 
         instance.intercept(request, new byte[0], (executedRequest, body) -> {
-            assertThat(executedRequest.getHeaders().getFirst("X-HMAC"), is(emptyOrNullString()));
+            assertThat(executedRequest.getHeaders().containsKey("X-HMAC"), is(false));
             return new MockClientHttpResponse(new byte[0], 200);
         });
     }

@@ -73,20 +73,23 @@ class TokenServiceTest {
         ReflectionTestUtils.setField(tokenService, "tokenCache", expiredTokenResponse("expired-token", "refresh-token"));
 
         ExecutorService executorService = Executors.newFixedThreadPool(2);
-        CyclicBarrier barrier = new CyclicBarrier(2);
-        Future<String> first = executorService.submit(() -> {
-            barrier.await();
-            return tokenService.getRefreshedTokenValue();
-        });
-        Future<String> second = executorService.submit(() -> {
-            barrier.await();
-            return tokenService.getRefreshedTokenValue();
-        });
+        try {
+            CyclicBarrier barrier = new CyclicBarrier(2);
+            Future<String> first = executorService.submit(() -> {
+                barrier.await();
+                return tokenService.getRefreshedTokenValue();
+            });
+            Future<String> second = executorService.submit(() -> {
+                barrier.await();
+                return tokenService.getRefreshedTokenValue();
+            });
 
-        assertThat(first.get(), is("refreshed-token"));
-        assertThat(second.get(), is("refreshed-token"));
-        assertThat(tokenService.refreshCount.get(), is(1));
-        executorService.shutdownNow();
+            assertThat(first.get(), is("refreshed-token"));
+            assertThat(second.get(), is("refreshed-token"));
+            assertThat(tokenService.refreshCount.get(), is(1));
+        } finally {
+            executorService.shutdownNow();
+        }
     }
 
     private static String jwtWithHmac(String hmac) {
