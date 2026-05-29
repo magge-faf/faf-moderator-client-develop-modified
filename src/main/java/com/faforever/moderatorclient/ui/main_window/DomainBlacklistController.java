@@ -61,10 +61,8 @@ public class DomainBlacklistController implements Controller<SplitPane> {
 
     public void refresh() {
         try {
-            domainBlacklist.clear();
-            domainBlacklist.addAll(
-                    domainBlacklistMapper.map(domainBlacklistService.getAll())
-            );
+            List<DomainBlacklistFX> mappedList = domainBlacklistMapper.map(domainBlacklistService.getAll());
+            domainBlacklist.setAll(mappedList);
         } catch (RuntimeException e) {
             log.error("Error refreshing domain blacklist", e);
         }
