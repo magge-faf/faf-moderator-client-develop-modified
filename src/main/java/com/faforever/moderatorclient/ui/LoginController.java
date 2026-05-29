@@ -67,6 +67,7 @@ public class LoginController implements Controller<Pane> {
     }
 
     public void cancelLogin() {
+        oAuthValuesReceiver.cancelLogin();
         if (loginFuture != null) {
             loginFuture.cancel(true);
         }

@@ -18,6 +18,7 @@ import java.io.Writer;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -46,6 +47,9 @@ public class OAuthValuesReceiver {
   private String state;
   private String codeVerifier;
   private CompletableFuture<Values> valuesFuture;
+  private volatile ServerSocket activeServerSocket;
+
+  private static final int CALLBACK_ACCEPT_TIMEOUT_MILLIS = 1_000;
 
   public CompletableFuture<Values> receiveValues(EnvironmentProperties environmentProperties) {
     if (valuesFuture != null && !valuesFuture.isDone()) {
@@ -60,6 +64,20 @@ public class OAuthValuesReceiver {
     valuesFuture = CompletableFuture.supplyAsync(this::readValues);
     return valuesFuture;
 
+  }
+
+  public void cancelLogin() {
+    if (valuesFuture != null) {
+      valuesFuture.cancel(true);
+    }
+    ServerSocket serverSocket = activeServerSocket;
+    if (serverSocket != null && !serverSocket.isClosed()) {
+      try {
+        serverSocket.close();
+      } catch (IOException e) {
+        log.warn("Could not close OAuth callback socket", e);
+      }
+    }
   }
 
   private void openBrowserToLogin() {
@@ -86,6 +104,8 @@ public class OAuthValuesReceiver {
 
   private Values readValues() {
     try (ServerSocket serverSocket = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+      activeServerSocket = serverSocket;
+      serverSocket.setSoTimeout(CALLBACK_ACCEPT_TIMEOUT_MILLIS);
       redirectUri = UriComponentsBuilder.fromUriString("http://127.0.0.1")
                                         .port(serverSocket.getLocalPort())
                                         .build()
@@ -94,7 +114,7 @@ public class OAuthValuesReceiver {
 
       openHydraUrl();
 
-      Socket socket = serverSocket.accept();
+      Socket socket = acceptCallback(serverSocket);
       BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
       String request = reader.readLine();
       log.info("Received OAuth callback request: {}", formatRequestForLog(request));
@@ -117,8 +137,20 @@ public class OAuthValuesReceiver {
     } catch (IOException e) {
       throw new IllegalStateException("Could not get code", e);
     } finally {
+      activeServerSocket = null;
       redirectUriLatch = null;
     }
+  }
+
+  private Socket acceptCallback(ServerSocket serverSocket) throws IOException {
+    while (!Thread.currentThread().isInterrupted() && (valuesFuture == null || !valuesFuture.isCancelled())) {
+      try {
+        return serverSocket.accept();
+      } catch (SocketTimeoutException ignored) {
+        // Re-check cancellation state after each bounded accept timeout.
+      }
+    }
+    throw new IOException("OAuth callback listener was cancelled");
   }
 
   private void openHydraUrl() {

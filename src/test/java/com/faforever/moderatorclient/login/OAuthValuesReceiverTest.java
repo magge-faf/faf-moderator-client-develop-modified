@@ -6,8 +6,11 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CompletableFuture;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -61,6 +64,22 @@ class OAuthValuesReceiverTest {
     assertThat(responseParts[0], containsString("Content-Type: text/html; charset=UTF-8"));
     assertThat(contentLength.find(), is(true));
     assertThat(Integer.parseInt(contentLength.group(1)), is(responseParts[1].getBytes(StandardCharsets.UTF_8).length));
+  }
+
+  @Test
+  void cancelLoginClosesActiveCallbackSocket() throws IOException {
+    OAuthValuesReceiver receiver = new OAuthValuesReceiver();
+    CompletableFuture<OAuthValuesReceiver.Values> valuesFuture = new CompletableFuture<>();
+
+    try (ServerSocket serverSocket = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+      ReflectionTestUtils.setField(receiver, "valuesFuture", valuesFuture);
+      ReflectionTestUtils.setField(receiver, "activeServerSocket", serverSocket);
+
+      receiver.cancelLogin();
+
+      assertThat(valuesFuture.isCancelled(), is(true));
+      assertThat(serverSocket.isClosed(), is(true));
+    }
   }
 
   private static class CapturingSocket extends Socket {
