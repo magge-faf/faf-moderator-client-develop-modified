@@ -650,13 +650,13 @@ public class ViewHelper {
         if (players.size() == 1) {
             PlayerFX p = players.get(0);
             if (p == null || p.getId() == null) return "No notes";
-            return formatNotes(noteCache.getOrDefault(p.getId(), Collections.emptyList()));
+            return ViewHelperFormatters.formatNotes(noteCache.getOrDefault(p.getId(), Collections.emptyList()));
         }
         StringBuilder sb = new StringBuilder();
         for (PlayerFX p : players) {
             if (p == null || p.getId() == null) continue;
             sb.append("[").append(p.getLogin()).append("]\n");
-            sb.append(formatNotes(noteCache.getOrDefault(p.getId(), Collections.emptyList()))).append("\n\n");
+            sb.append(ViewHelperFormatters.formatNotes(noteCache.getOrDefault(p.getId(), Collections.emptyList()))).append("\n\n");
         }
         return sb.toString().trim();
     }
@@ -734,21 +734,6 @@ public class ViewHelper {
     private static String truncateNote(String text, int maxLen) {
         if (text == null) return "";
         return text.length() <= maxLen ? text : text.substring(0, maxLen) + "…";
-    }
-
-    private static String formatNotes(List<UserNoteFX> notes) {
-        if (notes.isEmpty()) return "No notes";
-        return notes.stream()
-                .sorted(Comparator.<UserNoteFX, OffsetDateTime>comparing(
-                        n -> n.getCreateTime() != null ? n.getCreateTime() : OffsetDateTime.MIN)
-                        .reversed())
-                .map(n -> {
-                    String date = n.getCreateTime() != null ? DT_DATE.format(n.getCreateTime()) : "?";
-                    String author = n.getAuthor() != null && n.getAuthor().getLogin() != null
-                            ? n.getAuthor().getLogin() : "?";
-                    return "[" + date + "] " + author + ": " + n.getNote();
-                })
-                .collect(Collectors.joining("\n\n"));
     }
 
     public static void loadForceRenameDialog(UiService uiService, PlayerFX playerFX) {
