@@ -43,6 +43,7 @@ public class TokenService {
     private RestTemplate restTemplate;
     private EnvironmentProperties environmentProperties;
     private OAuth2AccessTokenResponse tokenCache;
+    private final Object refreshLock = new Object();
 
     public void prepare(EnvironmentProperties environmentProperties) {
         this.environmentProperties = environmentProperties;
@@ -57,10 +58,20 @@ public class TokenService {
         if (tokenCache == null) {
             throw new IllegalStateException("Token cache is null — authorize() must be called before requesting tokens");
         }
-        Instant expiresAt = tokenCache.getAccessToken().getExpiresAt();
+        OAuth2AccessTokenResponse currentToken = tokenCache;
+        Instant expiresAt = currentToken.getAccessToken().getExpiresAt();
         if (expiresAt == null || expiresAt.isBefore(Instant.now())) {
-            log.info("Token expired, requesting new with refresh token");
-            loginWithRefreshToken(tokenCache.getRefreshToken().getTokenValue(), false);
+            synchronized (refreshLock) {
+                currentToken = tokenCache;
+                expiresAt = currentToken.getAccessToken().getExpiresAt();
+                if (expiresAt == null || expiresAt.isBefore(Instant.now())) {
+                    if (currentToken.getRefreshToken() == null || !StringUtils.hasText(currentToken.getRefreshToken().getTokenValue())) {
+                        throw new IllegalStateException("Token cache is missing refresh token — login is required");
+                    }
+                    log.info("Token expired, requesting new with refresh token");
+                    loginWithRefreshToken(currentToken.getRefreshToken().getTokenValue(), false);
+                }
+            }
         } else {
             log.trace("Token still valid for {} seconds", Duration.between(Instant.now(), expiresAt).getSeconds());
         }
