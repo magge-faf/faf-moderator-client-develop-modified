@@ -26,6 +26,8 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -128,6 +130,22 @@ class FafApiCommunicationServiceTest {
 
         verify(eventPublisher, never()).publishEvent(org.mockito.ArgumentMatchers.any(ApiAuthorizedEvent.class));
         assertThat(authorizedLatch(service).getCount(), is(1L));
+    }
+
+    @Test
+    void getPagePropagatesFetchFailuresAfterPublishingEvent() throws Exception {
+        ApplicationEventPublisher eventPublisher = mock();
+        FafApiCommunicationService service = new FafApiCommunicationService(null, null, null, null, eventPublisher, mock(), null, null, new EnvironmentProperties(), null);
+        authorizedLatch(service).countDown();
+
+        assertThrows(NullPointerException.class, () -> service.getPage(
+                MapVersion.class,
+                ElideNavigator.of(MapVersion.class).collection(),
+                10,
+                1,
+                Collections.emptyMap()));
+
+        verify(eventPublisher).publishEvent(any(com.faforever.moderatorclient.api.event.FafApiFailGetEvent.class));
     }
 
     @SuppressWarnings("unchecked")

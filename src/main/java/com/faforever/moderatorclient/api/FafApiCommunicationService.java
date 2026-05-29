@@ -397,10 +397,10 @@ public class FafApiCommunicationService {
                     route,
                     Array.newInstance(clazz, 0).getClass(),
                     params);
-        } catch (Throwable t) {
+        } catch (RuntimeException t) {
             log.error("API returned error on getPage for route ''{}''", route, t);
             applicationEventPublisher.publishEvent(new FafApiFailGetEvent(t, route, routeBuilder.getDtoClass()));
-            return Collections.emptyList();
+            throw t;
         }
     }
 
