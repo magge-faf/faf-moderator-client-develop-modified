@@ -1914,7 +1914,7 @@ public class ViewHelper {
         extractors.put(widthColumn, MapVersionFX::getWidth);
 
         TableColumn<MapVersionFX, Number> heightColumn = new TableColumn<>("Height");
-        heightColumn.setCellValueFactory(o -> o.getValue().widthProperty());
+        heightColumn.setCellValueFactory(o -> o.getValue().heightProperty());
         heightColumn.setMinWidth(50);
         tableView.getColumns().add(heightColumn);
         extractors.put(heightColumn, MapVersionFX::getHeight);
