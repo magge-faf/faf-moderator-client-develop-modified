@@ -98,6 +98,10 @@ public class FafApiCommunicationService {
     }
 
     public boolean hasPermission(String... permissionTechnicalName) {
+        if (meResult == null || meResult.getPermissions() == null) {
+            return false;
+        }
+
         return meResult.getPermissions().stream()
                 .anyMatch(permission -> Arrays.asList(permissionTechnicalName).contains(permission));
     }
@@ -150,6 +154,7 @@ public class FafApiCommunicationService {
             meResult = getOne("/me", MeResult.class);
         } catch (Exception e) {
             log.error("Fetching /me failed", e);
+            return;
         }
 
         authorizedLatch.countDown();
