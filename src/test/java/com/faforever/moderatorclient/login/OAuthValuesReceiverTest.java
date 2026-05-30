@@ -50,6 +50,19 @@ class OAuthValuesReceiverTest {
   }
 
   @Test
+  void formatRequestForLogRedactsOAuthCallbackQuery() {
+    OAuthValuesReceiver receiver = new OAuthValuesReceiver();
+    String request = "GET /callback?code=secret-code&state=secret-state HTTP/1.1";
+
+    String formattedRequest = ReflectionTestUtils.invokeMethod(receiver, "formatRequestForLog", request);
+
+    assertThat(formattedRequest, is("GET /callback"));
+    assertThat(formattedRequest, not(containsString("secret-code")));
+    assertThat(formattedRequest, not(containsString("secret-state")));
+    assertThat(formattedRequest, not(containsString("?code=")));
+  }
+
+  @Test
   void writeResponseUsesUtf8ContentHeaders() {
     OAuthValuesReceiver receiver = new OAuthValuesReceiver();
     CapturingSocket socket = new CapturingSocket();
