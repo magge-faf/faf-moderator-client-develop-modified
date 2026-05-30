@@ -5,6 +5,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -28,8 +30,8 @@ public class LocalPreferencesReaderWriter {
             return new LocalPreferences();
         }
 
-        try {
-            return objectMapper.readValue(Files.newBufferedReader(prefsPath), LocalPreferences.class);
+        try (BufferedReader reader = Files.newBufferedReader(prefsPath)) {
+            return objectMapper.readValue(reader, LocalPreferences.class);
         } catch (IOException e) {
             log.error("Failed to read preferences, using defaults", e);
             return new LocalPreferences();
@@ -41,8 +43,10 @@ public class LocalPreferencesReaderWriter {
             if (prefsPath.getParent() != null && Files.notExists(prefsPath.getParent())) {
                 Files.createDirectories(prefsPath.getParent());
             }
-            objectMapper.writerWithDefaultPrettyPrinter()
-                    .writeValue(Files.newBufferedWriter(prefsPath), localPreferences);
+            try (BufferedWriter writer = Files.newBufferedWriter(prefsPath)) {
+                objectMapper.writerWithDefaultPrettyPrinter()
+                        .writeValue(writer, localPreferences);
+            }
             log.info("Preferences saved to {}", prefsPath);
         } catch (IOException e) {
             log.error("Failed to write preferences", e);

@@ -35,6 +35,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
 import java.util.*;
 
@@ -203,7 +205,11 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         tab.setOnSelectionChanged(event -> {
             if (tab.isSelected() && !dataLoadingState.getOrDefault(tab, false)) {
                 dataLoadingState.put(tab, true);
-                loadingFunction.run();
+                try {
+                    loadingFunction.run();
+                } catch (RuntimeException e) {
+                    log.error("Error during tab initialization for {}", tab.getId(), e);
+                }
             }
         });
     }
@@ -438,10 +444,15 @@ public class MainController implements Controller<TabPane>, DisposableBean {
             try {
                 String url = "https://api.github.com/repos/magge-faf/faf-moderator-client-develop-modified/releases/latest";
                 var conn = new java.net.URI(url).toURL().openConnection();
+                conn.setConnectTimeout(10_000);
+                conn.setReadTimeout(30_000);
                 conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
                 conn.setRequestProperty("User-Agent", "Java-Client");
 
-                String json = new String(conn.getInputStream().readAllBytes());
+                String json;
+                try (InputStream inputStream = conn.getInputStream()) {
+                    json = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+                }
                 com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(json);
                 String latestVersion = node.get("tag_name").asText();
 

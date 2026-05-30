@@ -16,6 +16,7 @@ import com.faforever.moderatorclient.ui.caches.LargeThumbnailCache;
 import com.faforever.moderatorclient.ui.domain.MapPoolAssignmentFX;
 import com.faforever.moderatorclient.ui.domain.MapPoolFX;
 import com.faforever.moderatorclient.ui.domain.MatchmakerQueueMapPoolFX;
+import javafx.application.Platform;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
@@ -53,6 +54,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 
@@ -124,13 +126,27 @@ public class LadderMapPoolController implements Controller<SplitPane> {
             }
         });
 
-        neroxisVersionComboBox.setItems(FXCollections.observableArrayList(mapService.getGeneratorVersions()));
-        neroxisVersionComboBox.getSelectionModel().selectFirst();
+        loadGeneratorVersions();
         neroxisSpawnsSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(2, 16, 2, 2));
         neroxisSizeSpinner.setValueFactory(new SpinnerValueFactory.DoubleSpinnerValueFactory(5, 20, 10, MIN_MAP_SIZE_STEP));
 
         bracketsScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         mapParamsLabel.managedProperty().bind(mapParamsLabel.visibleProperty());
+    }
+
+    private void loadGeneratorVersions() {
+        neroxisVersionComboBox.setDisable(true);
+        CompletableFuture.supplyAsync(mapService::getGeneratorVersions)
+                .thenAccept(versions -> Platform.runLater(() -> {
+                    neroxisVersionComboBox.setItems(FXCollections.observableArrayList(versions));
+                    neroxisVersionComboBox.getSelectionModel().selectFirst();
+                    neroxisVersionComboBox.setDisable(false);
+                }))
+                .exceptionally(throwable -> {
+                    log.warn("Could not load Neroxis generator versions", throwable);
+                    Platform.runLater(() -> neroxisVersionComboBox.setDisable(false));
+                    return null;
+                });
     }
 
     public void queueComboAction(ActionEvent event) {
@@ -320,10 +336,16 @@ public class LadderMapPoolController implements Controller<SplitPane> {
     }
 
     public void onGeneratedMapButton() {
+        ComparableVersion selectedVersion = neroxisVersionComboBox.getSelectionModel().getSelectedItem();
+        if (selectedVersion == null) {
+            log.warn("No Neroxis generator version selected");
+            return;
+        }
+
         NeroxisGeneratorParams neroxisGeneratorParams = new NeroxisGeneratorParams();
         neroxisGeneratorParams.setSpawns(neroxisSpawnsSpinner.getValue());
         neroxisGeneratorParams.setSize((int) (neroxisSizeSpinner.getValue() * KM_TO_MAP_PIXELS_FACTOR));
-        neroxisGeneratorParams.setVersion(neroxisVersionComboBox.getValue().toString());
+        neroxisGeneratorParams.setVersion(selectedVersion.toString());
         MapPoolAssignment mapPoolAssignment = new MapPoolAssignment();
         mapPoolAssignment.setMapParams(neroxisGeneratorParams);
         selectedMap.setValue(mapPoolAssignmentMapper.map(mapPoolAssignment));

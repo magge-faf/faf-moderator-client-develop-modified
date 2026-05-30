@@ -1,11 +1,5 @@
 package com.faforever.moderatorclient.ui.domain;
-import com.faforever.commons.api.dto.BanLevel;
-import com.faforever.commons.api.dto.BanStatus;
-import javafx.beans.binding.Bindings;
-import javafx.beans.property.ObjectProperty;
-import javafx.beans.property.SimpleStringProperty;
-import javafx.beans.property.StringProperty;
-import javafx.collections.ObservableList;
+
 import com.faforever.commons.api.dto.BanLevel;
 import com.faforever.commons.api.dto.BanStatus;
 import javafx.beans.binding.Bindings;

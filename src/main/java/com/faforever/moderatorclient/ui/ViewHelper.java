@@ -21,7 +21,6 @@ import com.faforever.moderatorclient.ui.domain.UniqueIdAssignmentFx;
 
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.ReadOnlyIntegerWrapper;
-import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
@@ -651,13 +650,13 @@ public class ViewHelper {
         if (players.size() == 1) {
             PlayerFX p = players.get(0);
             if (p == null || p.getId() == null) return "No notes";
-            return formatNotes(noteCache.getOrDefault(p.getId(), Collections.emptyList()));
+            return ViewHelperFormatters.formatNotes(noteCache.getOrDefault(p.getId(), Collections.emptyList()));
         }
         StringBuilder sb = new StringBuilder();
         for (PlayerFX p : players) {
             if (p == null || p.getId() == null) continue;
             sb.append("[").append(p.getLogin()).append("]\n");
-            sb.append(formatNotes(noteCache.getOrDefault(p.getId(), Collections.emptyList()))).append("\n\n");
+            sb.append(ViewHelperFormatters.formatNotes(noteCache.getOrDefault(p.getId(), Collections.emptyList()))).append("\n\n");
         }
         return sb.toString().trim();
     }
@@ -735,21 +734,6 @@ public class ViewHelper {
     private static String truncateNote(String text, int maxLen) {
         if (text == null) return "";
         return text.length() <= maxLen ? text : text.substring(0, maxLen) + "…";
-    }
-
-    private static String formatNotes(List<UserNoteFX> notes) {
-        if (notes.isEmpty()) return "No notes";
-        return notes.stream()
-                .sorted(Comparator.<UserNoteFX, OffsetDateTime>comparing(
-                        n -> n.getCreateTime() != null ? n.getCreateTime() : OffsetDateTime.MIN)
-                        .reversed())
-                .map(n -> {
-                    String date = n.getCreateTime() != null ? DT_DATE.format(n.getCreateTime()) : "?";
-                    String author = n.getAuthor() != null && n.getAuthor().getLogin() != null
-                            ? n.getAuthor().getLogin() : "?";
-                    return "[" + date + "] " + author + ": " + n.getNote();
-                })
-                .collect(Collectors.joining("\n\n"));
     }
 
     public static void loadForceRenameDialog(UiService uiService, PlayerFX playerFX) {
@@ -1915,7 +1899,7 @@ public class ViewHelper {
         extractors.put(widthColumn, MapVersionFX::getWidth);
 
         TableColumn<MapVersionFX, Number> heightColumn = new TableColumn<>("Height");
-        heightColumn.setCellValueFactory(o -> o.getValue().widthProperty());
+        heightColumn.setCellValueFactory(o -> o.getValue().heightProperty());
         heightColumn.setMinWidth(50);
         tableView.getColumns().add(heightColumn);
         extractors.put(heightColumn, MapVersionFX::getHeight);
@@ -2505,8 +2489,8 @@ public class ViewHelper {
         messageTableView.setEditable(true);
         HashMap<TableColumn<MessageFx, ?>, Function<MessageFx, ?>> extractors = new HashMap<>();
 
-        TableColumn<MessageFx, Number> idColumn = new TableColumn<>("ID");
-        idColumn.setCellValueFactory(o -> new SimpleIntegerProperty(o.getValue().getId()));
+        TableColumn<MessageFx, String> idColumn = new TableColumn<>("ID");
+        idColumn.setCellValueFactory(o -> o.getValue().idProperty());
         messageTableView.getColumns().add(idColumn);
         extractors.put(idColumn, MessageFx::getId);
 

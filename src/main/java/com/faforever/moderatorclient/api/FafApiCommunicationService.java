@@ -98,6 +98,10 @@ public class FafApiCommunicationService {
     }
 
     public boolean hasPermission(String... permissionTechnicalName) {
+        if (meResult == null || meResult.getPermissions() == null) {
+            return false;
+        }
+
         return meResult.getPermissions().stream()
                 .anyMatch(permission -> Arrays.asList(permissionTechnicalName).contains(permission));
     }
@@ -150,6 +154,7 @@ public class FafApiCommunicationService {
             meResult = getOne("/me", MeResult.class);
         } catch (Exception e) {
             log.error("Fetching /me failed", e);
+            return;
         }
 
         authorizedLatch.countDown();
@@ -191,7 +196,7 @@ public class FafApiCommunicationService {
 
     public static long getCooldownRemainingMillis() {
         long now = System.currentTimeMillis();
-        if (requestTimestamps.size() < MAX_REQUESTS_PER_MINUTE) {
+        if (requestTimestamps.size() < effectiveMaxRequestsPerMinute) {
             return 0;
         }
         return Math.max(0, (requestTimestamps.peek() + ONE_MINUTE_IN_MILLIS) - now);
@@ -351,18 +356,21 @@ public class FafApiCommunicationService {
         List<T> result = new LinkedList<>();
         int page = 1;
         int pageSize = environmentProperties.getMaxPageSize();
+        int fixedPageSize = pageSize;
         List<T> current;
 
-        do {
-            current = getPage(clazz, routeBuilder, pageSize, page++, params);
+        while (result.size() < count) {
+            current = getPage(clazz, routeBuilder, fixedPageSize, page++, params);
             result.addAll(current);
 
             // Stop early if fewer results than a full page were returned
-            if (current.size() < pageSize) {
+            if (current.size() < fixedPageSize) {
                 break;
             }
+        }
 
-        } while (!current.isEmpty() && result.size() < count);
+        // Truncate to requested count
+        result = result.subList(0, Math.min(result.size(), count));
 
         return result;
     }
@@ -391,10 +399,10 @@ public class FafApiCommunicationService {
                     route,
                     Array.newInstance(clazz, 0).getClass(),
                     params);
-        } catch (Throwable t) {
+        } catch (RuntimeException t) {
             log.error("API returned error on getPage for route ''{}''", route, t);
             applicationEventPublisher.publishEvent(new FafApiFailGetEvent(t, route, routeBuilder.getDtoClass()));
-            return Collections.emptyList();
+            throw t;
         }
     }
 
@@ -425,10 +433,10 @@ public class FafApiCommunicationService {
                     route,
                     Array.newInstance(clazz, 0).getClass(),
                     params);
-        } catch (Throwable t) {
+        } catch (RuntimeException t) {
             log.error("API returned error on Smurf Village Lookup for route '{}'", route, t);
             applicationEventPublisher.publishEvent(new FafApiFailGetEvent(t, route, routeBuilder.getDtoClass()));
-            return Collections.emptyList();
+            throw t;
         }
     }
 

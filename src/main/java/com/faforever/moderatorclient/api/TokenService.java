@@ -17,13 +17,14 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.web.util.DefaultUriBuilderFactory;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AccessTokenResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 
 import java.text.ParseException;
@@ -42,10 +43,14 @@ public class TokenService {
     private RestTemplate restTemplate;
     private EnvironmentProperties environmentProperties;
     private OAuth2AccessTokenResponse tokenCache;
+    private final Object refreshLock = new Object();
 
     public void prepare(EnvironmentProperties environmentProperties) {
         this.environmentProperties = environmentProperties;
-        RestTemplate rt = new RestTemplate(new JdkClientHttpRequestFactory());
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofSeconds(10));
+        requestFactory.setReadTimeout(Duration.ofSeconds(30));
+        RestTemplate rt = new RestTemplate(requestFactory);
         rt.setUriTemplateHandler(new DefaultUriBuilderFactory(environmentProperties.getOauthBaseUrl()));
         rt.setInterceptors(List.of(hmacHeaderInterceptor));
         this.restTemplate = rt;
@@ -56,10 +61,20 @@ public class TokenService {
         if (tokenCache == null) {
             throw new IllegalStateException("Token cache is null — authorize() must be called before requesting tokens");
         }
-        Instant expiresAt = tokenCache.getAccessToken().getExpiresAt();
+        OAuth2AccessTokenResponse currentToken = tokenCache;
+        Instant expiresAt = currentToken.getAccessToken().getExpiresAt();
         if (expiresAt == null || expiresAt.isBefore(Instant.now())) {
-            log.info("Token expired, requesting new with refresh token");
-            loginWithRefreshToken(tokenCache.getRefreshToken().getTokenValue(), false);
+            synchronized (refreshLock) {
+                currentToken = tokenCache;
+                expiresAt = currentToken.getAccessToken().getExpiresAt();
+                if (expiresAt == null || expiresAt.isBefore(Instant.now())) {
+                    if (currentToken.getRefreshToken() == null || !StringUtils.hasText(currentToken.getRefreshToken().getTokenValue())) {
+                        throw new IllegalStateException("Token cache is missing refresh token — login is required");
+                    }
+                    log.info("Token expired, requesting new with refresh token");
+                    loginWithRefreshToken(currentToken.getRefreshToken().getTokenValue(), false);
+                }
+            }
         } else {
             log.trace("Token still valid for {} seconds", Duration.between(Instant.now(), expiresAt).getSeconds());
         }
@@ -103,21 +118,22 @@ public class TokenService {
 
         Map<String, Object> responseBody = requestToken(headers, map);
         if (responseBody != null) {
-            parseResponse(responseBody);
+            parseResponse(responseBody, null);
 
             applicationEventPublisher.publishEvent(new HydraAuthorizedEvent());
         }
 
     }
 
-    private void parseResponse(Map<String, Object> responseBody) {
+    private void parseResponse(Map<String, Object> responseBody, String fallbackRefreshToken) {
         Object accessTokenObj = responseBody.get("access_token");
         Object expiresInObj = responseBody.get("expires_in");
         if (accessTokenObj == null || expiresInObj == null) {
             throw new IllegalStateException("OAuth token response is missing required fields (access_token or expires_in)");
         }
         String accessToken = (String) accessTokenObj;
-        String refreshToken = (String) responseBody.get("refresh_token");
+        String returnedRefreshToken = (String) responseBody.get("refresh_token");
+        String refreshToken = StringUtils.hasText(returnedRefreshToken) ? returnedRefreshToken : fallbackRefreshToken;
         long expiresIn = Long.parseLong(expiresInObj.toString());
 
         tokenCache = OAuth2AccessTokenResponse.withToken(accessToken)
@@ -126,9 +142,9 @@ public class TokenService {
                 .expiresIn(expiresIn)
                 .build();
 
-        if (localPreferences.getAutoLogin().isEnabled()) {
+        if (localPreferences.getAutoLogin().isEnabled() && StringUtils.hasText(returnedRefreshToken)) {
             log.info("Auto login enabled, persisting refresh token");
-            localPreferences.getAutoLogin().setRefreshToken(refreshToken);
+            localPreferences.getAutoLogin().setRefreshToken(returnedRefreshToken);
         }
         hmacHeaderInterceptor.setHmac(getHmac());
     }
@@ -146,7 +162,7 @@ public class TokenService {
         Map<String, Object> responseBody = requestToken(headers, map);
 
         if (responseBody != null) {
-            parseResponse(responseBody);
+            parseResponse(responseBody, refreshToken);
 
             if (fireEvent) {
                 applicationEventPublisher.publishEvent(new HydraAuthorizedEvent());

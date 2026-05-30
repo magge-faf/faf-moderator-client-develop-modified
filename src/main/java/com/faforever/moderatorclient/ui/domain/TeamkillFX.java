@@ -4,8 +4,7 @@ import javafx.beans.property.*;
 
 import java.time.OffsetDateTime;
 
-public class TeamkillFX {
-    private final StringProperty id;
+public class TeamkillFX extends AbstractEntityFX {
     private final ObjectProperty<PlayerFX> teamkiller;
     private final ObjectProperty<PlayerFX> victim;
     private final ObjectProperty<GameFX> game;
@@ -13,24 +12,11 @@ public class TeamkillFX {
     private final ObjectProperty<OffsetDateTime> reportedAt;
 
     public TeamkillFX() {
-        id = new SimpleStringProperty();
         teamkiller = new SimpleObjectProperty<>();
         victim = new SimpleObjectProperty<>();
         game = new SimpleObjectProperty<>();
         gameTime = new SimpleLongProperty();
         reportedAt = new SimpleObjectProperty<>();
-    }
-
-    public String getId() {
-        return id.get();
-    }
-
-    public void setId(String id) {
-        this.id.set(id);
-    }
-
-    public StringProperty idProperty() {
-        return id;
     }
 
     public PlayerFX getTeamkiller() {

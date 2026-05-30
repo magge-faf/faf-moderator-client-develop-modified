@@ -32,6 +32,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -168,9 +169,13 @@ public class LadderMapVoteGenerationFormController implements Controller<Node> {
     private String generateMapDescriptionHTML(MapVersion mapVersion) {
         String formattedHtml;
         try {
-            InputStream resourceAsStream = getClass().getResourceAsStream("/media/map_description_template.html");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(resourceAsStream));
-            String htmlTemplate = reader.lines().collect(Collectors.joining("\n"));
+            InputStream resourceAsStream = Objects.requireNonNull(
+                    getClass().getResourceAsStream("/media/map_description_template.html"),
+                    "Map description template resource is missing");
+            String htmlTemplate;
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(resourceAsStream))) {
+                htmlTemplate = reader.lines().collect(Collectors.joining("\n"));
+            }
 
             formattedHtml = htmlTemplate.replaceAll("\\{map-player-count}", String.valueOf(mapVersion.getMaxPlayers()));
             formattedHtml = formattedHtml.replaceAll("\\{preview-source}", mapVersion.getThumbnailUrlLarge().toString());

@@ -57,6 +57,12 @@ public class BansController implements Controller<HBox> {
     public TableView<BanInfoFX> banTableView;
     public CheckBox onlyActiveCheckBox;
     public Button editBanButton;
+    public Label statTotalLabel;
+    public Label statActiveLabel;
+    public Label statPermanentLabel;
+    public Label statTemporaryLabel;
+    public Label statExpiredLabel;
+    public Label statRevokedLabel;
     private FilteredList<BanInfoFX> filteredList;
     private ObservableList<BanInfoFX> itemList;
     private boolean inSearchMode = false;
@@ -104,6 +110,7 @@ public class BansController implements Controller<HBox> {
                 filteredList.setPredicate(banInfoFX -> !onlyActiveCheckBox.isSelected() || banInfoFX.getBanStatus() == BanStatus.BANNED);
         onlyActiveCheckBox.selectedProperty().addListener(onlyActiveBansChangeListener);
         onlyActiveBansChangeListener.invalidated(onlyActiveCheckBox.selectedProperty());
+        itemList.addListener((javafx.collections.ListChangeListener<BanInfoFX>) change -> Platform.runLater(this::updateStats));
     }
 
     public void onRefreshLatestBans() {
@@ -252,6 +259,21 @@ public class BansController implements Controller<HBox> {
         });
 
         BACKGROUND_EXECUTOR.submit(syncTask);
+    }
+
+    private void updateStats() {
+        int total = itemList.size();
+        long active = itemList.stream().filter(b -> b.getBanStatus() == BanStatus.BANNED).count();
+        long permanent = itemList.stream().filter(b -> b.getBanStatus() == BanStatus.BANNED && b.getDuration() == BanDurationType.PERMANENT).count();
+        long temporary = itemList.stream().filter(b -> b.getBanStatus() == BanStatus.BANNED && b.getDuration() == BanDurationType.TEMPORARY).count();
+        long expired = itemList.stream().filter(b -> b.getBanStatus() == BanStatus.EXPIRED).count();
+        long revoked = itemList.stream().filter(b -> b.getBanStatus() == BanStatus.DISABLED).count();
+        statTotalLabel.setText("Total: " + total);
+        statActiveLabel.setText("Active: " + active);
+        statPermanentLabel.setText("Permanent: " + permanent);
+        statTemporaryLabel.setText("Temporary: " + temporary);
+        statExpiredLabel.setText("Expired: " + expired);
+        statRevokedLabel.setText("Revoked: " + revoked);
     }
 
     public void onSave() {

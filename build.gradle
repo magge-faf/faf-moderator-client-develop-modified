@@ -3,7 +3,7 @@ import java.text.SimpleDateFormat
 
 plugins {
     id 'application'
-    id 'com.gradleup.shadow' version '9.4.1'
+    id 'com.gradleup.shadow' version '9.4.2'
 }
 
 repositories {
@@ -154,5 +154,3 @@ compileJava.dependsOn(tasks.named("generateVersionClass"))
 test {
     useJUnitPlatform()
 }
-
-version = project.hasProperty('version') ? project.property('version') : dateVersion()

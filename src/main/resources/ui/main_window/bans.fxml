@@ -56,6 +56,46 @@
                 <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
             </VBox.margin>
         </Button>
+        <Separator prefWidth="200.0">
+            <VBox.margin>
+                <Insets top="5.0"/>
+            </VBox.margin>
+        </Separator>
+        <Label text="Stats (loaded)" style="-fx-font-weight: bold;">
+            <VBox.margin>
+                <Insets bottom="2.0" left="5.0" right="5.0" top="5.0"/>
+            </VBox.margin>
+        </Label>
+        <Label fx:id="statTotalLabel" text="Total: —">
+            <VBox.margin>
+                <Insets bottom="1.0" left="5.0" right="5.0" top="1.0"/>
+            </VBox.margin>
+        </Label>
+        <Label fx:id="statActiveLabel" text="Active: —">
+            <VBox.margin>
+                <Insets bottom="1.0" left="5.0" right="5.0" top="1.0"/>
+            </VBox.margin>
+        </Label>
+        <Label fx:id="statPermanentLabel" text="Permanent: —">
+            <VBox.margin>
+                <Insets bottom="1.0" left="5.0" right="5.0" top="1.0"/>
+            </VBox.margin>
+        </Label>
+        <Label fx:id="statTemporaryLabel" text="Temporary: —">
+            <VBox.margin>
+                <Insets bottom="1.0" left="5.0" right="5.0" top="1.0"/>
+            </VBox.margin>
+        </Label>
+        <Label fx:id="statExpiredLabel" text="Expired: —">
+            <VBox.margin>
+                <Insets bottom="1.0" left="5.0" right="5.0" top="1.0"/>
+            </VBox.margin>
+        </Label>
+        <Label fx:id="statRevokedLabel" text="Revoked: —">
+            <VBox.margin>
+                <Insets bottom="1.0" left="5.0" right="5.0" top="1.0"/>
+            </VBox.margin>
+        </Label>
     </VBox>
     <TableView fx:id="banTableView" maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
                HBox.hgrow="ALWAYS"/>

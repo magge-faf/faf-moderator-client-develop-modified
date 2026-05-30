@@ -20,7 +20,6 @@ import org.springframework.util.Assert;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -88,10 +87,14 @@ public class AvatarInfoController implements Controller<Pane> {
         File selectedFile = fileChooser.showOpenDialog(getRoot().getScene().getWindow());
         if (selectedFile != null) {
             BufferedImage bufferedImage = ImageIO.read(selectedFile);
+            if (bufferedImage == null) {
+                ViewHelper.errorDialog("Invalid image", "The selected file is not a readable PNG image");
+                return;
+            }
 
             if (bufferedImage.getWidth() == 40 && bufferedImage.getHeight() == 20) {
                 avatarImageFile = selectedFile;
-                imageView.setImage(new Image(new FileInputStream(avatarImageFile)));
+                imageView.setImage(new Image(avatarImageFile.toURI().toString()));
             } else {
                 ViewHelper.errorDialog("Invalid image", "The avatar size has to be 40x20px");
             }

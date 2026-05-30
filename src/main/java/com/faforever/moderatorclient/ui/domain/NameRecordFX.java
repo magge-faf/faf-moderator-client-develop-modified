@@ -1,36 +1,21 @@
 package com.faforever.moderatorclient.ui.domain;
 
-import com.faforever.commons.api.dto.Player;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
-import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
+import javafx.beans.property.SimpleStringProperty;
 
 import java.time.OffsetDateTime;
 
-public class NameRecordFX {
-    private final StringProperty id;
+public class NameRecordFX extends AbstractEntityFX {
     private final ObjectProperty<OffsetDateTime> changeTime;
-    private final ObjectProperty<Player> player;
+    private final ObjectProperty<PlayerFX> player;
     private final StringProperty name;
 
     public NameRecordFX() {
-        id = new SimpleStringProperty();
         changeTime = new SimpleObjectProperty<>();
         player = new SimpleObjectProperty<>();
         name = new SimpleStringProperty();
-    }
-
-    public String getId() {
-        return id.get();
-    }
-
-    public void setId(String id) {
-        this.id.set(id);
-    }
-
-    public StringProperty idProperty() {
-        return id;
     }
 
     public OffsetDateTime getChangeTime() {
@@ -45,15 +30,15 @@ public class NameRecordFX {
         return changeTime;
     }
 
-    public Player getPlayer() {
+    public PlayerFX getPlayer() {
         return player.get();
     }
 
-    public void setPlayer(Player player) {
+    public void setPlayer(PlayerFX player) {
         this.player.set(player);
     }
 
-    public ObjectProperty<Player> playerProperty() {
+    public ObjectProperty<PlayerFX> playerProperty() {
         return player;
     }
 

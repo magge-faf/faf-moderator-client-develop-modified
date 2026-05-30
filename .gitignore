@@ -28,3 +28,4 @@ ConfigurationModerationToolFAF/
 # Editor / tool config
 .vscode/
 .claude/
+.codex/

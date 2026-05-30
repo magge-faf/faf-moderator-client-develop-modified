@@ -5,7 +5,6 @@ import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
-import javafx.beans.value.ObservableObjectValue;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableSet;
 import lombok.Getter;
@@ -57,7 +56,7 @@ public class ModerationReportFX extends AbstractEntityFX {
 		this.reportStatus.set(reportStatus);
 	}
 
-	public ObservableObjectValue<ModerationReportStatus> reportStatusProperty() {
+	public ObjectProperty<ModerationReportStatus> reportStatusProperty() {
 		return reportStatus;
 	}
 
@@ -105,7 +104,7 @@ public class ModerationReportFX extends AbstractEntityFX {
 		this.reporter.set(reporter);
 	}
 
-	public ObservableObjectValue<PlayerFX> reporterProperty() {
+	public ObjectProperty<PlayerFX> reporterProperty() {
 		return reporter;
 	}
 
@@ -117,7 +116,7 @@ public class ModerationReportFX extends AbstractEntityFX {
 		this.game.set(game);
 	}
 
-	public ObservableObjectValue<GameFX> gameProperty() {
+	public ObjectProperty<GameFX> gameProperty() {
 		return game;
 	}
 
@@ -129,7 +128,7 @@ public class ModerationReportFX extends AbstractEntityFX {
 		this.lastModerator.set(lastModerator);
 	}
 
-	public ObservableObjectValue<PlayerFX> lastModeratorProperty() {
+	public ObjectProperty<PlayerFX> lastModeratorProperty() {
 		return lastModerator;
 	}
 

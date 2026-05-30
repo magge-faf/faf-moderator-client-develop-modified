@@ -1,12 +1,9 @@
 package com.faforever.moderatorclient.ui.domain;
 
-import javafx.beans.property.ObjectProperty;
-import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 
-public class MessageFx {
-    private final ObjectProperty<Integer> id;
+public class MessageFx extends AbstractEntityFX {
     private final StringProperty key;
     private final StringProperty language;
     private final StringProperty region;
@@ -14,22 +11,9 @@ public class MessageFx {
 
     public MessageFx() {
         region = new SimpleStringProperty();
-        id = new SimpleObjectProperty<>();
         key = new SimpleStringProperty();
         language = new SimpleStringProperty();
         value = new SimpleStringProperty();
-    }
-
-    public Integer getId() {
-        return id.get();
-    }
-
-    public ObjectProperty<Integer> idProperty() {
-        return id;
-    }
-
-    public void setId(int id) {
-        this.id.set(id);
     }
 
     public String getKey() {
