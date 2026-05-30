@@ -2,36 +2,36 @@ name: Release
 
 on:
   workflow_run:
-    workflows: ["Auto Tag on Main Push"]
+    workflows: ["Auto Tag on Release Push"]
     types:
       - completed
+    branches:
+      - release
+
+permissions:
+  contents: write
 
 jobs:
   release:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Get latest tag
         id: get_latest_tag
         run: |
-          latest_tag=$(git describe --tags --abbrev=0)
+          latest_tag=$(git tag --points-at HEAD --sort=-creatordate | head -n 1)
+          if [ -z "$latest_tag" ]; then
+            echo "No tag found for release commit."
+            exit 1
+          fi
           echo "latest_tag=$latest_tag" >> $GITHUB_OUTPUT
-
-      - name: Create Draft Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.get_latest_tag.outputs.latest_tag }}
-          release_name: ${{ steps.get_latest_tag.outputs.latest_tag }}
-          draft: false
-          prerelease: false
 
       - name: Build Windows Files
         uses: docker://eclipse-temurin:21-jdk
@@ -46,12 +46,68 @@ jobs:
           echo "file=$FILE" >> $GITHUB_OUTPUT
           echo "zip_name=$(basename $FILE)" >> $GITHUB_OUTPUT
 
-      - name: Upload Windows zip
-        uses: actions/upload-release-asset@v1
+      - name: Prepare release notes
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ steps.find_win_zip.outputs.file }}
-          asset_name: faf-moderator-client-${{ steps.get_latest_tag.outputs.latest_tag }}-win.zip
-          asset_content_type: application/zip
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.get_latest_tag.outputs.latest_tag }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          PR_JSON=$(gh api \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${{ github.repository }}/commits/$HEAD_SHA/pulls" \
+            --jq 'map(select(.base.ref == "release")) | first // empty')
+
+          if [ -z "$PR_JSON" ]; then
+            echo "Automated release for $TAG" > release-notes.md
+            exit 0
+          fi
+
+          PR_TITLE=$(echo "$PR_JSON" | jq -r '.title // empty')
+          PR_BODY=$(echo "$PR_JSON" | jq -r '.body // empty')
+          MILESTONE_TITLE=$(echo "$PR_JSON" | jq -r '.milestone.title // empty')
+          MILESTONE_DESCRIPTION=$(echo "$PR_JSON" | jq -r '.milestone.description // empty')
+          PR_URL=$(echo "$PR_JSON" | jq -r '.html_url // empty')
+
+          {
+            if [ -n "$MILESTONE_TITLE" ]; then
+              echo "## $MILESTONE_TITLE"
+              echo
+            fi
+
+            if [ -n "$MILESTONE_DESCRIPTION" ]; then
+              echo "$MILESTONE_DESCRIPTION"
+              echo
+            fi
+
+            if [ -n "$PR_BODY" ]; then
+              echo "$PR_BODY"
+              echo
+            elif [ -n "$PR_TITLE" ]; then
+              echo "$PR_TITLE"
+              echo
+            else
+              echo "Automated release for $TAG"
+              echo
+            fi
+
+            if [ -n "$PR_URL" ]; then
+              echo "Released from $PR_URL"
+            fi
+          } > release-notes.md
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.get_latest_tag.outputs.latest_tag }}
+          ASSET_PATH: ${{ steps.find_win_zip.outputs.file }}
+        run: |
+          gh release create "$TAG" \
+            "$ASSET_PATH#faf-moderator-client-$TAG-win.zip" \
+            --title "$TAG" \
+            --notes-file release-notes.md \
+            --verify-tag
+
+      - name: Keep main and nightly up to date
+        run: |
+          git push origin HEAD:main
+          git push origin HEAD:nightly

@@ -1,21 +1,34 @@
-name: Auto Tag on Main Push
+name: Auto Tag on Release Push
 
 on:
   push:
     branches:
-      - master
+      - release
+
+permissions:
+  contents: write
 
 jobs:
   tag-and-push:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Get date-based tag
         id: get_tag
         run: |
-          TAG="v$(date +'%Y-%m-%d')"
+          BASE_TAG="v$(date -u +'%Y-%m-%d')"
+          TAG="$BASE_TAG"
+          SUFFIX=1
+
+          while git ls-remote --exit-code --tags origin "refs/tags/$TAG" > /dev/null 2>&1; do
+            TAG="$BASE_TAG.$SUFFIX"
+            SUFFIX=$((SUFFIX + 1))
+          done
+
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Create and push tag
@@ -25,16 +38,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Delete local tag if it exists
-          if git tag | grep -q "^$TAG$"; then
-            git tag -d "$TAG"
-          fi
-
-          # Delete remote tag if it exists
-          if git ls-remote --tags origin | grep -q "refs/tags/$TAG$"; then
-            git push --delete origin "$TAG"
-          fi
-
-          # Recreate and push the new tag
           git tag "$TAG"
           git push origin "$TAG"
