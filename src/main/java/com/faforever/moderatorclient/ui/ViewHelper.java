@@ -36,6 +36,7 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.control.cell.TreeItemPropertyValueFactory;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.*;
+import javafx.geometry.Pos;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -1350,21 +1351,23 @@ public class ViewHelper {
         return col -> new TableCell<>() {
             private final VBox vbox = new VBox();
 
+            {
+                setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+                setGraphicTextGap(0);
+                vbox.setSpacing(0);
+                vbox.setFillWidth(false);
+            }
+
             @Override
             protected void updateItem(String item, boolean empty) {
                 super.updateItem(item, empty);
+                vbox.getChildren().clear();
                 if (empty || item == null) {
                     setText(null);
                     setGraphic(null);
                     return;
                 }
                 String term = highlightTerm != null ? highlightTerm.get() : null;
-                if (term == null || term.isBlank() || !item.contains(term)) {
-                    setGraphic(null);
-                    setText(item);
-                    return;
-                }
-                vbox.getChildren().clear();
                 for (String line : item.split("\n", -1)) {
                     vbox.getChildren().add(buildRow(line, term));
                 }
@@ -1372,25 +1375,40 @@ public class ViewHelper {
                 setGraphic(vbox);
             }
 
-            private HBox buildRow(String line, String term) {
+            private HBox buildRow(String line, @Nullable String term) {
                 HBox row = new HBox();
-                int idx = line.indexOf(term);
-                if (idx < 0) {
+                row.setAlignment(Pos.BASELINE_LEFT);
+
+                if (term == null || term.isBlank() || !line.contains(term)) {
                     row.getChildren().add(plainText(line));
-                } else {
-                    if (idx > 0) row.getChildren().add(plainText(line.substring(0, idx)));
-                    Text hl = new Text(line.substring(idx, idx + term.length()));
-                    hl.setStyle("-fx-font-weight: bold; -fx-fill: #ff8c00;");
-                    row.getChildren().add(hl);
-                    if (idx + term.length() < line.length())
-                        row.getChildren().add(plainText(line.substring(idx + term.length())));
+                    return row;
+                }
+                int start = 0;
+                int idx;
+                while ((idx = line.indexOf(term, start)) >= 0) {
+                    if (idx > start) {
+                        row.getChildren().add(plainText(line.substring(start, idx)));
+                    }
+                    row.getChildren().add(highlightText(line.substring(idx, idx + term.length())));
+                    start = idx + term.length();
+                }
+                if (start < line.length()) {
+                    row.getChildren().add(plainText(line.substring(start)));
                 }
                 return row;
             }
 
             private Text plainText(String text) {
                 Text t = new Text(text);
+                t.fontProperty().bind(fontProperty());
                 t.fillProperty().bind(textFillProperty());
+                return t;
+            }
+
+            private Text highlightText(String text) {
+                Text t = new Text(text);
+                t.fontProperty().bind(fontProperty());
+                t.setStyle("-fx-fill: #ff8c00;");
                 return t;
             }
         };
