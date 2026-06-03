@@ -59,6 +59,9 @@ class DomainCollectionTest {
         AccountLinkFx oldAccountLink = new AccountLinkFx();
         UniqueIdAssignmentFx oldUniqueIdAssignment = new UniqueIdAssignmentFx();
 
+        uniqueIdAssignment.setId("new-unique-id");
+        oldUniqueIdAssignment.setId("old-unique-id");
+
         player.getNames().add(oldName);
         player.getBans().add(oldBan);
         player.getAvatarAssignments().add(oldAvatarAssignment);
