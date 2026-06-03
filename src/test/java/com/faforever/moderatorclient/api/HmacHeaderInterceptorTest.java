@@ -9,8 +9,8 @@ import java.io.IOException;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.emptyOrNullString;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
 
 class HmacHeaderInterceptorTest {
 
@@ -32,7 +32,7 @@ class HmacHeaderInterceptorTest {
         MockClientHttpRequest request = new MockClientHttpRequest();
 
         instance.intercept(request, new byte[0], (executedRequest, body) -> {
-            assertThat(executedRequest.getHeaders().containsKey("X-HMAC"), is(false));
+            assertThat(executedRequest.getHeaders().getFirst("X-HMAC"), is(nullValue()));
             return new MockClientHttpResponse(new byte[0], 200);
         });
     }
