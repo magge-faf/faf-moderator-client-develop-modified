@@ -1,0 +1,54 @@
+name: Auto Merge Dependabot PRs
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  enable-auto-merge:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Enable auto-merge for Dependabot PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER=$(jq -r '.pull_request.number // empty' "$GITHUB_EVENT_PATH")
+          PR_AUTHOR=$(jq -r '.pull_request.user.login // empty' "$GITHUB_EVENT_PATH")
+          PR_BRANCH=$(jq -r '.pull_request.head.ref // empty' "$GITHUB_EVENT_PATH")
+          PR_DRAFT=$(jq -r '.pull_request.draft // false' "$GITHUB_EVENT_PATH")
+
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No pull request was associated with this workflow run."
+            exit 0
+          fi
+
+          if [ "$PR_AUTHOR" != "dependabot[bot]" ]; then
+            echo "Skipping non-Dependabot PR from $PR_AUTHOR."
+            exit 0
+          fi
+
+          case "$PR_BRANCH" in
+            dependabot/*) ;;
+            *)
+              echo "Skipping non-Dependabot branch $PR_BRANCH."
+              exit 0
+              ;;
+          esac
+
+          if [ "$PR_DRAFT" = "true" ]; then
+            echo "Skipping draft Dependabot PR #$PR_NUMBER."
+            exit 0
+          fi
+
+          gh pr merge --auto --squash "$PR_NUMBER"
