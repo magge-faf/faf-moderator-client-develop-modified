@@ -14,6 +14,7 @@
 <?import javafx.scene.control.CheckBox?>
 <?import javafx.scene.text.Text?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Priority?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TitledPane?>
@@ -62,10 +63,17 @@
 
                 <TitledPane text="Smurf Village Lookup" fx:id="smurfVillageLookupTitledPane">
                     <VBox spacing="10">
-                        <HBox spacing="10" alignment="CENTER_LEFT">
-                            <Label text="ID/Name/Attr:" style="-fx-font-size: 14px;"/>
-                            <TextField fx:id="smurfVillageLookupTextField" promptText="Enter ID/Name/Attr" onAction="#onLookupSmurfVillage"/>
+                        <HBox spacing="6" alignment="CENTER_LEFT">
+                            <TextField fx:id="smurfVillageLookupTextField"
+                                       promptText="Enter ID/Name/Attr"
+                                       onAction="#onLookupSmurfVillage"
+                                       HBox.hgrow="ALWAYS"/>
                             <Button text="Lookup" onAction="#onLookupSmurfVillage" mnemonicParsing="false"/>
+                            <Button text="All On" onAction="#onLookupSmurfVillageAllEnabled" mnemonicParsing="false">
+                                <tooltip>
+                                    <Tooltip text="Run one lookup with all Smurf Village lookup settings enabled without changing the saved settings."/>
+                                </tooltip>
+                            </Button>
                         </HBox>
                         <HBox spacing="10" alignment="CENTER_LEFT">
                             <Label fx:id="statusLabelSmurfVillageLookup" text="Idle" style="-fx-background-color: blue; -fx-text-fill: white;"/>

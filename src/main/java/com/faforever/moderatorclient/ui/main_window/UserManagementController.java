@@ -1158,7 +1158,7 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     private void processBannedUsers(Path filePath, Label progressLabel, String taskName) {
-        captureSmurfCheckSettings();
+        captureSmurfCheckSettings(false);
         resetPreviousStateSmurfVillageLookup();
         Set<String> userIds = bansController.loadExistingBannedUserIds(filePath);
 
@@ -1798,7 +1798,7 @@ public class UserManagementController implements Controller<SplitPane> {
             updateSmurfVillageLogTextArea("\n  → no related accounts\n");
         }
 
-        if (catchFirstLayerSmurfsOnlyCheckBox.isSelected()) {
+        if (smurfLookupSettings.catchFirstLayerOnly()) {
             log.trace("Smurf tracing is disabled.");
             return;
         }
@@ -1825,8 +1825,8 @@ public class UserManagementController implements Controller<SplitPane> {
         });
     }
 
-    private void captureSmurfCheckSettings() {
-        smurfLookupSettings = new SmurfLookupSettings(
+    private SmurfLookupSettings readSmurfLookupSettingsFromUi() {
+        return new SmurfLookupSettings(
                 includeUUIDCheckBox.isSelected(),
                 includeUIDHashCheckBox.isSelected(),
                 includeIPCheckBox.isSelected(),
@@ -1839,7 +1839,13 @@ public class UserManagementController implements Controller<SplitPane> {
                 SmurfLookupSettings.parseThreshold(maxMatchesBeforePromptSmurfVillageLookupTextField.getText()),
                 promptUserOnThresholdExceededSmurfVillageLookupCheckBox.isSelected(),
                 onlyShowActiveAccountsCheckBox.isSelected(),
-                suppressNoRelatedAccountsCheckBox.isSelected());
+                suppressNoRelatedAccountsCheckBox.isSelected(),
+                catchFirstLayerSmurfsOnlyCheckBox.isSelected());
+    }
+
+    private void captureSmurfCheckSettings(boolean forceEnableAllSettings) {
+        SmurfLookupSettings settings = readSmurfLookupSettingsFromUi();
+        smurfLookupSettings = forceEnableAllSettings ? settings.withAllEnabled() : settings;
     }
 
     private void resetPreviousStateSmurfVillageLookup() {
@@ -1861,7 +1867,15 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     public void onLookupSmurfVillage() {
-        captureSmurfCheckSettings();
+        startSmurfVillageLookup(false);
+    }
+
+    public void onLookupSmurfVillageAllEnabled() {
+        startSmurfVillageLookup(true);
+    }
+
+    private void startSmurfVillageLookup(boolean forceEnableAllSettings) {
+        captureSmurfCheckSettings(forceEnableAllSettings);
         users.clear();
         userSearchTableView.getSortOrder().clear();
 
@@ -1991,7 +2005,7 @@ public class UserManagementController implements Controller<SplitPane> {
             return;
         }
 
-        captureSmurfCheckSettings();
+        captureSmurfCheckSettings(false);
         smurfLookupSettings = smurfLookupSettings.withSuppressCleanOutput(true);
         users.clear();
         userSearchTableView.getSortOrder().clear();
