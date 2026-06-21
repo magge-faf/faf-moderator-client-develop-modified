@@ -14,6 +14,7 @@ record SmurfLookupSettings(
         boolean promptOnThreshold,
         boolean onlyShowActive,
         boolean suppressCleanOutput,
+        boolean suppressExcludedItems,
         boolean catchFirstLayerOnly) {
 
     private static final int DEFAULT_THRESHOLD = 10;
@@ -30,6 +31,7 @@ record SmurfLookupSettings(
                 false,
                 false,
                 DEFAULT_THRESHOLD,
+                false,
                 false,
                 false,
                 false,
@@ -59,6 +61,7 @@ record SmurfLookupSettings(
                 promptOnThreshold,
                 onlyShowActive,
                 suppressCleanOutput,
+                suppressExcludedItems,
                 catchFirstLayerOnly);
     }
 
@@ -77,6 +80,7 @@ record SmurfLookupSettings(
                 true,
                 true,
                 true,
+                suppressExcludedItems,
                 true);
     }
 }

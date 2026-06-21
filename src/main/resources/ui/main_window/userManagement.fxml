@@ -121,6 +121,8 @@
                                           text="Only Show Unbanned (Active) Accounts"/>
                                 <CheckBox fx:id="suppressNoRelatedAccountsCheckBox"
                                           text="Suppress &quot;no related accounts&quot; and &quot;Checking PlayerID&quot; lines"/>
+                                <CheckBox fx:id="suppressExcludedItemsCheckBox"
+                                          text="Suppress excluded-item skip lines"/>
                                 <CheckBox fx:id="catchFirstLayerSmurfsOnlyCheckBox"
                                           text="Limit to First Layer Accounts (See Tooltip)">
                                     <tooltip>

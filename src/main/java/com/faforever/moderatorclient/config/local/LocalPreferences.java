@@ -155,6 +155,7 @@ public class LocalPreferences {
         boolean catchFirstLayerSmurfsOnlyCheckBox = true;
         boolean onlyShowActiveAccountsCheckBox = false;
         boolean suppressNoRelatedAccountsCheckBox = false;
+        boolean suppressExcludedItemsCheckBox = false;
 
         boolean includeUUIDCheckBox = false;
         boolean includeUIDHashCheckBox = true;

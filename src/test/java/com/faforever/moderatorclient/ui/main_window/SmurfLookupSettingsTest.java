@@ -15,7 +15,7 @@ class SmurfLookupSettingsTest {
     @Test
     void withSuppressCleanOutputPreservesOtherSnapshotValues() {
         SmurfLookupSettings settings = new SmurfLookupSettings(
-                true, true, true, true, true, true, true, true, true, 25, true, true, false, true);
+                true, true, true, true, true, true, true, true, true, 25, true, true, false, false, true);
 
         SmurfLookupSettings updated = settings.withSuppressCleanOutput(true);
 
@@ -24,13 +24,14 @@ class SmurfLookupSettingsTest {
         assertThat(updated.promptOnThreshold(), is(true));
         assertThat(updated.onlyShowActive(), is(true));
         assertThat(updated.suppressCleanOutput(), is(true));
+        assertThat(updated.suppressExcludedItems(), is(false));
         assertThat(updated.catchFirstLayerOnly(), is(true));
     }
 
     @Test
     void withAllEnabledTurnsOnEveryBooleanFlagWithoutChangingThreshold() {
         SmurfLookupSettings settings = new SmurfLookupSettings(
-                false, false, false, false, false, false, false, false, false, 25, false, false, false, false);
+                false, false, false, false, false, false, false, false, false, 25, false, false, false, false, false);
 
         SmurfLookupSettings updated = settings.withAllEnabled();
 
@@ -47,6 +48,7 @@ class SmurfLookupSettingsTest {
         assertThat(updated.promptOnThreshold(), is(true));
         assertThat(updated.onlyShowActive(), is(true));
         assertThat(updated.suppressCleanOutput(), is(true));
+        assertThat(updated.suppressExcludedItems(), is(false));
         assertThat(updated.catchFirstLayerOnly(), is(true));
     }
 }

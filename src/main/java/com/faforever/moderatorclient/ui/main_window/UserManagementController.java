@@ -196,6 +196,7 @@ public class UserManagementController implements Controller<SplitPane> {
     public CheckBox includeIPCheckBox;
     public CheckBox onlyShowActiveAccountsCheckBox;
     public CheckBox suppressNoRelatedAccountsCheckBox;
+    public CheckBox suppressExcludedItemsCheckBox;
 
     @Value("${faforever.vault.replay-download-url-format}")
     private String replayDownLoadFormat;
@@ -939,6 +940,7 @@ public class UserManagementController implements Controller<SplitPane> {
         includeProcessorNameCheckBox.setSelected(settings.isIncludeProcessorNameCheckBox());
         catchFirstLayerSmurfsOnlyCheckBox.setSelected(settings.isCatchFirstLayerSmurfsOnlyCheckBox());
         onlyShowActiveAccountsCheckBox.setSelected(settings.isOnlyShowActiveAccountsCheckBox());
+        suppressExcludedItemsCheckBox.setSelected(settings.isSuppressExcludedItemsCheckBox());
 
     }
 
@@ -1340,8 +1342,10 @@ public class UserManagementController implements Controller<SplitPane> {
                 }
             }
             if (excluded) {
-                updateSmurfVillageLogTextArea(String.format(
-                        "\n  EXCLUDED: [%s] = [%s] (in excluded_items.json, skipping)", displayAttr, item));
+                if (!smurfLookupSettings.suppressExcludedItems()) {
+                    updateSmurfVillageLogTextArea(String.format(
+                            "\n  EXCLUDED: [%s] = [%s] (in excluded_items.json, skipping)", displayAttr, item));
+                }
             } else {
                 toProcess.add(item);
             }
@@ -1905,6 +1909,7 @@ public class UserManagementController implements Controller<SplitPane> {
                 promptUserOnThresholdExceededSmurfVillageLookupCheckBox.isSelected(),
                 onlyShowActiveAccountsCheckBox.isSelected(),
                 suppressNoRelatedAccountsCheckBox.isSelected(),
+                suppressExcludedItemsCheckBox.isSelected(),
                 catchFirstLayerSmurfsOnlyCheckBox.isSelected());
     }
 
