@@ -3,7 +3,7 @@ name: Auto Merge Dependabot PRs
 on:
   pull_request:
     branches:
-      - main
+      - nightly
     types:
       - opened
       - synchronize
@@ -51,4 +51,4 @@ jobs:
             exit 0
           fi
 
-          gh pr merge --auto --squash "$PR_NUMBER"
+          gh pr merge --repo "$GITHUB_REPOSITORY" --auto --squash "$PR_NUMBER"
