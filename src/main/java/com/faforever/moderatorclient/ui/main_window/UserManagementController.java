@@ -1945,7 +1945,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
     private void captureSmurfCheckSettings(boolean forceEnableAllSettings) {
         SmurfLookupSettings settings = readSmurfLookupSettingsFromUi();
-        smurfLookupSettings = forceEnableAllSettings ? settings.withAllEnabled() : settings;
+        smurfLookupSettings = forceEnableAllSettings ? settings.withAllLookupIdentifiersEnabled() : settings;
     }
 
     private void resetPreviousStateSmurfVillageLookup() {

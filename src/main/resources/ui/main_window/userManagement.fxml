@@ -71,7 +71,7 @@
                             <Button text="Lookup" onAction="#onLookupSmurfVillage" mnemonicParsing="false"/>
                             <Button text="All On" onAction="#onLookupSmurfVillageAllEnabled" mnemonicParsing="false">
                                 <tooltip>
-                                    <Tooltip text="Run one lookup with all Smurf Village lookup settings enabled without changing the saved settings."/>
+                                    <Tooltip text="Run one lookup with all Smurf Village identifier checkboxes enabled without changing the saved expert settings."/>
                                 </tooltip>
                             </Button>
                         </HBox>

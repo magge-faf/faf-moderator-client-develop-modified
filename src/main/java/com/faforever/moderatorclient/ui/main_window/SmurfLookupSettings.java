@@ -65,7 +65,7 @@ record SmurfLookupSettings(
                 catchFirstLayerOnly);
     }
 
-    SmurfLookupSettings withAllEnabled() {
+    SmurfLookupSettings withAllLookupIdentifiersEnabled() {
         return new SmurfLookupSettings(
                 true,
                 true,
@@ -77,10 +77,10 @@ record SmurfLookupSettings(
                 true,
                 true,
                 threshold,
-                true,
-                true,
-                true,
+                promptOnThreshold,
+                onlyShowActive,
+                suppressCleanOutput,
                 suppressExcludedItems,
-                true);
+                catchFirstLayerOnly);
     }
 }

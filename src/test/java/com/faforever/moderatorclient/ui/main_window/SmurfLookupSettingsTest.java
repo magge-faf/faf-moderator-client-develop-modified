@@ -29,11 +29,11 @@ class SmurfLookupSettingsTest {
     }
 
     @Test
-    void withAllEnabledTurnsOnEveryBooleanFlagWithoutChangingThreshold() {
+    void withAllLookupIdentifiersEnabledTurnsOnOnlyLookupFlagsWithoutChangingOtherSettings() {
         SmurfLookupSettings settings = new SmurfLookupSettings(
                 false, false, false, false, false, false, false, false, false, 25, false, false, false, false, false);
 
-        SmurfLookupSettings updated = settings.withAllEnabled();
+        SmurfLookupSettings updated = settings.withAllLookupIdentifiersEnabled();
 
         assertThat(updated.includeUUID(), is(true));
         assertThat(updated.includeHash(), is(true));
@@ -45,10 +45,10 @@ class SmurfLookupSettingsTest {
         assertThat(updated.includeCpuName(), is(true));
         assertThat(updated.includeManufacturer(), is(true));
         assertThat(updated.threshold(), is(25));
-        assertThat(updated.promptOnThreshold(), is(true));
-        assertThat(updated.onlyShowActive(), is(true));
-        assertThat(updated.suppressCleanOutput(), is(true));
+        assertThat(updated.promptOnThreshold(), is(false));
+        assertThat(updated.onlyShowActive(), is(false));
+        assertThat(updated.suppressCleanOutput(), is(false));
         assertThat(updated.suppressExcludedItems(), is(false));
-        assertThat(updated.catchFirstLayerOnly(), is(true));
+        assertThat(updated.catchFirstLayerOnly(), is(false));
     }
 }
