@@ -876,7 +876,7 @@ public class UserManagementController implements Controller<SplitPane> {
         }
 
         editBanButton.setText(selectedBan.getBanStatus() == BanStatus.BANNED
-                ? "Replace active ban"
+                ? "Replace or disable active ban"
                 : "Edit expired ban");
     }
 

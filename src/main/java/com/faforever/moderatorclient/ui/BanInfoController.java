@@ -269,7 +269,7 @@ public class BanInfoController implements Controller<Pane> {
             log.debug("Updating ban id '{}'", banInfo.getId());
             if (originalBanStatus == BanStatus.BANNED) {
                 if (!ViewHelper.confirmDialog(
-                        "Replace active ban",
+                        "Disable or Replace active ban",
                         "Saving here will disable the current active ban and create a new replacement ban with the updated values. Use Revocation instead if you only want to disable the ban."
                 )) {
                     return;
@@ -490,7 +490,7 @@ public class BanInfoController implements Controller<Pane> {
         }
 
         if (originalBanStatus == BanStatus.BANNED) {
-            dialogTitle = "Replace active ban";
+            dialogTitle = "Replace or disable active ban";
             editModeNoticeLabel.setText("Saving this form will disable the current active ban and create a new replacement ban with the updated values. The old ban stays in history as disabled. Use Revocation below only if you want to disable the ban without creating a replacement.");
             editModeNoticeLabel.setVisible(true);
             saveButton.setText("Disable old ban and create replacement");
