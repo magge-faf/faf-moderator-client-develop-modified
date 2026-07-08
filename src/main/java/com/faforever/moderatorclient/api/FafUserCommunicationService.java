@@ -124,4 +124,24 @@ public class FafUserCommunicationService {
             return false;
         }
     }
+
+    @SneakyThrows
+    public String getIrcChatToken() {
+        authorizedLatch.await();
+        IrcChatToken token = restTemplate.getForObject("/irc/ergochat/token", IrcChatToken.class);
+        if (token == null || token.value() == null || token.value().isBlank()) {
+            throw new IllegalStateException("FAF IRC token response is empty");
+        }
+        return token.value();
+    }
+
+    @SneakyThrows
+    public String getLobbyAccessUrl() {
+        authorizedLatch.await();
+        LobbyAccessInfo accessInfo = restTemplate.getForObject("/lobby/access", LobbyAccessInfo.class);
+        if (accessInfo == null || accessInfo.accessUrl() == null || accessInfo.accessUrl().isBlank()) {
+            throw new IllegalStateException("FAF lobby access response is empty");
+        }
+        return accessInfo.accessUrl();
+    }
 }
