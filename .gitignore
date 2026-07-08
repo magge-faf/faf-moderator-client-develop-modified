@@ -1,6 +1,7 @@
 # Build directories
 target/
 build/
+build_verify/
 
 # Gradle files
 .gradle
