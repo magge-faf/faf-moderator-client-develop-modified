@@ -10,6 +10,7 @@ import com.faforever.moderatorclient.ui.domain.PlayerFX;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
 import javafx.beans.InvalidationListener;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -100,9 +101,14 @@ public class BansController implements Controller<HBox> {
         }
         playerRadioButton.setUserData((Supplier<List<BanInfoFX>>) () -> banService.getBanInfoByBannedPlayerNameContains(filter.getText()));
         banIdRadioButton.setUserData((Supplier<List<BanInfoFX>>) () -> Collections.singletonList(banService.getBanInfoById(filter.getText())));
-        editBanButton.disableProperty().bind(banTableView.getSelectionModel().selectedItemProperty().isNull());
+        editBanButton.disableProperty().bind(Bindings.createBooleanBinding(
+                () -> !canEditBan(banTableView.getSelectionModel().getSelectedItem()),
+                banTableView.getSelectionModel().selectedItemProperty()
+        ));
+        banTableView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> updateEditBanButtonText(newValue));
+        updateEditBanButtonText(null);
         banTableView.setOnMouseClicked(event -> {
-            if (event.getClickCount() == 2 && banTableView.getSelectionModel().getSelectedItem() != null) {
+            if (event.getClickCount() == 2 && canEditBan(banTableView.getSelectionModel().getSelectedItem())) {
                 editBan();
             }
         });
@@ -130,6 +136,11 @@ public class BansController implements Controller<HBox> {
             log.info("Could not delete ban, there was no message selected");
             return;
         }
+        if (!canEditBan(selectedItem)) {
+            ViewHelper.errorDialog("Permission required",
+                    "Disabled ban records require senior admin permission to edit.");
+            return;
+        }
         openBanDialog(selectedItem, false);
     }
 
@@ -145,7 +156,7 @@ public class BansController implements Controller<HBox> {
         });
 
         Stage banInfoDialog = new Stage();
-        banInfoDialog.setTitle(isNew ? "Apply new ban" : "Edit ban");
+        banInfoDialog.setTitle(banInfoController.getDialogTitle());
         banInfoDialog.setScene(new Scene(banInfoController.getRoot()));
         banInfoDialog.showAndWait();
     }
@@ -336,5 +347,25 @@ public class BansController implements Controller<HBox> {
             }
         }
         return userIds;
+    }
+
+    private void updateEditBanButtonText(BanInfoFX selectedBan) {
+        if (selectedBan == null) {
+            editBanButton.setText("Replace Ban");
+            return;
+        }
+
+        if (selectedBan.getBanStatus() == BanStatus.DISABLED) {
+            editBanButton.setText("Edit Disabled Ban (needs permission)");
+            return;
+        }
+
+        editBanButton.setText(selectedBan.getBanStatus() == BanStatus.BANNED
+                ? "Replace Active Ban"
+                : "Edit Expired Ban");
+    }
+
+    private boolean canEditBan(BanInfoFX selectedBan) {
+        return selectedBan != null && selectedBan.getBanStatus() != BanStatus.DISABLED;
     }
 }

@@ -46,7 +46,7 @@
                 <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
             </VBox.margin>
         </Button>
-        <Button fx:id="editBanButton" mnemonicParsing="false" onAction="#editBan" text="Edit Ban">
+        <Button fx:id="editBanButton" mnemonicParsing="false" onAction="#editBan" text="Replace Ban">
             <VBox.margin>
                 <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
             </VBox.margin>

@@ -43,7 +43,7 @@ println "Platform is: ${javafxPlatform}"
 dependencies {
     def springBootVersion = "4.0.6"
     def mapStructVersion = "1.6.3"
-    def commonsVersion = "20260407-92612a0"
+    def commonsVersion = "20260628-7c450f0"
 
     annotationProcessor(platform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}"))
     implementation(platform("org.springframework.boot:spring-boot-dependencies:${springBootVersion}"))
@@ -56,16 +56,20 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client:4.0.6")
+    implementation("io.projectreactor.netty:reactor-netty-http")
     implementation("javax.inject:javax.inject:1")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("com.github.jasminb:jsonapi-converter:0.15")
     implementation 'org.java-websocket:Java-WebSocket:1.6.0' // Required for LobbyWebSocketClient
     implementation("com.faforever.commons:data:${commonsVersion}")
     implementation("com.faforever.commons:api:${commonsVersion}")
+    implementation("com.faforever.commons:lobby:${commonsVersion}")
     implementation("org.apache.httpcomponents:httpclient:4.5.14")
     implementation("com.github.rutledgepaulv:q-builders:1.6")
     implementation("com.google.guava:guava:33.6.0-jre")
+    implementation("org.kitteh.irc:client-lib:9.0.0")
     implementation("org.mapstruct:mapstruct:${mapStructVersion}")
     implementation("org.openjfx:javafx-base:${javafxVersion}:${javafxPlatform}")
     implementation("org.openjfx:javafx-controls:${javafxVersion}:${javafxPlatform}")
@@ -73,7 +77,7 @@ dependencies {
     implementation("org.openjfx:javafx-fxml:${javafxVersion}:${javafxPlatform}")
     implementation("org.openjfx:javafx-web:${javafxVersion}:${javafxPlatform}")
     implementation("org.openjfx:javafx-media:${javafxVersion}:${javafxPlatform}")
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.22.0")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.22.1")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     implementation 'org.json:json:20260522'

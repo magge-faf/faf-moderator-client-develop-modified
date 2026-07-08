@@ -32,6 +32,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @Slf4j
@@ -102,6 +103,27 @@ public class TokenService {
         } catch (ParseException e) {
             throw new RuntimeException("Invalid JWT", e);
         }
+    }
+
+    public Optional<String> getPreferredUsername() {
+        if (tokenCache == null) {
+            return Optional.empty();
+        }
+
+        try {
+            Map<String, Object> claims = extractCustomClaims(tokenCache.getAccessToken().getTokenValue());
+            for (String key : List.of("preferred_username", "username", "nickname", "login", "name")) {
+                Object value = claims.get(key);
+                if (value instanceof String candidate && !candidate.isBlank()) {
+                    return Optional.of(candidate);
+                }
+            }
+        } catch (RuntimeException e) {
+            log.warn("Failed to parse token claims for preferred username", e);
+            return Optional.empty();
+        }
+
+        return Optional.empty();
     }
 
     public void loginWithAuthorizationCode(OAuthValuesReceiver.Values values) {

@@ -88,3 +88,24 @@
     -fx-table-cell-border-color: transparent;
 }
 
+.irc-subtle-label {
+    -fx-text-fill: #9ea7b3;
+}
+
+.irc-topic-label {
+    -fx-font-style: italic;
+}
+
+.irc-message-cell {
+    -fx-padding: 6 0 6 0;
+}
+
+.irc-message-meta {
+    -fx-font-weight: bold;
+    -fx-text-fill: #aeb7c4;
+}
+
+.irc-message-body {
+    -fx-text-fill: lightgray;
+}
+

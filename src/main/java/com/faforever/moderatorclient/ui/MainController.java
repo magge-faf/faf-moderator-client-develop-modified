@@ -3,6 +3,7 @@ package com.faforever.moderatorclient.ui;
 import com.faforever.commons.api.dto.GroupPermission;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.FafUserCommunicationService;
+import com.faforever.moderatorclient.api.LobbyOAuthService;
 import com.faforever.moderatorclient.api.TokenService;
 import com.faforever.moderatorclient.api.event.FafApiFailGetEvent;
 import com.faforever.moderatorclient.api.event.FafApiFailModifyEvent;
@@ -53,6 +54,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     private final TokenService tokenService;
     private final FafApiCommunicationService fafApiCommunicationService;
     private final FafUserCommunicationService fafUserCommunicationService;
+    private final LobbyOAuthService lobbyOAuthService;
     private final UiService uiService;
     private final PlatformService platformService;
     public TabPane root;
@@ -67,6 +69,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     public Tab votingTab;
     public Tab tutorialTab;
     public Tab messagesTab;
+    public Tab ircChatTab;
     public Tab reportTab;
     public Tab permissionTab;
     public Tab settingsTab;
@@ -90,6 +93,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     private VotingController votingController;
     private TutorialController tutorialController;
     private MessagesController messagesController;
+    private IrcChatController ircChatController;
     private UserGroupsController userGroupsController;
     private RecentNotesController recentNotesController;
     private ReportStatisticsController reportStatisticsController;
@@ -127,6 +131,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         initBanTab();
         initDomainBlacklistTab();
         initMessagesTab();
+        initIrcChatTab();
         initPermissionTab();
         initRecentActivityTab();
         initReportTab();
@@ -302,6 +307,11 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         }
     }
 
+    private void initIrcChatTab() {
+        ircChatController = uiService.loadFxml("ui/main_window/ircChatTab.fxml");
+        ircChatTab.setContent(ircChatController.getRoot());
+    }
+
     private void initVotingTab() {
         if (checkPermissionForTab(votingTab, GroupPermission.ROLE_ADMIN_VOTE)) {
             votingController = uiService.loadFxml("ui/main_window/voting.fxml");
@@ -348,6 +358,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
 
             fafApiCommunicationService.initialize(environmentProperties);
             fafUserCommunicationService.initialize(environmentProperties);
+            lobbyOAuthService.prepare(environmentProperties);
             tokenService.prepare(environmentProperties);
 
             try {
@@ -401,6 +412,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         if (votingController != null) votingController.onSave();
         if (tutorialController != null) tutorialController.onSave();
         if (messagesController != null) messagesController.onSave();
+        if (ircChatController != null) ircChatController.onSave();
         if (userGroupsController != null) userGroupsController.onSave();
         if (recentActivityController != null) recentActivityController.onSave();
         if (apiHistoryController != null) apiHistoryController.onSave();

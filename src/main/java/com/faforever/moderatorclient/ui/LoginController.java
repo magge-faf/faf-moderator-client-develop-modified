@@ -2,6 +2,7 @@ package com.faforever.moderatorclient.ui;
 
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.FafUserCommunicationService;
+import com.faforever.moderatorclient.api.LobbyOAuthService;
 import com.faforever.moderatorclient.api.TokenService;
 import com.faforever.moderatorclient.api.event.ApiAuthorizedEvent;
 import com.faforever.moderatorclient.config.ApplicationProperties;
@@ -30,6 +31,7 @@ public class LoginController implements Controller<Pane> {
     private final LocalPreferences localPreferences;
     private final FafApiCommunicationService fafApiCommunicationService;
     private final FafUserCommunicationService fafUserCommunicationService;
+    private final LobbyOAuthService lobbyOAuthService;
     private final TokenService tokenService;
     private final OAuthValuesReceiver oAuthValuesReceiver;
 
@@ -61,6 +63,7 @@ public class LoginController implements Controller<Pane> {
         EnvironmentProperties environmentProperties = applicationProperties.getEnvironments().get(environmentComboBox.getValue());
         fafApiCommunicationService.initialize(environmentProperties);
         fafUserCommunicationService.initialize(environmentProperties);
+        lobbyOAuthService.prepare(environmentProperties);
         localPreferences.getAutoLogin().setEnvironment(environmentComboBox.getValue());
         tokenService.prepare(environmentProperties);
         loginFuture = oAuthValuesReceiver.receiveValues(environmentProperties).thenAccept(tokenService::loginWithAuthorizationCode);

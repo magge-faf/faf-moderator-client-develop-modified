@@ -196,6 +196,7 @@ public class UserManagementController implements Controller<SplitPane> {
     public CheckBox includeIPCheckBox;
     public CheckBox onlyShowActiveAccountsCheckBox;
     public CheckBox suppressNoRelatedAccountsCheckBox;
+    public CheckBox suppressExcludedItemsCheckBox;
 
     @Value("${faforever.vault.replay-download-url-format}")
     private String replayDownLoadFormat;
@@ -458,7 +459,12 @@ public class UserManagementController implements Controller<SplitPane> {
         setExpiresAtButton.disableProperty().bind(userAvatarsTableView.getSelectionModel().selectedItemProperty().isNull());
         takeAvatarButton.disableProperty().bind(userAvatarsTableView.getSelectionModel().selectedItemProperty().isNull());
         removeGroupButton.disableProperty().bind(userGroupsTableView.getSelectionModel().selectedItemProperty().isNull());
-        editBanButton.disableProperty().bind(userBansTableView.getSelectionModel().selectedItemProperty().isNull());
+        editBanButton.disableProperty().bind(Bindings.createBooleanBinding(
+                () -> !canEditBan(userBansTableView.getSelectionModel().getSelectedItem()),
+                userBansTableView.getSelectionModel().selectedItemProperty()
+        ));
+        userBansTableView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> updateEditBanButtonText(newValue));
+        updateEditBanButtonText(null);
     }
 
     private void configureFeaturedModFilter() {
@@ -777,6 +783,11 @@ public class UserManagementController implements Controller<SplitPane> {
     public void onEditBan() {
         BanInfoFX selectedBan = userBansTableView.getSelectionModel().getSelectedItem();
         Assert.notNull(selectedBan, "You need to select a ban to edit it.");
+        if (!canEditBan(selectedBan)) {
+            ViewHelper.errorDialog("Permission required",
+                    "Disabled ban records require senior admin permission to edit.");
+            return;
+        }
 
         openBanDialog(selectedBan, false);
     }
@@ -789,7 +800,7 @@ public class UserManagementController implements Controller<SplitPane> {
         }
 
         Stage banInfoDialog = new Stage();
-        banInfoDialog.setTitle(isNew ? "Apply new ban" : "Edit ban");
+        banInfoDialog.setTitle(banInfoController.getDialogTitle());
         banInfoDialog.setScene(new Scene(banInfoController.getRoot()));
         banInfoDialog.showAndWait();
     }
@@ -851,6 +862,26 @@ public class UserManagementController implements Controller<SplitPane> {
         Optional<ButtonType> result = alert.showAndWait();
 
         return result.isPresent() && result.get() == ButtonType.YES;
+    }
+
+    private void updateEditBanButtonText(BanInfoFX selectedBan) {
+        if (selectedBan == null) {
+            editBanButton.setText("Replace selected ban");
+            return;
+        }
+
+        if (selectedBan.getBanStatus() == BanStatus.DISABLED) {
+            editBanButton.setText("Edit disabled ban (needs permission)");
+            return;
+        }
+
+        editBanButton.setText(selectedBan.getBanStatus() == BanStatus.BANNED
+                ? "Replace or disable active ban"
+                : "Edit expired ban");
+    }
+
+    private boolean canEditBan(BanInfoFX selectedBan) {
+        return selectedBan != null && selectedBan.getBanStatus() != BanStatus.DISABLED;
     }
 
     public void onGiveAvatar() {
@@ -939,6 +970,7 @@ public class UserManagementController implements Controller<SplitPane> {
         includeProcessorNameCheckBox.setSelected(settings.isIncludeProcessorNameCheckBox());
         catchFirstLayerSmurfsOnlyCheckBox.setSelected(settings.isCatchFirstLayerSmurfsOnlyCheckBox());
         onlyShowActiveAccountsCheckBox.setSelected(settings.isOnlyShowActiveAccountsCheckBox());
+        suppressExcludedItemsCheckBox.setSelected(settings.isSuppressExcludedItemsCheckBox());
 
     }
 
@@ -1158,7 +1190,7 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     private void processBannedUsers(Path filePath, Label progressLabel, String taskName) {
-        captureSmurfCheckSettings();
+        captureSmurfCheckSettings(false);
         resetPreviousStateSmurfVillageLookup();
         Set<String> userIds = bansController.loadExistingBannedUserIds(filePath);
 
@@ -1340,8 +1372,10 @@ public class UserManagementController implements Controller<SplitPane> {
                 }
             }
             if (excluded) {
-                updateSmurfVillageLogTextArea(String.format(
-                        "\n  EXCLUDED: [%s] = [%s] (in excluded_items.json, skipping)", displayAttr, item));
+                if (!smurfLookupSettings.suppressExcludedItems()) {
+                    updateSmurfVillageLogTextArea(String.format(
+                            "\n  EXCLUDED: [%s] = [%s] (in excluded_items.json, skipping)", displayAttr, item));
+                }
             } else {
                 toProcess.add(item);
             }
@@ -1389,7 +1423,8 @@ public class UserManagementController implements Controller<SplitPane> {
         }
 
         String currentPlayerId = currentPlayer != null ? currentPlayer.getId() : null;
-        String headerLine = String.format("\n  [%s]  %s", displayAttr, String.join("|", toProcess));
+        String headerLine = formatLookupHeader(displayAttr, toProcess);
+        boolean showMatchedValues = toProcess.size() > 1;
 
         // Deduplicate by player ID — API may return the same player for multiple matching values
         Map<String, PlayerFX> deduplicated = new LinkedHashMap<>();
@@ -1434,6 +1469,12 @@ public class UserManagementController implements Controller<SplitPane> {
                 }
                 activeLines.add(String.format("\n    %s  %s  id: %s   %s",
                         prefix, user.getLogin(), user.getId(), banInfo));
+                if (showMatchedValues) {
+                    List<String> matchedValues = getMatchingAttributeValues(user, property, toProcess);
+                    if (!matchedValues.isEmpty()) {
+                        activeLines.add(String.format("\n       shared %s: %s", displayAttr, String.join(" | ", matchedValues)));
+                    }
+                }
                 addPlayerDirectlyToTable(user);
                 cumulativeAccounts.add(user.getId());
             }
@@ -1521,6 +1562,13 @@ public class UserManagementController implements Controller<SplitPane> {
                         Map<String, Object> newExcluded = new LinkedHashMap<>();
                         newExcluded.put(property, value);
                         newExcluded.put("AddedOn", LocalDateTime.now().toString());
+                        newExcluded.put(
+                                "comment",
+                                String.format(
+                                        "Excluded by user prompt: %d related accounts found for [%s = %s]",
+                                        snapshot.size(),
+                                        property,
+                                        value));
                         excludedItems.add(newExcluded);
                         excludedHardwareItemsController.saveExcludedItem(newExcluded);
                         updateSmurfVillageLogTextArea(String.format(
@@ -1582,6 +1630,64 @@ public class UserManagementController implements Controller<SplitPane> {
         }
 
         if (localLog.length() > 0) updateSmurfVillageLogTextArea(localLog.toString());
+    }
+
+    private String formatLookupHeader(String displayAttr, Collection<String> values) {
+        List<String> orderedValues = new ArrayList<>(values);
+        if (orderedValues.size() <= 3) {
+            return String.format("\n  [%s]  %s", displayAttr, String.join("|", orderedValues));
+        }
+
+        return String.format("\n  [%s]  %d values queried", displayAttr, orderedValues.size());
+    }
+
+    private List<String> getMatchingAttributeValues(PlayerFX player, String property, Collection<String> queriedValues) {
+        Set<String> playerValues = getPlayerAttributeValues(player, property);
+        if (playerValues.isEmpty()) {
+            return List.of();
+        }
+
+        return queriedValues.stream()
+                .filter(playerValues::contains)
+                .distinct()
+                .toList();
+    }
+
+    private Set<String> getPlayerAttributeValues(PlayerFX player, String property) {
+        if (player == null || property == null || property.isBlank()) {
+            return Set.of();
+        }
+
+        Set<String> values = new LinkedHashSet<>();
+        if ("recentIpAddress".equals(property)) {
+            addIfNotBlank(values, player.getRecentIpAddress());
+            return values;
+        }
+
+        for (UniqueIdAssignmentFx assignment : player.getUniqueIdAssignments()) {
+            UniqueIdFx uniqueId = assignment.getUniqueId();
+            if (uniqueId == null) {
+                continue;
+            }
+
+            switch (property) {
+                case "uniqueIdAssignments.uniqueId.uuid" -> addIfNotBlank(values, uniqueId.getUuid());
+                case "uniqueIdAssignments.uniqueId.hash" -> addIfNotBlank(values, uniqueId.getHash());
+                case "uniqueIdAssignments.uniqueId.memorySerialNumber" -> addIfNotBlank(values, uniqueId.getMemorySerialNumber());
+                case "uniqueIdAssignments.uniqueId.volumeSerialNumber" -> addIfNotBlank(values, uniqueId.getVolumeSerialNumber());
+                case "uniqueIdAssignments.uniqueId.serialNumber" -> addIfNotBlank(values, uniqueId.getSerialNumber());
+                case "uniqueIdAssignments.uniqueId.deviceId" -> addIfNotBlank(values, uniqueId.getDeviceId());
+                case "uniqueIdAssignments.uniqueId.name" -> addIfNotBlank(values, uniqueId.getName());
+                case "uniqueIdAssignments.uniqueId.processorId" -> addIfNotBlank(values, uniqueId.getProcessorId());
+                case "uniqueIdAssignments.uniqueId.manufacturer" -> addIfNotBlank(values, uniqueId.getManufacturer());
+                case "uniqueIdAssignments.uniqueId.SMBIOSBIOSVersion" -> addIfNotBlank(values, uniqueId.getSMBIOSBIOSVersion());
+                default -> {
+                    return Set.of();
+                }
+            }
+        }
+
+        return values;
     }
 
     @SuppressWarnings("unchecked")
@@ -1798,7 +1904,7 @@ public class UserManagementController implements Controller<SplitPane> {
             updateSmurfVillageLogTextArea("\n  → no related accounts\n");
         }
 
-        if (catchFirstLayerSmurfsOnlyCheckBox.isSelected()) {
+        if (smurfLookupSettings.catchFirstLayerOnly()) {
             log.trace("Smurf tracing is disabled.");
             return;
         }
@@ -1825,8 +1931,8 @@ public class UserManagementController implements Controller<SplitPane> {
         });
     }
 
-    private void captureSmurfCheckSettings() {
-        smurfLookupSettings = new SmurfLookupSettings(
+    private SmurfLookupSettings readSmurfLookupSettingsFromUi() {
+        return new SmurfLookupSettings(
                 includeUUIDCheckBox.isSelected(),
                 includeUIDHashCheckBox.isSelected(),
                 includeIPCheckBox.isSelected(),
@@ -1839,7 +1945,14 @@ public class UserManagementController implements Controller<SplitPane> {
                 SmurfLookupSettings.parseThreshold(maxMatchesBeforePromptSmurfVillageLookupTextField.getText()),
                 promptUserOnThresholdExceededSmurfVillageLookupCheckBox.isSelected(),
                 onlyShowActiveAccountsCheckBox.isSelected(),
-                suppressNoRelatedAccountsCheckBox.isSelected());
+                suppressNoRelatedAccountsCheckBox.isSelected(),
+                suppressExcludedItemsCheckBox.isSelected(),
+                catchFirstLayerSmurfsOnlyCheckBox.isSelected());
+    }
+
+    private void captureSmurfCheckSettings(boolean forceEnableAllSettings) {
+        SmurfLookupSettings settings = readSmurfLookupSettingsFromUi();
+        smurfLookupSettings = forceEnableAllSettings ? settings.withAllLookupIdentifiersEnabled() : settings;
     }
 
     private void resetPreviousStateSmurfVillageLookup() {
@@ -1861,7 +1974,15 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     public void onLookupSmurfVillage() {
-        captureSmurfCheckSettings();
+        startSmurfVillageLookup(false);
+    }
+
+    public void onLookupSmurfVillageAllEnabled() {
+        startSmurfVillageLookup(true);
+    }
+
+    private void startSmurfVillageLookup(boolean forceEnableAllSettings) {
+        captureSmurfCheckSettings(forceEnableAllSettings);
         users.clear();
         userSearchTableView.getSortOrder().clear();
 
@@ -1991,7 +2112,7 @@ public class UserManagementController implements Controller<SplitPane> {
             return;
         }
 
-        captureSmurfCheckSettings();
+        captureSmurfCheckSettings(false);
         smurfLookupSettings = smurfLookupSettings.withSuppressCleanOutput(true);
         users.clear();
         userSearchTableView.getSortOrder().clear();

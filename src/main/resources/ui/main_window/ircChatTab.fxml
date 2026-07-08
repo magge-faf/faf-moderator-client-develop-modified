@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Priority?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane xmlns="http://javafx.com/javafx/8.0.171" xmlns:fx="http://javafx.com/fxml/1"
+            fx:id="root" fx:controller="com.faforever.moderatorclient.ui.main_window.IrcChatController">
+    <top>
+        <VBox spacing="8.0" BorderPane.alignment="CENTER">
+            <padding>
+                <Insets bottom="10.0" left="10.0" right="10.0" top="10.0"/>
+            </padding>
+            <children>
+                <HBox alignment="CENTER_LEFT" spacing="12.0">
+                    <children>
+                        <Label text="FAF IRC"/>
+                        <Label fx:id="serverInfoLabel" styleClass="irc-subtle-label"/>
+                        <Label fx:id="statusIndicatorLabel" text="●"/>
+                        <Label fx:id="connectionStatusLabel" text="Disconnected" HBox.hgrow="ALWAYS"/>
+                    </children>
+                </HBox>
+                <HBox spacing="8.0">
+                    <children>
+                        <TextField fx:id="nicknameField" editable="false" promptText="Moderator nickname"/>
+                        <CheckBox fx:id="autoConnectCheckBox" mnemonicParsing="false" text="Auto-connect on startup"/>
+                        <CheckBox fx:id="debugTrafficCheckBox" mnemonicParsing="false" text="Debug raw traffic"/>
+                        <CheckBox fx:id="suppressJoinLeaveNoiseCheckBox" mnemonicParsing="false" text="Hide join/leave noise"/>
+                        <Button fx:id="connectButton" mnemonicParsing="false" onAction="#connect" text="Connect"/>
+                        <Button fx:id="disconnectButton" mnemonicParsing="false" onAction="#disconnect" text="Disconnect"/>
+                    </children>
+                </HBox>
+                <HBox spacing="8.0">
+                    <children>
+                        <TextField fx:id="joinChannelField" promptText="#aeolus" HBox.hgrow="ALWAYS"/>
+                        <Button fx:id="joinChannelButton" mnemonicParsing="false" onAction="#joinChannel" text="Join"/>
+                        <Button fx:id="leaveChannelButton" mnemonicParsing="false" onAction="#leaveSelectedChannel" text="Leave selected"/>
+                    </children>
+                </HBox>
+            </children>
+        </VBox>
+    </top>
+    <center>
+        <HBox spacing="10.0">
+            <padding>
+                <Insets bottom="10.0" left="10.0" right="10.0"/>
+            </padding>
+            <children>
+                <VBox prefWidth="220.0" spacing="6.0">
+                    <children>
+                        <Label text="Channels"/>
+                        <ListView fx:id="channelListView" VBox.vgrow="ALWAYS"/>
+                    </children>
+                </VBox>
+                <VBox spacing="6.0" HBox.hgrow="ALWAYS">
+                    <children>
+                        <Label fx:id="activeTopicLabel" text="No topic set" styleClass="irc-topic-label"/>
+                        <Separator/>
+                        <ListView fx:id="messageListView" VBox.vgrow="ALWAYS"/>
+                    </children>
+                </VBox>
+                <VBox prefWidth="220.0" spacing="6.0">
+                    <children>
+                        <Label fx:id="usersHeaderLabel" text="Users (0 online)"/>
+                        <TextField fx:id="userSearchField" promptText="Search users"/>
+                        <Button fx:id="pmSelectedUserButton" mnemonicParsing="false" onAction="#openPrivateMessage" text="PM selected"/>
+                        <Label text="Manual kick target"/>
+                        <Label text="Manual target overrides selected IRC user" wrapText="true" styleClass="irc-subtle-label"/>
+                        <TextField fx:id="kickLookupField" promptText="Enter ID / Name"/>
+                        <Button fx:id="kickGameButton" mnemonicParsing="false" onAction="#kickSelectedUserFromGame" text="Kick from game"/>
+                        <Button fx:id="kickClientButton" mnemonicParsing="false" onAction="#kickSelectedUserFromClient" text="Kick from client"/>
+                        <Button fx:id="kickGameAndClientButton" mnemonicParsing="false" onAction="#kickSelectedUserFromGameAndClient" text="Kick from game + client"/>
+                        <ListView fx:id="userListView" VBox.vgrow="ALWAYS"/>
+                    </children>
+                </VBox>
+            </children>
+        </HBox>
+    </center>
+    <bottom>
+        <HBox spacing="8.0" BorderPane.alignment="CENTER">
+            <padding>
+                <Insets bottom="10.0" left="10.0" right="10.0" top="0.0"/>
+            </padding>
+            <children>
+                <TextField fx:id="messageInputField" onAction="#sendMessage" promptText="Type a message and press Enter"
+                           HBox.hgrow="ALWAYS"/>
+                <Button fx:id="sendMessageButton" mnemonicParsing="false" onAction="#sendMessage" text="Send"/>
+            </children>
+        </HBox>
+    </bottom>
+</BorderPane>
