@@ -3,7 +3,7 @@ name: Dependabot Build
 on:
   pull_request:
     branches:
-      - main
+      - nightly
 
 jobs:
   checks:
