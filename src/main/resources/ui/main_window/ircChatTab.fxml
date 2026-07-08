@@ -72,6 +72,9 @@
                         <Label fx:id="usersHeaderLabel" text="Users (0 online)"/>
                         <TextField fx:id="userSearchField" promptText="Search users"/>
                         <Button fx:id="pmSelectedUserButton" mnemonicParsing="false" onAction="#openPrivateMessage" text="PM selected"/>
+                        <Label text="Manual kick target"/>
+                        <Label text="Manual target overrides selected IRC user" wrapText="true" styleClass="irc-subtle-label"/>
+                        <TextField fx:id="kickLookupField" promptText="Enter ID / Name"/>
                         <Button fx:id="kickGameButton" mnemonicParsing="false" onAction="#kickSelectedUserFromGame" text="Kick from game"/>
                         <Button fx:id="kickClientButton" mnemonicParsing="false" onAction="#kickSelectedUserFromClient" text="Kick from client"/>
                         <Button fx:id="kickGameAndClientButton" mnemonicParsing="false" onAction="#kickSelectedUserFromGameAndClient" text="Kick from game + client"/>

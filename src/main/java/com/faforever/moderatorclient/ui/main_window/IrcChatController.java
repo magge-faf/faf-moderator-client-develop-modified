@@ -71,6 +71,7 @@ public class IrcChatController implements Controller<BorderPane> {
     public Button disconnectButton;
     public TextField joinChannelField;
     public TextField userSearchField;
+    public TextField kickLookupField;
     public Button joinChannelButton;
     public Button leaveChannelButton;
     public Button pmSelectedUserButton;
@@ -134,6 +135,8 @@ public class IrcChatController implements Controller<BorderPane> {
                 renderChannel(selected.name());
             }
         });
+        kickLookupField.textProperty().addListener((observable, oldValue, newValue) ->
+                updateConnectionState(ircClient.getConnectionState()));
         userListView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) ->
                 updateConnectionState(ircClient.getConnectionState()));
 
@@ -330,10 +333,10 @@ public class IrcChatController implements Controller<BorderPane> {
         leaveChannelButton.setDisable(!connected || channelListView.getSelectionModel().getSelectedItem() == null);
         sendMessageButton.setDisable(!connected || channelListView.getSelectionModel().getSelectedItem() == null);
         pmSelectedUserButton.setDisable(!connected || userListView.getSelectionModel().getSelectedItem() == null);
-        boolean canKickSelectedUser = connected && !moderationActionInProgress && canKickSelectedUser();
-        kickGameButton.setDisable(!canKickSelectedUser);
-        kickClientButton.setDisable(!canKickSelectedUser);
-        kickGameAndClientButton.setDisable(!canKickSelectedUser);
+        boolean canKickUser = connected && !moderationActionInProgress && hasKickTarget();
+        kickGameButton.setDisable(!canKickUser);
+        kickClientButton.setDisable(!canKickUser);
+        kickGameAndClientButton.setDisable(!canKickUser);
         messageInputField.setDisable(!connected);
     }
 
@@ -471,9 +474,13 @@ public class IrcChatController implements Controller<BorderPane> {
         };
     }
 
-    private boolean canKickSelectedUser() {
+    private boolean hasKickTarget() {
         if (!fafApiCommunicationService.hasPermission(GroupPermission.ADMIN_KICK_SERVER)) {
             return false;
+        }
+
+        if (hasManualKickInput()) {
+            return true;
         }
 
         String selectedUser = userListView.getSelectionModel().getSelectedItem();
@@ -486,15 +493,22 @@ public class IrcChatController implements Controller<BorderPane> {
     }
 
     private void kickSelectedUser(KickTarget target) {
-        if (!canKickSelectedUser()) {
+        if (!hasKickTarget()) {
             return;
         }
 
-        String selectedLogin = stripPrefix(userListView.getSelectionModel().getSelectedItem());
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+        KickRequest targetRequest;
+        try {
+            targetRequest = resolveKickRequest();
+        } catch (IllegalStateException e) {
+            showAlert(Alert.AlertType.WARNING, "Kick Target Invalid", e.getMessage());
+            return;
+        }
+
         confirm.setTitle("Confirm Kick");
-        confirm.setHeaderText(target.confirmHeader(selectedLogin));
-        confirm.setContentText(target.confirmBody(selectedLogin));
+        confirm.setHeaderText(target.confirmHeader(targetRequest.displayName()));
+        confirm.setContentText(target.confirmBody(targetRequest.displayName()));
 
         Optional<ButtonType> result = confirm.showAndWait();
         if (result.isEmpty() || result.get() != ButtonType.OK) {
@@ -503,37 +517,116 @@ public class IrcChatController implements Controller<BorderPane> {
 
         setModerationActionInProgress(true);
         CompletableFuture
-                .runAsync(() -> executeKick(target, selectedLogin))
+                .runAsync(() -> executeKick(target, targetRequest))
                 .whenComplete((unused, throwable) -> Platform.runLater(() -> {
                     setModerationActionInProgress(false);
                     if (throwable == null) {
                         showAlert(Alert.AlertType.INFORMATION, "Kick Sent",
-                                target.successMessage(selectedLogin));
+                                target.successMessage(targetRequest.displayName()));
                     } else {
-                        log.error("Failed to {} for {}", target.actionName(), selectedLogin, throwable);
+                        log.error("Failed to {} for {}", target.actionName(), targetRequest.displayName(), throwable);
                         showAlert(Alert.AlertType.ERROR, "Kick Failed",
-                                "Failed to " + target.actionName() + " for " + selectedLogin + ".\n\n" + rootCauseMessage(throwable));
+                                "Failed to " + target.actionName() + " for " + targetRequest.displayName() + ".\n\n" + rootCauseMessage(throwable));
                     }
                 }));
     }
 
-    private void executeKick(KickTarget target, String login) {
-        PlayerFX player = findPlayerByLogin(login);
-        int playerId = parsePlayerId(player);
-
+    private void executeKick(KickTarget target, KickRequest request) {
         switch (target) {
-            case GAME -> lobbyModerationService.kickFromGame(playerId);
-            case CLIENT -> lobbyModerationService.kickFromClient(playerId);
-            case GAME_AND_CLIENT -> lobbyModerationService.kickFromGameAndClient(playerId);
+            case GAME -> lobbyModerationService.kickFromGame(request.playerId());
+            case CLIENT -> lobbyModerationService.kickFromClient(request.playerId());
+            case GAME_AND_CLIENT -> lobbyModerationService.kickFromGameAndClient(request.playerId());
         }
     }
 
-    private PlayerFX findPlayerByLogin(String login) {
-        List<PlayerFX> matches = userService.findUsersByAttribute("login", login);
+    private PlayerFX findPlayerById(String playerId) {
+        List<PlayerFX> matches = userService.findUsersByAttribute("id", playerId);
         return matches.stream()
-                .filter(player -> player.getLogin() != null && player.getLogin().equalsIgnoreCase(login))
+                .filter(player -> player.getId() != null && player.getId().equals(playerId))
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException("No FAF player found for login: " + login));
+                .orElseThrow(() -> new IllegalStateException("No FAF player found for user ID: " + playerId));
+    }
+
+    private PlayerFX findPlayerByLoginOrName(String loginOrName) {
+        List<PlayerFX> loginMatches = userService.findUsersByAttribute("login", loginOrName);
+        Optional<PlayerFX> exactLoginMatch = loginMatches.stream()
+                .filter(player -> player.getLogin() != null && player.getLogin().equalsIgnoreCase(loginOrName))
+                .findFirst();
+        if (exactLoginMatch.isPresent()) {
+            return exactLoginMatch.get();
+        }
+
+        List<PlayerFX> nameMatches = userService.findUsersByAttribute("names.name", loginOrName).stream()
+                .filter(player -> player.getNames().stream().anyMatch(name ->
+                        name.getName() != null && name.getName().equalsIgnoreCase(loginOrName)))
+                .toList();
+        if (nameMatches.size() == 1) {
+            return nameMatches.getFirst();
+        }
+        if (nameMatches.size() > 1) {
+            throw new IllegalStateException("Multiple FAF players match that name. Enter the user ID or exact username instead.");
+        }
+
+        throw new IllegalStateException("No FAF player found for username or name: " + loginOrName);
+    }
+
+    private KickRequest resolveKickRequest() {
+        String manualLookup = normalizeKickInput(kickLookupField.getText());
+
+        if (!manualLookup.isBlank()) {
+            PlayerFX player = isNumeric(manualLookup)
+                    ? findPlayerById(manualLookup)
+                    : findPlayerByLoginOrName(manualLookup);
+
+            int playerId = parsePlayerId(player);
+            String login = normalizeKickInput(player.getLogin());
+            ensureNotSelf(playerId, login.isBlank() ? manualLookup : login);
+
+            return new KickRequest(playerId, login, formatKickDisplay(login, playerId));
+        }
+
+        String selectedUser = userListView.getSelectionModel().getSelectedItem();
+        if (selectedUser == null || selectedUser.isBlank()) {
+            throw new IllegalStateException("Select a user or enter a user ID or username.");
+        }
+
+        String selectedLogin = stripPrefix(selectedUser);
+        PlayerFX player = findPlayerByLoginOrName(selectedLogin);
+        int playerId = parsePlayerId(player);
+        ensureNotSelf(playerId, selectedLogin);
+        String login = normalizeKickInput(player.getLogin());
+        return new KickRequest(playerId, login.isBlank() ? selectedLogin : login, formatKickDisplay(login.isBlank() ? selectedLogin : login, playerId));
+    }
+
+    private boolean hasManualKickInput() {
+        return !normalizeKickInput(kickLookupField.getText()).isBlank();
+    }
+
+    private String normalizeKickInput(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private boolean isNumeric(String value) {
+        return !value.isBlank() && value.chars().allMatch(Character::isDigit);
+    }
+
+    private String formatKickDisplay(String login, int playerId) {
+        return login == null || login.isBlank()
+                ? "user ID " + playerId
+                : login + " [id " + playerId + "]";
+    }
+
+    private void ensureNotSelf(int playerId, String login) {
+        if (login != null && !login.isBlank()
+                && login.equalsIgnoreCase(resolveModeratorNickname(localPreferences.getTabIrcChat()))) {
+            throw new IllegalStateException("You cannot kick your own moderator account.");
+        }
+
+        if (fafApiCommunicationService.getMeResult() != null
+                && fafApiCommunicationService.getMeResult().getId() != null
+                && fafApiCommunicationService.getMeResult().getId().equals(String.valueOf(playerId))) {
+            throw new IllegalStateException("You cannot kick your own moderator account.");
+        }
     }
 
     private int parsePlayerId(PlayerFX player) {
@@ -565,6 +658,9 @@ public class IrcChatController implements Controller<BorderPane> {
         return current.getMessage() == null || current.getMessage().isBlank()
                 ? current.getClass().getSimpleName()
                 : current.getMessage();
+    }
+
+    private record KickRequest(int playerId, String login, String displayName) {
     }
 
     private enum KickTarget {
