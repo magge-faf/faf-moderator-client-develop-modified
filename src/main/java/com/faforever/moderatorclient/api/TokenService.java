@@ -110,12 +110,17 @@ public class TokenService {
             return Optional.empty();
         }
 
-        Map<String, Object> claims = extractCustomClaims(tokenCache.getAccessToken().getTokenValue());
-        for (String key : List.of("preferred_username", "username", "nickname", "login", "name")) {
-            Object value = claims.get(key);
-            if (value instanceof String candidate && !candidate.isBlank()) {
-                return Optional.of(candidate);
+        try {
+            Map<String, Object> claims = extractCustomClaims(tokenCache.getAccessToken().getTokenValue());
+            for (String key : List.of("preferred_username", "username", "nickname", "login", "name")) {
+                Object value = claims.get(key);
+                if (value instanceof String candidate && !candidate.isBlank()) {
+                    return Optional.of(candidate);
+                }
             }
+        } catch (RuntimeException e) {
+            log.warn("Failed to parse token claims for preferred username", e);
+            return Optional.empty();
         }
 
         return Optional.empty();

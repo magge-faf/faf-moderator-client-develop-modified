@@ -120,50 +120,70 @@ public class LocalPreferences {
 
         private String encryptToken(String token) {
             try {
-                // Use a simple XOR cipher with a system-derived key
-                // This is not cryptographically strong but better than plaintext
-                String key = getSystemKey();
-                byte[] tokenBytes = token.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-                byte[] keyBytes = key.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-                byte[] encrypted = new byte[tokenBytes.length];
+                javax.crypto.SecretKey secretKey = getOrGenerateSecretKey();
+                javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding");
+                byte[] iv = new byte[12];
+                java.security.SecureRandom random = new java.security.SecureRandom();
+                random.nextBytes(iv);
+                javax.crypto.spec.GCMParameterSpec gcmSpec = new javax.crypto.spec.GCMParameterSpec(128, iv);
+                cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, secretKey, gcmSpec);
+                byte[] encrypted = cipher.doFinal(token.getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
-                for (int i = 0; i < tokenBytes.length; i++) {
-                    encrypted[i] = (byte) (tokenBytes[i] ^ keyBytes[i % keyBytes.length]);
-                }
+                // Prepend IV to encrypted data
+                byte[] combined = new byte[iv.length + encrypted.length];
+                System.arraycopy(iv, 0, combined, 0, iv.length);
+                System.arraycopy(encrypted, 0, combined, iv.length, encrypted.length);
 
-                return java.util.Base64.getEncoder().encodeToString(encrypted);
+                return java.util.Base64.getEncoder().encodeToString(combined);
             } catch (Exception e) {
-                // Fallback to plaintext if encryption fails
-                return token;
+                throw new RuntimeException("Failed to encrypt token", e);
             }
         }
 
         private String decryptToken(String encryptedToken) {
             try {
-                String key = getSystemKey();
-                byte[] encrypted = java.util.Base64.getDecoder().decode(encryptedToken);
-                byte[] keyBytes = key.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-                byte[] decrypted = new byte[encrypted.length];
+                javax.crypto.SecretKey secretKey = getOrGenerateSecretKey();
+                byte[] combined = java.util.Base64.getDecoder().decode(encryptedToken);
 
-                for (int i = 0; i < encrypted.length; i++) {
-                    decrypted[i] = (byte) (encrypted[i] ^ keyBytes[i % keyBytes.length]);
-                }
+                // Extract IV and encrypted data
+                byte[] iv = new byte[12];
+                byte[] encrypted = new byte[combined.length - 12];
+                System.arraycopy(combined, 0, iv, 0, 12);
+                System.arraycopy(combined, 12, encrypted, 0, encrypted.length);
+
+                javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding");
+                javax.crypto.spec.GCMParameterSpec gcmSpec = new javax.crypto.spec.GCMParameterSpec(128, iv);
+                cipher.init(javax.crypto.Cipher.DECRYPT_MODE, secretKey, gcmSpec);
+                byte[] decrypted = cipher.doFinal(encrypted);
 
                 return new String(decrypted, java.nio.charset.StandardCharsets.UTF_8);
             } catch (Exception e) {
-                // Return null if decryption fails
+                // Return null if decryption fails (might be old XOR-encrypted data)
                 return null;
             }
         }
 
-        private String getSystemKey() {
-            // Generate a key from system properties to make it hardware-specific
-            String osName = System.getProperty("os.name", "");
-            String osVersion = System.getProperty("os.version", "");
-            String userName = System.getProperty("user.name", "");
-            String userHome = System.getProperty("user.home", "");
+        private javax.crypto.SecretKey getOrGenerateSecretKey() {
+            try {
+                String encodedKey = CREDENTIAL_PREFERENCES.get("aesKey", null);
+                if (encodedKey != null) {
+                    byte[] keyBytes = java.util.Base64.getDecoder().decode(encodedKey);
+                    return new javax.crypto.spec.SecretKeySpec(keyBytes, "AES");
+                }
 
-            return osName + osVersion + userName + userHome + "faf-moderator-salt";
+                // Generate new key
+                javax.crypto.KeyGenerator keyGen = javax.crypto.KeyGenerator.getInstance("AES");
+                keyGen.init(256, new java.security.SecureRandom());
+                javax.crypto.SecretKey secretKey = keyGen.generateKey();
+
+                // Store it
+                encodedKey = java.util.Base64.getEncoder().encodeToString(secretKey.getEncoded());
+                CREDENTIAL_PREFERENCES.put("aesKey", encodedKey);
+
+                return secretKey;
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to initialize encryption key", e);
+            }
         }
     }
 

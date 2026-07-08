@@ -29,6 +29,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
 @Service
@@ -39,11 +40,12 @@ public class LobbyOAuthService {
     private final OAuthValuesReceiver oAuthValuesReceiver;
 
     private final Object refreshLock = new Object();
+    private volatile CompletableFuture<Void> pendingAuthorization = null;
 
     private EnvironmentProperties environmentProperties;
     private RestTemplate oauthRestTemplate;
     private RestTemplate userRestTemplate;
-    private OAuth2AccessTokenResponse tokenCache;
+    private volatile OAuth2AccessTokenResponse tokenCache;
 
     public void prepare(EnvironmentProperties environmentProperties) {
         this.environmentProperties = environmentProperties;
@@ -68,34 +70,77 @@ public class LobbyOAuthService {
 
         OAuth2AccessTokenResponse currentToken = tokenCache;
         if (currentToken == null) {
+            CompletableFuture<Void> authFuture;
             synchronized (refreshLock) {
                 currentToken = tokenCache;
                 if (currentToken == null) {
-                    authorizeForLobby();
-                    currentToken = tokenCache;
+                    if (pendingAuthorization == null) {
+                        pendingAuthorization = CompletableFuture.runAsync(() -> {
+                            try {
+                                authorizeForLobby();
+                            } finally {
+                                synchronized (refreshLock) {
+                                    pendingAuthorization = null;
+                                }
+                            }
+                        });
+                    }
+                    authFuture = pendingAuthorization;
+                } else {
+                    authFuture = null;
                 }
+            }
+            if (authFuture != null) {
+                authFuture.join();
+                currentToken = tokenCache;
             }
         }
 
         Instant expiresAt = currentToken.getAccessToken().getExpiresAt();
         if (expiresAt == null || expiresAt.isBefore(Instant.now())) {
+            CompletableFuture<Void> authFuture = null;
             synchronized (refreshLock) {
                 currentToken = tokenCache;
                 expiresAt = currentToken.getAccessToken().getExpiresAt();
                 if (expiresAt == null || expiresAt.isBefore(Instant.now())) {
                     String refreshToken = currentToken.getRefreshToken() == null ? null : currentToken.getRefreshToken().getTokenValue();
                     if (!StringUtils.hasText(refreshToken)) {
-                        authorizeForLobby();
+                        if (pendingAuthorization == null) {
+                            pendingAuthorization = CompletableFuture.runAsync(() -> {
+                                try {
+                                    authorizeForLobby();
+                                } finally {
+                                    synchronized (refreshLock) {
+                                        pendingAuthorization = null;
+                                    }
+                                }
+                            });
+                        }
+                        authFuture = pendingAuthorization;
                     } else {
                         try {
                             loginWithRefreshToken(refreshToken);
                         } catch (RuntimeException e) {
                             log.warn("Lobby token refresh failed, requesting fresh lobby authorization", e);
                             localPreferences.getAutoLogin().setLobbyRefreshToken(null);
-                            authorizeForLobby();
+                            if (pendingAuthorization == null) {
+                                pendingAuthorization = CompletableFuture.runAsync(() -> {
+                                    try {
+                                        authorizeForLobby();
+                                    } finally {
+                                        synchronized (refreshLock) {
+                                            pendingAuthorization = null;
+                                        }
+                                    }
+                                });
+                            }
+                            authFuture = pendingAuthorization;
                         }
                     }
                 }
+            }
+            if (authFuture != null) {
+                authFuture.join();
             }
         }
 
@@ -114,7 +159,7 @@ public class LobbyOAuthService {
         headers.setBearerAuth(token);
         headers.set(HttpHeaders.ACCEPT, "application/json");
         headers.set(HttpHeaders.USER_AGENT, environmentProperties.getLobbyUserAgent());
-        String hmac = getHmac();
+        String hmac = getHmac(token);
         if (StringUtils.hasText(hmac)) {
             headers.add("X-HMAC", hmac);
         }
@@ -230,14 +275,18 @@ public class LobbyOAuthService {
                 }
         );
 
-        return responseEntity.getBody();
+        Map<String, Object> body = responseEntity.getBody();
+        if (body == null) {
+            throw new IllegalStateException("OAuth token endpoint returned an empty response body");
+        }
+        return body;
     }
 
-    private String getHmac() {
-        if (tokenCache == null) {
+    private String getHmac(String tokenValue) {
+        if (tokenValue == null) {
             return null;
         }
-        var claims = extractCustomClaims(tokenCache.getAccessToken().getTokenValue());
+        var claims = extractCustomClaims(tokenValue);
         @SuppressWarnings("unchecked")
         var extensions = (Map<String, Object>) claims.get("ext");
         if (extensions == null) {

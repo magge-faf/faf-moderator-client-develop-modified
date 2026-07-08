@@ -33,11 +33,12 @@ public final class WebSocketConnection implements ClientConnection {
     private final Sinks.Many<String> outboundSink = Sinks.many().unicast().onBackpressureBuffer();
     private final Flux<String> outboundMessages = outboundSink.asFlux().publish().autoConnect();
 
-    private boolean reconnect = true;
-    private Disposable ping;
-    private Connection connection;
+    private volatile boolean reconnect = true;
+    private volatile Disposable ping;
+    private volatile Connection connection;
     private volatile String lastMessage;
-    private boolean alive = true;
+    private volatile boolean alive = true;
+    private volatile Disposable reconnectSubscription;
 
     public WebSocketConnection(Client.WithManagement client) {
         this.client = client;
@@ -94,7 +95,16 @@ public final class WebSocketConnection implements ClientConnection {
     }
 
     private void scheduleReconnect(int delay) {
-        Mono.delay(Duration.ofMillis(delay)).doOnNext(ignored -> this.client.connect()).subscribe();
+        if (reconnectSubscription != null) {
+            reconnectSubscription.dispose();
+        }
+        reconnectSubscription = Mono.delay(Duration.ofMillis(delay))
+                .doOnNext(ignored -> {
+                    if (reconnect) {
+                        this.client.connect();
+                    }
+                })
+                .subscribe();
     }
 
     private void handleException(Throwable thrown) {
@@ -124,6 +134,10 @@ public final class WebSocketConnection implements ClientConnection {
     @Override
     public void shutdown(String message, boolean reconnect) {
         this.reconnect = reconnect;
+        if (reconnectSubscription != null) {
+            reconnectSubscription.dispose();
+            reconnectSubscription = null;
+        }
         this.client.pauseMessageSending();
         outboundSink.emitNext("QUIT" + (message != null ? " :" + message : ""),
                 Sinks.EmitFailureHandler.busyLooping(Duration.ofMinutes(1)));

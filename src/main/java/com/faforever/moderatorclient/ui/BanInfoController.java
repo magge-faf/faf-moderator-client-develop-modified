@@ -452,12 +452,16 @@ public class BanInfoController implements Controller<Pane> {
             return;
         }
 
+        // Capture checkbox state on FX thread before entering async block
+        boolean shouldKickFromGame = kickFromGameCheckBox.isSelected();
+        boolean shouldKickFromLobby = kickFromLobbyCheckBox.isSelected();
+
         CompletableFuture.runAsync(() -> {
-            if (kickFromGameCheckBox.isSelected() && kickFromLobbyCheckBox.isSelected()) {
+            if (shouldKickFromGame && shouldKickFromLobby) {
                 lobbyModerationService.kickFromGameAndClient(playerId);
-            } else if (kickFromGameCheckBox.isSelected()) {
+            } else if (shouldKickFromGame) {
                 lobbyModerationService.kickFromGame(playerId);
-            } else if (kickFromLobbyCheckBox.isSelected()) {
+            } else if (shouldKickFromLobby) {
                 lobbyModerationService.kickFromClient(playerId);
             }
         }).exceptionally(throwable -> {

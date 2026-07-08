@@ -29,17 +29,17 @@ final class ChannelManager {
     }
 
     void markJoined(String channel) {
-        ensureChannelState(channel).joined = true;
+        ensureChannelState(channel).setJoined(true);
     }
 
     void markLeft(String channel) {
         ChannelState state = ensureChannelState(channel);
-        state.joined = false;
-        state.unreadCount = 0;
+        state.setJoined(false);
+        state.setUnreadCount(0);
     }
 
     void updateTopic(String channel, String topic) {
-        ensureChannelState(channel).topic = topic == null ? "" : topic;
+        ensureChannelState(channel).setTopic(topic == null ? "" : topic);
     }
 
     void addMessage(IrcChannelMessageEvent event, boolean incrementUnread) {
@@ -54,7 +54,7 @@ final class ChannelManager {
                 event.ownMessage()
         ));
         if (incrementUnread) {
-            state.unreadCount++;
+            state.incrementUnreadCount();
         }
     }
 
@@ -70,12 +70,12 @@ final class ChannelManager {
                 false
         ));
         if (incrementUnread) {
-            state.unreadCount++;
+            state.incrementUnreadCount();
         }
     }
 
     void markRead(String channel) {
-        Optional.ofNullable(channels.get(channel)).ifPresent(state -> state.unreadCount = 0);
+        Optional.ofNullable(channels.get(channel)).ifPresent(state -> state.setUnreadCount(0));
     }
 
     Optional<IrcChannelSnapshot> snapshot(String channel, UserManager userManager) {
@@ -90,7 +90,7 @@ final class ChannelManager {
         return channels.values()
                 .stream()
                 .sorted(Comparator.comparing(ChannelState::name, String.CASE_INSENSITIVE_ORDER))
-                .map(state -> state.snapshot(userManager.getUsers(state.name)))
+                .map(state -> state.snapshot(userManager.getUsers(state.name())))
                 .toList();
     }
 
@@ -121,18 +121,34 @@ final class ChannelManager {
             this.name = name;
         }
 
-        private String name() {
+        private synchronized String name() {
             return name;
         }
 
-        private void append(IrcMessageEntry entry) {
+        private synchronized void setTopic(String topic) {
+            this.topic = topic;
+        }
+
+        private synchronized void setJoined(boolean joined) {
+            this.joined = joined;
+        }
+
+        private synchronized void setUnreadCount(int count) {
+            this.unreadCount = count;
+        }
+
+        private synchronized void incrementUnreadCount() {
+            this.unreadCount++;
+        }
+
+        private synchronized void append(IrcMessageEntry entry) {
             history.addLast(entry);
             while (history.size() > MAX_HISTORY) {
                 history.removeFirst();
             }
         }
 
-        private IrcChannelSnapshot snapshot(List<String> users) {
+        private synchronized IrcChannelSnapshot snapshot(List<String> users) {
             return new IrcChannelSnapshot(
                     name,
                     topic,

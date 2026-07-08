@@ -16,6 +16,10 @@ final class ConnectionManager {
     void connect(IrcConfiguration configuration, String username, String ircToken, Object eventListener,
                  Consumer<String> inputListener,
                  Consumer<String> outputListener, Consumer<Exception> exceptionListener) {
+        if (ircToken == null || ircToken.isBlank()) {
+            throw new IllegalArgumentException("IRC token is required and cannot be null or blank");
+        }
+
         Client.WithManagement client = (Client.WithManagement) Client.builder()
                 .name("faf-moderator-client")
                 .nick(configuration.nickname())

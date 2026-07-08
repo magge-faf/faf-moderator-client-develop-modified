@@ -167,9 +167,21 @@ public class IrcClientService implements IrcClient, DisposableBean {
         }
         String trimmedMessage = message.trim();
         channelManager.ensureChannel(normalizedChannel);
+
+        IrcConnectionState currentState = connectionState.get();
+        IrcConfiguration configuration = configurationRef.get();
+        String nickname;
+        if (currentState != null && !currentState.currentNickname().isBlank()) {
+            nickname = currentState.currentNickname();
+        } else if (configuration != null) {
+            nickname = configuration.nickname();
+        } else {
+            nickname = "unknown";
+        }
+
         IrcChannelMessageEvent localEvent = new IrcChannelMessageEvent(
                 normalizedChannel,
-                connectionState.get().currentNickname().isBlank() ? configurationRef.get().nickname() : connectionState.get().currentNickname(),
+                nickname,
                 trimmedMessage,
                 IrcMessageKind.CHAT,
                 true,
