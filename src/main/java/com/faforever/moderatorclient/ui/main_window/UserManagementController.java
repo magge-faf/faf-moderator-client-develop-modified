@@ -1562,6 +1562,13 @@ public class UserManagementController implements Controller<SplitPane> {
                         Map<String, Object> newExcluded = new LinkedHashMap<>();
                         newExcluded.put(property, value);
                         newExcluded.put("AddedOn", LocalDateTime.now().toString());
+                        newExcluded.put(
+                                "comment",
+                                String.format(
+                                        "Excluded by user prompt: %d related accounts found for [%s = %s]",
+                                        snapshot.size(),
+                                        property,
+                                        value));
                         excludedItems.add(newExcluded);
                         excludedHardwareItemsController.saveExcludedItem(newExcluded);
                         updateSmurfVillageLogTextArea(String.format(
