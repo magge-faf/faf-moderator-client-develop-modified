@@ -60,6 +60,7 @@ dependencies {
     implementation("javax.inject:javax.inject:1")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("com.github.jasminb:jsonapi-converter:0.15")
     implementation 'org.java-websocket:Java-WebSocket:1.6.0' // Required for LobbyWebSocketClient
     implementation("com.faforever.commons:data:${commonsVersion}")

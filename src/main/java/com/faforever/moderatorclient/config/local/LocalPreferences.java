@@ -32,6 +32,7 @@ public class LocalPreferences {
     private TabUserGroups tabUserGroups = new TabUserGroups();
     private TabRecentActivity tabRecentActivity = new TabRecentActivity();
     private TabApiHistory tabApiHistory = new TabApiHistory();
+    private TabIrcChat tabIrcChat = new TabIrcChat();
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     @Data
@@ -39,11 +40,15 @@ public class LocalPreferences {
         private static final Preferences CREDENTIAL_PREFERENCES = Preferences.userNodeForPackage(AutoLogin.class);
         private static final String REFRESH_TOKEN_KEY = "refreshToken";
         private static final String ENCRYPTED_TOKEN_KEY = "encryptedRefreshToken";
+        private static final String LOBBY_REFRESH_TOKEN_KEY = "lobbyRefreshToken";
+        private static final String ENCRYPTED_LOBBY_TOKEN_KEY = "encryptedLobbyRefreshToken";
 
         boolean enabled;
         String environment;
         @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         String refreshToken;
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+        String lobbyRefreshToken;
 
         public String getRefreshToken() {
             // First check if there's a legacy plaintext token in the JSON field
@@ -80,6 +85,36 @@ public class LocalPreferences {
                 CREDENTIAL_PREFERENCES.remove(REFRESH_TOKEN_KEY);
                 // Don't store in JSON field
                 this.refreshToken = null;
+            }
+        }
+
+        public String getLobbyRefreshToken() {
+            if (lobbyRefreshToken != null) {
+                return lobbyRefreshToken;
+            }
+
+            String encryptedToken = CREDENTIAL_PREFERENCES.get(ENCRYPTED_LOBBY_TOKEN_KEY, null);
+            if (encryptedToken != null) {
+                return decryptToken(encryptedToken);
+            }
+
+            return CREDENTIAL_PREFERENCES.get(LOBBY_REFRESH_TOKEN_KEY, null);
+        }
+
+        public void setLobbyRefreshToken(String refreshToken) {
+            if (this.lobbyRefreshToken != null && !this.lobbyRefreshToken.isBlank()) {
+                this.lobbyRefreshToken = null;
+            }
+
+            if (refreshToken == null || refreshToken.isBlank()) {
+                CREDENTIAL_PREFERENCES.remove(ENCRYPTED_LOBBY_TOKEN_KEY);
+                CREDENTIAL_PREFERENCES.remove(LOBBY_REFRESH_TOKEN_KEY);
+                this.lobbyRefreshToken = null;
+            } else {
+                String encrypted = encryptToken(refreshToken);
+                CREDENTIAL_PREFERENCES.put(ENCRYPTED_LOBBY_TOKEN_KEY, encrypted);
+                CREDENTIAL_PREFERENCES.remove(LOBBY_REFRESH_TOKEN_KEY);
+                this.lobbyRefreshToken = null;
             }
         }
 
@@ -357,5 +392,16 @@ public class LocalPreferences {
     public static class TabApiHistory {
         Map<String, Double> historyTableColumnWidths = new HashMap<>();
         List<String> historyTableColumnOrder = new ArrayList<>();
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @Data
+    public static class TabIrcChat {
+        String nickname = "";
+        boolean autoConnectOnStartup = true;
+        boolean debugTraffic = false;
+        boolean suppressJoinLeaveNoise = false;
+        String selectedChannel = "#aeolus";
+        List<String> autoJoinChannels = new ArrayList<>(List.of("#aeolus", "#moderators"));
     }
 }

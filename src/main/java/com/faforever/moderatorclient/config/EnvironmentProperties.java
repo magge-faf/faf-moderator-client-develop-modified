@@ -25,6 +25,10 @@ public class EnvironmentProperties {
     private String oauthScopes;
     @NotBlank
     private String userBaseUrl;
+    private String lobbyClientId = "2e8808cf-5889-469b-b2c3-01f0cc58c4af";
+    private String lobbyOauthScopes = "openid offline public_profile upload_map upload_mod lobby";
+    private String lobbyUserAgent = "downlords-faf-client";
+    private String lobbyClientVersion = "unspecified";
 
     // Defines default pagination and result limits based on user roles:
     // Moderators = page 10_000

@@ -3,7 +3,6 @@ package com.faforever.moderatorclient.api;
 import com.faforever.commons.lobby.ConnectionStatus;
 import com.faforever.commons.lobby.FafLobbyClient;
 import com.faforever.commons.lobby.FafLobbyClient.Config;
-import com.faforever.moderatorclient.config.ApplicationVersion;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
@@ -19,11 +18,10 @@ import java.util.concurrent.atomic.AtomicReference;
 @RequiredArgsConstructor
 public class LobbyModerationService {
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(30);
-    private static final String USER_AGENT = "faf-moderator-client/" + ApplicationVersion.CURRENT_VERSION;
 
     private final FafLobbyClient lobbyClient;
-    private final FafUserCommunicationService fafUserCommunicationService;
-    private final TokenService tokenService;
+    private final LobbyOAuthService lobbyOAuthService;
+    private final LobbyUidService lobbyUidService;
 
     private final AtomicReference<ConnectionStatus> connectionStatus = new AtomicReference<>(ConnectionStatus.DISCONNECTED);
 
@@ -85,15 +83,17 @@ public class LobbyModerationService {
             return;
         }
 
-        String token = tokenService.getRefreshedTokenValue();
-        String lobbyAccessUrl = fafUserCommunicationService.getLobbyAccessUrl();
+        String token = lobbyOAuthService.getRefreshedTokenValue();
+        String lobbyAccessUrl = lobbyOAuthService.getLobbyAccessUrl(token);
+        String lobbyUserAgent = lobbyOAuthService.getEnvironmentProperties().getLobbyUserAgent();
+        String lobbyClientVersion = lobbyOAuthService.getEnvironmentProperties().getLobbyClientVersion();
 
         Config config = new Config(
                 token,
-                ApplicationVersion.CURRENT_VERSION,
-                USER_AGENT,
+                lobbyClientVersion,
+                lobbyUserAgent,
                 lobbyAccessUrl,
-                sessionId -> "moderator-client-" + sessionId,
+                sessionId -> lobbyUidService.generateUid(sessionId),
                 1024 * 1024,
                 false
         );
