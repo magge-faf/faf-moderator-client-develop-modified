@@ -230,7 +230,7 @@
                             <Insets/>
                         </HBox.margin>
                     </Button>
-                    <Button fx:id="editBanButton" text="Edit selected ban" onAction="#onEditBan" mnemonicParsing="false" disable="true">
+                    <Button fx:id="editBanButton" text="Replace selected ban" onAction="#onEditBan" mnemonicParsing="false" disable="true">
                         <HBox.margin>
                             <Insets left="10.0"/>
                         </HBox.margin>

@@ -459,7 +459,12 @@ public class UserManagementController implements Controller<SplitPane> {
         setExpiresAtButton.disableProperty().bind(userAvatarsTableView.getSelectionModel().selectedItemProperty().isNull());
         takeAvatarButton.disableProperty().bind(userAvatarsTableView.getSelectionModel().selectedItemProperty().isNull());
         removeGroupButton.disableProperty().bind(userGroupsTableView.getSelectionModel().selectedItemProperty().isNull());
-        editBanButton.disableProperty().bind(userBansTableView.getSelectionModel().selectedItemProperty().isNull());
+        editBanButton.disableProperty().bind(Bindings.createBooleanBinding(
+                () -> !canEditBan(userBansTableView.getSelectionModel().getSelectedItem()),
+                userBansTableView.getSelectionModel().selectedItemProperty()
+        ));
+        userBansTableView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> updateEditBanButtonText(newValue));
+        updateEditBanButtonText(null);
     }
 
     private void configureFeaturedModFilter() {
@@ -778,6 +783,11 @@ public class UserManagementController implements Controller<SplitPane> {
     public void onEditBan() {
         BanInfoFX selectedBan = userBansTableView.getSelectionModel().getSelectedItem();
         Assert.notNull(selectedBan, "You need to select a ban to edit it.");
+        if (!canEditBan(selectedBan)) {
+            ViewHelper.errorDialog("Permission required",
+                    "Disabled ban records require senior admin permission to edit.");
+            return;
+        }
 
         openBanDialog(selectedBan, false);
     }
@@ -790,7 +800,7 @@ public class UserManagementController implements Controller<SplitPane> {
         }
 
         Stage banInfoDialog = new Stage();
-        banInfoDialog.setTitle(isNew ? "Apply new ban" : "Edit ban");
+        banInfoDialog.setTitle(banInfoController.getDialogTitle());
         banInfoDialog.setScene(new Scene(banInfoController.getRoot()));
         banInfoDialog.showAndWait();
     }
@@ -852,6 +862,26 @@ public class UserManagementController implements Controller<SplitPane> {
         Optional<ButtonType> result = alert.showAndWait();
 
         return result.isPresent() && result.get() == ButtonType.YES;
+    }
+
+    private void updateEditBanButtonText(BanInfoFX selectedBan) {
+        if (selectedBan == null) {
+            editBanButton.setText("Replace selected ban");
+            return;
+        }
+
+        if (selectedBan.getBanStatus() == BanStatus.DISABLED) {
+            editBanButton.setText("Edit disabled ban (needs permission)");
+            return;
+        }
+
+        editBanButton.setText(selectedBan.getBanStatus() == BanStatus.BANNED
+                ? "Replace active ban"
+                : "Edit expired ban");
+    }
+
+    private boolean canEditBan(BanInfoFX selectedBan) {
+        return selectedBan != null && selectedBan.getBanStatus() != BanStatus.DISABLED;
     }
 
     public void onGiveAvatar() {

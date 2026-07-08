@@ -3,7 +3,10 @@ package com.faforever.moderatorclient.ui;
 import com.faforever.commons.api.dto.BanDurationType;
 import com.faforever.commons.api.dto.BanInfo;
 import com.faforever.commons.api.dto.BanLevel;
+import com.faforever.commons.api.dto.GroupPermission;
+import com.faforever.commons.api.dto.BanStatus;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
+import com.faforever.moderatorclient.api.LobbyModerationService;
 import com.faforever.moderatorclient.api.domain.BanService;
 import com.faforever.moderatorclient.ui.domain.BanInfoFX;
 import com.faforever.moderatorclient.ui.domain.ModerationReportFX;
@@ -30,19 +33,26 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.concurrent.CompletableFuture;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.prefs.Preferences;
 
 @Component
 @Scope(BeanDefinition.SCOPE_PROTOTYPE)
 @Slf4j
 @RequiredArgsConstructor
 public class BanInfoController implements Controller<Pane> {
+    private static final Preferences BAN_DIALOG_PREFERENCES = Preferences.userNodeForPackage(BanInfoController.class);
+    private static final String KICK_FROM_GAME_PREF = "banDialog.kickFromGame";
+    private static final String KICK_FROM_LOBBY_PREF = "banDialog.kickFromLobby";
+
     private final FafApiCommunicationService fafApi;
     private final BanService banService;
+    private final LobbyModerationService lobbyModerationService;
     private final PlayerMapper playerMapper;
     public GridPane root;
     public TextField affectedUserTextField;
@@ -63,11 +73,18 @@ public class BanInfoController implements Controller<Pane> {
     public RadioButton globalBanRadioButton;
     public Button revokeButton;
     public Button specificTimeButton;
+    public Button saveButton;
+    public Button cancelButton;
     public Label userLabel;
     public Label banIsRevokedNotice;
+    public Label editModeNoticeLabel;
+    public Label postBanActionsLabel;
     public TextField revocationTimeTextField;
     public VBox revokeOptions;
     public VBox specificTimeSection;
+    public VBox postBanActionsBox;
+    public CheckBox kickFromGameCheckBox;
+    public CheckBox kickFromLobbyCheckBox;
     public TextField reportIdTextField;
     public ToggleGroup banDuration;
 
@@ -76,6 +93,9 @@ public class BanInfoController implements Controller<Pane> {
 
     @Getter
     private BanInfoFX banInfo;
+    @Getter
+    private String dialogTitle = "Apply new ban";
+    private BanStatus originalBanStatus;
     private Consumer<BanInfoFX> postedListener;
     private Runnable onBanRevoked;
 
@@ -95,6 +115,8 @@ public class BanInfoController implements Controller<Pane> {
     @FXML
     public void initialize() {
         banIsRevokedNotice.managedProperty().bind(banIsRevokedNotice.visibleProperty());
+        editModeNoticeLabel.managedProperty().bind(editModeNoticeLabel.visibleProperty());
+        postBanActionsBox.managedProperty().bind(postBanActionsBox.visibleProperty());
         banReasonTextField.textProperty().addListener((observable, oldValue, newValue) -> {
             if (newValue.regionMatches(true, 0, "warning", 0, 7)) {
                 warningBanRadioButton.setSelected(true);
@@ -116,6 +138,8 @@ public class BanInfoController implements Controller<Pane> {
                 banReasonTextField.setText(MULTI_ACCOUNT_REASON);
             }
         });
+
+        initializePostBanActions();
     }
 
     public void onSpecificTimeToggle() {
@@ -139,6 +163,8 @@ public class BanInfoController implements Controller<Pane> {
 
     public void setBanInfo(BanInfoFX banInfo) {
         this.banInfo = banInfo;
+        this.originalBanStatus = banInfo.getId() == null ? null : banInfo.getBanStatus();
+        refreshDialogMode();
 
         if (banInfo.getId() != null) {
             revokeOptions.setDisable(false);
@@ -187,6 +213,8 @@ public class BanInfoController implements Controller<Pane> {
                 userLabel.setText("Affected User ID");
             }
         }
+
+        refreshDialogMode();
     }
 
     public void onSave() {
@@ -236,17 +264,26 @@ public class BanInfoController implements Controller<Pane> {
             if (postedListener != null) {
                 postedListener.accept(loadedBanInfo);
             }
+            runPostBanActions();
         } else {
             log.debug("Updating ban id '{}'", banInfo.getId());
-            if (banInfo.getRevokeTime() == null) {
+            if (originalBanStatus == BanStatus.BANNED) {
+                if (!ViewHelper.confirmDialog(
+                        "Replace active ban",
+                        "Saving here will disable the current active ban and create a new replacement ban with the updated values. Use Revocation instead if you only want to disable the ban."
+                )) {
+                    return;
+                }
                 // Active ban: revoke old entry and create a new one so all fields are persisted
                 String newBanId = banService.revokeThenCreateBan(banInfo);
                 BanInfoFX loadedBanInfo = banService.getBanInfoById(newBanId);
                 if (postedListener != null) {
                     postedListener.accept(loadedBanInfo);
                 }
+                runPostBanActions();
             } else {
                 banService.patchBanInfo(banInfo);
+                runPostBanActions();
             }
         }
         close();
@@ -383,5 +420,97 @@ public class BanInfoController implements Controller<Pane> {
     public void preSetReportId(String id) {
         reportIdTextField.setText(id);
         reportIdTextField.setDisable(true);
+    }
+
+    private void initializePostBanActions() {
+        boolean canKickPlayers = fafApi.hasPermission(GroupPermission.ADMIN_KICK_SERVER);
+        postBanActionsBox.setVisible(canKickPlayers);
+        if (!canKickPlayers) {
+            return;
+        }
+
+        kickFromGameCheckBox.setSelected(BAN_DIALOG_PREFERENCES.getBoolean(KICK_FROM_GAME_PREF, false));
+        kickFromLobbyCheckBox.setSelected(BAN_DIALOG_PREFERENCES.getBoolean(KICK_FROM_LOBBY_PREF, false));
+
+        kickFromGameCheckBox.selectedProperty().addListener((observable, oldValue, newValue) ->
+                BAN_DIALOG_PREFERENCES.putBoolean(KICK_FROM_GAME_PREF, newValue));
+        kickFromLobbyCheckBox.selectedProperty().addListener((observable, oldValue, newValue) ->
+                BAN_DIALOG_PREFERENCES.putBoolean(KICK_FROM_LOBBY_PREF, newValue));
+    }
+
+    private void runPostBanActions() {
+        if (!postBanActionsBox.isVisible() || (!kickFromGameCheckBox.isSelected() && !kickFromLobbyCheckBox.isSelected())) {
+            return;
+        }
+
+        int playerId;
+        try {
+            playerId = Integer.parseInt(banInfo.getPlayer().getId());
+        } catch (Exception e) {
+            ViewHelper.errorDialog("Kick failed",
+                    "The ban was saved, but the player could not be kicked because the player id is missing or invalid.");
+            return;
+        }
+
+        CompletableFuture.runAsync(() -> {
+            if (kickFromGameCheckBox.isSelected() && kickFromLobbyCheckBox.isSelected()) {
+                lobbyModerationService.kickFromGameAndClient(playerId);
+            } else if (kickFromGameCheckBox.isSelected()) {
+                lobbyModerationService.kickFromGame(playerId);
+            } else if (kickFromLobbyCheckBox.isSelected()) {
+                lobbyModerationService.kickFromClient(playerId);
+            }
+        }).exceptionally(throwable -> {
+            log.error("Failed to apply post-ban kick actions for player {}", playerId, throwable);
+            javafx.application.Platform.runLater(() -> ViewHelper.errorDialog(
+                    "Kick failed",
+                    "The ban was saved, but the kick action failed.\n" + rootCauseMessage(throwable)
+            ));
+            return null;
+        });
+    }
+
+    private String rootCauseMessage(Throwable throwable) {
+        Throwable current = throwable;
+        while (current.getCause() != null) {
+            current = current.getCause();
+        }
+        return current.getMessage() == null || current.getMessage().isBlank()
+                ? current.getClass().getSimpleName()
+                : current.getMessage();
+    }
+
+    private void refreshDialogMode() {
+        if (banInfo == null || banInfo.getId() == null) {
+            dialogTitle = "Apply new ban";
+            editModeNoticeLabel.setVisible(false);
+            saveButton.setText("Apply ban");
+            cancelButton.setText("Cancel");
+            return;
+        }
+
+        if (originalBanStatus == BanStatus.BANNED) {
+            dialogTitle = "Replace active ban";
+            editModeNoticeLabel.setText("Saving this form will disable the current active ban and create a new replacement ban with the updated values. The old ban stays in history as disabled. Use Revocation below only if you want to disable the ban without creating a replacement.");
+            editModeNoticeLabel.setVisible(true);
+            saveButton.setText("Disable old ban and create replacement");
+            cancelButton.setText("Cancel replacement");
+            return;
+        }
+
+        if (originalBanStatus == BanStatus.EXPIRED) {
+            dialogTitle = "Edit expired ban";
+            editModeNoticeLabel.setText("This ban is already expired. Saving updates this existing record only and will not create a replacement ban.");
+            editModeNoticeLabel.setVisible(true);
+            saveButton.setText("Save expired ban");
+            cancelButton.setText("Cancel");
+            return;
+        }
+
+        dialogTitle = "Edit disabled ban";
+        editModeNoticeLabel.setText("This ban is already disabled. Saving updates this existing record only and will not create a replacement ban.");
+        editModeNoticeLabel.setVisible(true);
+        saveButton.setText("Save disabled ban");
+        cancelButton.setText("Cancel");
     }
 }
