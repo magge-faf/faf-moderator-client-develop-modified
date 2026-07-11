@@ -420,7 +420,10 @@ public class LocalPreferences {
         String nickname = "";
         boolean autoConnectOnStartup = true;
         boolean debugTraffic = false;
-        boolean suppressJoinLeaveNoise = false;
+        boolean suppressJoinLeaveNoise = true;
+        boolean autoLoadLastDayHistory = true;
+        boolean mentionSoundEnabled = true;
+        boolean mentionToastEnabled = true;
         String selectedChannel = "#aeolus";
         List<String> autoJoinChannels = new ArrayList<>(List.of("#aeolus", "#moderators"));
     }

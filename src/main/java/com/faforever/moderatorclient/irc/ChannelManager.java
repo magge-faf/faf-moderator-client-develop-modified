@@ -1,10 +1,8 @@
 package com.faforever.moderatorclient.irc;
 
 import java.time.Instant;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -13,7 +11,12 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 final class ChannelManager {
-    private static final int MAX_HISTORY = 500;
+    private static final int MAX_HISTORY = 50_000;
+    private static final Comparator<IrcMessageEntry> HISTORY_ORDER = Comparator
+            .comparing(IrcMessageEntry::timestamp)
+            .thenComparing(entry -> entry.messageId() == null ? "" : entry.messageId())
+            .thenComparing(entry -> entry.sender() == null ? "" : entry.sender())
+            .thenComparing(entry -> entry.text() == null ? "" : entry.text());
 
     private final Map<String, ChannelState> channels = new ConcurrentHashMap<>();
 
@@ -44,32 +47,38 @@ final class ChannelManager {
 
     void addMessage(IrcChannelMessageEvent event, boolean incrementUnread) {
         ChannelState state = ensureChannelState(event.channel());
-        state.append(new IrcMessageEntry(
+        IrcMessageEntry entry = new IrcMessageEntry(
                 event.channel(),
                 event.author(),
                 event.message(),
+                event.messageId(),
                 event.kind(),
                 null,
                 event.timestamp(),
-                event.ownMessage()
-        ));
-        if (incrementUnread) {
+                event.ownMessage(),
+                event.historical()
+        );
+        boolean added = state.append(entry);
+        if (added && incrementUnread && IrcNoiseFilter.countsAsUnread(entry)) {
             state.incrementUnreadCount();
         }
     }
 
     void addNotification(String channel, String sender, String message, IrcChannelNotificationType type, Instant timestamp, boolean incrementUnread) {
         ChannelState state = ensureChannelState(channel);
-        state.append(new IrcMessageEntry(
+        IrcMessageEntry entry = new IrcMessageEntry(
                 channel,
                 sender,
                 message,
+                null,
                 type == IrcChannelNotificationType.ERROR ? IrcMessageKind.NOTICE : IrcMessageKind.SYSTEM,
                 type,
                 timestamp,
+                false,
                 false
-        ));
-        if (incrementUnread) {
+        );
+        boolean added = state.append(entry);
+        if (added && incrementUnread && IrcNoiseFilter.countsAsUnread(entry)) {
             state.incrementUnreadCount();
         }
     }
@@ -115,7 +124,7 @@ final class ChannelManager {
         private String topic = "";
         private boolean joined;
         private int unreadCount;
-        private final Deque<IrcMessageEntry> history = new ArrayDeque<>();
+        private final List<IrcMessageEntry> history = new ArrayList<>();
 
         private ChannelState(String name) {
             this.name = name;
@@ -141,11 +150,31 @@ final class ChannelManager {
             this.unreadCount++;
         }
 
-        private synchronized void append(IrcMessageEntry entry) {
-            history.addLast(entry);
+        private synchronized boolean append(IrcMessageEntry entry) {
+            if (contains(entry)) {
+                return false;
+            }
+            history.add(entry);
+            history.sort(HISTORY_ORDER);
             while (history.size() > MAX_HISTORY) {
                 history.removeFirst();
             }
+            return true;
+        }
+
+        private boolean contains(IrcMessageEntry entry) {
+            if (entry.messageId() != null && !entry.messageId().isBlank()) {
+                return history.stream().anyMatch(existing -> entry.messageId().equals(existing.messageId()));
+            }
+            return history.stream().anyMatch(existing ->
+                    existing.timestamp().equals(entry.timestamp())
+                            && equalsIgnoreNull(existing.sender(), entry.sender())
+                            && equalsIgnoreNull(existing.text(), entry.text())
+                            && existing.kind() == entry.kind());
+        }
+
+        private boolean equalsIgnoreNull(String left, String right) {
+            return left == null ? right == null : left.equals(right);
         }
 
         private synchronized IrcChannelSnapshot snapshot(List<String> users) {
@@ -155,7 +184,7 @@ final class ChannelManager {
                     joined,
                     unreadCount,
                     List.copyOf(users),
-                    List.copyOf(new ArrayList<>(history))
+                    List.copyOf(history)
             );
         }
     }

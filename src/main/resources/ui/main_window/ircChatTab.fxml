@@ -3,6 +3,7 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.DatePicker?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.Separator?>
@@ -33,9 +34,27 @@
                         <TextField fx:id="nicknameField" editable="false" promptText="Moderator nickname"/>
                         <CheckBox fx:id="autoConnectCheckBox" mnemonicParsing="false" text="Auto-connect on startup"/>
                         <CheckBox fx:id="debugTrafficCheckBox" mnemonicParsing="false" text="Debug raw traffic"/>
-                        <CheckBox fx:id="suppressJoinLeaveNoiseCheckBox" mnemonicParsing="false" text="Hide join/leave noise"/>
+                        <CheckBox fx:id="suppressJoinLeaveNoiseCheckBox" mnemonicParsing="false" text="Hide system messages"/>
+                        <CheckBox fx:id="autoLoadLastDayHistoryCheckBox" mnemonicParsing="false" text="Auto load last 1 day"/>
                         <Button fx:id="connectButton" mnemonicParsing="false" onAction="#connect" text="Connect"/>
                         <Button fx:id="disconnectButton" mnemonicParsing="false" onAction="#disconnect" text="Disconnect"/>
+                    </children>
+                </HBox>
+                <HBox spacing="8.0">
+                    <children>
+                        <CheckBox fx:id="mentionSoundCheckBox" mnemonicParsing="false" text="Mention sound"/>
+                        <CheckBox fx:id="mentionToastCheckBox" mnemonicParsing="false" text="Mention notification"/>
+                        <Button fx:id="testMentionNotificationButton" mnemonicParsing="false"
+                                onAction="#testMentionNotification" text="Test notification / sound"/>
+                    </children>
+                </HBox>
+                <HBox alignment="CENTER_LEFT" spacing="8.0">
+                    <children>
+                        <DatePicker fx:id="historySinceDatePicker"/>
+                        <Button fx:id="loadHistorySinceButton" mnemonicParsing="false"
+                                onAction="#loadHistorySinceDate" text="Load since date"/>
+                        <Label fx:id="historyStatusLabel" text="Auto-load or manually load IRC history for the selected channel."
+                               wrapText="true" HBox.hgrow="ALWAYS"/>
                     </children>
                 </HBox>
                 <HBox spacing="8.0">

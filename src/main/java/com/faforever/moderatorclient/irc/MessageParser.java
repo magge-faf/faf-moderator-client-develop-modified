@@ -1,5 +1,8 @@
 package com.faforever.moderatorclient.irc;
 
+import org.kitteh.irc.client.library.element.MessageTag.MsgId;
+import org.kitteh.irc.client.library.element.MessageTag.Time;
+import org.kitteh.irc.client.library.event.helper.ServerMessageEvent;
 import org.kitteh.irc.client.library.event.channel.ChannelJoinEvent;
 import org.kitteh.irc.client.library.event.channel.ChannelMessageEvent;
 import org.kitteh.irc.client.library.event.channel.ChannelPartEvent;
@@ -18,9 +21,11 @@ final class MessageParser {
                 event.getChannel().getName(),
                 event.getActor().getNick(),
                 event.getMessage(),
+                event.getTag("msgid", MsgId.class).map(MsgId::getId).orElse(null),
                 IrcMessageKind.CHAT,
                 event.getActor().getNick().equalsIgnoreCase(selfNick),
-                Instant.now()
+                false,
+                resolveTimestamp(event)
         );
     }
 
@@ -31,7 +36,7 @@ final class MessageParser {
                 event.getUser().getNick(),
                 null,
                 event.getUser().getNick() + " joined " + event.getChannel().getName(),
-                Instant.now()
+                resolveTimestamp(event)
         );
     }
 
@@ -45,7 +50,7 @@ final class MessageParser {
                 event.getUser().getNick(),
                 null,
                 partMessage,
-                Instant.now()
+                resolveTimestamp(event)
         );
     }
 
@@ -59,7 +64,7 @@ final class MessageParser {
                 event.getUser().getNick(),
                 null,
                 quitMessage,
-                Instant.now()
+                resolveTimestamp(event)
         );
     }
 
@@ -70,7 +75,7 @@ final class MessageParser {
                 event.getOldUser().getNick(),
                 event.getNewUser().getNick(),
                 event.getOldUser().getNick() + " is now known as " + event.getNewUser().getNick(),
-                Instant.now()
+                resolveTimestamp(event)
         );
     }
 
@@ -82,12 +87,16 @@ final class MessageParser {
                 event.getChannel().getName(),
                 event.getNewTopic().getValue().orElse(""),
                 setter,
-                Instant.now()
+                resolveTimestamp(event)
         );
     }
 
     IrcUserListEvent parseUserList(String channel, List<String> users) {
         return new IrcUserListEvent(channel, List.copyOf(users), Instant.now());
+    }
+
+    private Instant resolveTimestamp(ServerMessageEvent event) {
+        return event.getTag("time", Time.class).map(Time::getTime).orElse(Instant.now());
     }
 
     Optional<WhoUser> parseWhoUser(ClientReceiveNumericEvent event) {

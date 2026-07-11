@@ -29,6 +29,10 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Timer;
@@ -82,7 +86,7 @@ public class FafModeratorClientApplication extends Application {
         UiService uiService = applicationContext.getBean(UiService.class);
         MainController mainController = uiService.loadFxml("ui/mainWindow.fxml");
         mainController.display();
-        primaryStage.getIcons().add(new Image(Objects.requireNonNull(this.getClass().getResourceAsStream("/media/favicon.png"))));
+        primaryStage.getIcons().add(loadImage("/media/favicon.png"));
         Scene scene = new Scene(mainController.getRoot());
 
         String stylesheet = "/style/main-light.css";
@@ -126,6 +130,14 @@ public class FafModeratorClientApplication extends Application {
             }
         };
         timer.scheduleAtFixedRate(task, 0, 1000);
+    }
+
+    private Image loadImage(String resourcePath) {
+        try (InputStream inputStream = Objects.requireNonNull(getClass().getResourceAsStream(resourcePath))) {
+            return new Image(new ByteArrayInputStream(inputStream.readAllBytes()));
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to load image resource: " + resourcePath, e);
+        }
     }
 
     public void updateWindowTitle(Stage primaryStage, long startTime, int requestsInLastMinute,
