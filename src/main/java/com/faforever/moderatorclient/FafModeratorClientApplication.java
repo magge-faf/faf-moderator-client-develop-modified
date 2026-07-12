@@ -5,6 +5,7 @@ import com.faforever.moderatorclient.config.ApplicationProperties;
 import com.faforever.moderatorclient.config.ApplicationVersion;
 import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.config.local.LocalPreferencesReaderWriter;
+import com.faforever.moderatorclient.logging.LogMaintenanceService;
 import com.faforever.moderatorclient.ui.MainController;
 import com.faforever.moderatorclient.ui.PlatformService;
 import com.faforever.moderatorclient.ui.PlatformServiceImpl;
@@ -59,6 +60,8 @@ public class FafModeratorClientApplication extends Application {
     private LocalPreferences localPreferences;
     @Autowired
     private LocalPreferencesReaderWriter localPreferencesReaderWriter;
+    @Autowired
+    private LogMaintenanceService logMaintenanceService;
 
     private Stage primaryStage;
 
@@ -76,6 +79,7 @@ public class FafModeratorClientApplication extends Application {
         SpringApplication app = new SpringApplication(FafModeratorClientApplication.class);
         applicationContext = app.run();
         applicationContext.getAutowireCapableBeanFactory().autowireBean(this);
+        logMaintenanceService.archiveLegacyClientLogs();
     }
 
     @Override
