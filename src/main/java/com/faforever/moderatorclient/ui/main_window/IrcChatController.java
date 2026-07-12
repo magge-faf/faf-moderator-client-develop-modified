@@ -61,7 +61,7 @@ import java.util.concurrent.CompletableFuture;
 public class IrcChatController implements Controller<BorderPane> {
     private static final DateTimeFormatter MESSAGE_TIME_FORMAT =
             DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.systemDefault());
-    private static final int AUTO_HISTORY_LIMIT = 500;
+    private static final long AUTO_HISTORY_LOOKBACK_DAYS = 1;
 
     private final IrcClient ircClient;
     private final LocalPreferences localPreferences;
@@ -79,7 +79,6 @@ public class IrcChatController implements Controller<BorderPane> {
     public Label usersHeaderLabel;
     public TextField nicknameField;
     public CheckBox autoConnectCheckBox;
-    public CheckBox debugTrafficCheckBox;
     public CheckBox suppressJoinLeaveNoiseCheckBox;
     public CheckBox autoLoadLastDayHistoryCheckBox;
     public CheckBox mentionSoundCheckBox;
@@ -125,7 +124,6 @@ public class IrcChatController implements Controller<BorderPane> {
         nicknameField.setText(resolveModeratorNickname(tab));
         nicknameField.setEditable(false);
         autoConnectCheckBox.setSelected(tab.isAutoConnectOnStartup());
-        debugTrafficCheckBox.setSelected(tab.isDebugTraffic());
         suppressJoinLeaveNoiseCheckBox.setSelected(tab.isSuppressJoinLeaveNoise());
         autoLoadLastDayHistoryCheckBox.setSelected(tab.isAutoLoadLastDayHistory());
         mentionSoundCheckBox.setSelected(tab.isMentionSoundEnabled());
@@ -267,7 +265,6 @@ public class IrcChatController implements Controller<BorderPane> {
         LocalPreferences.TabIrcChat tab = localPreferences.getTabIrcChat();
         tab.setNickname(nicknameField.getText() == null ? "" : nicknameField.getText().trim());
         tab.setAutoConnectOnStartup(autoConnectCheckBox.isSelected());
-        tab.setDebugTraffic(debugTrafficCheckBox.isSelected());
         tab.setSuppressJoinLeaveNoise(suppressJoinLeaveNoiseCheckBox.isSelected());
         tab.setAutoLoadLastDayHistory(autoLoadLastDayHistoryCheckBox.isSelected());
         tab.setMentionSoundEnabled(mentionSoundCheckBox.isSelected());
@@ -324,7 +321,7 @@ public class IrcChatController implements Controller<BorderPane> {
                 IrcConfiguration.DEFAULT_HOST,
                 IrcConfiguration.DEFAULT_PORT,
                 resolveModeratorNickname(localPreferences.getTabIrcChat()),
-                debugTrafficCheckBox.isSelected(),
+                localPreferences.getTabIrcChat().isDebugTraffic(),
                 autoJoinChannels
         );
     }
@@ -606,8 +603,8 @@ public class IrcChatController implements Controller<BorderPane> {
         }
 
         runHistoryLoad(
-                "recent IRC history for " + channelName,
-                ircClient.requestRecentHistory(channelName, AUTO_HISTORY_LIMIT),
+                "the last 1 day of IRC history for " + channelName,
+                ircClient.requestHistorySince(channelName, Instant.now().minus(AUTO_HISTORY_LOOKBACK_DAYS, ChronoUnit.DAYS)),
                 () -> {
                     autoLoadedHistoryChannels.remove(channelKey);
                     maybeAutoLoadJoinedChannelHistories();
@@ -616,7 +613,7 @@ public class IrcChatController implements Controller<BorderPane> {
                     if (visibleMessageCount(channelName) == 0) {
                         historyStatusLabel.setText(String.format(
                                 Locale.ROOT,
-                                "Loaded recent IRC history for %s but no visible chat messages were found.",
+                                "Loaded the last 1 day of IRC history for %s but no visible chat messages were found.",
                                 result.target()
                         ));
                     }

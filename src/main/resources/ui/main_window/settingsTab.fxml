@@ -41,6 +41,13 @@
             <Separator/>
 
             <VBox spacing="5">
+                <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="IRC"/>
+                <CheckBox fx:id="ircDebugTrafficCheckBox" mnemonicParsing="false" text="Debug raw IRC traffic"/>
+            </VBox>
+
+            <Separator/>
+
+            <VBox spacing="5">
                 <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="Misc"/>
                 <HBox spacing="10">
                     <Button fx:id="openConfigurationFolderButton" mnemonicParsing="false"

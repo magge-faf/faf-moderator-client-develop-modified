@@ -47,6 +47,8 @@ public class SettingsController implements Controller<Pane> {
     public ComboBox<String> browserComboBox;
     @FXML
     public CheckBox fetchBansOnStartupCheckBox;
+    @FXML
+    public CheckBox ircDebugTrafficCheckBox;
 
 
     @Override
@@ -80,6 +82,9 @@ public class SettingsController implements Controller<Pane> {
         });
 
         fetchBansOnStartupCheckBox.setSelected(localPreferences.getTabSettings().isFetchBansOnStartupCheckBox());
+        ircDebugTrafficCheckBox.setSelected(localPreferences.getTabIrcChat().isDebugTraffic());
+        ircDebugTrafficCheckBox.selectedProperty().addListener((obs, oldVal, newVal) ->
+                localPreferences.getTabIrcChat().setDebugTraffic(newVal));
 
         if (browserComboBox.getValue() == null) {
             browserComboBox.setValue(localPreferences.getUi().getBrowserComboBox());
@@ -339,6 +344,7 @@ public class SettingsController implements Controller<Pane> {
         localPreferences.getUi().setDarkMode(darkModeCheckBox.isSelected());
 
         localPreferences.getTabSettings().setFetchBansOnStartupCheckBox(fetchBansOnStartupCheckBox.isSelected());
+        localPreferences.getTabIrcChat().setDebugTraffic(ircDebugTrafficCheckBox.isSelected());
 
         Tab selectedTab = defaultActiveTabComboBox.getSelectionModel().getSelectedItem();
         if (selectedTab != null) {

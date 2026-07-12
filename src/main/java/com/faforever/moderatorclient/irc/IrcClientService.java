@@ -17,6 +17,7 @@ import org.kitteh.irc.client.library.event.channel.ChannelTopicEvent;
 import org.kitteh.irc.client.library.event.channel.ChannelUsersUpdatedEvent;
 import org.kitteh.irc.client.library.event.client.ClientNegotiationCompleteEvent;
 import org.kitteh.irc.client.library.event.client.ClientReceiveNumericEvent;
+import org.kitteh.irc.client.library.event.helper.ClientReceiveServerMessageEvent;
 import org.kitteh.irc.client.library.event.client.NickRejectedEvent;
 import org.kitteh.irc.client.library.event.connection.ClientConnectionClosedEvent;
 import org.kitteh.irc.client.library.event.connection.ClientConnectionEndedEvent;
@@ -56,6 +57,7 @@ public class IrcClientService implements IrcClient, DisposableBean {
     private static final long MAX_RECONNECT_DELAY_MILLIS = 30_000L;
     private static final int HISTORY_PAGE_LIMIT = 500;
     private static final int HISTORY_SANITY_LIMIT = 20_000;
+    private static final int HISTORY_SINCE_TIMEOUT_SECONDS = 60;
 
     private final ConnectionManager connectionManager = new ConnectionManager();
     private final MessageParser messageParser = new MessageParser();
@@ -79,6 +81,7 @@ public class IrcClientService implements IrcClient, DisposableBean {
     private final Map<String, HistoryRequestState> pendingHistoryRequests = new ConcurrentHashMap<>();
     private final Map<String, HistoryRequestState> activeHistoryRequests = new ConcurrentHashMap<>();
     private final Set<String> historicalBatchReferences = ConcurrentHashMap.newKeySet();
+    private final Map<String, PendingHistoryBatch> pendingHistoryBatches = new ConcurrentHashMap<>();
 
     @Override
     public void connect() {
@@ -243,6 +246,7 @@ public class IrcClientService implements IrcClient, DisposableBean {
             return CompletableFuture.failedFuture(new IllegalStateException("A history request is already running for " + normalizedTarget + "."));
         }
 
+        log.info("IRC history request: recent target={} limit={}", normalizedTarget, request.pageLimit());
         connectionManager.sendRawLine("CHATHISTORY LATEST " + toWireTarget(normalizedTarget) + " * " + request.pageLimit());
         return future.orTimeout(20, TimeUnit.SECONDS).whenComplete((unused, throwable) -> clearHistoryRequest(normalizedTarget));
     }
@@ -274,8 +278,10 @@ public class IrcClientService implements IrcClient, DisposableBean {
             return CompletableFuture.failedFuture(new IllegalStateException("A history request is already running for " + normalizedTarget + "."));
         }
 
+        log.info("IRC history request: since target={} since={} limit={}", normalizedTarget, request.since(), request.pageLimit());
         connectionManager.sendRawLine("CHATHISTORY LATEST " + toWireTarget(normalizedTarget) + " * " + request.pageLimit());
-        return future.orTimeout(30, TimeUnit.SECONDS).whenComplete((unused, throwable) -> clearHistoryRequest(normalizedTarget));
+        return future.orTimeout(HISTORY_SINCE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .whenComplete((unused, throwable) -> clearHistoryRequest(normalizedTarget));
     }
 
     @Override
@@ -363,11 +369,23 @@ public class IrcClientService implements IrcClient, DisposableBean {
     public void onChannelMessage(ChannelMessageEvent event) {
         IrcChannelMessageEvent parsedEvent = messageParser.parseMessage(event, connectionState.get().currentNickname());
         IrcChannelMessageEvent resolvedEvent = historicalMessageEvent(parsedEvent, event);
-        if (IrcNoiseFilter.isHistoryServerMessage(resolvedEvent.author())) {
-            return;
+        try {
+            if (IrcNoiseFilter.isHistoryServerMessage(resolvedEvent.author())) {
+                log.info("IRC history replay ignored HistServ channel={} message={}", resolvedEvent.channel(), resolvedEvent.message());
+                return;
+            }
+            if (resolvedEvent.historical()) {
+                log.info("IRC history replay chat channel={} author={} messageId={} text={}",
+                        resolvedEvent.channel(),
+                        resolvedEvent.author(),
+                        resolvedEvent.messageId(),
+                        abbreviateForLog(resolvedEvent.message()));
+            }
+            channelManager.addMessage(resolvedEvent, !resolvedEvent.historical());
+            eventDispatcher.dispatch(resolvedEvent);
+        } finally {
+            finalizeHistoryReplayProgress(event);
         }
-        channelManager.addMessage(resolvedEvent, !resolvedEvent.historical());
-        eventDispatcher.dispatch(resolvedEvent);
     }
 
     @Handler
@@ -386,33 +404,59 @@ public class IrcClientService implements IrcClient, DisposableBean {
         HistoryRequestState active = pending.withReachedServerEnd(reachedServerEnd);
         activeHistoryRequests.put(event.getReferenceTag().getReferenceTag(), active);
         historicalBatchReferences.add(event.getReferenceTag().getReferenceTag());
+        log.info("IRC history batch start: ref={} target={} events={} reachedServerEnd={}",
+                event.getReferenceTag().getReferenceTag(),
+                target,
+                event.getReferenceTag().getEvents().size(),
+                reachedServerEnd);
     }
 
     @Handler
     public void onHistoryBatchEnd(ClientBatchEndEvent event) {
         String batchReference = event.getReferenceTag().getReferenceTag();
-        historicalBatchReferences.remove(batchReference);
-        HistoryRequestState active = activeHistoryRequests.remove(batchReference);
+        HistoryRequestState active = activeHistoryRequests.get(batchReference);
         if (active == null) {
             return;
         }
 
         HistoryPage page = summarizeHistoryPage(event);
-        int totalLoaded = active.totalLoaded() + page.messageCount();
+        log.info("IRC history batch end: ref={} target={} eventCount={} earliestSelector={} earliestTimestamp={}",
+                batchReference,
+                active.target(),
+                page.visibleMessageCount(),
+                page.earliestSelector(),
+                page.earliestTimestamp());
+        if (page.replayMessageCount() == 0) {
+            finalizeHistoryBatch(batchReference, active, page);
+            return;
+        }
+        pendingHistoryBatches.put(batchReference, new PendingHistoryBatch(active, page, new AtomicInteger(page.replayMessageCount())));
+    }
+
+    private void finalizeHistoryBatch(String batchReference, HistoryRequestState active, HistoryPage page) {
+        pendingHistoryBatches.remove(batchReference);
+        historicalBatchReferences.remove(batchReference);
+        activeHistoryRequests.remove(batchReference);
+
+        int totalLoaded = active.totalLoaded() + page.visibleMessageCount();
 
         if (active.mode() == Mode.RECENT) {
+            log.info("IRC history request complete: target={} loaded={} mode=recent reachedServerEnd={}",
+                    active.target(), totalLoaded, active.reachedServerEnd());
             active.future().complete(new IrcHistoryLoadResult(active.target(), totalLoaded, null, false, active.reachedServerEnd()));
             return;
         }
 
         boolean reachedRequestedStart = page.earliestTimestamp() != null && !page.earliestTimestamp().isAfter(active.since());
-        boolean stop = page.messageCount() == 0
+        boolean stop = page.replayMessageCount() == 0
                 || reachedRequestedStart
                 || active.reachedServerEnd()
                 || totalLoaded >= HISTORY_SANITY_LIMIT
                 || page.earliestSelector() == null;
 
         if (stop) {
+            log.info("IRC history request complete: target={} loaded={} mode=since reachedRequestedStart={} reachedServerEnd={}",
+                    active.target(), totalLoaded, reachedRequestedStart, active.reachedServerEnd());
             active.future().complete(new IrcHistoryLoadResult(
                     active.target(),
                     totalLoaded,
@@ -425,28 +469,34 @@ public class IrcClientService implements IrcClient, DisposableBean {
 
         HistoryRequestState nextPage = active.withTotalLoaded(totalLoaded).withReachedServerEnd(false);
         pendingHistoryRequests.put(active.target(), nextPage);
+        log.info("IRC history request continue: target={} loaded={} before={}", active.target(), totalLoaded, page.earliestSelector());
         connectionManager.sendRawLine("CHATHISTORY BEFORE " + toWireTarget(active.target()) + " " + page.earliestSelector() + " " + active.pageLimit());
     }
 
     private HistoryPage summarizeHistoryPage(ClientBatchEndEvent event) {
-        List<ServerMessageEvent> messageEvents = event.getReferenceTag().getEvents().stream()
-                .filter(ServerMessageEvent.class::isInstance)
-                .map(ServerMessageEvent.class::cast)
-                .filter(MessageEvent.class::isInstance)
+        List<ClientReceiveServerMessageEvent> messageEvents = event.getReferenceTag().getEvents().stream()
+                .filter(ClientReceiveServerMessageEvent.class::isInstance)
+                .map(ClientReceiveServerMessageEvent.class::cast)
+                .filter(messageEvent -> "PRIVMSG".equalsIgnoreCase(messageEvent.getCommand()))
+                .filter(messageEvent -> messageEvent.getParameters().size() >= 2)
                 .toList();
 
         if (messageEvents.isEmpty()) {
-            return new HistoryPage(0, null, null);
+            return new HistoryPage(0, 0, null, null);
         }
 
-        ServerMessageEvent earliest = messageEvents.getFirst();
+        ClientReceiveServerMessageEvent earliest = messageEvents.getFirst();
         Instant earliestTimestamp = extractTimestamp(earliest).orElse(null);
         String earliestSelector = earliest.getTag("msgid", MsgId.class)
                 .map(msgId -> "msgid=" + msgId.getId())
                 .or(() -> extractTimestamp(earliest).map(this::formatTimestampSelector))
                 .orElse(null);
 
-        return new HistoryPage(messageEvents.size(), earliestSelector, earliestTimestamp);
+        int visibleMessageCount = (int) messageEvents.stream()
+                .filter(this::isVisibleHistoryMessage)
+                .count();
+
+        return new HistoryPage(messageEvents.size(), visibleMessageCount, earliestSelector, earliestTimestamp);
     }
 
     private String formatTimestampSelector(Instant instant) {
@@ -495,8 +545,12 @@ public class IrcClientService implements IrcClient, DisposableBean {
                 isHistoryBatchEvent(event),
                 extractTimestamp(event).orElse(Instant.now())
         );
-        channelManager.addMessage(parsedEvent, !parsedEvent.historical());
-        eventDispatcher.dispatch(parsedEvent);
+        try {
+            channelManager.addMessage(parsedEvent, !parsedEvent.historical());
+            eventDispatcher.dispatch(parsedEvent);
+        } finally {
+            finalizeHistoryReplayProgress(event);
+        }
     }
 
     @Handler
@@ -683,6 +737,9 @@ public class IrcClientService implements IrcClient, DisposableBean {
             log.debug("[IRC IN ] {}", line);
             eventDispatcher.dispatch(new IrcDebugTrafficEvent(IrcTrafficDirection.INBOUND, line, Instant.now()));
         }
+        if (shouldLogHistoryTraffic(line)) {
+            log.info("[IRC IN ] {}", line);
+        }
     }
 
     private void handleOutboundTraffic(String line) {
@@ -690,6 +747,9 @@ public class IrcClientService implements IrcClient, DisposableBean {
         if (configuration != null && configuration.debugTraffic()) {
             log.debug("[IRC OUT] {}", line);
             eventDispatcher.dispatch(new IrcDebugTrafficEvent(IrcTrafficDirection.OUTBOUND, line, Instant.now()));
+        }
+        if (shouldLogHistoryTraffic(line)) {
+            log.info("[IRC OUT] {}", line);
         }
     }
 
@@ -704,6 +764,7 @@ public class IrcClientService implements IrcClient, DisposableBean {
     private void clearPresence() {
         pendingHistoryRequests.clear();
         activeHistoryRequests.clear();
+        pendingHistoryBatches.clear();
         historicalBatchReferences.clear();
         userManager.clear();
         channelManager.knownChannels().forEach(channel -> {
@@ -806,6 +867,7 @@ public class IrcClientService implements IrcClient, DisposableBean {
             }
             return remove;
         });
+        pendingHistoryBatches.keySet().removeIf(referencesToRemove::contains);
         historicalBatchReferences.removeIf(referencesToRemove::contains);
     }
 
@@ -815,8 +877,63 @@ public class IrcClientService implements IrcClient, DisposableBean {
         activeHistoryRequests.values().forEach(request -> futures.add(request.future()));
         pendingHistoryRequests.clear();
         activeHistoryRequests.clear();
+        pendingHistoryBatches.clear();
         historicalBatchReferences.clear();
         futures.forEach(future -> future.completeExceptionally(new IllegalStateException(message)));
+    }
+
+    private boolean isVisibleHistoryMessage(ClientReceiveServerMessageEvent event) {
+        if (event.getParameters().size() < 2) {
+            return false;
+        }
+        return !IrcNoiseFilter.isHiddenSystemMessage(
+                event.getParameters().getFirst(),
+                event.getActor().getName(),
+                IrcMessageKind.CHAT,
+                null,
+                event.getParameters().get(1)
+        );
+    }
+
+    private void finalizeHistoryReplayProgress(ServerMessageEvent event) {
+        String batchReference = event.getTag("batch")
+                .flatMap(MessageTag::getValue)
+                .orElse(null);
+        if (batchReference == null) {
+            return;
+        }
+
+        PendingHistoryBatch pendingBatch = pendingHistoryBatches.get(batchReference);
+        if (pendingBatch == null) {
+            return;
+        }
+
+        if (pendingBatch.remainingReplayEvents().decrementAndGet() > 0) {
+            return;
+        }
+
+        if (pendingHistoryBatches.remove(batchReference, pendingBatch)) {
+            finalizeHistoryBatch(batchReference, pendingBatch.request(), pendingBatch.page());
+        }
+    }
+
+    private boolean shouldLogHistoryTraffic(String line) {
+        if (line == null || line.isBlank()) {
+            return false;
+        }
+        return line.contains("CHATHISTORY")
+                || line.contains(" BATCH ")
+                || line.contains("batch=")
+                || line.contains("draft/chathistory")
+                || line.contains("HistServ");
+    }
+
+    private String abbreviateForLog(String message) {
+        if (message == null) {
+            return "";
+        }
+        String singleLine = message.replace('\n', ' ').replace('\r', ' ');
+        return singleLine.length() <= 160 ? singleLine : singleLine.substring(0, 160) + "...";
     }
 
     private enum Mode {
@@ -842,6 +959,13 @@ public class IrcClientService implements IrcClient, DisposableBean {
         }
     }
 
-    private record HistoryPage(int messageCount, String earliestSelector, Instant earliestTimestamp) {
+    private record HistoryPage(int replayMessageCount, int visibleMessageCount, String earliestSelector, Instant earliestTimestamp) {
+    }
+
+    private record PendingHistoryBatch(
+            HistoryRequestState request,
+            HistoryPage page,
+            AtomicInteger remainingReplayEvents
+    ) {
     }
 }

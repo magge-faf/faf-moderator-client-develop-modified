@@ -33,7 +33,6 @@
                     <children>
                         <TextField fx:id="nicknameField" editable="false" promptText="Moderator nickname"/>
                         <CheckBox fx:id="autoConnectCheckBox" mnemonicParsing="false" text="Auto-connect on startup"/>
-                        <CheckBox fx:id="debugTrafficCheckBox" mnemonicParsing="false" text="Debug raw traffic"/>
                         <CheckBox fx:id="suppressJoinLeaveNoiseCheckBox" mnemonicParsing="false" text="Hide system messages"/>
                         <CheckBox fx:id="autoLoadLastDayHistoryCheckBox" mnemonicParsing="false" text="Auto load last 1 day"/>
                         <Button fx:id="connectButton" mnemonicParsing="false" onAction="#connect" text="Connect"/>
