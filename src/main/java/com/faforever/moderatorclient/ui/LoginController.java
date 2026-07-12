@@ -52,7 +52,14 @@ public class LoginController implements Controller<Pane> {
                 (key, environmentProperties) -> environmentComboBox.getItems().add(key)
         );
 
-        environmentComboBox.getSelectionModel().select(0);
+        rememberLoginCheckBox.setSelected(localPreferences.getAutoLogin().isEnabled());
+
+        String rememberedEnvironment = localPreferences.getAutoLogin().getEnvironment();
+        if (rememberedEnvironment != null && applicationProperties.getEnvironments().containsKey(rememberedEnvironment)) {
+            environmentComboBox.getSelectionModel().select(rememberedEnvironment);
+        } else {
+            environmentComboBox.getSelectionModel().select(0);
+        }
     }
 
     public void rememberLogin() {

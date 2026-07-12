@@ -5,10 +5,12 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.prefs.Preferences;
+import java.util.prefs.BackingStoreException;
 import java.util.concurrent.TimeUnit;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -60,7 +62,17 @@ public class LocalPreferences {
             // Try to get from encrypted Preferences store
             String encryptedToken = CREDENTIAL_PREFERENCES.get(ENCRYPTED_TOKEN_KEY, null);
             if (encryptedToken != null) {
-                return decryptToken(encryptedToken);
+                String decryptedToken = decryptToken(encryptedToken);
+                if (decryptedToken != null) {
+                    return decryptedToken;
+                }
+
+                String legacyDecryptedToken = decryptLegacyToken(encryptedToken);
+                if (legacyDecryptedToken != null) {
+                    // Migrate legacy XOR-encrypted tokens to the current AES format after a successful read.
+                    setRefreshToken(legacyDecryptedToken);
+                    return legacyDecryptedToken;
+                }
             }
 
             // Fallback to legacy plaintext Preferences (for migration)
@@ -77,6 +89,7 @@ public class LocalPreferences {
             if (refreshToken == null || refreshToken.isBlank()) {
                 CREDENTIAL_PREFERENCES.remove(ENCRYPTED_TOKEN_KEY);
                 CREDENTIAL_PREFERENCES.remove(REFRESH_TOKEN_KEY);
+                flushPreferences();
                 this.refreshToken = null;
             } else {
                 // Store encrypted in Preferences
@@ -84,6 +97,7 @@ public class LocalPreferences {
                 CREDENTIAL_PREFERENCES.put(ENCRYPTED_TOKEN_KEY, encrypted);
                 // Remove legacy plaintext entry
                 CREDENTIAL_PREFERENCES.remove(REFRESH_TOKEN_KEY);
+                flushPreferences();
                 // Don't store in JSON field
                 this.refreshToken = null;
             }
@@ -96,7 +110,16 @@ public class LocalPreferences {
 
             String encryptedToken = CREDENTIAL_PREFERENCES.get(ENCRYPTED_LOBBY_TOKEN_KEY, null);
             if (encryptedToken != null) {
-                return decryptToken(encryptedToken);
+                String decryptedToken = decryptToken(encryptedToken);
+                if (decryptedToken != null) {
+                    return decryptedToken;
+                }
+
+                String legacyDecryptedToken = decryptLegacyToken(encryptedToken);
+                if (legacyDecryptedToken != null) {
+                    setLobbyRefreshToken(legacyDecryptedToken);
+                    return legacyDecryptedToken;
+                }
             }
 
             return CREDENTIAL_PREFERENCES.get(LOBBY_REFRESH_TOKEN_KEY, null);
@@ -110,11 +133,13 @@ public class LocalPreferences {
             if (refreshToken == null || refreshToken.isBlank()) {
                 CREDENTIAL_PREFERENCES.remove(ENCRYPTED_LOBBY_TOKEN_KEY);
                 CREDENTIAL_PREFERENCES.remove(LOBBY_REFRESH_TOKEN_KEY);
+                flushPreferences();
                 this.lobbyRefreshToken = null;
             } else {
                 String encrypted = encryptToken(refreshToken);
                 CREDENTIAL_PREFERENCES.put(ENCRYPTED_LOBBY_TOKEN_KEY, encrypted);
                 CREDENTIAL_PREFERENCES.remove(LOBBY_REFRESH_TOKEN_KEY);
+                flushPreferences();
                 this.lobbyRefreshToken = null;
             }
         }
@@ -144,7 +169,11 @@ public class LocalPreferences {
         private String decryptToken(String encryptedToken) {
             try {
                 javax.crypto.SecretKey secretKey = getOrGenerateSecretKey();
-                byte[] combined = java.util.Base64.getDecoder().decode(encryptedToken);
+                byte[] combined = Base64.getDecoder().decode(encryptedToken);
+
+                if (combined.length <= 12) {
+                    return null;
+                }
 
                 // Extract IV and encrypted data
                 byte[] iv = new byte[12];
@@ -164,11 +193,29 @@ public class LocalPreferences {
             }
         }
 
+        private String decryptLegacyToken(String encryptedToken) {
+            try {
+                String key = getLegacySystemKey();
+                byte[] encrypted = Base64.getDecoder().decode(encryptedToken);
+                byte[] keyBytes = key.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                byte[] decrypted = new byte[encrypted.length];
+
+                for (int i = 0; i < encrypted.length; i++) {
+                    decrypted[i] = (byte) (encrypted[i] ^ keyBytes[i % keyBytes.length]);
+                }
+
+                String decryptedToken = new String(decrypted, java.nio.charset.StandardCharsets.UTF_8);
+                return decryptedToken.isBlank() ? null : decryptedToken;
+            } catch (Exception e) {
+                return null;
+            }
+        }
+
         private javax.crypto.SecretKey getOrGenerateSecretKey() {
             try {
                 String encodedKey = CREDENTIAL_PREFERENCES.get("aesKey", null);
                 if (encodedKey != null) {
-                    byte[] keyBytes = java.util.Base64.getDecoder().decode(encodedKey);
+                    byte[] keyBytes = Base64.getDecoder().decode(encodedKey);
                     return new javax.crypto.spec.SecretKeySpec(keyBytes, "AES");
                 }
 
@@ -178,12 +225,30 @@ public class LocalPreferences {
                 javax.crypto.SecretKey secretKey = keyGen.generateKey();
 
                 // Store it
-                encodedKey = java.util.Base64.getEncoder().encodeToString(secretKey.getEncoded());
+                encodedKey = Base64.getEncoder().encodeToString(secretKey.getEncoded());
                 CREDENTIAL_PREFERENCES.put("aesKey", encodedKey);
+                flushPreferences();
 
                 return secretKey;
             } catch (Exception e) {
                 throw new RuntimeException("Failed to initialize encryption key", e);
+            }
+        }
+
+        private String getLegacySystemKey() {
+            String osName = System.getProperty("os.name", "");
+            String osVersion = System.getProperty("os.version", "");
+            String userName = System.getProperty("user.name", "");
+            String userHome = System.getProperty("user.home", "");
+
+            return osName + osVersion + userName + userHome + "faf-moderator-salt";
+        }
+
+        private void flushPreferences() {
+            try {
+                CREDENTIAL_PREFERENCES.flush();
+            } catch (BackingStoreException e) {
+                throw new RuntimeException("Failed to persist credential preferences", e);
             }
         }
     }
