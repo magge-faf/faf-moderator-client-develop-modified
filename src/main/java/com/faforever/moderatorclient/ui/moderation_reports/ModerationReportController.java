@@ -1054,14 +1054,20 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private void updateReportDetails(ModerationReportFX newValue) {
-        reportedPlayersOfCurrentlySelectedReport.setAll(newValue.getReportedUsers());
+        Collection<PlayerFX> reportedUsers = newValue.getReportedUsers() == null
+                ? Collections.emptySet()
+                : newValue.getReportedUsers();
+        reportedPlayersOfCurrentlySelectedReport.setAll(reportedUsers);
         currentlySelectedItemNotNull = newValue;
 
         copyReportIdButton.setText("Report ID: " + newValue.getId());
         copyReportIdButton.setId(newValue.getId());
 
-        copyReporterIdButton.setText(newValue.getReporter().getRepresentation());
-        copyReporterIdButton.setId(newValue.getReporter().getRepresentation());
+        String reporterRepresentation = newValue.getReporter() == null
+                ? "Reporter n/a"
+                : newValue.getReporter().getRepresentation();
+        copyReporterIdButton.setText(reporterRepresentation);
+        copyReporterIdButton.setId(newValue.getReporter() == null ? "" : reporterRepresentation);
 
         // Since ~2023, reports have only one offender; legacy reports may have several.
         for (PlayerFX offender : reportedPlayersOfCurrentlySelectedReport) {
@@ -1069,6 +1075,12 @@ public class ModerationReportController implements Controller<Region> {
             copyReportedUserIdButton.setText(offender.getRepresentation());
             createReportForumButton.setId(offender.getId());
             createReportForumButton.setText("Search Forum:\n" + offender.getRepresentation());
+        }
+        if (reportedPlayersOfCurrentlySelectedReport.isEmpty()) {
+            copyReportedUserIdButton.setId("");
+            copyReportedUserIdButton.setText("Reported User n/a");
+            createReportForumButton.setId("");
+            createReportForumButton.setText("Search Forum:\nn/a");
         }
 
         if (newValue.getGame() != null) {
@@ -1629,7 +1641,7 @@ public class ModerationReportController implements Controller<Region> {
             FafApiCommunicationService.checkRateLimit();
 
             String replayUrl = game.getReplayUrl(replayDownLoadFormat);
-            log.info("Downloading replay from {} to {}", replayUrl, tempFilePath);
+            log.debug("Downloading replay from {} to {}", replayUrl, tempFilePath);
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(replayUrl))
