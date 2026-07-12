@@ -25,6 +25,7 @@ import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
+import javafx.geometry.Orientation;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
@@ -33,6 +34,7 @@ import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.ScrollBar;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.VBox;
@@ -61,7 +63,7 @@ import java.util.concurrent.CompletableFuture;
 public class IrcChatController implements Controller<BorderPane> {
     private static final DateTimeFormatter MESSAGE_TIME_FORMAT =
             DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.systemDefault());
-    private static final long AUTO_HISTORY_LOOKBACK_DAYS = 1;
+    private static final long AUTO_HISTORY_LOOKBACK_HOURS = 8;
 
     private final IrcClient ircClient;
     private final LocalPreferences localPreferences;
@@ -114,6 +116,11 @@ public class IrcChatController implements Controller<BorderPane> {
     private boolean suppressSelectionHandler;
     private boolean moderationActionInProgress;
     private boolean historyLoadInProgress;
+    private boolean historyLoadShouldKeepBottom;
+    private boolean messageViewPinnedToBottom = true;
+    private boolean suppressMessageScrollTracking;
+    private ScrollBar messageListScrollBar;
+    private String renderedChannelName;
     private final Set<String> autoLoadedHistoryChannels = new HashSet<>();
 
     @FXML
@@ -129,8 +136,8 @@ public class IrcChatController implements Controller<BorderPane> {
         mentionSoundCheckBox.setSelected(tab.isMentionSoundEnabled());
         mentionToastCheckBox.setSelected(tab.isMentionToastEnabled());
         joinChannelField.setText(IrcConfiguration.DEFAULT_CHANNEL);
-        historySinceDatePicker.setValue(LocalDate.now().minusDays(30));
-        historyStatusLabel.setText("Auto-load or manually load IRC history for the selected channel.");
+        historySinceDatePicker.setValue(LocalDate.now().minusDays(1));
+        historyStatusLabel.setText("Auto-load covers the last 8 hours. Use manual history for older chat.");
 
         channelListView.setItems(channels);
         messageListView.setItems(messages);
@@ -138,6 +145,7 @@ public class IrcChatController implements Controller<BorderPane> {
 
         configureChannelListView();
         configureMessageListView();
+        configureMessageListScrollTracking();
         configureModerationButtons();
 
         channelListView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
@@ -361,6 +369,7 @@ public class IrcChatController implements Controller<BorderPane> {
     private void showChannel(String channelName) {
         localPreferences.getTabIrcChat().setSelectedChannel(channelName);
         ircClient.markChannelRead(channelName);
+        messageViewPinnedToBottom = true;
         renderChannel(channelName);
         refreshChannelListOnly();
         maybeAutoLoadLastDayHistory(channelName);
@@ -368,18 +377,22 @@ public class IrcChatController implements Controller<BorderPane> {
 
     private void renderChannel(String channelName) {
         ircClient.getChannelSnapshot(channelName).ifPresentOrElse(snapshot -> {
+            boolean channelChanged = renderedChannelName == null || !renderedChannelName.equalsIgnoreCase(channelName);
+            boolean keepBottom = channelChanged || historyLoadShouldKeepBottom || messageViewPinnedToBottom;
             messages.setAll(filterMessages(snapshot.history()));
             users.setAll(filterUsers(snapshot.users()));
             usersHeaderLabel.setText(String.format(Locale.ROOT, "Users (%d online)", snapshot.users().size()));
             activeTopicLabel.setText(snapshot.topic().isBlank() ? "No topic set" : snapshot.topic());
-            if (!historyLoadInProgress) {
-                Platform.runLater(() -> messageListView.scrollTo(Math.max(messages.size() - 1, 0)));
+            renderedChannelName = channelName;
+            if (keepBottom) {
+                scrollMessageListToBottom();
             }
         }, () -> {
             messages.clear();
             users.clear();
             usersHeaderLabel.setText("Users (0 online)");
             activeTopicLabel.setText("No topic set");
+            renderedChannelName = channelName;
         });
     }
 
@@ -468,11 +481,68 @@ public class IrcChatController implements Controller<BorderPane> {
                 String historyFlag = item.historical() ? " [history]" : "";
                 metaLabel.setText(String.format("[%s] %s%s", MESSAGE_TIME_FORMAT.format(item.timestamp()), sender, historyFlag));
                 bodyLabel.setText(item.text());
-                container.setStyle(item.ownMessage() ? "-fx-background-color: rgba(30,116,198,0.12); -fx-background-radius: 6; -fx-padding: 6;"
-                        : "-fx-padding: 6;");
+                container.setStyle(item.ownMessage()
+                        ? "-fx-background-color: rgba(30,116,198,0.10); -fx-border-color: rgba(30,116,198,0.35); -fx-border-width: 0 0 0 2; -fx-padding: 6 0 6 8;"
+                        : "-fx-padding: 6 0 6 0;");
                 setGraphic(container);
                 setText(null);
             }
+        });
+    }
+
+    private void configureMessageListScrollTracking() {
+        messageListView.skinProperty().addListener((observable, oldValue, newValue) ->
+                Platform.runLater(this::attachMessageListScrollTracking));
+        Platform.runLater(this::attachMessageListScrollTracking);
+    }
+
+    private void attachMessageListScrollTracking() {
+        ScrollBar verticalScrollBar = messageListView.lookupAll(".scroll-bar").stream()
+                .filter(ScrollBar.class::isInstance)
+                .map(ScrollBar.class::cast)
+                .filter(scrollBar -> scrollBar.getOrientation() == Orientation.VERTICAL)
+                .findFirst()
+                .orElse(null);
+        if (verticalScrollBar == null || verticalScrollBar == messageListScrollBar) {
+            return;
+        }
+
+        messageListScrollBar = verticalScrollBar;
+        messageListScrollBar.valueProperty().addListener((observable, oldValue, newValue) -> {
+            if (!suppressMessageScrollTracking) {
+                messageViewPinnedToBottom = isMessageViewNearBottom();
+            }
+        });
+        messageViewPinnedToBottom = isMessageViewNearBottom();
+    }
+
+    private boolean isMessageViewNearBottom() {
+        if (messageListScrollBar == null) {
+            return true;
+        }
+        double min = messageListScrollBar.getMin();
+        double max = messageListScrollBar.getMax();
+        if (max <= min) {
+            return true;
+        }
+        double slack = Math.max(0.05d, (max - min) * 0.02d);
+        return messageListScrollBar.getValue() >= max - slack;
+    }
+
+    private void scrollMessageListToBottom() {
+        if (messages.isEmpty()) {
+            return;
+        }
+        Platform.runLater(() -> {
+            suppressMessageScrollTracking = true;
+            messageListView.scrollTo(messages.size() - 1);
+            if (messageListScrollBar != null) {
+                messageListScrollBar.setValue(messageListScrollBar.getMax());
+            }
+            Platform.runLater(() -> {
+                messageViewPinnedToBottom = true;
+                suppressMessageScrollTracking = false;
+            });
         });
     }
 
@@ -603,8 +673,8 @@ public class IrcChatController implements Controller<BorderPane> {
         }
 
         runHistoryLoad(
-                "the last 1 day of IRC history for " + channelName,
-                ircClient.requestHistorySince(channelName, Instant.now().minus(AUTO_HISTORY_LOOKBACK_DAYS, ChronoUnit.DAYS)),
+                "the last 8 hours of IRC history for " + channelName,
+                ircClient.requestHistorySince(channelName, Instant.now().minus(AUTO_HISTORY_LOOKBACK_HOURS, ChronoUnit.HOURS)),
                 () -> {
                     autoLoadedHistoryChannels.remove(channelKey);
                     maybeAutoLoadJoinedChannelHistories();
@@ -613,12 +683,13 @@ public class IrcChatController implements Controller<BorderPane> {
                     if (visibleMessageCount(channelName) == 0) {
                         historyStatusLabel.setText(String.format(
                                 Locale.ROOT,
-                                "Loaded the last 1 day of IRC history for %s but no visible chat messages were found.",
+                                "Loaded the last 8 hours of IRC history for %s but no visible chat messages were found.",
                                 result.target()
                         ));
                     }
                     maybeAutoLoadJoinedChannelHistories();
-                }
+                },
+                true
         );
     }
 
@@ -656,22 +727,29 @@ public class IrcChatController implements Controller<BorderPane> {
     }
 
     private void runHistoryLoad(String label, CompletableFuture<IrcHistoryLoadResult> future) {
-        runHistoryLoad(label, future, null, null);
+        runHistoryLoad(label, future, null, null, false);
     }
 
     private void runHistoryLoad(String label, CompletableFuture<IrcHistoryLoadResult> future, Runnable onFailure) {
-        runHistoryLoad(label, future, onFailure, null);
+        runHistoryLoad(label, future, onFailure, null, false);
     }
 
     private void runHistoryLoad(String label, CompletableFuture<IrcHistoryLoadResult> future, Runnable onFailure,
                                 java.util.function.Consumer<IrcHistoryLoadResult> onSuccess) {
+        runHistoryLoad(label, future, onFailure, onSuccess, false);
+    }
+
+    private void runHistoryLoad(String label, CompletableFuture<IrcHistoryLoadResult> future, Runnable onFailure,
+                                java.util.function.Consumer<IrcHistoryLoadResult> onSuccess, boolean keepBottom) {
         historyLoadInProgress = true;
+        historyLoadShouldKeepBottom = keepBottom;
         historyStatusLabel.setText("Loading " + label + "...");
         updateConnectionState(ircClient.getConnectionState());
 
         future.whenComplete((result, throwable) -> Platform.runLater(() -> {
             if (throwable != null) {
                 historyLoadInProgress = false;
+                historyLoadShouldKeepBottom = false;
                 updateConnectionState(ircClient.getConnectionState());
                 if (onFailure != null) {
                     onFailure.run();
@@ -682,6 +760,7 @@ public class IrcChatController implements Controller<BorderPane> {
 
             refreshChannelListOnly();
             historyLoadInProgress = false;
+            historyLoadShouldKeepBottom = false;
             updateConnectionState(ircClient.getConnectionState());
             String status = result.requestedSince() == null
                     ? String.format(Locale.ROOT, "Loaded %d recent IRC messages for %s.", result.loadedCount(), result.target())

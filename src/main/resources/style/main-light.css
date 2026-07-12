@@ -90,12 +90,137 @@
     -fx-text-fill: #9ea7b3;
 }
 
+.irc-shell {
+    -fx-background-color: linear-gradient(to bottom, #f5f8fc 0%, #eef3f8 100%);
+}
+
+.irc-top {
+    -fx-background-color: transparent;
+}
+
+.irc-hero,
+.irc-panel,
+.irc-composer {
+    -fx-background-color: rgba(255, 255, 255, 0.95);
+    -fx-background-radius: 8;
+    -fx-border-color: #d7e1ec;
+    -fx-border-radius: 8;
+    -fx-padding: 12;
+    -fx-effect: dropshadow(gaussian, rgba(31, 45, 61, 0.08), 18, 0.18, 0, 6);
+}
+
+.irc-hero {
+    -fx-padding: 10 12 10 12;
+}
+
+.irc-title {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #18212b;
+}
+
+.irc-section-title {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #3d4b5a;
+}
+
+.irc-status-block {
+    -fx-background-color: rgba(241, 246, 252, 0.95);
+    -fx-background-radius: 6;
+    -fx-padding: 6 8 6 8;
+}
+
+.irc-status-dot {
+    -fx-font-size: 18px;
+}
+
+.irc-status-label {
+    -fx-font-weight: bold;
+    -fx-text-fill: #18212b;
+}
+
+.irc-history-warning {
+    -fx-text-fill: #9b6a17;
+}
+
+.irc-panel .text-field,
+.irc-composer .text-field,
+.irc-panel .date-picker,
+.irc-panel .date-picker .text-field {
+    -fx-background-color: #f7fafe;
+    -fx-background-radius: 5;
+    -fx-border-color: #cfdbe8;
+    -fx-border-radius: 5;
+    -fx-text-fill: #1e2730;
+    -fx-prompt-text-fill: #7a8794;
+}
+
+.irc-panel .date-picker .arrow-button {
+    -fx-background-color: #e5edf6;
+    -fx-background-radius: 0 5 5 0;
+}
+
+.irc-panel .button,
+.irc-composer .button {
+    -fx-background-color: linear-gradient(to bottom, #f4f7fb, #e0e8f1);
+    -fx-background-radius: 5;
+    -fx-text-fill: #1f2933;
+    -fx-padding: 8 14 8 14;
+}
+
+#connectButton,
+#loadHistorySinceButton,
+#joinChannelButton,
+#sendMessageButton,
+#testMentionNotificationButton,
+#pmSelectedUserButton {
+    -fx-background-color: linear-gradient(to bottom, #5f8fd8, #3d6fb7);
+    -fx-text-fill: white;
+}
+
+#disconnectButton,
+#leaveChannelButton,
+#kickGameButton,
+#kickClientButton,
+#kickGameAndClientButton {
+    -fx-background-color: linear-gradient(to bottom, #e8edf3, #d9e0e8);
+}
+
+.irc-panel .list-view {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 4;
+    -fx-control-inner-background: #f7fafe;
+    -fx-background-radius: 4;
+}
+
+.irc-panel .list-view .scroll-bar:vertical {
+    -fx-scale-x: 1;
+    -fx-padding: 0;
+    -fx-opacity: 1;
+}
+
+.irc-panel .list-cell {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0;
+    -fx-padding: 8 10 8 10;
+}
+
+.irc-panel .list-cell:selected {
+    -fx-background-color: rgba(95, 143, 216, 0.22);
+}
+
 .irc-topic-label {
-    -fx-font-style: italic;
+    -fx-font-style: normal;
+    -fx-text-fill: #4d6788;
+    -fx-background-color: #eef4fb;
+    -fx-background-radius: 4;
+    -fx-padding: 8 10 8 10;
 }
 
 .irc-message-cell {
-    -fx-padding: 6 0 6 0;
+    -fx-padding: 6 2 6 2;
 }
 
 .irc-message-meta {

@@ -92,12 +92,136 @@
     -fx-text-fill: #9ea7b3;
 }
 
+.irc-shell {
+    -fx-background-color: linear-gradient(to bottom, #1b2129 0%, #151a20 100%);
+}
+
+.irc-top {
+    -fx-background-color: transparent;
+}
+
+.irc-hero,
+.irc-panel,
+.irc-composer {
+    -fx-background-color: rgba(35, 42, 52, 0.96);
+    -fx-background-radius: 8;
+    -fx-border-color: #313a47;
+    -fx-border-radius: 8;
+    -fx-padding: 12;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.22), 18, 0.18, 0, 6);
+}
+
+.irc-hero {
+    -fx-padding: 10 12 10 12;
+}
+
+.irc-title {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #f2f6fb;
+}
+
+.irc-section-title {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #d4dbe4;
+}
+
+.irc-status-block {
+    -fx-background-color: rgba(18, 23, 30, 0.85);
+    -fx-background-radius: 6;
+    -fx-padding: 6 8 6 8;
+}
+
+.irc-status-dot {
+    -fx-font-size: 18px;
+}
+
+.irc-status-label {
+    -fx-font-weight: bold;
+    -fx-text-fill: #f2f6fb;
+}
+
+.irc-history-warning {
+    -fx-text-fill: #dfbd78;
+}
+
+.irc-panel .text-field,
+.irc-composer .text-field,
+.irc-panel .date-picker,
+.irc-panel .date-picker .text-field {
+    -fx-background-color: #202731;
+    -fx-background-radius: 5;
+    -fx-border-color: #384252;
+    -fx-border-radius: 5;
+    -fx-text-fill: #edf2f8;
+    -fx-prompt-text-fill: #7f8b9a;
+}
+
+.irc-panel .date-picker .arrow-button {
+    -fx-background-color: #2d3744;
+    -fx-background-radius: 0 5 5 0;
+}
+
+.irc-panel .button,
+.irc-composer .button {
+    -fx-background-color: linear-gradient(to bottom, #425065, #333d4d);
+    -fx-background-radius: 5;
+    -fx-text-fill: #edf2f8;
+    -fx-padding: 8 14 8 14;
+}
+
+#connectButton,
+#loadHistorySinceButton,
+#joinChannelButton,
+#sendMessageButton,
+#testMentionNotificationButton,
+#pmSelectedUserButton {
+    -fx-background-color: linear-gradient(to bottom, #4c7dca, #315b9b);
+}
+
+#disconnectButton,
+#leaveChannelButton,
+#kickGameButton,
+#kickClientButton,
+#kickGameAndClientButton {
+    -fx-background-color: linear-gradient(to bottom, #5a6472, #414a57);
+}
+
+.irc-panel .list-view {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 4;
+    -fx-control-inner-background: #1a2028;
+    -fx-background-radius: 4;
+}
+
+.irc-panel .list-view .scroll-bar:vertical {
+    -fx-scale-x: 1;
+    -fx-padding: 0;
+    -fx-opacity: 1;
+}
+
+.irc-panel .list-cell {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0;
+    -fx-padding: 8 10 8 10;
+}
+
+.irc-panel .list-cell:selected {
+    -fx-background-color: rgba(58, 101, 171, 0.85);
+}
+
 .irc-topic-label {
-    -fx-font-style: italic;
+    -fx-font-style: normal;
+    -fx-text-fill: #a9c0de;
+    -fx-background-color: rgba(23, 29, 37, 0.9);
+    -fx-background-radius: 4;
+    -fx-padding: 8 10 8 10;
 }
 
 .irc-message-cell {
-    -fx-padding: 6 0 6 0;
+    -fx-padding: 6 2 6 2;
 }
 
 .irc-message-meta {
