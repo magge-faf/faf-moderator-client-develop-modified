@@ -492,10 +492,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         ButtonType nextStartButtonType = new ButtonType("Show At Next Start", ButtonBar.ButtonData.LEFT);
         ButtonType remindLaterButtonType = new ButtonType("Remind Me Later", ButtonBar.ButtonData.CANCEL_CLOSE);
 
-        if (autoUpdateAvailable) {
-            dialog.getDialogPane().getButtonTypes().add(updateButtonType);
-        }
-        dialog.getDialogPane().getButtonTypes().addAll(nextStartButtonType, remindLaterButtonType);
+        dialog.getDialogPane().getButtonTypes().addAll(updateButtonType, remindLaterButtonType, nextStartButtonType);
 
         Label message = new Label(
                 "You are running " + ApplicationVersion.CURRENT_VERSION + ".\n" +
@@ -519,7 +516,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         VBox content = new VBox(12, message, reminderBox, new HBox(8, changelogButton, downloadButton));
         if (!autoUpdateAvailable) {
             Label autoUpdateInfo = new Label(
-                    "Automatic in-app update is only available when the client is started from an unpacked release folder."
+                    "Self-update is only available from an unpacked release install with the normal bin/lib folder layout."
             );
             autoUpdateInfo.setWrapText(true);
             content.getChildren().add(autoUpdateInfo);
@@ -530,6 +527,10 @@ public class MainController implements Controller<TabPane>, DisposableBean {
 
         ButtonType result = dialog.showAndWait().orElse(remindLaterButtonType);
         if (result == updateButtonType) {
+            if (!autoUpdateAvailable) {
+                showAutomaticUpdateUnavailable(release, matchingAsset.isPresent());
+                return;
+            }
             startAutomaticUpdate(release);
             return;
         }
@@ -540,6 +541,26 @@ public class MainController implements Controller<TabPane>, DisposableBean {
             localPreferences.getVersionReminder().scheduleAfterDays(release.tagName(), reminderDaysSpinner.getValue());
         }
         localPreferencesReaderWriter.write(localPreferences);
+    }
+
+    private void showAutomaticUpdateUnavailable(GithubRelease release, boolean hasMatchingAsset) {
+        String detail;
+        if (!hasMatchingAsset) {
+            detail = "No compatible downloadable release zip was found for this platform in "
+                    + release.displayName() + ".";
+        } else {
+            detail = "This run does not look like a packaged release install.\n\n"
+                    + "Self-update currently only works when the client was started from an unpacked release folder "
+                    + "that contains the normal bin/ and lib/ directories.\n\n"
+                    + "If you started the app from source, IntelliJ, Gradle, or some custom layout, use Direct Download instead.";
+        }
+
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Self-Update Unavailable");
+        alert.setHeaderText("Backup + Update + Restart is not available here");
+        alert.setContentText(detail);
+        applyDialogStyles(alert.getDialogPane());
+        alert.showAndWait();
     }
 
     private void startAutomaticUpdate(GithubRelease release) {
