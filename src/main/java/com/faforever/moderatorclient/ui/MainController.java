@@ -9,11 +9,13 @@ import com.faforever.moderatorclient.api.event.FafApiFailGetEvent;
 import com.faforever.moderatorclient.api.event.FafApiFailModifyEvent;
 import com.faforever.moderatorclient.api.event.FafUserFailModifyEvent;
 import com.faforever.moderatorclient.api.event.TokenExpiredEvent;
+import com.faforever.moderatorclient.config.ApplicationPaths;
 import com.faforever.moderatorclient.config.ApplicationProperties;
 import com.faforever.moderatorclient.config.ApplicationVersion;
 import com.faforever.moderatorclient.config.EnvironmentProperties;
 import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.config.local.LocalPreferencesReaderWriter;
+import com.faforever.moderatorclient.replay.ReplayStorageService;
 import com.faforever.moderatorclient.update.ApplicationUpdateService;
 import com.faforever.moderatorclient.update.GithubRelease;
 import com.faforever.moderatorclient.update.GithubReleaseAsset;
@@ -69,6 +71,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     private final UiService uiService;
     private final PlatformService platformService;
     private final ApplicationUpdateService applicationUpdateService;
+    private final ReplayStorageService replayStorageService;
     public TabPane root;
     public Tab userManagementTab;
     public Tab matchmakerMapPoolTab;
@@ -117,7 +120,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     private final Map<Tab, Boolean> dataLoadingState = new HashMap<>();
 
     private final FafApiCommunicationService communicationService;
-    public static final String CONFIGURATION_FOLDER = "data";
+    public static final String CONFIGURATION_FOLDER = ApplicationPaths.CONFIGURATION_DIRECTORY_NAME;
 
     @Override
     public TabPane getRoot() {
@@ -135,6 +138,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     }
 
     private void initializeAfterLogin() {
+        replayStorageService.purgeReplayFilesIfEnabled();
         initUserManagementTab();
         initMatchmakerMapPoolTab();
         initMapVaultTab();

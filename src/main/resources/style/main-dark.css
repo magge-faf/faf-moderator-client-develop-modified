@@ -171,6 +171,13 @@
     -fx-padding: 8 14 8 14;
 }
 
+#chooseUpdateBackupFolderButton {
+    -fx-background-color: linear-gradient(to bottom, #4c7dca, #315b9b);
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-padding: 8 16 8 16;
+}
+
 #connectButton,
 #loadHistorySinceButton,
 #joinChannelButton,

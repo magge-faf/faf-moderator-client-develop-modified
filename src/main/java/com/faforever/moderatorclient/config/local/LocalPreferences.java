@@ -332,6 +332,11 @@ public class LocalPreferences {
         boolean rememberLoginCheckBox = true;
         boolean darkModeCheckBox = true;
         boolean fetchBansOnStartupCheckBox = false;
+        boolean autoBackupConfigurationFolderOnSaveCheckBox = true;
+        boolean autoPurgeTempReplaysOlderThanOneDayCheckBox = true;
+
+        // Numeric settings
+        int updateBackupAutoPurgeDays = 30;
 
         // TitledPanes
 

@@ -1,7 +1,9 @@
 package com.faforever.moderatorclient.ui.main_window;
 
+import com.faforever.moderatorclient.config.ApplicationPaths;
 import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.config.local.LocalPreferencesReaderWriter;
+import com.faforever.moderatorclient.replay.ReplayStorageService;
 import com.faforever.moderatorclient.update.ApplicationUpdateService;
 import com.faforever.moderatorclient.ui.Controller;
 import com.faforever.moderatorclient.ui.MainController;
@@ -21,6 +23,7 @@ import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -33,6 +36,7 @@ public class SettingsController implements Controller<Pane> {
     private final LocalPreferences localPreferences;
     private final MainController mainController;
     private final ApplicationUpdateService applicationUpdateService;
+    private final ReplayStorageService replayStorageService;
 
     public VBox root;
     @FXML
@@ -54,7 +58,27 @@ public class SettingsController implements Controller<Pane> {
     @FXML
     public CheckBox ircDebugTrafficCheckBox;
     @FXML
+    public CheckBox autoBackupConfigurationFolderOnSaveCheckBox;
+    @FXML
+    public Label configurationFolderInfoLabel;
+    @FXML
+    public Label configurationBackupStatusLabel;
+    @FXML
+    public CheckBox autoPurgeTempReplaysOlderThanOneDayCheckBox;
+    @FXML
+    public Label replayFolderInfoLabel;
+    @FXML
+    public Label replayFolderStatusLabel;
+    @FXML
     public TextField updateBackupFolderTextField;
+    @FXML
+    public Label updateBackupFolderInfoLabel;
+    @FXML
+    public Label updateBackupFolderStatusLabel;
+    @FXML
+    public Label updateBackupFolderDefaultLabel;
+    @FXML
+    public Spinner<Integer> updateBackupAutoPurgeDaysSpinner;
 
     private String defaultUpdateBackupFolder;
 
@@ -92,6 +116,12 @@ public class SettingsController implements Controller<Pane> {
         ircDebugTrafficCheckBox.setSelected(localPreferences.getTabIrcChat().isDebugTraffic());
         ircDebugTrafficCheckBox.selectedProperty().addListener((obs, oldVal, newVal) ->
                 localPreferences.getTabIrcChat().setDebugTraffic(newVal));
+        autoBackupConfigurationFolderOnSaveCheckBox.setSelected(
+                localPreferences.getTabSettings().isAutoBackupConfigurationFolderOnSaveCheckBox()
+        );
+        autoPurgeTempReplaysOlderThanOneDayCheckBox.setSelected(
+                localPreferences.getTabSettings().isAutoPurgeTempReplaysOlderThanOneDayCheckBox()
+        );
 
         defaultUpdateBackupFolder = applicationUpdateService.resolveDefaultBackupDirectory().toString();
         String configuredBackupFolder = localPreferences.getTabSettings().getUpdateBackupFolder();
@@ -101,6 +131,33 @@ public class SettingsController implements Controller<Pane> {
                         : configuredBackupFolder
         );
         updateBackupFolderTextField.setPromptText(defaultUpdateBackupFolder);
+        updateBackupAutoPurgeDaysSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(
+                0,
+                3650,
+                Math.max(0, localPreferences.getTabSettings().getUpdateBackupAutoPurgeDays())
+        ));
+        updateBackupAutoPurgeDaysSpinner.setEditable(true);
+        updateBackupFolderTextField.textProperty().addListener((obs, oldVal, newVal) -> refreshUpdateBackupFolderInfo());
+        configurationFolderInfoLabel.setText(String.format(
+                Locale.ROOT,
+                "App data folder: %s. Older installs may still have %s; move files manually if you still need them.",
+                ApplicationPaths.resolveConfigurationDirectory(),
+                ApplicationPaths.resolveLegacyConfigurationDirectory().getFileName()
+        ));
+        replayFolderInfoLabel.setText(String.format(
+                Locale.ROOT,
+                "Replay folder: %s. All replay downloads and temp replay files are stored here.",
+                replayStorageService.resolveReplayDirectory()
+        ));
+        updateBackupFolderDefaultLabel.setText(String.format(
+                Locale.ROOT,
+                "Use Default = %s. The root path is the folder where the software was started.",
+                defaultUpdateBackupFolder
+        ));
+        configurationBackupStatusLabel.setText("");
+        replayFolderStatusLabel.setText("");
+        refreshUpdateBackupFolderInfo();
+        refreshReplayFolderInfo();
 
         if (browserComboBox.getValue() == null) {
             browserComboBox.setValue(localPreferences.getUi().getBrowserComboBox());
@@ -297,15 +354,12 @@ public class SettingsController implements Controller<Pane> {
     }
 
     public void onOpenConfigurationFolder() {
-        File folder = new File(CONFIGURATION_FOLDER);
-        if (folder.exists() && folder.isDirectory()) {
-            try {
-                openPath(folder);
-            } catch (IOException e) {
-                log.error("Failed to open configuration folder", e);
-            }
-        } else {
-            log.warn("Configuration folder does not exist or is invalid: {}", folder.getAbsolutePath());
+        File folder = ApplicationPaths.resolveConfigurationDirectory().toFile();
+        try {
+            Files.createDirectories(folder.toPath());
+            openPath(folder);
+        } catch (IOException e) {
+            log.error("Failed to open configuration folder", e);
         }
     }
 
@@ -335,6 +389,7 @@ public class SettingsController implements Controller<Pane> {
 
     public void onUseDefaultUpdateBackupFolder() {
         updateBackupFolderTextField.setText(defaultUpdateBackupFolder);
+        refreshUpdateBackupFolderInfo();
     }
 
     public void onOpenUpdateBackupFolder() {
@@ -345,6 +400,34 @@ public class SettingsController implements Controller<Pane> {
             openPath(folder.toFile());
         } catch (IOException e) {
             log.error("Failed to open update backup folder", e);
+        }
+    }
+
+    public void onRefreshUpdateBackupFolderInfo() {
+        refreshUpdateBackupFolderInfo();
+    }
+
+    public void onPurgeOldUpdateBackups() {
+        int days = currentAutoPurgeDays();
+        if (days <= 0) {
+            updateBackupFolderStatusLabel.setText("Set auto purge days above 0 before running a manual purge.");
+            return;
+        }
+
+        try {
+            persistBackupFolderPreference(false);
+            ApplicationUpdateService.BackupPurgeResult result = applicationUpdateService.purgeBackupFilesOlderThan(days);
+            updateBackupFolderStatusLabel.setText(String.format(
+                    Locale.ROOT,
+                    "Purged %d old log files older than %d days and freed %.2f MB.",
+                    result.deletedFileCount(),
+                    result.ageDays(),
+                    bytesToMegabytes(result.deletedBytes())
+            ));
+            refreshUpdateBackupFolderInfo();
+        } catch (IOException e) {
+            updateBackupFolderStatusLabel.setText("Failed to purge old logs: " + e.getMessage());
+            log.error("Failed to purge update backup folder", e);
         }
     }
 
@@ -359,17 +442,52 @@ public class SettingsController implements Controller<Pane> {
     }
 
     public void onOpenPathToUserSettings() {
-        String path = System.getProperty("user.home") + File.separator + "AppData" + File.separator + "Roaming" + File.separator + "Mordor";
-        File directory = new File(path);
+        File directory = ApplicationPaths.resolveWorkingDirectory().toFile();
+        try {
+            openPath(directory);
+        } catch (IOException e) {
+            log.error("Failed to open application root {}", directory, e);
+        }
+    }
 
-        if (directory.exists() && directory.isDirectory()) {
-            try {
-                openPath(directory);
-            } catch (IOException e) {
-                log.error("Failed to open directory {}", path, e);
-            }
-        } else {
-            log.info("Directory does not exist: {}", path);
+    public void onBackupConfigurationFolderNow() {
+        try {
+            persistBackupFolderPreference(false);
+            Path backupArchive = applicationUpdateService.createConfigurationBackupArchive();
+            configurationBackupStatusLabel.setText("Backed up app data folder to " + backupArchive);
+        } catch (IOException e) {
+            configurationBackupStatusLabel.setText("Failed to back up app data folder: " + e.getMessage());
+            log.error("Failed to back up configuration folder", e);
+        }
+    }
+
+    public void onOpenReplayFolder() {
+        try {
+            replayStorageService.ensureReplayDirectoryExists();
+            openPath(replayStorageService.resolveReplayDirectory().toFile());
+        } catch (IOException e) {
+            replayFolderStatusLabel.setText("Failed to open replay folder: " + e.getMessage());
+            log.error("Failed to open replay folder", e);
+        }
+    }
+
+    public void onRefreshReplayFolderInfo() {
+        refreshReplayFolderInfo();
+    }
+
+    public void onPurgeOldReplayFiles() {
+        try {
+            ReplayStorageService.ReplayCleanupResult result = replayStorageService.purgeReplayFilesOlderThanOneDay();
+            replayFolderStatusLabel.setText(String.format(
+                    Locale.ROOT,
+                    "Purged %d replay files older than 1 day and freed %.2f MB.",
+                    result.deletedFileCount(),
+                    bytesToMegabytes(result.deletedBytes())
+            ));
+            refreshReplayFolderInfo();
+        } catch (IOException e) {
+            replayFolderStatusLabel.setText("Failed to purge replay files: " + e.getMessage());
+            log.error("Failed to purge replay folder", e);
         }
     }
 
@@ -395,13 +513,14 @@ public class SettingsController implements Controller<Pane> {
         localPreferences.getUi().setDarkMode(darkModeCheckBox.isSelected());
 
         localPreferences.getTabSettings().setFetchBansOnStartupCheckBox(fetchBansOnStartupCheckBox.isSelected());
+        localPreferences.getTabSettings().setAutoBackupConfigurationFolderOnSaveCheckBox(
+                autoBackupConfigurationFolderOnSaveCheckBox.isSelected()
+        );
+        localPreferences.getTabSettings().setAutoPurgeTempReplaysOlderThanOneDayCheckBox(
+                autoPurgeTempReplaysOlderThanOneDayCheckBox.isSelected()
+        );
         localPreferences.getTabIrcChat().setDebugTraffic(ircDebugTrafficCheckBox.isSelected());
-        String backupFolder = updateBackupFolderTextField.getText() == null ? "" : updateBackupFolderTextField.getText().trim();
-        if (backupFolder.isBlank() || backupFolder.equals(defaultUpdateBackupFolder)) {
-            localPreferences.getTabSettings().setUpdateBackupFolder("");
-        } else {
-            localPreferences.getTabSettings().setUpdateBackupFolder(Path.of(backupFolder).toAbsolutePath().normalize().toString());
-        }
+        persistBackupFolderPreference(true);
 
         Tab selectedTab = defaultActiveTabComboBox.getSelectionModel().getSelectedItem();
         if (selectedTab != null) {
@@ -409,6 +528,15 @@ public class SettingsController implements Controller<Pane> {
         }
 
         localPreferencesReaderWriter.write(localPreferences);
+        if (autoBackupConfigurationFolderOnSaveCheckBox.isSelected()) {
+            try {
+                Path backupArchive = applicationUpdateService.createConfigurationBackupArchive();
+                configurationBackupStatusLabel.setText("Auto-backed up app data folder to " + backupArchive);
+            } catch (IOException e) {
+                configurationBackupStatusLabel.setText("Auto-backup failed: " + e.getMessage());
+                log.error("Failed to auto-back up configuration folder", e);
+            }
+        }
         Scene scene = root.getScene();
         String styleSheet = darkModeCheckBox.isSelected() ? "/style/main-dark.css" : "/style/main-light.css";
 
@@ -426,6 +554,69 @@ public class SettingsController implements Controller<Pane> {
         } catch (Exception e) {
             log.debug("Ignoring invalid backup folder path: {}", value, e);
             return null;
+        }
+    }
+
+    private void persistBackupFolderPreference(boolean refreshInfo) {
+        String backupFolder = updateBackupFolderTextField.getText() == null ? "" : updateBackupFolderTextField.getText().trim();
+        if (backupFolder.isBlank() || backupFolder.equals(defaultUpdateBackupFolder)) {
+            localPreferences.getTabSettings().setUpdateBackupFolder("");
+        } else {
+            localPreferences.getTabSettings().setUpdateBackupFolder(Path.of(backupFolder).toAbsolutePath().normalize().toString());
+        }
+        localPreferences.getTabSettings().setUpdateBackupAutoPurgeDays(currentAutoPurgeDays());
+        if (refreshInfo) {
+            refreshUpdateBackupFolderInfo();
+        }
+    }
+
+    private int currentAutoPurgeDays() {
+        SpinnerValueFactory<Integer> valueFactory = updateBackupAutoPurgeDaysSpinner.getValueFactory();
+        return valueFactory == null || valueFactory.getValue() == null ? 0 : Math.max(0, valueFactory.getValue());
+    }
+
+    private void refreshUpdateBackupFolderInfo() {
+        try {
+            persistBackupFolderPreference(false);
+            ApplicationUpdateService.BackupFolderStats stats = applicationUpdateService.describeBackupFolder();
+            updateBackupFolderInfoLabel.setText(String.format(
+                    Locale.ROOT,
+                    "Stored logs: %.2f MB across %d files in %s",
+                    bytesToMegabytes(stats.totalBytes()),
+                    stats.fileCount(),
+                    stats.directory()
+            ));
+            if (updateBackupFolderStatusLabel.getText() == null) {
+                updateBackupFolderStatusLabel.setText("");
+            }
+        } catch (Exception e) {
+            updateBackupFolderInfoLabel.setText("Stored logs: unavailable");
+            updateBackupFolderStatusLabel.setText("Unable to inspect log folder: " + e.getMessage());
+            log.error("Failed to refresh update backup folder info", e);
+        }
+    }
+
+    private double bytesToMegabytes(long bytes) {
+        return bytes / (1024d * 1024d);
+    }
+
+    private void refreshReplayFolderInfo() {
+        try {
+            ReplayStorageService.ReplayFolderStats stats = replayStorageService.describeReplayFolder();
+            replayFolderInfoLabel.setText(String.format(
+                    Locale.ROOT,
+                    "Replay folder: %s. Stored replays: %.2f MB across %d files.",
+                    stats.directory(),
+                    bytesToMegabytes(stats.totalBytes()),
+                    stats.fileCount()
+            ));
+            if (replayFolderStatusLabel.getText() == null) {
+                replayFolderStatusLabel.setText("");
+            }
+        } catch (IOException e) {
+            replayFolderInfoLabel.setText("Replay folder: unavailable");
+            replayFolderStatusLabel.setText("Unable to inspect replay folder: " + e.getMessage());
+            log.error("Failed to refresh replay folder info", e);
         }
     }
 }

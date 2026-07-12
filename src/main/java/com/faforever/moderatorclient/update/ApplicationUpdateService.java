@@ -1,6 +1,7 @@
 package com.faforever.moderatorclient.update;
 
 import com.faforever.moderatorclient.Launcher;
+import com.faforever.moderatorclient.config.ApplicationPaths;
 import com.faforever.moderatorclient.config.ApplicationVersion;
 import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,7 +18,9 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -106,8 +109,82 @@ public class ApplicationUpdateService {
 
     public Path resolveDefaultBackupDirectory() {
         return resolveInstallLocation()
-                .map(InstallLocation::installRoot)
-                .orElseGet(() -> Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize());
+                .map(installLocation -> installLocation.installRoot().resolve("logs"))
+                .orElseGet(() -> Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize().resolve("logs"));
+    }
+
+    public Path resolveConfiguredBackupDirectory() {
+        String configuredDirectory = blankToNull(localPreferences.getTabSettings().getUpdateBackupFolder());
+        if (configuredDirectory == null) {
+            return resolveDefaultBackupDirectory();
+        }
+        return Path.of(configuredDirectory).toAbsolutePath().normalize();
+    }
+
+    public BackupFolderStats describeBackupFolder() throws IOException {
+        Path backupDir = resolveConfiguredBackupDirectory();
+        if (!Files.isDirectory(backupDir)) {
+            return new BackupFolderStats(backupDir, 0L, 0L);
+        }
+
+        try (var paths = Files.walk(backupDir)) {
+            long[] totals = paths
+                    .filter(Files::isRegularFile)
+                    .map(path -> {
+                        try {
+                            return new long[]{1L, Files.size(path)};
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    })
+                    .reduce(new long[]{0L, 0L}, (left, right) -> new long[]{left[0] + right[0], left[1] + right[1]});
+            return new BackupFolderStats(backupDir, totals[0], totals[1]);
+        } catch (RuntimeException e) {
+            if (e.getCause() instanceof IOException ioException) {
+                throw ioException;
+            }
+            throw e;
+        }
+    }
+
+    public BackupPurgeResult purgeBackupFilesOlderThan(int days) throws IOException {
+        Path backupDir = resolveConfiguredBackupDirectory();
+        if (days <= 0 || !Files.isDirectory(backupDir)) {
+            return new BackupPurgeResult(backupDir, days, 0L, 0L);
+        }
+
+        Instant cutoff = Instant.now().minus(Duration.ofDays(days));
+        List<Path> pathsToDelete;
+        try (var paths = Files.walk(backupDir)) {
+            pathsToDelete = paths
+                    .filter(Files::isRegularFile)
+                    .filter(path -> isOlderThan(path, cutoff))
+                    .toList();
+        }
+
+        long deletedFiles = 0L;
+        long deletedBytes = 0L;
+        for (Path path : pathsToDelete) {
+            long size = Files.size(path);
+            Files.deleteIfExists(path);
+            deletedFiles++;
+            deletedBytes += size;
+        }
+
+        return new BackupPurgeResult(backupDir, days, deletedFiles, deletedBytes);
+    }
+
+    public Path createConfigurationBackupArchive() throws IOException {
+        Path configurationDirectory = ApplicationPaths.resolveConfigurationDirectory();
+        Files.createDirectories(configurationDirectory);
+
+        Path backupDir = resolveConfiguredBackupDirectory();
+        Files.createDirectories(backupDir);
+        purgeConfiguredBackupFilesIfEnabled();
+
+        Path backupArchive = backupDir.resolve("config-backup-" + BACKUP_TIMESTAMP.format(LocalDateTime.now()) + ".zip");
+        zipDirectory(configurationDirectory, backupArchive);
+        return backupArchive;
     }
 
     public void prepareUpdateAndLaunchInstaller(GithubRelease release, Consumer<String> statusCallback)
@@ -260,6 +337,7 @@ public class ApplicationUpdateService {
     private Path createBackupArchivePath(Path installRoot) throws IOException {
         Path backupDir = resolveConfiguredBackupDirectory();
         Files.createDirectories(backupDir);
+        purgeConfiguredBackupFilesIfEnabled();
 
         String installName = installRoot.getFileName() == null ? "faf-moderator-client" : installRoot.getFileName().toString();
         String backupName = installName + "-" + normalizeVersion(ApplicationVersion.CURRENT_VERSION) + "-"
@@ -267,18 +345,11 @@ public class ApplicationUpdateService {
         return backupDir.resolve(backupName);
     }
 
-    private Path resolveConfiguredBackupDirectory() {
-        String configuredDirectory = blankToNull(localPreferences.getTabSettings().getUpdateBackupFolder());
-        if (configuredDirectory == null) {
-            return resolveDefaultBackupDirectory();
-        }
-        return Path.of(configuredDirectory).toAbsolutePath().normalize();
-    }
-
     private void zipDirectory(Path sourceDirectory, Path zipPath) throws IOException {
         try (ZipOutputStream zipOutputStream = new ZipOutputStream(Files.newOutputStream(zipPath))) {
             Files.walk(sourceDirectory)
                     .filter(Files::isRegularFile)
+                    .filter(path -> !path.toAbsolutePath().normalize().equals(zipPath.toAbsolutePath().normalize()))
                     .forEach(path -> {
                         Path relativePath = sourceDirectory.relativize(path);
                         ZipEntry entry = new ZipEntry(relativePath.toString().replace('\\', '/'));
@@ -463,6 +534,34 @@ public class ApplicationUpdateService {
         return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
     }
 
+    private void purgeConfiguredBackupFilesIfEnabled() {
+        int retentionDays = localPreferences.getTabSettings().getUpdateBackupAutoPurgeDays();
+        if (retentionDays <= 0) {
+            return;
+        }
+        try {
+            BackupPurgeResult result = purgeBackupFilesOlderThan(retentionDays);
+            if (result.deletedFileCount() > 0) {
+                log.info("Auto-purged {} update archive files ({} bytes) older than {} days from {}",
+                        result.deletedFileCount(),
+                        result.deletedBytes(),
+                        result.ageDays(),
+                        result.directory());
+            }
+        } catch (IOException e) {
+            log.warn("Failed to auto-purge update archives from {}", resolveConfiguredBackupDirectory(), e);
+        }
+    }
+
+    private boolean isOlderThan(Path path, Instant cutoff) {
+        try {
+            FileTime lastModifiedTime = Files.getLastModifiedTime(path);
+            return lastModifiedTime.toInstant().isBefore(cutoff);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value;
     }
@@ -482,5 +581,11 @@ public class ApplicationUpdateService {
     }
 
     private record InstallLocation(Path installRoot, Path launcherScript) {
+    }
+
+    public record BackupFolderStats(Path directory, long fileCount, long totalBytes) {
+    }
+
+    public record BackupPurgeResult(Path directory, int ageDays, long deletedFileCount, long deletedBytes) {
     }
 }

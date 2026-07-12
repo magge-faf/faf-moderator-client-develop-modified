@@ -15,6 +15,7 @@ import com.faforever.moderatorclient.api.domain.BanService;
 import com.faforever.moderatorclient.api.domain.ModerationReportService;
 import com.faforever.moderatorclient.api.domain.UserService;
 import com.faforever.moderatorclient.config.TemplateAndReasonConfig;
+import com.faforever.moderatorclient.replay.ReplayStorageService;
 import com.faforever.moderatorclient.ui.*;
 import com.faforever.moderatorclient.ui.domain.BanInfoFX;
 import com.faforever.moderatorclient.ui.domain.GameFX;
@@ -125,6 +126,7 @@ public class ModerationReportController implements Controller<Region> {
             .build();
     private final BanService banService;
     private final UserService userService;
+    private final ReplayStorageService replayStorageService;
     public Button createReportForumButton;
     public TableColumn lastActivity;
     @FXML
@@ -272,7 +274,7 @@ public class ModerationReportController implements Controller<Region> {
         String replayUrl = String.format(replayDownLoadFormat, replayId);
         Path tempFilePath = null;
         try {
-            tempFilePath = Files.createTempFile("faf_replay_", ".fafreplay");
+            tempFilePath = replayStorageService.resolveReplayFile(Integer.parseInt(replayId));
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(replayUrl))
@@ -1629,7 +1631,7 @@ public class ModerationReportController implements Controller<Region> {
 
     private Path createTempFile(GameFX game) {
         try {
-            return Files.createTempFile(format("faf_replay_" + game.getId()), "");
+            return replayStorageService.createTemporaryReplayFile("analysis-" + game.getId() + "-");
         } catch (IOException e) {
             log.error("An error occurred while creating a temporary file.", e);
             return null;

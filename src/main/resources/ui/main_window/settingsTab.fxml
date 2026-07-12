@@ -41,35 +41,70 @@
             <Separator/>
 
             <VBox spacing="5">
-                <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="IRC"/>
-                <CheckBox fx:id="ircDebugTrafficCheckBox" mnemonicParsing="false" text="Debug raw IRC traffic"/>
+                <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="App Data"/>
+                <Label fx:id="configurationFolderInfoLabel" wrapText="true"/>
+                <HBox spacing="10">
+                    <Button fx:id="openConfigurationFolderButton" mnemonicParsing="false"
+                            onAction="#onOpenConfigurationFolder" text="Open App Data Folder"/>
+                    <Button fx:id="openPathToUserSettings" mnemonicParsing="false"
+                            onAction="#onOpenPathToUserSettings" text="Open App Root Folder"/>
+                    <Button fx:id="openAiPromptButton" mnemonicParsing="false" onAction="#onOpenAiPromptButton"
+                            text="View AI Prompt"/>
+                </HBox>
+                <CheckBox fx:id="autoBackupConfigurationFolderOnSaveCheckBox" mnemonicParsing="false"
+                          text="Automatically back up the app data folder when settings are saved"/>
+                <HBox spacing="10">
+                    <Button mnemonicParsing="false" onAction="#onBackupConfigurationFolderNow" text="Back Up App Data Now"/>
+                </HBox>
+                <Label fx:id="configurationBackupStatusLabel" text="" wrapText="true"/>
             </VBox>
 
             <Separator/>
 
             <VBox spacing="5">
-                <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="Misc"/>
+                <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="Replay Folder"/>
+                <Label fx:id="replayFolderInfoLabel" wrapText="true"/>
+                <CheckBox fx:id="autoPurgeTempReplaysOlderThanOneDayCheckBox" mnemonicParsing="false"
+                          text="Automatically remove temp replay files older than 1 day"/>
                 <HBox spacing="10">
-                    <Button fx:id="openConfigurationFolderButton" mnemonicParsing="false"
-                            onAction="#onOpenConfigurationFolder" text="Open Config Folder"/>
-                    <Button fx:id="openPathToUserSettings" mnemonicParsing="false"
-                            onAction="#onOpenPathToUserSettings" text="Open User Settings Folder"/>
-                    <Button fx:id="openAiPromptButton" mnemonicParsing="false" onAction="#onOpenAiPromptButton"
-                            text="View AI Prompt"/>
+                    <Button mnemonicParsing="false" onAction="#onOpenReplayFolder" text="Open Replay Folder"/>
+                    <Button mnemonicParsing="false" onAction="#onRefreshReplayFolderInfo" text="Refresh Size"/>
+                    <Button mnemonicParsing="false" onAction="#onPurgeOldReplayFiles" text="Purge Old Replays Now"/>
                 </HBox>
+                <Label fx:id="replayFolderStatusLabel" text="" wrapText="true"/>
             </VBox>
 
             <Separator/>
 
             <VBox spacing="5">
                 <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="Update Backups"/>
-                <Label text="Backup folder for automatic updates (.zip files). Default: install root." wrapText="true"/>
-                <TextField fx:id="updateBackupFolderTextField" promptText="Install root"/>
+                <Label text="Backup folder for automatic updates and app data archives. Default: app root / logs." wrapText="true"/>
+                <TextField fx:id="updateBackupFolderTextField" promptText="App root / logs"/>
                 <HBox spacing="10">
-                    <Button mnemonicParsing="false" onAction="#onChooseUpdateBackupFolder" text="Browse..."/>
+                    <Button fx:id="chooseUpdateBackupFolderButton" mnemonicParsing="false"
+                            onAction="#onChooseUpdateBackupFolder" text="Browse..."/>
                     <Button mnemonicParsing="false" onAction="#onUseDefaultUpdateBackupFolder" text="Use Default"/>
                     <Button mnemonicParsing="false" onAction="#onOpenUpdateBackupFolder" text="Open Folder"/>
                 </HBox>
+                <Label fx:id="updateBackupFolderDefaultLabel" text="" wrapText="true"/>
+                <Label fx:id="updateBackupFolderInfoLabel" text="Stored logs: 0.00 MB across 0 files." wrapText="true"/>
+                <HBox alignment="CENTER_LEFT" spacing="10">
+                    <Label text="Auto purge logs older than"/>
+                    <Spinner fx:id="updateBackupAutoPurgeDaysSpinner" editable="true" prefWidth="90.0"/>
+                    <Label text="days (0 disables)"/>
+                </HBox>
+                <HBox spacing="10">
+                    <Button mnemonicParsing="false" onAction="#onRefreshUpdateBackupFolderInfo" text="Refresh Size"/>
+                    <Button mnemonicParsing="false" onAction="#onPurgeOldUpdateBackups" text="Purge Older Logs Now"/>
+                </HBox>
+                <Label fx:id="updateBackupFolderStatusLabel" text="" wrapText="true"/>
+            </VBox>
+
+            <Separator/>
+
+            <VBox spacing="5">
+                <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="Debug"/>
+                <CheckBox fx:id="ircDebugTrafficCheckBox" mnemonicParsing="false" text="Debug raw IRC traffic"/>
             </VBox>
 
             <Separator/>
