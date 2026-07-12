@@ -3,6 +3,8 @@ package com.faforever.moderatorclient.config.local;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
+import java.util.concurrent.TimeUnit;
+
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
@@ -41,5 +43,17 @@ class LocalPreferencesTest {
                 localPreferences.getAutoLogin().setRefreshToken(null);
             }
         }
+    }
+
+    @Test
+    void legacyVersionReminderTimestampStillMapsToDeferredReminderWindow() throws Exception {
+        LocalPreferences localPreferences = objectMapper.readValue(
+                "{\"versionReminder\":{\"lastReminderEpoch\":1000}}",
+                LocalPreferences.class);
+
+        assertThat(
+                localPreferences.getVersionReminder().getEffectiveNextReminderEpoch(),
+                is(1000L + TimeUnit.DAYS.toMillis(3))
+        );
     }
 }

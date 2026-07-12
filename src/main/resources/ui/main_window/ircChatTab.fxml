@@ -12,6 +12,7 @@
 <?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.Priority?>
+<?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
 
 <BorderPane xmlns="http://javafx.com/javafx/8.0.171" xmlns:fx="http://javafx.com/fxml/1"
@@ -45,10 +46,13 @@
                         <HBox alignment="CENTER_LEFT" spacing="8.0">
                             <children>
                                 <Label text="Session" styleClass="irc-section-title"/>
-                                <TextField fx:id="nicknameField" editable="false" promptText="Moderator nickname" HBox.hgrow="ALWAYS"/>
+                                <TextField fx:id="nicknameField" editable="false" promptText="Moderator nickname"
+                                           prefWidth="220.0" maxWidth="260.0"/>
                                 <Button fx:id="connectButton" mnemonicParsing="false" onAction="#connect" text="Connect"/>
                                 <Button fx:id="disconnectButton" mnemonicParsing="false" onAction="#disconnect" text="Disconnect"/>
-                                <TextField fx:id="joinChannelField" promptText="#aeolus" prefWidth="140.0"/>
+                                <Region HBox.hgrow="ALWAYS"/>
+                                <Label text="Channel" styleClass="irc-section-title"/>
+                                <TextField fx:id="joinChannelField" promptText="#aeolus" prefWidth="130.0"/>
                                 <Button fx:id="joinChannelButton" mnemonicParsing="false" onAction="#joinChannel" text="Join"/>
                                 <Button fx:id="leaveChannelButton" mnemonicParsing="false" onAction="#leaveSelectedChannel" text="Leave"/>
                             </children>

@@ -14,18 +14,30 @@ import com.faforever.moderatorclient.config.ApplicationVersion;
 import com.faforever.moderatorclient.config.EnvironmentProperties;
 import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.config.local.LocalPreferencesReaderWriter;
+import com.faforever.moderatorclient.update.ApplicationUpdateService;
+import com.faforever.moderatorclient.update.GithubRelease;
+import com.faforever.moderatorclient.update.GithubReleaseAsset;
 import com.faforever.moderatorclient.ui.main_window.*;
 import com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.DialogPane;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.Spinner;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
+import javafx.scene.control.TextArea;
 import javafx.scene.image.Image;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 import lombok.RequiredArgsConstructor;
@@ -36,9 +48,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @Component
@@ -57,6 +68,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     private final LobbyOAuthService lobbyOAuthService;
     private final UiService uiService;
     private final PlatformService platformService;
+    private final ApplicationUpdateService applicationUpdateService;
     public TabPane root;
     public Tab userManagementTab;
     public Tab matchmakerMapPoolTab;
@@ -444,33 +456,13 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     }
 
     private void checkForNewVersion() {
-        long lastReminder = localPreferences.getVersionReminder().getLastReminderEpoch();
-        long now = System.currentTimeMillis();
-
-        // Only show popup if more than 3 days passed since the last reminder
-        if (now - lastReminder < 3L * 24 * 60 * 60 * 1000) {
-            return;
-        }
-
         Thread versionCheckThread = new Thread(() -> {
             try {
-                String url = "https://api.github.com/repos/magge-faf/faf-moderator-client-develop-modified/releases/latest";
-                var conn = new java.net.URI(url).toURL().openConnection();
-                conn.setConnectTimeout(10_000);
-                conn.setReadTimeout(30_000);
-                conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
-                conn.setRequestProperty("User-Agent", "Java-Client");
-
-                String json;
-                try (InputStream inputStream = conn.getInputStream()) {
-                    json = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-                }
-                com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(json);
-                String latestVersion = node.get("tag_name").asText();
-
-                if (isNewerVersion(latestVersion)) {
-                    Platform.runLater(() -> showUpdatePopup(latestVersion));
-                }
+                applicationUpdateService.fetchLatestRelease().ifPresent(release -> {
+                    if (applicationUpdateService.shouldShowUpdate(release, localPreferences.getVersionReminder())) {
+                        Platform.runLater(() -> showUpdatePopup(release));
+                    }
+                });
             } catch (Exception e) {
                 log.warn("Failed to check for new version", e);
             }
@@ -480,44 +472,148 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     }
 
     private boolean isNewerVersion(String latest) {
-        return latest.compareTo(ApplicationVersion.CURRENT_VERSION) > 0;
+        return applicationUpdateService.isNewerVersion(latest);
     }
 
-    private void showUpdatePopup(String latestVersion) {
-        String downloadUrl = "https://github.com/magge-faf/faf-moderator-client-develop-modified/releases/latest";
+    private void showUpdatePopup(GithubRelease release) {
+        Optional<GithubReleaseAsset> matchingAsset = applicationUpdateService.findMatchingAsset(release);
+        boolean autoUpdateAvailable = applicationUpdateService.canSelfUpdate(release);
+        int defaultReminderDays = Math.max(1, localPreferences.getVersionReminder().getReminderDelayDays());
 
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("Update Available");
-        alert.setHeaderText("Version " + latestVersion + " is available");
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Update Available");
+        dialog.setHeaderText("Version " + release.displayName() + " is available");
+
+        ButtonType updateButtonType = new ButtonType("Backup + Update + Restart", ButtonBar.ButtonData.OK_DONE);
+        ButtonType nextStartButtonType = new ButtonType("Show At Next Start", ButtonBar.ButtonData.LEFT);
+        ButtonType remindLaterButtonType = new ButtonType("Remind Me Later", ButtonBar.ButtonData.CANCEL_CLOSE);
+
+        if (autoUpdateAvailable) {
+            dialog.getDialogPane().getButtonTypes().add(updateButtonType);
+        }
+        dialog.getDialogPane().getButtonTypes().addAll(nextStartButtonType, remindLaterButtonType);
 
         Label message = new Label(
                 "You are running " + ApplicationVersion.CURRENT_VERSION + ".\n" +
-                "Download the latest release to get the newest features and fixes."
+                "You can open the latest changelog, download the release directly, or let the client update itself."
         );
         message.setWrapText(true);
-        alert.getDialogPane().setContent(new VBox(message));
 
-        ButtonType openButton = new ButtonType("Open Download Page", ButtonBar.ButtonData.OK_DONE);
-        ButtonType remindButton = new ButtonType("Remind Me in 3 Days", ButtonBar.ButtonData.CANCEL_CLOSE);
-        alert.getButtonTypes().setAll(openButton, remindButton);
+        Spinner<Integer> reminderDaysSpinner = new Spinner<>(1, 90, defaultReminderDays);
+        reminderDaysSpinner.setEditable(true);
 
-        String stylesheet = localPreferences.getTabSettings().isDarkModeCheckBox()
-                ? "/style/main-dark.css" : "/style/main-light.css";
-        alert.getDialogPane().getStylesheets().add(
-                Objects.requireNonNull(getClass().getResource(stylesheet)).toExternalForm()
-        );
+        HBox reminderBox = new HBox(8, new Label("Remind me again in"), reminderDaysSpinner, new Label("days"));
 
-        alert.showAndWait().ifPresent(result -> {
-            if (result == openButton) {
-                platformService.showDocument(downloadUrl);
+        Button changelogButton = new Button("Show Change Log");
+        changelogButton.setOnAction(event -> showChangelogDialog(release));
+
+        Button downloadButton = new Button(matchingAsset.isPresent() ? "Direct Download" : "Open Release Page");
+        downloadButton.setOnAction(event -> platformService.showDocument(
+                matchingAsset.map(GithubReleaseAsset::browserDownloadUrl).orElse(release.htmlUrl())
+        ));
+
+        VBox content = new VBox(12, message, reminderBox, new HBox(8, changelogButton, downloadButton));
+        if (!autoUpdateAvailable) {
+            Label autoUpdateInfo = new Label(
+                    "Automatic in-app update is only available when the client is started from an unpacked release folder."
+            );
+            autoUpdateInfo.setWrapText(true);
+            content.getChildren().add(autoUpdateInfo);
+        }
+
+        dialog.getDialogPane().setContent(content);
+        applyDialogStyles(dialog.getDialogPane());
+
+        ButtonType result = dialog.showAndWait().orElse(remindLaterButtonType);
+        if (result == updateButtonType) {
+            startAutomaticUpdate(release);
+            return;
+        }
+
+        if (result == nextStartButtonType) {
+            localPreferences.getVersionReminder().scheduleForNextStart(release.tagName(), reminderDaysSpinner.getValue());
+        } else {
+            localPreferences.getVersionReminder().scheduleAfterDays(release.tagName(), reminderDaysSpinner.getValue());
+        }
+        localPreferencesReaderWriter.write(localPreferences);
+    }
+
+    private void startAutomaticUpdate(GithubRelease release) {
+        Alert progressAlert = new Alert(Alert.AlertType.INFORMATION);
+        progressAlert.setTitle("Preparing Update");
+        progressAlert.setHeaderText("Preparing " + release.displayName());
+
+        Label statusLabel = new Label("Starting update preparation...");
+        statusLabel.setWrapText(true);
+        VBox content = new VBox(12, new ProgressIndicator(), statusLabel);
+        progressAlert.getDialogPane().setContent(content);
+        progressAlert.getButtonTypes().clear();
+        applyDialogStyles(progressAlert.getDialogPane());
+
+        if (root != null && root.getScene() != null && root.getScene().getWindow() != null) {
+            progressAlert.initOwner(root.getScene().getWindow());
+        }
+        progressAlert.initModality(Modality.APPLICATION_MODAL);
+        progressAlert.setOnCloseRequest(event -> event.consume());
+
+        Thread updateThread = new Thread(() -> {
+            try {
+                applicationUpdateService.prepareUpdateAndLaunchInstaller(release,
+                        status -> Platform.runLater(() -> statusLabel.setText(status)));
+                Platform.runLater(() -> {
+                    progressAlert.close();
+                    Platform.exit();
+                    System.exit(0);
+                });
+            } catch (Exception e) {
+                log.warn("Failed to prepare automatic update", e);
+                Platform.runLater(() -> {
+                    progressAlert.close();
+                    ViewHelper.exceptionDialog(
+                            "Automatic update failed",
+                            "The update could not be prepared. Your current installation is still intact.",
+                            e,
+                            Optional.ofNullable(release.htmlUrl())
+                    );
+                });
             }
         });
+        updateThread.setDaemon(true);
+        updateThread.start();
 
-        localPreferences.getVersionReminder().setLastReminderEpoch(System.currentTimeMillis());
-        try {
-            localPreferencesReaderWriter.write(localPreferences);
-        } catch (Exception e) {
-            log.warn("Failed to save version reminder timestamp", e);
-        }
+        progressAlert.show();
+    }
+
+    private void showChangelogDialog(GithubRelease release) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Latest Change Log");
+        alert.setHeaderText(release.displayName());
+
+        String published = release.publishedAt() == null
+                ? "Unknown publish date"
+                : "Published: " + DateTimeFormatter.ISO_LOCAL_DATE.format(release.publishedAt());
+        Label publishedLabel = new Label(published);
+
+        TextArea changelogArea = new TextArea(release.changelogText().isBlank()
+                ? "No changelog text was published for this release."
+                : release.changelogText());
+        changelogArea.setEditable(false);
+        changelogArea.setWrapText(true);
+        changelogArea.setPrefRowCount(20);
+        changelogArea.setPrefColumnCount(80);
+
+        VBox content = new VBox(10, publishedLabel, changelogArea);
+        alert.getDialogPane().setContent(content);
+        alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
+        applyDialogStyles(alert.getDialogPane());
+        alert.showAndWait();
+    }
+
+    private void applyDialogStyles(DialogPane dialogPane) {
+        String stylesheet = localPreferences.getTabSettings().isDarkModeCheckBox()
+                ? "/style/main-dark.css" : "/style/main-light.css";
+        dialogPane.getStylesheets().add(
+                Objects.requireNonNull(getClass().getResource(stylesheet)).toExternalForm()
+        );
     }
 }

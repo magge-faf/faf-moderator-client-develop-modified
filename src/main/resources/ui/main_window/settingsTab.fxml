@@ -62,6 +62,19 @@
             <Separator/>
 
             <VBox spacing="5">
+                <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="Update Backups"/>
+                <Label text="Backup folder for automatic updates (.zip files). Default: install root." wrapText="true"/>
+                <TextField fx:id="updateBackupFolderTextField" promptText="Install root"/>
+                <HBox spacing="10">
+                    <Button mnemonicParsing="false" onAction="#onChooseUpdateBackupFolder" text="Browse..."/>
+                    <Button mnemonicParsing="false" onAction="#onUseDefaultUpdateBackupFolder" text="Use Default"/>
+                    <Button mnemonicParsing="false" onAction="#onOpenUpdateBackupFolder" text="Open Folder"/>
+                </HBox>
+            </VBox>
+
+            <Separator/>
+
+            <VBox spacing="5">
                 <Text style="-fx-font-size: 12pt; -fx-font-weight: bold;"
                       text="Select Browser for 'Search Forum' Button" textAlignment="CENTER"/>
                 <ComboBox fx:id="browserComboBox" minWidth="200">

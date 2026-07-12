@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.prefs.Preferences;
+import java.util.concurrent.TimeUnit;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Data
@@ -256,6 +257,7 @@ public class LocalPreferences {
     @Data
     public static class TabSettings {
         // TextFields
+        String updateBackupFolder = "";
 
         // TextArea
 
@@ -312,7 +314,34 @@ public class LocalPreferences {
     @JsonIgnoreProperties(ignoreUnknown = true)
     @Data
     public static class VersionReminder {
-        private long lastReminderEpoch = 0; // timestamp in milliseconds
+        private long lastReminderEpoch = 0; // legacy timestamp in milliseconds
+        private long nextReminderEpoch = 0;
+        private int reminderDelayDays = 3;
+        private String reminderVersionTag = "";
+
+        public long getEffectiveNextReminderEpoch() {
+            if (nextReminderEpoch > 0) {
+                return nextReminderEpoch;
+            }
+            if (lastReminderEpoch > 0) {
+                return lastReminderEpoch + TimeUnit.DAYS.toMillis(Math.max(1, reminderDelayDays));
+            }
+            return 0;
+        }
+
+        public void scheduleAfterDays(String versionTag, int days) {
+            reminderDelayDays = Math.max(1, days);
+            reminderVersionTag = versionTag == null ? "" : versionTag;
+            nextReminderEpoch = System.currentTimeMillis() + TimeUnit.DAYS.toMillis(reminderDelayDays);
+            lastReminderEpoch = 0;
+        }
+
+        public void scheduleForNextStart(String versionTag, int preferredDelayDays) {
+            reminderDelayDays = Math.max(1, preferredDelayDays);
+            reminderVersionTag = versionTag == null ? "" : versionTag;
+            nextReminderEpoch = 0;
+            lastReminderEpoch = 0;
+        }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

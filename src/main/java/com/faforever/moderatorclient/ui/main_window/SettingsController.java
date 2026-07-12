@@ -2,11 +2,13 @@ package com.faforever.moderatorclient.ui.main_window;
 
 import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.config.local.LocalPreferencesReaderWriter;
+import com.faforever.moderatorclient.update.ApplicationUpdateService;
 import com.faforever.moderatorclient.ui.Controller;
 import com.faforever.moderatorclient.ui.MainController;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
+import javafx.stage.DirectoryChooser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Objects;
+import java.util.Optional;
 
 import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
 
@@ -29,6 +32,7 @@ import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLD
 public class SettingsController implements Controller<Pane> {
     private final LocalPreferences localPreferences;
     private final MainController mainController;
+    private final ApplicationUpdateService applicationUpdateService;
 
     public VBox root;
     @FXML
@@ -49,7 +53,10 @@ public class SettingsController implements Controller<Pane> {
     public CheckBox fetchBansOnStartupCheckBox;
     @FXML
     public CheckBox ircDebugTrafficCheckBox;
+    @FXML
+    public TextField updateBackupFolderTextField;
 
+    private String defaultUpdateBackupFolder;
 
     @Override
     public VBox getRoot() {return root;}
@@ -85,6 +92,15 @@ public class SettingsController implements Controller<Pane> {
         ircDebugTrafficCheckBox.setSelected(localPreferences.getTabIrcChat().isDebugTraffic());
         ircDebugTrafficCheckBox.selectedProperty().addListener((obs, oldVal, newVal) ->
                 localPreferences.getTabIrcChat().setDebugTraffic(newVal));
+
+        defaultUpdateBackupFolder = applicationUpdateService.resolveDefaultBackupDirectory().toString();
+        String configuredBackupFolder = localPreferences.getTabSettings().getUpdateBackupFolder();
+        updateBackupFolderTextField.setText(
+                configuredBackupFolder == null || configuredBackupFolder.isBlank()
+                        ? defaultUpdateBackupFolder
+                        : configuredBackupFolder
+        );
+        updateBackupFolderTextField.setPromptText(defaultUpdateBackupFolder);
 
         if (browserComboBox.getValue() == null) {
             browserComboBox.setValue(localPreferences.getUi().getBrowserComboBox());
@@ -297,6 +313,41 @@ public class SettingsController implements Controller<Pane> {
         openFile(CONFIGURATION_FOLDER + File.separator + "templateGamingModeratorTask.txt");
     }
 
+    public void onChooseUpdateBackupFolder() {
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setTitle("Select Update Backup Folder");
+
+        Path initialDirectory = resolveBackupFolderFieldPath();
+        if (initialDirectory != null && Files.isDirectory(initialDirectory)) {
+            directoryChooser.setInitialDirectory(initialDirectory.toFile());
+        } else {
+            Path defaultPath = Path.of(defaultUpdateBackupFolder);
+            if (Files.isDirectory(defaultPath)) {
+                directoryChooser.setInitialDirectory(defaultPath.toFile());
+            }
+        }
+
+        File selectedDirectory = directoryChooser.showDialog(root.getScene().getWindow());
+        if (selectedDirectory != null) {
+            updateBackupFolderTextField.setText(selectedDirectory.getAbsolutePath());
+        }
+    }
+
+    public void onUseDefaultUpdateBackupFolder() {
+        updateBackupFolderTextField.setText(defaultUpdateBackupFolder);
+    }
+
+    public void onOpenUpdateBackupFolder() {
+        try {
+            Path folder = Optional.ofNullable(resolveBackupFolderFieldPath())
+                    .orElse(Path.of(defaultUpdateBackupFolder));
+            Files.createDirectories(folder);
+            openPath(folder.toFile());
+        } catch (IOException e) {
+            log.error("Failed to open update backup folder", e);
+        }
+    }
+
     public void templatesAndReasonsReportButton() throws IOException {
         openFile(CONFIGURATION_FOLDER + File.separator +  "templatesAndReasons.json");
 
@@ -345,6 +396,12 @@ public class SettingsController implements Controller<Pane> {
 
         localPreferences.getTabSettings().setFetchBansOnStartupCheckBox(fetchBansOnStartupCheckBox.isSelected());
         localPreferences.getTabIrcChat().setDebugTraffic(ircDebugTrafficCheckBox.isSelected());
+        String backupFolder = updateBackupFolderTextField.getText() == null ? "" : updateBackupFolderTextField.getText().trim();
+        if (backupFolder.isBlank() || backupFolder.equals(defaultUpdateBackupFolder)) {
+            localPreferences.getTabSettings().setUpdateBackupFolder("");
+        } else {
+            localPreferences.getTabSettings().setUpdateBackupFolder(Path.of(backupFolder).toAbsolutePath().normalize().toString());
+        }
 
         Tab selectedTab = defaultActiveTabComboBox.getSelectionModel().getSelectedItem();
         if (selectedTab != null) {
@@ -357,5 +414,18 @@ public class SettingsController implements Controller<Pane> {
 
         scene.getStylesheets().clear();
         scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource(styleSheet)).toExternalForm());
+    }
+
+    private Path resolveBackupFolderFieldPath() {
+        String value = updateBackupFolderTextField.getText();
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Path.of(value).toAbsolutePath().normalize();
+        } catch (Exception e) {
+            log.debug("Ignoring invalid backup folder path: {}", value, e);
+            return null;
+        }
     }
 }
