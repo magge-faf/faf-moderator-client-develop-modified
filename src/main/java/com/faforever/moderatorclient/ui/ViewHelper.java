@@ -84,7 +84,6 @@ import static com.faforever.commons.api.dto.GroupPermission.ROLE_ADMIN_ACCOUNT_N
 @Slf4j
 public class ViewHelper {
 
-    @Autowired
     private static LargeThumbnailCache largeThumbnailCache;
 
     private static SmurfManagementController smurfManagementController;
@@ -96,9 +95,9 @@ public class ViewHelper {
     private static final DateTimeFormatter DT_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter DT_UID = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
-    @Autowired
-    public ViewHelper(SmurfManagementController smurfManagementController) {
+    public ViewHelper(SmurfManagementController smurfManagementController, LargeThumbnailCache largeThumbnailCache) {
         ViewHelper.smurfManagementController = smurfManagementController;
+        ViewHelper.largeThumbnailCache = largeThumbnailCache;
     }
 
     /**
