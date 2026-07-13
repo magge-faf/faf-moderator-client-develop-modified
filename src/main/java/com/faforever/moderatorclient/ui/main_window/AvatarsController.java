@@ -57,8 +57,6 @@ public class AvatarsController implements Controller<SplitPane> {
     public Button editAvatarButton;
     public Button deleteAvatarButton;
 
-    public Label avatarLoadProgressLabel;
-
     @Autowired
     private final EnvironmentProperties environmentProperties;
 
@@ -69,7 +67,6 @@ public class AvatarsController implements Controller<SplitPane> {
 
     @FXML
     public void initialize() {
-        UrlImageViewTableCell.setLoadProgressLabel(avatarLoadProgressLabel);
         ViewHelper.buildAvatarTableView(avatarTableView, avatars);
         ViewHelper.buildAvatarAssignmentTableView(avatarAssignmentTableView, avatarAssignments, this::removeAvatarFromPlayer);
         ViewHelper.ensureColumnIds(avatarTableView);
