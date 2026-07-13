@@ -287,47 +287,49 @@ public class ReplayAnalysisController implements Controller<VBox> {
             int replayId = Integer.parseInt(
                 replayPath.getFileName().toString().replace(".fafreplay", "")
             );
-            ReplayDataParser replayDataParser = new ReplayDataParser(replayPath, objectMapper);
-            List<GameOption> gameOptions = replayDataParser.getGameOptions();
-            String commonArmy = getValueForKey(gameOptions);
-            if ("Union".equals(commonArmy)) {
-                checkedReplays.put(replayId, ReplayStatus.UNION);
-                return;
+            try (ReplayStorageService.PreparedReplay preparedReplay = replayStorageService.prepareReplayForParsing(replayPath)) {
+                ReplayDataParser replayDataParser = new ReplayDataParser(preparedReplay.path(), objectMapper);
+                List<GameOption> gameOptions = replayDataParser.getGameOptions();
+                String commonArmy = getValueForKey(gameOptions);
+                if ("Union".equals(commonArmy)) {
+                    checkedReplays.put(replayId, ReplayStatus.UNION);
+                    return;
+                }
+                List<Event> events = replayDataParser.getEvents();
+                ModerationReportController.DesyncResult desyncResult = checkReplayEventsForDesync(
+                    events
+                );
+                if (desyncResult.desync()) {
+                    checkedReplays.put(replayId, ReplayStatus.DESYNCED);
+                    return;
+                }
+                List<ModeratorEvent> moderatorEvents = replayDataParser.getModeratorEvents();
+                List<PlayerInfo> playerInfoList = replayDataParser
+                    .getArmies()
+                    .entrySet()
+                    .stream()
+                    .filter(entry -> entry.getValue().containsKey("PlayerName"))
+                    .map(
+                        entry ->
+                            new PlayerInfo(
+                                entry.getKey() + 1,
+                                (String) entry.getValue().get("PlayerName")
+                            )
+                    )
+                    .toList();
+                if (
+                    checkModeratorEventsForFocusSwitch(
+                        moderatorEvents,
+                        replayPath.getFileName().toString(),
+                        playerInfoList
+                    )
+                ) {
+                    checkedReplays.put(replayId, ReplayStatus.DETECTED);
+                    log.debug("Detected: {}", replayId);
+                    return;
+                }
+                checkedReplays.put(replayId, ReplayStatus.CHECKED);
             }
-            List<Event> events = replayDataParser.getEvents();
-            ModerationReportController.DesyncResult desyncResult = checkReplayEventsForDesync(
-                events
-            );
-            if (desyncResult.desync()) {
-                checkedReplays.put(replayId, ReplayStatus.DESYNCED);
-                return;
-            }
-            List<ModeratorEvent> moderatorEvents = replayDataParser.getModeratorEvents();
-            List<PlayerInfo> playerInfoList = replayDataParser
-                .getArmies()
-                .entrySet()
-                .stream()
-                .filter(entry -> entry.getValue().containsKey("PlayerName"))
-                .map(
-                    entry ->
-                        new PlayerInfo(
-                            entry.getKey() + 1,
-                            (String) entry.getValue().get("PlayerName")
-                        )
-                )
-                .toList();
-            if (
-                checkModeratorEventsForFocusSwitch(
-                    moderatorEvents,
-                    replayPath.getFileName().toString(),
-                    playerInfoList
-                )
-            ) {
-                checkedReplays.put(replayId, ReplayStatus.DETECTED);
-                log.debug("Detected: {}", replayId);
-                return;
-            }
-            checkedReplays.put(replayId, ReplayStatus.CHECKED);
         } catch (Exception e) {
             int replayId = 0;
             try {

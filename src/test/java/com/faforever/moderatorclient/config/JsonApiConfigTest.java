@@ -1,5 +1,7 @@
 package com.faforever.moderatorclient.config;
 
+import com.faforever.commons.replay.ReplayMetadata;
+import com.faforever.commons.replay.VictoryCondition;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -48,6 +50,26 @@ class JsonApiConfigTest {
         );
 
         assertThat(value.version.toString(), is("2.0.0"));
+    }
+
+    @Test
+    void deserializesReplayMetadataVictoryConditionFromEnumName() throws Exception {
+        ReplayMetadata metadata = objectMapper.readValue(
+                "{\"game_type\":\"DEMORALIZATION\"}",
+                ReplayMetadata.class
+        );
+
+        assertThat(metadata.getVictoryCondition(), is(VictoryCondition.DEMORALIZATION));
+    }
+
+    @Test
+    void deserializesReplayMetadataVictoryConditionFromNumericValue() throws Exception {
+        ReplayMetadata metadata = objectMapper.readValue(
+                "{\"game_type\":0}",
+                ReplayMetadata.class
+        );
+
+        assertThat(metadata.getVictoryCondition(), is(VictoryCondition.DEMORALIZATION));
     }
 
     private record DatedValue(OffsetDateTime time) {

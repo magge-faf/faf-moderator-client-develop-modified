@@ -7,17 +7,29 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class ReplayStorageService {
     private static final Duration TEMP_REPLAY_MAX_AGE = Duration.ofDays(1);
+    private static final Pattern TEXTUAL_GAME_TYPE_PATTERN =
+            Pattern.compile("\"game_type\"\\s*:\\s*\"([^\"]+)\"");
+    private static final Map<String, Integer> GAME_TYPE_BY_NAME = Map.of(
+            "DEMORALIZATION", 0,
+            "DOMINATION", 1,
+            "ERADICATION", 2,
+            "SANDBOX", 3
+    );
 
     private final LocalPreferences localPreferences;
 
@@ -45,6 +57,28 @@ public class ReplayStorageService {
             sanitizedPrefix = "faf_replay_";
         }
         return Files.createTempFile(resolveReplayDirectory(), sanitizedPrefix, ".fafreplay");
+    }
+
+    public PreparedReplay prepareReplayForParsing(Path replayFile) throws IOException {
+        byte[] replayBytes = Files.readAllBytes(replayFile);
+        int headerEnd = findReplayHeaderEnd(replayBytes);
+        String header = new String(replayBytes, 0, headerEnd, StandardCharsets.UTF_8);
+        String normalizedHeader = normalizeReplayHeader(header);
+
+        if (header.equals(normalizedHeader)) {
+            return new PreparedReplay(replayFile, false);
+        }
+
+        Path normalizedReplay = createTemporaryReplayFile("normalized_replay_");
+        byte[] normalizedHeaderBytes = normalizedHeader.getBytes(StandardCharsets.UTF_8);
+        byte[] normalizedReplayBytes = new byte[normalizedHeaderBytes.length + 1 + (replayBytes.length - headerEnd - 1)];
+
+        System.arraycopy(normalizedHeaderBytes, 0, normalizedReplayBytes, 0, normalizedHeaderBytes.length);
+        normalizedReplayBytes[normalizedHeaderBytes.length] = '\n';
+        System.arraycopy(replayBytes, headerEnd + 1, normalizedReplayBytes, normalizedHeaderBytes.length + 1, replayBytes.length - headerEnd - 1);
+
+        Files.write(normalizedReplay, normalizedReplayBytes);
+        return new PreparedReplay(normalizedReplay, true);
     }
 
     public ReplayFolderStats describeReplayFolder() throws IOException {
@@ -132,9 +166,42 @@ public class ReplayStorageService {
         }
     }
 
+    private int findReplayHeaderEnd(byte[] replayBytes) {
+        for (int i = 0; i < replayBytes.length; i++) {
+            if (replayBytes[i] == '\n') {
+                return i;
+            }
+        }
+        throw new IllegalArgumentException("Missing separator between replay header and body");
+    }
+
+    private String normalizeReplayHeader(String header) {
+        Matcher matcher = TEXTUAL_GAME_TYPE_PATTERN.matcher(header);
+        if (!matcher.find()) {
+            return header;
+        }
+
+        String rawGameType = matcher.group(1).trim();
+        Integer normalizedGameType = GAME_TYPE_BY_NAME.get(rawGameType.toUpperCase());
+        if (normalizedGameType == null) {
+            return header;
+        }
+
+        return matcher.replaceFirst("\"game_type\":" + normalizedGameType);
+    }
+
     public record ReplayFolderStats(Path directory, long fileCount, long totalBytes) {
     }
 
     public record ReplayCleanupResult(Path directory, Duration maxAge, long deletedFileCount, long deletedBytes) {
+    }
+
+    public record PreparedReplay(Path path, boolean temporary) implements AutoCloseable {
+        @Override
+        public void close() throws IOException {
+            if (temporary) {
+                Files.deleteIfExists(path);
+            }
+        }
     }
 }

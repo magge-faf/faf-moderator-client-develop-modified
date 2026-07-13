@@ -4,6 +4,7 @@ import com.faforever.moderatorclient.config.local.LocalPreferences;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
@@ -69,6 +70,47 @@ class ReplayStorageServiceTest {
 
             assertThat(stats.fileCount(), is(1L));
             assertThat(stats.totalBytes(), greaterThan(0L));
+        } finally {
+            System.setProperty("user.dir", originalUserDir);
+        }
+    }
+
+    @Test
+    void prepareReplayForParsingNormalizesTextualGameType(@TempDir Path tempDir) throws Exception {
+        String originalUserDir = System.getProperty("user.dir");
+        try {
+            System.setProperty("user.dir", tempDir.toString());
+            ReplayStorageService service = new ReplayStorageService(new LocalPreferences());
+            Path replay = service.resolveReplayFile(555);
+            Files.write(replay, ("{\"game_type\":\"DEMORALIZATION\",\"compression\":\"zstd\"}\nbody").getBytes(StandardCharsets.UTF_8));
+
+            Path preparedPath;
+            try (ReplayStorageService.PreparedReplay preparedReplay = service.prepareReplayForParsing(replay)) {
+                preparedPath = preparedReplay.path();
+                String preparedContent = Files.readString(preparedPath, StandardCharsets.UTF_8);
+                assertThat(preparedReplay.temporary(), is(true));
+                assertThat(preparedContent, is("{\"game_type\":0,\"compression\":\"zstd\"}\nbody"));
+            }
+
+            assertThat(Files.exists(preparedPath), is(false));
+        } finally {
+            System.setProperty("user.dir", originalUserDir);
+        }
+    }
+
+    @Test
+    void prepareReplayForParsingReusesReplayWhenHeaderIsAlreadyNumeric(@TempDir Path tempDir) throws Exception {
+        String originalUserDir = System.getProperty("user.dir");
+        try {
+            System.setProperty("user.dir", tempDir.toString());
+            ReplayStorageService service = new ReplayStorageService(new LocalPreferences());
+            Path replay = service.resolveReplayFile(556);
+            Files.write(replay, ("{\"game_type\":0,\"compression\":\"zstd\"}\nbody").getBytes(StandardCharsets.UTF_8));
+
+            try (ReplayStorageService.PreparedReplay preparedReplay = service.prepareReplayForParsing(replay)) {
+                assertThat(preparedReplay.temporary(), is(false));
+                assertThat(preparedReplay.path(), is(replay));
+            }
         } finally {
             System.setProperty("user.dir", originalUserDir);
         }

@@ -1678,74 +1678,76 @@ public class ModerationReportController implements Controller<Region> {
 
     private void processAndDisplayReplay(String header, Path tempFilePath, String promptAI) {
         try {
-            ReplayDataParser replayDataParser = new ReplayDataParser(tempFilePath, objectMapper);
-            String chatLog = generateChatLog(replayDataParser);
+            try (ReplayStorageService.PreparedReplay preparedReplay = replayStorageService.prepareReplayForParsing(tempFilePath)) {
+                ReplayDataParser replayDataParser = new ReplayDataParser(preparedReplay.path(), objectMapper);
+                String chatLog = generateChatLog(replayDataParser);
 
-            StringBuilder chatLogFiltered = new StringBuilder();
-            StringBuilder chatLogFilteredOffenderOnly = new StringBuilder();
-            String reportedUser = extractName(copyReportedUserIdButton.getText());
+                StringBuilder chatLogFiltered = new StringBuilder();
+                StringBuilder chatLogFilteredOffenderOnly = new StringBuilder();
+                String reportedUser = extractName(copyReportedUserIdButton.getText());
 
-            chatLogFiltered.append(header);
+                chatLogFiltered.append(header);
 
-            String metadataInfo = generateMetadataInfo(replayDataParser);
-            chatLogFiltered.append(metadataInfo);
+                String metadataInfo = generateMetadataInfo(replayDataParser);
+                chatLogFiltered.append(metadataInfo);
 
-            String filteredChatLog = filterAndAppendChatLog(chatLog);
-            chatLogFiltered.append(filteredChatLog);
+                String filteredChatLog = filterAndAppendChatLog(chatLog);
+                chatLogFiltered.append(filteredChatLog);
 
-            Map<Integer, PlayerInfo> playerInfoMap = replayDataParser.getArmies().entrySet().stream()
-                    .filter(entry -> entry.getValue().containsKey("PlayerName"))
-                    .collect(Collectors.toMap(
-                            entry -> entry.getKey() + 1,
-                            entry -> new PlayerInfo(entry.getKey() + 1, (String) entry.getValue().get("PlayerName"))
-                    ));
+                Map<Integer, PlayerInfo> playerInfoMap = replayDataParser.getArmies().entrySet().stream()
+                        .filter(entry -> entry.getValue().containsKey("PlayerName"))
+                        .collect(Collectors.toMap(
+                                entry -> entry.getKey() + 1,
+                                entry -> new PlayerInfo(entry.getKey() + 1, (String) entry.getValue().get("PlayerName"))
+                        ));
 
-            List<ModeratorEvent> moderatorEvents = replayDataParser.getModeratorEvents();
-            showModeratorEvent(moderatorEvents, playerInfoMap);
+                List<ModeratorEvent> moderatorEvents = replayDataParser.getModeratorEvents();
+                showModeratorEvent(moderatorEvents, playerInfoMap);
 
-            List<PaintingBrushStroke> paintingStrokes = extractPaintingStrokes(replayDataParser);
-            Platform.runLater(() -> {
-                currentPaintingStrokes = paintingStrokes;
-                paintingMinX = Float.MAX_VALUE; paintingMaxX = -Float.MAX_VALUE;
-                paintingMinZ = Float.MAX_VALUE; paintingMaxZ = -Float.MAX_VALUE;
-                for (PaintingBrushStroke s : paintingStrokes) {
-                    for (float[] pt : s.points()) {
-                        if (pt[0] < paintingMinX) paintingMinX = pt[0];
-                        if (pt[0] > paintingMaxX) paintingMaxX = pt[0];
-                        if (pt[1] < paintingMinZ) paintingMinZ = pt[1];
-                        if (pt[1] > paintingMaxZ) paintingMaxZ = pt[1];
+                List<PaintingBrushStroke> paintingStrokes = extractPaintingStrokes(replayDataParser);
+                Platform.runLater(() -> {
+                    currentPaintingStrokes = paintingStrokes;
+                    paintingMinX = Float.MAX_VALUE; paintingMaxX = -Float.MAX_VALUE;
+                    paintingMinZ = Float.MAX_VALUE; paintingMaxZ = -Float.MAX_VALUE;
+                    for (PaintingBrushStroke s : paintingStrokes) {
+                        for (float[] pt : s.points()) {
+                            if (pt[0] < paintingMinX) paintingMinX = pt[0];
+                            if (pt[0] > paintingMaxX) paintingMaxX = pt[0];
+                            if (pt[1] < paintingMinZ) paintingMinZ = pt[1];
+                            if (pt[1] > paintingMaxZ) paintingMaxZ = pt[1];
+                        }
+                    }
+                    long maxSec = paintingStrokes.isEmpty() ? 0
+                            : paintingStrokes.stream().mapToLong(s -> s.time().getSeconds()).max().orElse(0);
+                    paintingTimeSlider.setMin(0);
+                    paintingTimeSlider.setMax(Math.max(maxSec, 1));
+                    paintingTimeSlider.setValue(maxSec);
+                    paintingTimeLabel.setText(formatDurationHMS(maxSec));
+                    renderPaintingStrokes(paintingStrokes);
+                });
+
+                chatLogFiltered.append("\n").append(promptAI);
+
+                for (String line : filteredChatLog.split("\n")) {
+                    if (line.contains(reportedUser)) {
+                        chatLogFilteredOffenderOnly.append(line).append("\n");
                     }
                 }
-                long maxSec = paintingStrokes.isEmpty() ? 0
-                        : paintingStrokes.stream().mapToLong(s -> s.time().getSeconds()).max().orElse(0);
-                paintingTimeSlider.setMin(0);
-                paintingTimeSlider.setMax(Math.max(maxSec, 1));
-                paintingTimeSlider.setValue(maxSec);
-                paintingTimeLabel.setText(formatDurationHMS(maxSec));
-                renderPaintingStrokes(paintingStrokes);
-            });
 
-            chatLogFiltered.append("\n").append(promptAI);
+                chatLogFilteredOffenderOnly.append("\n\n").append(promptAI);
 
-            for (String line : filteredChatLog.split("\n")) {
-                if (line.contains(reportedUser)) {
-                    chatLogFilteredOffenderOnly.append(line).append("\n");
-                }
+                Platform.runLater(() -> {
+                    copyChatLogButton.setId(chatLogFiltered.toString());
+                    copyChatLogButton.setText("Copy Chat Log");
+
+                    copyChatLogButtonOffenderOnly.setText("Copy Chat Offender");
+                    copyChatLogButtonOffenderOnly.setId(chatLogFilteredOffenderOnly.toString());
+
+                    updateChatLogToColorTextFlow(chatLogTextFlow, String.valueOf(chatLogFiltered),
+                            extractName(copyReporterIdButton.getText()),
+                            extractName(copyReportedUserIdButton.getText()));
+                });
             }
-
-            chatLogFilteredOffenderOnly.append("\n\n").append(promptAI);
-
-            Platform.runLater(() -> {
-                copyChatLogButton.setId(chatLogFiltered.toString());
-                copyChatLogButton.setText("Copy Chat Log");
-
-                copyChatLogButtonOffenderOnly.setText("Copy Chat Offender");
-                copyChatLogButtonOffenderOnly.setId(chatLogFilteredOffenderOnly.toString());
-
-                updateChatLogToColorTextFlow(chatLogTextFlow, String.valueOf(chatLogFiltered),
-                        extractName(copyReporterIdButton.getText()),
-                        extractName(copyReportedUserIdButton.getText()));
-            });
         } catch (Exception e) {
             log.error("An error occurred while parsing replay data.", e);
         }

@@ -1,5 +1,6 @@
 package com.faforever.moderatorclient.config;
 
+import com.faforever.commons.replay.ReplayMetadata;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
@@ -34,19 +35,20 @@ public class JsonApiConfig {
     @Bean
     @Primary
     public ObjectMapper objectMapper() {
-        SimpleModule versionModule = new SimpleModule();
-        versionModule.addDeserializer(ComparableVersion.class, new StdDeserializer<>(ComparableVersion.class) {
+        SimpleModule fafModule = new SimpleModule();
+        fafModule.addDeserializer(ComparableVersion.class, new StdDeserializer<>(ComparableVersion.class) {
             @Override
             public ComparableVersion deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
                 return new ComparableVersion(p.getValueAsString());
             }
         });
+        fafModule.addDeserializer(ReplayMetadata.class, new ReplayMetadataDeserializer());
 
         return new ObjectMapper()
                 .registerModule(new KotlinModule.Builder().build())
                 .registerModule(new JavaTimeModule())
                 .registerModule(new Jdk8Module())
-                .registerModule(versionModule)
+                .registerModule(fafModule)
                 .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL)
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                 .enable(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)
