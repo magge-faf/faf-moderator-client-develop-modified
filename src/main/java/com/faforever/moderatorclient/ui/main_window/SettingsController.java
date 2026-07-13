@@ -274,8 +274,6 @@ public class SettingsController implements Controller<Pane> {
             } catch (IOException e) {
                 log.warn("Failed to create {}", jsonFileTemplatesAndReasons, e);
             }
-        } else {
-            log.info(jsonFileTemplatesAndReasons +" already exists.");
         }
     }
 
@@ -328,8 +326,6 @@ public class SettingsController implements Controller<Pane> {
             } catch (IOException e) {
                 log.warn("Failed to create {}", jsonFileTemplatesFinishReports, e);
             }
-        } else {
-            log.info("{} already exists.", jsonFileTemplatesFinishReports);
         }
     }
 
