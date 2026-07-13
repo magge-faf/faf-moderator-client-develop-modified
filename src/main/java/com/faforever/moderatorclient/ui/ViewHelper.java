@@ -44,6 +44,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
 import java.time.Duration;
+import java.time.LocalDate;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
 import javafx.util.Callback;
@@ -64,6 +65,8 @@ import java.nio.file.Path;
 import java.text.MessageFormat;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.Period;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import javafx.application.Platform;
@@ -183,8 +186,17 @@ public class ViewHelper {
 
         TableColumn<AvatarFX, OffsetDateTime> changeTimeColumn = new TableColumn<>("Created");
         changeTimeColumn.setCellValueFactory(o -> o.getValue().createTimeProperty());
+        changeTimeColumn.setCellFactory(offsetDateTimeCellFactory(DT_DATETIME));
         changeTimeColumn.setMinWidth(180);
         tableView.getColumns().add(changeTimeColumn);
+
+        TableColumn<AvatarFX, String> ageColumn = new TableColumn<>("Age");
+        ageColumn.setCellValueFactory(o -> Bindings.createStringBinding(
+                () -> formatAge(o.getValue().getCreateTime()),
+                o.getValue().createTimeProperty()));
+        ageColumn.setMinWidth(90);
+        tableView.getColumns().add(ageColumn);
+        extractors.put(ageColumn, avatarFX -> formatAge(avatarFX.getCreateTime()));
 
         TableColumn<AvatarFX, String> urlColumn = new TableColumn<>("URL");
         urlColumn.setCellValueFactory(o -> o.getValue().urlProperty());
@@ -1312,6 +1324,31 @@ public class ViewHelper {
                 setText(empty || item == null ? null : fmt.format(item));
             }
         };
+    }
+
+    private static String formatAge(OffsetDateTime createdAt) {
+        if (createdAt == null) {
+            return "";
+        }
+
+        LocalDate createdDate = createdAt.atZoneSameInstant(ZoneId.systemDefault()).toLocalDate();
+        LocalDate today = LocalDate.now();
+        if (createdDate.isAfter(today)) {
+            return "0d";
+        }
+
+        Period period = Period.between(createdDate, today);
+        List<String> parts = new ArrayList<>(3);
+        if (period.getYears() > 0) {
+            parts.add(period.getYears() + "y");
+        }
+        if (period.getMonths() > 0) {
+            parts.add(period.getMonths() + "mo");
+        }
+        if (period.getDays() > 0 || parts.isEmpty()) {
+            parts.add(period.getDays() + "d");
+        }
+        return String.join(" ", parts);
     }
 
     private static TableColumn<PlayerFX, String> addUidStringColumn(
