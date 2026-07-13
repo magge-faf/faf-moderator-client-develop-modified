@@ -94,7 +94,6 @@ public class FafApiCommunicationService {
         this.environmentProperties = environmentProperties;
         maxRequests = environmentProperties.getMaxRequestsToServerPerMinute();
         effectiveMaxRequestsPerMinute = maxRequests;
-        log.info("Setting max requests to server per minute to {}", maxRequests);
     }
 
     public boolean hasPermission(String... permissionTechnicalName) {
