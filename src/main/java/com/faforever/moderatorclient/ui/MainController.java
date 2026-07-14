@@ -417,7 +417,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     @Override
     public void destroy() {
         log.info("Application exit received: saving local preferences to disk.");
-        if (settingsController != null) settingsController.onSave();
+        boolean preferencesSaved = settingsController == null || settingsController.saveOnExit();
         if (moderationReportController != null) moderationReportController.onSave();
         if (userManagementController != null) userManagementController.onSave();
         if (bansController != null) bansController.onSave();
@@ -432,8 +432,11 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         if (userGroupsController != null) userGroupsController.onSave();
         if (recentActivityController != null) recentActivityController.onSave();
         if (apiHistoryController != null) apiHistoryController.onSave();
-        localPreferencesReaderWriter.write(localPreferences);
-        log.info("Local preferences saved successfully.");
+        if (preferencesSaved) {
+            log.info("Local preferences saved successfully.");
+        } else {
+            log.warn("Local preferences were not saved successfully.");
+        }
     }
 
     @EventListener

@@ -60,8 +60,8 @@ class ApplicationUpdateServiceTest {
     }
 
     @Test
-    void defaultBackupDirectoryUsesLogsFolder() {
-        assertThat(service.resolveDefaultBackupDirectory().getFileName().toString(), is("logs"));
+    void defaultBackupDirectoryUsesBackupFolder() {
+        assertThat(service.resolveDefaultBackupDirectory().getFileName().toString(), is("backup"));
     }
 
     @Test
@@ -93,7 +93,7 @@ class ApplicationUpdateServiceTest {
             Files.writeString(configDir.resolve("templatesAndReasons.json"), "{}");
 
             LocalPreferences localPreferences = new LocalPreferences();
-            localPreferences.getTabSettings().setUpdateBackupFolder(tempDir.resolve("logs").toString());
+            localPreferences.getTabSettings().setUpdateBackupFolder(tempDir.resolve("backup").toString());
             ApplicationUpdateService localService = new ApplicationUpdateService(new ObjectMapper(), localPreferences);
 
             Path archive = localService.createConfigurationBackupArchive();

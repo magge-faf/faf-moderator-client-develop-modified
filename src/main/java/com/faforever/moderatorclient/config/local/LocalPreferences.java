@@ -332,7 +332,7 @@ public class LocalPreferences {
         boolean rememberLoginCheckBox = true;
         boolean darkModeCheckBox = true;
         boolean fetchBansOnStartupCheckBox = false;
-        boolean autoBackupConfigurationFolderOnSaveCheckBox = true;
+        boolean autoBackupConfigurationFolderOnSaveCheckBox = false;
         boolean autoPurgeTempReplaysOlderThanOneDayCheckBox = true;
 
         // Numeric settings
@@ -521,8 +521,8 @@ public class LocalPreferences {
         boolean debugTraffic = false;
         boolean suppressJoinLeaveNoise = true;
         boolean autoLoadLastDayHistory = true;
-        boolean mentionSoundEnabled = true;
         boolean showIrcLocalLog = true;
+        boolean mentionSoundEnabled = true;
         boolean mentionToastEnabled = true;
         String selectedChannel = "#aeolus";
         List<String> autoJoinChannels = new ArrayList<>(List.of("#aeolus", "#moderators"));

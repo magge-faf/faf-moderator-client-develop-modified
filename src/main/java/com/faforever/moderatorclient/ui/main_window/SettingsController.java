@@ -415,14 +415,14 @@ public class SettingsController implements Controller<Pane> {
             ApplicationUpdateService.BackupPurgeResult result = applicationUpdateService.purgeBackupFilesOlderThan(days);
             updateBackupFolderStatusLabel.setText(String.format(
                     Locale.ROOT,
-                    "Purged %d old log files older than %d days and freed %.2f MB.",
+                    "Purged %d old backup files older than %d days and freed %.2f MB.",
                     result.deletedFileCount(),
                     result.ageDays(),
                     bytesToMegabytes(result.deletedBytes())
             ));
             refreshUpdateBackupFolderInfo();
         } catch (IOException e) {
-            updateBackupFolderStatusLabel.setText("Failed to purge old logs: " + e.getMessage());
+            updateBackupFolderStatusLabel.setText("Failed to purge old backups: " + e.getMessage());
             log.error("Failed to purge update backup folder", e);
         }
     }
@@ -501,10 +501,17 @@ public class SettingsController implements Controller<Pane> {
     @Autowired
     private LocalPreferencesReaderWriter localPreferencesReaderWriter;
 
-    public void onSave() {
-        log.info("onSave from SettingsController.java");
+    public boolean onSave() {
+        return saveSettings(true, true);
+    }
 
-        // Save preferences from UI
+    public boolean saveOnExit() {
+        return saveSettings(false, false);
+    }
+
+    private boolean saveSettings(boolean createBackupArchive, boolean applyStyleSheet) {
+        log.info("Saving settings (createBackupArchive={}, applyStyleSheet={})", createBackupArchive, applyStyleSheet);
+
         localPreferences.getAutoLogin().setEnabled(rememberLoginCheckBox.isSelected());
         localPreferences.getUi().setDarkMode(darkModeCheckBox.isSelected());
 
@@ -523,8 +530,8 @@ public class SettingsController implements Controller<Pane> {
             localPreferences.getUi().setStartUpTab(selectedTab.getId());
         }
 
-        localPreferencesReaderWriter.write(localPreferences);
-        if (autoBackupConfigurationFolderOnSaveCheckBox.isSelected()) {
+        boolean saved = localPreferencesReaderWriter.write(localPreferences);
+        if (createBackupArchive && autoBackupConfigurationFolderOnSaveCheckBox.isSelected()) {
             try {
                 Path backupArchive = applicationUpdateService.createConfigurationBackupArchive();
                 configurationBackupStatusLabel.setText("Auto-backed up app data folder to " + backupArchive);
@@ -533,11 +540,16 @@ public class SettingsController implements Controller<Pane> {
                 log.error("Failed to auto-back up configuration folder", e);
             }
         }
+        if (!applyStyleSheet) {
+            return saved;
+        }
+
         Scene scene = root.getScene();
         String styleSheet = darkModeCheckBox.isSelected() ? "/style/main-dark.css" : "/style/main-light.css";
 
         scene.getStylesheets().clear();
         scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource(styleSheet)).toExternalForm());
+        return saved;
     }
 
     private Path resolveBackupFolderFieldPath() {
@@ -577,7 +589,7 @@ public class SettingsController implements Controller<Pane> {
             ApplicationUpdateService.BackupFolderStats stats = applicationUpdateService.describeBackupFolder();
             updateBackupFolderInfoLabel.setText(String.format(
                     Locale.ROOT,
-                    "Stored logs: %.2f MB across %d files in %s",
+                    "Stored backups: %.2f MB across %d files in %s",
                     bytesToMegabytes(stats.totalBytes()),
                     stats.fileCount(),
                     stats.directory()
@@ -586,8 +598,8 @@ public class SettingsController implements Controller<Pane> {
                 updateBackupFolderStatusLabel.setText("");
             }
         } catch (Exception e) {
-            updateBackupFolderInfoLabel.setText("Stored logs: unavailable");
-            updateBackupFolderStatusLabel.setText("Unable to inspect log folder: " + e.getMessage());
+            updateBackupFolderInfoLabel.setText("Stored backups: unavailable");
+            updateBackupFolderStatusLabel.setText("Unable to inspect backup folder: " + e.getMessage());
             log.error("Failed to refresh update backup folder info", e);
         }
     }

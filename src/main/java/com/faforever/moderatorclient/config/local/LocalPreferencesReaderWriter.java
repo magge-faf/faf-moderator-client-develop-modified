@@ -38,7 +38,7 @@ public class LocalPreferencesReaderWriter {
         }
     }
 
-    public void write(LocalPreferences localPreferences) {
+    public boolean write(LocalPreferences localPreferences) {
         try {
             if (prefsPath.getParent() != null && Files.notExists(prefsPath.getParent())) {
                 Files.createDirectories(prefsPath.getParent());
@@ -48,8 +48,10 @@ public class LocalPreferencesReaderWriter {
                         .writeValue(writer, localPreferences);
             }
             log.info("Preferences saved to {}", prefsPath);
+            return true;
         } catch (IOException e) {
             log.error("Failed to write preferences", e);
+            return false;
         }
     }
 }

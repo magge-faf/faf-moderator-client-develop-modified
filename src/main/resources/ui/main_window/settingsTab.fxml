@@ -36,6 +36,7 @@
                 </HBox>
                 <CheckBox fx:id="darkModeCheckBox" mnemonicParsing="false" text="Dark Mode"/>
                 <CheckBox fx:id="fetchBansOnStartupCheckBox" mnemonicParsing="false" text="Load bans at startup"/>
+                <Button mnemonicParsing="false" onAction="#onSave" text="Save Settings"/>
             </VBox>
 
             <Separator/>
@@ -52,7 +53,7 @@
                             text="View AI Prompt"/>
                 </HBox>
                 <CheckBox fx:id="autoBackupConfigurationFolderOnSaveCheckBox" mnemonicParsing="false"
-                          text="Automatically back up the app data folder when settings are saved"/>
+                          text="Automatically back up the app data folder when Save Settings is clicked"/>
                 <HBox spacing="10">
                     <Button mnemonicParsing="false" onAction="#onBackupConfigurationFolderNow" text="Back Up App Data Now"/>
                 </HBox>
@@ -78,8 +79,8 @@
 
             <VBox spacing="5">
                 <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="Update Backups"/>
-                <Label text="Backup folder for automatic updates and app data archives. Default: app root / logs." wrapText="true"/>
-                <TextField fx:id="updateBackupFolderTextField" promptText="App root / logs"/>
+                <Label text="Backup folder for automatic updates and app data archives. Default: app root / backup." wrapText="true"/>
+                <TextField fx:id="updateBackupFolderTextField" promptText="App root / backup"/>
                 <HBox spacing="10">
                     <Button fx:id="chooseUpdateBackupFolderButton" mnemonicParsing="false"
                             onAction="#onChooseUpdateBackupFolder" text="Browse..."/>
@@ -87,15 +88,15 @@
                     <Button mnemonicParsing="false" onAction="#onOpenUpdateBackupFolder" text="Open Folder"/>
                 </HBox>
                 <Label fx:id="updateBackupFolderDefaultLabel" text="" wrapText="true"/>
-                <Label fx:id="updateBackupFolderInfoLabel" text="Stored logs: 0.00 MB across 0 files." wrapText="true"/>
+                <Label fx:id="updateBackupFolderInfoLabel" text="Stored backups: 0.00 MB across 0 files." wrapText="true"/>
                 <HBox alignment="CENTER_LEFT" spacing="10">
-                    <Label text="Auto purge logs older than"/>
+                    <Label text="Auto purge backups older than"/>
                     <Spinner fx:id="updateBackupAutoPurgeDaysSpinner" editable="true" prefWidth="90.0"/>
                     <Label text="days (0 disables)"/>
                 </HBox>
                 <HBox spacing="10">
                     <Button mnemonicParsing="false" onAction="#onRefreshUpdateBackupFolderInfo" text="Refresh Size"/>
-                    <Button mnemonicParsing="false" onAction="#onPurgeOldUpdateBackups" text="Purge Older Logs Now"/>
+                    <Button mnemonicParsing="false" onAction="#onPurgeOldUpdateBackups" text="Purge Older Backups Now"/>
                 </HBox>
                 <Label fx:id="updateBackupFolderStatusLabel" text="" wrapText="true"/>
             </VBox>

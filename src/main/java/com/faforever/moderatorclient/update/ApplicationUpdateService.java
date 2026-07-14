@@ -109,8 +109,8 @@ public class ApplicationUpdateService {
 
     public Path resolveDefaultBackupDirectory() {
         return resolveInstallLocation()
-                .map(installLocation -> installLocation.installRoot().resolve("logs"))
-                .orElseGet(() -> Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize().resolve("logs"));
+                .map(installLocation -> installLocation.installRoot().resolve("backup"))
+                .orElseGet(() -> Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize().resolve("backup"));
     }
 
     public Path resolveConfiguredBackupDirectory() {
