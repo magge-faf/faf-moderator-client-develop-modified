@@ -246,7 +246,7 @@ public class IrcClientService implements IrcClient, DisposableBean {
             return CompletableFuture.failedFuture(new IllegalStateException("A history request is already running for " + normalizedTarget + "."));
         }
 
-        log.info("IRC history request: recent target={} limit={}", normalizedTarget, request.pageLimit());
+        log.debug("IRC history request: recent target={} limit={}", normalizedTarget, request.pageLimit());
         connectionManager.sendRawLine("CHATHISTORY LATEST " + toWireTarget(normalizedTarget) + " * " + request.pageLimit());
         return future.orTimeout(20, TimeUnit.SECONDS).whenComplete((unused, throwable) -> clearHistoryRequest(normalizedTarget));
     }
@@ -278,7 +278,7 @@ public class IrcClientService implements IrcClient, DisposableBean {
             return CompletableFuture.failedFuture(new IllegalStateException("A history request is already running for " + normalizedTarget + "."));
         }
 
-        log.info("IRC history request: since target={} since={} limit={}", normalizedTarget, request.since(), request.pageLimit());
+        log.debug("IRC history request: since target={} since={} limit={}", normalizedTarget, request.since(), request.pageLimit());
         connectionManager.sendRawLine("CHATHISTORY LATEST " + toWireTarget(normalizedTarget) + " * " + request.pageLimit());
         return future.orTimeout(HISTORY_SINCE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .whenComplete((unused, throwable) -> clearHistoryRequest(normalizedTarget));
@@ -371,11 +371,11 @@ public class IrcClientService implements IrcClient, DisposableBean {
         IrcChannelMessageEvent resolvedEvent = historicalMessageEvent(parsedEvent, event);
         try {
             if (IrcNoiseFilter.isHistoryServerMessage(resolvedEvent.author())) {
-                log.info("IRC history replay ignored HistServ channel={} message={}", resolvedEvent.channel(), resolvedEvent.message());
+                log.debug("IRC history replay ignored HistServ channel={} message={}", resolvedEvent.channel(), resolvedEvent.message());
                 return;
             }
             if (resolvedEvent.historical()) {
-                log.info("IRC history replay chat channel={} author={} messageId={} text={}",
+                log.debug("IRC history replay chat channel={} author={} messageId={} text={}",
                         resolvedEvent.channel(),
                         resolvedEvent.author(),
                         resolvedEvent.messageId(),
@@ -404,7 +404,7 @@ public class IrcClientService implements IrcClient, DisposableBean {
         HistoryRequestState active = pending.withReachedServerEnd(reachedServerEnd);
         activeHistoryRequests.put(event.getReferenceTag().getReferenceTag(), active);
         historicalBatchReferences.add(event.getReferenceTag().getReferenceTag());
-        log.info("IRC history batch start: ref={} target={} events={} reachedServerEnd={}",
+        log.debug("IRC history batch start: ref={} target={} events={} reachedServerEnd={}",
                 event.getReferenceTag().getReferenceTag(),
                 target,
                 event.getReferenceTag().getEvents().size(),
@@ -420,7 +420,7 @@ public class IrcClientService implements IrcClient, DisposableBean {
         }
 
         HistoryPage page = summarizeHistoryPage(event);
-        log.info("IRC history batch end: ref={} target={} eventCount={} earliestSelector={} earliestTimestamp={}",
+        log.debug("IRC history batch end: ref={} target={} eventCount={} earliestSelector={} earliestTimestamp={}",
                 batchReference,
                 active.target(),
                 page.visibleMessageCount(),
@@ -441,7 +441,7 @@ public class IrcClientService implements IrcClient, DisposableBean {
         int totalLoaded = active.totalLoaded() + page.visibleMessageCount();
 
         if (active.mode() == Mode.RECENT) {
-            log.info("IRC history request complete: target={} loaded={} mode=recent reachedServerEnd={}",
+            log.debug("IRC history request complete: target={} loaded={} mode=recent reachedServerEnd={}",
                     active.target(), totalLoaded, active.reachedServerEnd());
             active.future().complete(new IrcHistoryLoadResult(active.target(), totalLoaded, null, false, active.reachedServerEnd()));
             return;
@@ -455,7 +455,7 @@ public class IrcClientService implements IrcClient, DisposableBean {
                 || page.earliestSelector() == null;
 
         if (stop) {
-            log.info("IRC history request complete: target={} loaded={} mode=since reachedRequestedStart={} reachedServerEnd={}",
+            log.debug("IRC history request complete: target={} loaded={} mode=since reachedRequestedStart={} reachedServerEnd={}",
                     active.target(), totalLoaded, reachedRequestedStart, active.reachedServerEnd());
             active.future().complete(new IrcHistoryLoadResult(
                     active.target(),
@@ -469,7 +469,7 @@ public class IrcClientService implements IrcClient, DisposableBean {
 
         HistoryRequestState nextPage = active.withTotalLoaded(totalLoaded).withReachedServerEnd(false);
         pendingHistoryRequests.put(active.target(), nextPage);
-        log.info("IRC history request continue: target={} loaded={} before={}", active.target(), totalLoaded, page.earliestSelector());
+        log.debug("IRC history request continue: target={} loaded={} before={}", active.target(), totalLoaded, page.earliestSelector());
         connectionManager.sendRawLine("CHATHISTORY BEFORE " + toWireTarget(active.target()) + " " + page.earliestSelector() + " " + active.pageLimit());
     }
 
@@ -738,7 +738,7 @@ public class IrcClientService implements IrcClient, DisposableBean {
             eventDispatcher.dispatch(new IrcDebugTrafficEvent(IrcTrafficDirection.INBOUND, line, Instant.now()));
         }
         if (shouldLogHistoryTraffic(line)) {
-            log.info("[IRC IN ] {}", line);
+            log.debug("[IRC IN ] {}", line);
         }
     }
 
@@ -749,7 +749,7 @@ public class IrcClientService implements IrcClient, DisposableBean {
             eventDispatcher.dispatch(new IrcDebugTrafficEvent(IrcTrafficDirection.OUTBOUND, line, Instant.now()));
         }
         if (shouldLogHistoryTraffic(line)) {
-            log.info("[IRC OUT] {}", line);
+            log.debug("[IRC OUT] {}", line);
         }
     }
 
