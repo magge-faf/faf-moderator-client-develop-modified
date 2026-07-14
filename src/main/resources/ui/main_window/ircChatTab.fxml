@@ -3,10 +3,10 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.CheckBox?>
-<?import javafx.scene.control.DatePicker?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.FlowPane?>
@@ -62,74 +62,76 @@
                                 <CheckBox fx:id="autoConnectCheckBox" mnemonicParsing="false" text="Auto-connect on startup"/>
                                 <CheckBox fx:id="suppressJoinLeaveNoiseCheckBox" mnemonicParsing="false" text="Hide system messages"/>
                                 <CheckBox fx:id="autoLoadLastDayHistoryCheckBox" mnemonicParsing="false" text="Auto-load last 8 hours of chat history"/>
+                                <CheckBox fx:id="showLocalLogCheckBox" mnemonicParsing="false" text="Show local log"/>
                                 <CheckBox fx:id="mentionSoundCheckBox" mnemonicParsing="false" text="Mention sound"/>
                                 <CheckBox fx:id="mentionToastCheckBox" mnemonicParsing="false" text="Mention notification"/>
                                 <Button fx:id="testMentionNotificationButton" mnemonicParsing="false"
                                         onAction="#testMentionNotification" text="Test notification"/>
                             </children>
                         </FlowPane>
-                        <HBox alignment="TOP_LEFT" spacing="12.0">
-                            <children>
-                                <HBox alignment="CENTER_LEFT" spacing="8.0">
-                                    <children>
-                                        <Label text="History" styleClass="irc-section-title"/>
-                                        <DatePicker fx:id="historySinceDatePicker"/>
-                                        <Button fx:id="loadHistorySinceButton" mnemonicParsing="false"
-                                                onAction="#loadHistorySinceDate" text="Load since date"/>
-                                    </children>
-                                </HBox>
-                                <VBox spacing="4.0" HBox.hgrow="ALWAYS">
-                                    <children>
-                                        <Label text="Older date ranges may time out. Loading more than 1 day back is possible, but not recommended."
-                                               wrapText="true" styleClass="irc-history-warning"/>
-                                        <Label fx:id="historyStatusLabel"
-                                               text="Auto-load covers the last 8 hours. Use manual history for older chat."
-                                               wrapText="true" styleClass="irc-subtle-label"/>
-                                    </children>
-                                </VBox>
-                            </children>
-                        </HBox>
                     </children>
                 </VBox>
             </children>
         </VBox>
     </top>
     <center>
-        <HBox spacing="12.0">
-            <padding>
-                <Insets bottom="10.0" left="12.0" right="12.0"/>
-            </padding>
-            <children>
-                <VBox prefWidth="220.0" spacing="8.0" styleClass="irc-panel">
+        <SplitPane fx:id="contentSplitPane" orientation="VERTICAL" dividerPositions="0.18">
+            <items>
+                <VBox fx:id="localLogContainer" spacing="6.0" styleClass="irc-panel">
+                    <padding>
+                        <Insets bottom="10.0" left="12.0" right="12.0" top="0.0"/>
+                    </padding>
                     <children>
-                        <Label text="Channels" styleClass="irc-section-title"/>
-                        <ListView fx:id="channelListView" VBox.vgrow="ALWAYS"/>
+                        <HBox alignment="CENTER_LEFT" spacing="8.0">
+                            <children>
+                                <Label text="Local Log" styleClass="irc-section-title"/>
+                                <Region HBox.hgrow="ALWAYS"/>
+                                <Button fx:id="clearLocalLogButton" mnemonicParsing="false"
+                                        onAction="#clearLocalLog" text="Clear"/>
+                            </children>
+                        </HBox>
+                        <Label text="Auto-load covers the last 8 hours of chat history."
+                               wrapText="true" styleClass="irc-subtle-label"/>
+                        <ListView fx:id="localLogListView" VBox.vgrow="ALWAYS"/>
                     </children>
                 </VBox>
-                <VBox spacing="8.0" styleClass="irc-panel" HBox.hgrow="ALWAYS">
+                <HBox spacing="12.0">
+                    <padding>
+                        <Insets bottom="10.0" left="12.0" right="12.0"/>
+                    </padding>
                     <children>
-                        <Label text="Conversation" styleClass="irc-section-title"/>
-                        <Label fx:id="activeTopicLabel" text="No topic set" styleClass="irc-topic-label"/>
-                        <Separator/>
-                        <ListView fx:id="messageListView" VBox.vgrow="ALWAYS"/>
+                        <VBox prefWidth="220.0" spacing="8.0" styleClass="irc-panel">
+                            <children>
+                                <Label text="Channels" styleClass="irc-section-title"/>
+                                <ListView fx:id="channelListView" VBox.vgrow="ALWAYS"/>
+                            </children>
+                        </VBox>
+                        <VBox spacing="8.0" styleClass="irc-panel" HBox.hgrow="ALWAYS">
+                            <children>
+                                <Label text="Conversation" styleClass="irc-section-title"/>
+                                <Label fx:id="activeTopicLabel" text="No topic set" styleClass="irc-topic-label"/>
+                                <Separator/>
+                                <ListView fx:id="messageListView" VBox.vgrow="ALWAYS"/>
+                            </children>
+                        </VBox>
+                        <VBox prefWidth="240.0" spacing="8.0" styleClass="irc-panel">
+                            <children>
+                                <Label fx:id="usersHeaderLabel" text="Users (0 online)" styleClass="irc-section-title"/>
+                                <TextField fx:id="userSearchField" promptText="Search users"/>
+                                <Button fx:id="pmSelectedUserButton" mnemonicParsing="false" onAction="#openPrivateMessage" text="PM selected"/>
+                                <Label text="Manual kick target" styleClass="irc-section-title"/>
+                                <Label text="Manual target overrides selected IRC user" wrapText="true" styleClass="irc-subtle-label"/>
+                                <TextField fx:id="kickLookupField" promptText="Enter ID / Name"/>
+                                <Button fx:id="kickGameButton" mnemonicParsing="false" onAction="#kickSelectedUserFromGame" text="Kick from game"/>
+                                <Button fx:id="kickClientButton" mnemonicParsing="false" onAction="#kickSelectedUserFromClient" text="Kick from client"/>
+                                <Button fx:id="kickGameAndClientButton" mnemonicParsing="false" onAction="#kickSelectedUserFromGameAndClient" text="Kick from game + client"/>
+                                <ListView fx:id="userListView" VBox.vgrow="ALWAYS"/>
+                            </children>
+                        </VBox>
                     </children>
-                </VBox>
-                <VBox prefWidth="240.0" spacing="8.0" styleClass="irc-panel">
-                    <children>
-                        <Label fx:id="usersHeaderLabel" text="Users (0 online)" styleClass="irc-section-title"/>
-                        <TextField fx:id="userSearchField" promptText="Search users"/>
-                        <Button fx:id="pmSelectedUserButton" mnemonicParsing="false" onAction="#openPrivateMessage" text="PM selected"/>
-                        <Label text="Manual kick target" styleClass="irc-section-title"/>
-                        <Label text="Manual target overrides selected IRC user" wrapText="true" styleClass="irc-subtle-label"/>
-                        <TextField fx:id="kickLookupField" promptText="Enter ID / Name"/>
-                        <Button fx:id="kickGameButton" mnemonicParsing="false" onAction="#kickSelectedUserFromGame" text="Kick from game"/>
-                        <Button fx:id="kickClientButton" mnemonicParsing="false" onAction="#kickSelectedUserFromClient" text="Kick from client"/>
-                        <Button fx:id="kickGameAndClientButton" mnemonicParsing="false" onAction="#kickSelectedUserFromGameAndClient" text="Kick from game + client"/>
-                        <ListView fx:id="userListView" VBox.vgrow="ALWAYS"/>
-                    </children>
-                </VBox>
-            </children>
-        </HBox>
+                </HBox>
+            </items>
+        </SplitPane>
     </center>
     <bottom>
         <HBox spacing="10.0" styleClass="irc-composer" BorderPane.alignment="CENTER">

@@ -228,6 +228,9 @@ public class IrcClientService implements IrcClient, DisposableBean {
         if (normalizedTarget.isBlank()) {
             return CompletableFuture.failedFuture(new IllegalArgumentException("Select a channel first."));
         }
+        if (isPrivateConversation(normalizedTarget)) {
+            return CompletableFuture.failedFuture(new IllegalArgumentException("IRC history is only supported for channels."));
+        }
         if (connectionState.get().status() != IrcConnectionStatus.CONNECTED) {
             return CompletableFuture.failedFuture(new IllegalStateException("IRC must be connected before loading history."));
         }
@@ -256,6 +259,9 @@ public class IrcClientService implements IrcClient, DisposableBean {
         String normalizedTarget = normalizeTarget(target);
         if (normalizedTarget.isBlank()) {
             return CompletableFuture.failedFuture(new IllegalArgumentException("Select a channel first."));
+        }
+        if (isPrivateConversation(normalizedTarget)) {
+            return CompletableFuture.failedFuture(new IllegalArgumentException("IRC history is only supported for channels."));
         }
         if (since == null) {
             return CompletableFuture.failedFuture(new IllegalArgumentException("A start time is required."));

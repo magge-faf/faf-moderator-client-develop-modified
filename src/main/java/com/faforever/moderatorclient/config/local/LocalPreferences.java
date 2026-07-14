@@ -522,6 +522,7 @@ public class LocalPreferences {
         boolean suppressJoinLeaveNoise = true;
         boolean autoLoadLastDayHistory = true;
         boolean mentionSoundEnabled = true;
+        boolean showIrcLocalLog = true;
         boolean mentionToastEnabled = true;
         String selectedChannel = "#aeolus";
         List<String> autoJoinChannels = new ArrayList<>(List.of("#aeolus", "#moderators"));

@@ -87,11 +87,11 @@
 }
 
 .irc-subtle-label {
-    -fx-text-fill: #9ea7b3;
+    -fx-text-fill: derive(lightgray, -18%);
 }
 
 .irc-shell {
-    -fx-background-color: linear-gradient(to bottom, #f5f8fc 0%, #eef3f8 100%);
+    -fx-background-color: -fx-base;
 }
 
 .irc-top {
@@ -101,12 +101,11 @@
 .irc-hero,
 .irc-panel,
 .irc-composer {
-    -fx-background-color: rgba(255, 255, 255, 0.95);
-    -fx-background-radius: 8;
-    -fx-border-color: #d7e1ec;
-    -fx-border-radius: 8;
+    -fx-background-color: derive(-fx-base, 8%);
+    -fx-background-radius: 4;
+    -fx-border-color: derive(-fx-base, 22%);
+    -fx-border-radius: 4;
     -fx-padding: 12;
-    -fx-effect: dropshadow(gaussian, rgba(31, 45, 61, 0.08), 18, 0.18, 0, 6);
 }
 
 .irc-hero {
@@ -114,20 +113,20 @@
 }
 
 .irc-title {
-    -fx-font-size: 20px;
+    -fx-font-size: 18px;
     -fx-font-weight: bold;
-    -fx-text-fill: #18212b;
+    -fx-text-fill: lightgray;
 }
 
 .irc-section-title {
     -fx-font-size: 12px;
     -fx-font-weight: bold;
-    -fx-text-fill: #3d4b5a;
+    -fx-text-fill: lightgray;
 }
 
 .irc-status-block {
-    -fx-background-color: rgba(241, 246, 252, 0.95);
-    -fx-background-radius: 6;
+    -fx-background-color: derive(-fx-base, 14%);
+    -fx-background-radius: 4;
     -fx-padding: 6 8 6 8;
 }
 
@@ -137,35 +136,33 @@
 
 .irc-status-label {
     -fx-font-weight: bold;
-    -fx-text-fill: #18212b;
+    -fx-text-fill: lightgray;
 }
 
 .irc-history-warning {
-    -fx-text-fill: #9b6a17;
+    -fx-text-fill: #d0a733;
 }
 
 .irc-panel .text-field,
 .irc-composer .text-field,
 .irc-panel .date-picker,
 .irc-panel .date-picker .text-field {
-    -fx-background-color: #f7fafe;
-    -fx-background-radius: 5;
-    -fx-border-color: #cfdbe8;
-    -fx-border-radius: 5;
-    -fx-text-fill: #1e2730;
-    -fx-prompt-text-fill: #7a8794;
+    -fx-background-color: -fx-control-inner-background;
+    -fx-background-radius: 3;
+    -fx-border-color: derive(-fx-base, 30%);
+    -fx-border-radius: 3;
+    -fx-text-fill: lightgray;
+    -fx-prompt-text-fill: gray;
 }
 
 .irc-panel .date-picker .arrow-button {
-    -fx-background-color: #e5edf6;
-    -fx-background-radius: 0 5 5 0;
+    -fx-background-color: derive(-fx-base, 25%);
+    -fx-background-radius: 0 3 3 0;
 }
 
 .irc-panel .button,
 .irc-composer .button {
-    -fx-background-color: linear-gradient(to bottom, #f4f7fb, #e0e8f1);
-    -fx-background-radius: 5;
-    -fx-text-fill: #1f2933;
+    -fx-background-radius: 3;
     -fx-padding: 8 14 8 14;
 }
 
@@ -182,7 +179,7 @@
 #sendMessageButton,
 #testMentionNotificationButton,
 #pmSelectedUserButton {
-    -fx-background-color: linear-gradient(to bottom, #5f8fd8, #3d6fb7);
+    -fx-base: -fx-accent;
     -fx-text-fill: white;
 }
 
@@ -191,15 +188,14 @@
 #kickGameButton,
 #kickClientButton,
 #kickGameAndClientButton {
-    -fx-background-color: linear-gradient(to bottom, #e8edf3, #d9e0e8);
+    -fx-background-color: derive(-fx-base, 25%);
 }
 
 .irc-panel .list-view {
-    -fx-background-color: transparent;
+    -fx-background-color: -fx-control-inner-background;
     -fx-background-insets: 0;
     -fx-padding: 4;
-    -fx-control-inner-background: #f7fafe;
-    -fx-background-radius: 4;
+    -fx-background-radius: 3;
 }
 
 .irc-panel .list-view .scroll-bar:vertical {
@@ -215,14 +211,14 @@
 }
 
 .irc-panel .list-cell:selected {
-    -fx-background-color: rgba(95, 143, 216, 0.22);
+    -fx-background-color: derive(-fx-accent, -10%);
 }
 
 .irc-topic-label {
     -fx-font-style: normal;
-    -fx-text-fill: #4d6788;
-    -fx-background-color: #eef4fb;
-    -fx-background-radius: 4;
+    -fx-text-fill: derive(lightgray, -5%);
+    -fx-background-color: -fx-control-inner-background;
+    -fx-background-radius: 3;
     -fx-padding: 8 10 8 10;
 }
 
@@ -232,10 +228,10 @@
 
 .irc-message-meta {
     -fx-font-weight: bold;
-    -fx-text-fill: #5b6470;
+    -fx-text-fill: derive(lightgray, -12%);
 }
 
 .irc-message-body {
-    -fx-text-fill: #20242a;
+    -fx-text-fill: lightgray;
 }
 
