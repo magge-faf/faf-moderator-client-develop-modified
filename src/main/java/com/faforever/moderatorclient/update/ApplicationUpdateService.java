@@ -104,7 +104,21 @@ public class ApplicationUpdateService {
     }
 
     public boolean canSelfUpdate(GithubRelease release) {
-        return findMatchingAsset(release).isPresent() && resolveInstallLocation().isPresent();
+        return describeAutomaticUpdateUnavailableReason(release).isEmpty();
+    }
+
+    public Optional<String> describeAutomaticUpdateUnavailableReason(GithubRelease release) {
+        if (findMatchingAsset(release).isEmpty()) {
+            return Optional.of("No compatible downloadable release zip was found for this platform in "
+                    + release.displayName() + ".");
+        }
+        if (resolveInstallLocation().isEmpty()) {
+            return Optional.of("This run does not look like a packaged release install.\n\n"
+                    + "Self-update currently only works when the client was started from an unpacked release folder "
+                    + "that contains the normal bin/ and lib/ directories.\n\n"
+                    + "If you started the app from source, IntelliJ, Gradle, or some custom layout, install the release package manually.");
+        }
+        return describeInstallerRuntimeUnavailableReason();
     }
 
     public Path resolveDefaultBackupDirectory() {
@@ -532,6 +546,44 @@ public class ApplicationUpdateService {
 
     private boolean isWindows() {
         return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+    }
+
+    private Optional<String> describeInstallerRuntimeUnavailableReason() {
+        if (isWindows()) {
+            String systemRoot = System.getenv("SystemRoot") == null ? "C:\\Windows" : System.getenv("SystemRoot");
+            Path bundledPowerShell = Path.of(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+            if (isExecutableAvailable("powershell.exe") || Files.isRegularFile(bundledPowerShell)) {
+                return Optional.empty();
+            }
+            return Optional.of("PowerShell is required for automatic updates on Windows.\n\n"
+                    + "Install or enable Windows PowerShell, then restart the client and try the automatic update again. "
+                    + "You can still use Manual Download.");
+        }
+
+        if (isExecutableAvailable("sh")) {
+            return Optional.empty();
+        }
+        return Optional.of("A POSIX sh runtime is required for automatic updates on this system.\n\n"
+                + "Install a compatible shell, then restart the client and try the automatic update again. "
+                + "You can still use Manual Download.");
+    }
+
+    private boolean isExecutableAvailable(String executableName) {
+        String pathValue = System.getenv("PATH");
+        if (pathValue == null || pathValue.isBlank()) {
+            return false;
+        }
+
+        for (String directory : pathValue.split(java.io.File.pathSeparator)) {
+            if (directory == null || directory.isBlank()) {
+                continue;
+            }
+            Path executablePath = Path.of(directory, executableName);
+            if (Files.isRegularFile(executablePath)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void purgeConfiguredBackupFilesIfEnabled() {

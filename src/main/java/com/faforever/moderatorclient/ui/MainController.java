@@ -31,7 +31,6 @@ import javafx.scene.control.Dialog;
 import javafx.scene.control.DialogPane;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
-import javafx.scene.control.Spinner;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextArea;
@@ -483,44 +482,36 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     }
 
     private void showUpdatePopup(GithubRelease release) {
-        Optional<GithubReleaseAsset> matchingAsset = applicationUpdateService.findMatchingAsset(release);
-        boolean autoUpdateAvailable = applicationUpdateService.canSelfUpdate(release);
-        int defaultReminderDays = Math.max(1, localPreferences.getVersionReminder().getReminderDelayDays());
+        Optional<String> autoUpdateUnavailableReason = applicationUpdateService.describeAutomaticUpdateUnavailableReason(release);
 
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.setTitle("Update Available");
         dialog.setHeaderText("Version " + release.displayName() + " is available");
 
         ButtonType updateButtonType = new ButtonType("Backup + Update + Restart", ButtonBar.ButtonData.OK_DONE);
-        ButtonType nextStartButtonType = new ButtonType("Show At Next Start", ButtonBar.ButtonData.LEFT);
-        ButtonType remindLaterButtonType = new ButtonType("Remind Me Later", ButtonBar.ButtonData.CANCEL_CLOSE);
+        ButtonType closeButtonType = new ButtonType("Not Now", ButtonBar.ButtonData.CANCEL_CLOSE);
 
-        dialog.getDialogPane().getButtonTypes().addAll(updateButtonType, remindLaterButtonType, nextStartButtonType);
+        dialog.getDialogPane().getButtonTypes().addAll(updateButtonType, closeButtonType);
 
         Label message = new Label(
                 "You are running " + ApplicationVersion.CURRENT_VERSION + ".\n" +
-                "You can open the latest changelog, download the release directly, or let the client update itself."
+                "Review the changelog first, or let the client back up this installation, update, and restart."
         );
         message.setWrapText(true);
-
-        Spinner<Integer> reminderDaysSpinner = new Spinner<>(1, 90, defaultReminderDays);
-        reminderDaysSpinner.setEditable(true);
-
-        HBox reminderBox = new HBox(8, new Label("Remind me again in"), reminderDaysSpinner, new Label("days"));
 
         Button changelogButton = new Button("Show Change Log");
         changelogButton.setOnAction(event -> showChangelogDialog(release));
 
-        Button downloadButton = new Button(matchingAsset.isPresent() ? "Direct Download" : "Open Release Page");
+        Button downloadButton = new Button("Manual Download");
         downloadButton.setOnAction(event -> platformService.showDocument(
-                matchingAsset.map(GithubReleaseAsset::browserDownloadUrl).orElse(release.htmlUrl())
+                applicationUpdateService.findMatchingAsset(release)
+                        .map(GithubReleaseAsset::browserDownloadUrl)
+                        .orElse(release.htmlUrl())
         ));
 
-        VBox content = new VBox(12, message, reminderBox, new HBox(8, changelogButton, downloadButton));
-        if (!autoUpdateAvailable) {
-            Label autoUpdateInfo = new Label(
-                    "Self-update is only available from an unpacked release install with the normal bin/lib folder layout."
-            );
+        VBox content = new VBox(12, message, new HBox(8, changelogButton, downloadButton));
+        if (autoUpdateUnavailableReason.isPresent()) {
+            Label autoUpdateInfo = new Label(autoUpdateUnavailableReason.get());
             autoUpdateInfo.setWrapText(true);
             content.getChildren().add(autoUpdateInfo);
         }
@@ -528,36 +519,24 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         dialog.getDialogPane().setContent(content);
         applyDialogStyles(dialog.getDialogPane());
 
-        ButtonType result = dialog.showAndWait().orElse(remindLaterButtonType);
+        ButtonType result = dialog.showAndWait().orElse(closeButtonType);
         if (result == updateButtonType) {
-            if (!autoUpdateAvailable) {
-                showAutomaticUpdateUnavailable(release, matchingAsset.isPresent());
+            if (autoUpdateUnavailableReason.isPresent()) {
+                showAutomaticUpdateUnavailable(autoUpdateUnavailableReason.get());
                 return;
             }
             startAutomaticUpdate(release);
             return;
         }
 
-        if (result == nextStartButtonType) {
-            localPreferences.getVersionReminder().scheduleForNextStart(release.tagName(), reminderDaysSpinner.getValue());
-        } else {
-            localPreferences.getVersionReminder().scheduleAfterDays(release.tagName(), reminderDaysSpinner.getValue());
-        }
+        localPreferences.getVersionReminder().scheduleForNextStart(
+                release.tagName(),
+                localPreferences.getVersionReminder().getReminderDelayDays()
+        );
         localPreferencesReaderWriter.write(localPreferences);
     }
 
-    private void showAutomaticUpdateUnavailable(GithubRelease release, boolean hasMatchingAsset) {
-        String detail;
-        if (!hasMatchingAsset) {
-            detail = "No compatible downloadable release zip was found for this platform in "
-                    + release.displayName() + ".";
-        } else {
-            detail = "This run does not look like a packaged release install.\n\n"
-                    + "Self-update currently only works when the client was started from an unpacked release folder "
-                    + "that contains the normal bin/ and lib/ directories.\n\n"
-                    + "If you started the app from source, IntelliJ, Gradle, or some custom layout, use Direct Download instead.";
-        }
-
+    private void showAutomaticUpdateUnavailable(String detail) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle("Self-Update Unavailable");
         alert.setHeaderText("Backup + Update + Restart is not available here");
