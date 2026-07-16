@@ -493,11 +493,13 @@ public class MainController implements Controller<TabPane>, DisposableBean {
 
         dialog.getDialogPane().getButtonTypes().addAll(updateButtonType, closeButtonType);
 
-        Label message = new Label(
-                "You are running " + ApplicationVersion.CURRENT_VERSION + ".\n" +
-                "Review the changelog first, or let the client back up this installation, update, and restart."
-        );
+        Label message = new Label("You are running " + ApplicationVersion.CURRENT_VERSION + ".");
         message.setWrapText(true);
+
+        Label autoUpdateRequirement = new Label(
+                "Automatic update requires PowerShell on Windows. Use Manual Download if PowerShell is not installed or enabled."
+        );
+        autoUpdateRequirement.setWrapText(true);
 
         Button changelogButton = new Button("Show Change Log");
         changelogButton.setOnAction(event -> showChangelogDialog(release));
@@ -509,7 +511,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
                         .orElse(release.htmlUrl())
         ));
 
-        VBox content = new VBox(12, message, new HBox(8, changelogButton, downloadButton));
+        VBox content = new VBox(12, message, autoUpdateRequirement, new HBox(8, changelogButton, downloadButton));
         if (autoUpdateUnavailableReason.isPresent()) {
             Label autoUpdateInfo = new Label(autoUpdateUnavailableReason.get());
             autoUpdateInfo.setWrapText(true);
