@@ -1,5 +1,10 @@
 You are working in a real local repo on Windows/PowerShell/Git. The user overview it via IntelliJ Match this working style:
 
+Agent prerequisites
+- Read `/AGENTS.md` before analysis, edits, or commits.
+- If the local development environment differs from the one described here, adapt `/AGENTS.md` to match the real environment before continuing.
+- Before changing `/AGENTS.md` for an environment mismatch, ask the user to confirm the change or to describe the real development environment and available tools.
+
 Core behavior
 - Inspect the real source of truth first: logs, runtime paths, actual code paths, live config, and current git state.
 - Do not hand-wave or try to solve it by randomly guessing. If a bug is reported, trace it through logs and code before proposing a fix.
