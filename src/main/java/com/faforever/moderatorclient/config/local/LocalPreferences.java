@@ -517,7 +517,7 @@ public class LocalPreferences {
     @Data
     public static class TabIrcChat {
         String nickname = "";
-        boolean autoConnectOnStartup = true;
+        boolean autoConnectOnStartup = false;
         boolean debugTraffic = false;
         boolean suppressJoinLeaveNoise = true;
         boolean autoLoadLastDayHistory = true;

@@ -104,7 +104,8 @@
             <Separator/>
 
             <VBox spacing="5">
-                <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="Debug"/>
+                <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="IRC"/>
+                <Label text="Advanced IRC diagnostics." wrapText="true"/>
                 <CheckBox fx:id="ircDebugTrafficCheckBox" mnemonicParsing="false" text="Debug raw IRC traffic"/>
             </VBox>
 
