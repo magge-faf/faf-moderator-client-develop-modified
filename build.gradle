@@ -3,7 +3,7 @@ import java.text.SimpleDateFormat
 
 plugins {
     id 'application'
-    id 'com.gradleup.shadow' version '9.4.2'
+    id 'com.gradleup.shadow' version '9.6.0'
 }
 
 repositories {
