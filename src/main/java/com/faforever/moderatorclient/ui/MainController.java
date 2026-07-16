@@ -345,24 +345,12 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     }
 
     public void display() {
-        if (localPreferences.getAutoLogin().isEnabled()) {
-            String environment = localPreferences.getAutoLogin().getEnvironment();
-            String refreshToken = localPreferences.getAutoLogin().getRefreshToken();
+        String environment = localPreferences.getAutoLogin().getEnvironment();
+        String refreshToken = localPreferences.getAutoLogin().getRefreshToken();
+        boolean hasAutoLoginCredentials = environment != null && !environment.isBlank()
+                && refreshToken != null && !refreshToken.isBlank();
 
-            if (environment == null || environment.isBlank()) {
-                log.warn("Auto login configuration is missing the environment. Disabling auto login and showing login dialog.");
-                localPreferences.getAutoLogin().setEnabled(false);
-                display();
-                return;
-            }
-
-            if (refreshToken == null || refreshToken.isBlank()) {
-                log.warn("Auto login configuration is missing the refresh token. Disabling auto login and showing login dialog.");
-                localPreferences.getAutoLogin().setEnabled(false);
-                display();
-                return;
-            }
-
+        if (localPreferences.getAutoLogin().isEnabled() && hasAutoLoginCredentials) {
             EnvironmentProperties environmentProperties = applicationProperties.getEnvironments().get(environment);
             if (environmentProperties == null) {
                 log.warn("No environment configuration found for key '{}'. Disabling auto login and showing login dialog.", environment);

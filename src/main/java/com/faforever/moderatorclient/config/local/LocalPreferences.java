@@ -46,7 +46,7 @@ public class LocalPreferences {
         private static final String LOBBY_REFRESH_TOKEN_KEY = "lobbyRefreshToken";
         private static final String ENCRYPTED_LOBBY_TOKEN_KEY = "encryptedLobbyRefreshToken";
 
-        boolean enabled;
+        boolean enabled = true;
         String environment;
         @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         String refreshToken;

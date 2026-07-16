@@ -71,6 +71,7 @@ public class LoginController implements Controller<Pane> {
         fafApiCommunicationService.initialize(environmentProperties);
         fafUserCommunicationService.initialize(environmentProperties);
         lobbyOAuthService.prepare(environmentProperties);
+        localPreferences.getAutoLogin().setEnabled(rememberLoginCheckBox.isSelected());
         localPreferences.getAutoLogin().setEnvironment(environmentComboBox.getValue());
         tokenService.prepare(environmentProperties);
         loginFuture = oAuthValuesReceiver.receiveValues(environmentProperties).thenAccept(tokenService::loginWithAuthorizationCode);
