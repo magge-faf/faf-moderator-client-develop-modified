@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Duration;
@@ -22,6 +23,7 @@ import java.util.regex.Pattern;
 @Slf4j
 public class ReplayStorageService {
     private static final Duration TEMP_REPLAY_MAX_AGE = Duration.ofDays(1);
+    private static final int MAX_REPLAY_HEADER_BYTES = 8192;
     private static final Pattern TEXTUAL_GAME_TYPE_PATTERN =
             Pattern.compile("\"game_type\"\\s*:\\s*\"([^\"]+)\"");
     private static final Map<String, Integer> GAME_TYPE_BY_NAME = Map.of(
@@ -112,7 +114,7 @@ public class ReplayStorageService {
     }
 
     public ReplayCleanupResult purgeReplayFilesOlderThan(Duration maxAge) throws IOException {
-        Path replayDir = resolveReplayDirectory();
+        Path replayDir = resolveReplayDirectory().toAbsolutePath().normalize();
         if (!Files.isDirectory(replayDir)) {
             return new ReplayCleanupResult(replayDir, maxAge, 0L, 0L);
         }
@@ -122,7 +124,7 @@ public class ReplayStorageService {
         long deletedBytes = 0L;
 
         try (var paths = Files.walk(replayDir)) {
-            for (Path path : paths.filter(Files::isRegularFile).filter(file -> isReplayFile(file, cutoff)).toList()) {
+            for (Path path : paths.filter(file -> isReplayFile(file, replayDir, cutoff)).toList()) {
                 long size = Files.size(path);
                 Files.deleteIfExists(path);
                 deletedFiles++;
@@ -152,18 +154,53 @@ public class ReplayStorageService {
         }
     }
 
-    private boolean isReplayFile(Path path, Instant cutoff) {
+    private boolean isReplayFile(Path path, Path replayDir, Instant cutoff) {
+        Path normalizedPath = path.toAbsolutePath().normalize();
+        if (!normalizedPath.startsWith(replayDir) || !replayDir.equals(normalizedPath.getParent())) {
+            return false;
+        }
+        if (!Files.isRegularFile(normalizedPath, LinkOption.NOFOLLOW_LINKS)) {
+            return false;
+        }
+
         String fileName = path.getFileName() == null ? "" : path.getFileName().toString().toLowerCase();
         if (!fileName.endsWith(".fafreplay")) {
             return false;
         }
 
         try {
-            FileTime lastModifiedTime = Files.getLastModifiedTime(path);
-            return lastModifiedTime.toInstant().isBefore(cutoff);
+            FileTime lastModifiedTime = Files.getLastModifiedTime(normalizedPath);
+            return lastModifiedTime.toInstant().isBefore(cutoff) && hasReplayHeader(normalizedPath);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private boolean hasReplayHeader(Path path) throws IOException {
+        byte[] headerBytes = new byte[MAX_REPLAY_HEADER_BYTES];
+        int bytesRead;
+        try (var inputStream = Files.newInputStream(path)) {
+            bytesRead = inputStream.read(headerBytes);
+        }
+        if (bytesRead <= 0) {
+            return false;
+        }
+
+        int headerEnd = -1;
+        for (int i = 0; i < bytesRead; i++) {
+            if (headerBytes[i] == '\n') {
+                headerEnd = i;
+                break;
+            }
+        }
+        if (headerEnd <= 0) {
+            return false;
+        }
+
+        String header = new String(headerBytes, 0, headerEnd, StandardCharsets.UTF_8).trim();
+        return header.startsWith("{")
+                && header.endsWith("}")
+                && (header.contains("\"compression\"") || header.contains("\"game_type\""));
     }
 
     private int findReplayHeaderEnd(byte[] replayBytes) {

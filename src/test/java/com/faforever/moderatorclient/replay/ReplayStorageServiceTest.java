@@ -43,8 +43,8 @@ class ReplayStorageServiceTest {
 
             Path oldReplay = service.resolveReplayDirectory().resolve("old.fafreplay");
             Path newReplay = service.resolveReplayDirectory().resolve("new.fafreplay");
-            Files.writeString(oldReplay, "old");
-            Files.writeString(newReplay, "new");
+            Files.writeString(oldReplay, "{\"game_type\":0,\"compression\":\"zstd\"}\nold");
+            Files.writeString(newReplay, "{\"game_type\":0,\"compression\":\"zstd\"}\nnew");
             Files.setLastModifiedTime(oldReplay, FileTime.from(Instant.now().minus(2, ChronoUnit.DAYS)));
 
             ReplayStorageService.ReplayCleanupResult result = service.purgeReplayFilesOlderThanOneDay();
@@ -52,6 +52,49 @@ class ReplayStorageServiceTest {
             assertThat(result.deletedFileCount(), is(1L));
             assertThat(Files.exists(oldReplay), is(false));
             assertThat(Files.exists(newReplay), is(true));
+        } finally {
+            System.setProperty("user.dir", originalUserDir);
+        }
+    }
+
+    @Test
+    void purgeReplayFilesOlderThanOneDayKeepsInvalidReplayFiles(@TempDir Path tempDir) throws Exception {
+        String originalUserDir = System.getProperty("user.dir");
+        try {
+            System.setProperty("user.dir", tempDir.toString());
+            ReplayStorageService service = new ReplayStorageService(new LocalPreferences());
+            service.ensureReplayDirectoryExists();
+
+            Path invalidReplay = service.resolveReplayDirectory().resolve("invalid.fafreplay");
+            Files.writeString(invalidReplay, "not a replay");
+            Files.setLastModifiedTime(invalidReplay, FileTime.from(Instant.now().minus(2, ChronoUnit.DAYS)));
+
+            ReplayStorageService.ReplayCleanupResult result = service.purgeReplayFilesOlderThanOneDay();
+
+            assertThat(result.deletedFileCount(), is(0L));
+            assertThat(Files.exists(invalidReplay), is(true));
+        } finally {
+            System.setProperty("user.dir", originalUserDir);
+        }
+    }
+
+    @Test
+    void purgeReplayFilesOlderThanOneDayKeepsNestedReplayFiles(@TempDir Path tempDir) throws Exception {
+        String originalUserDir = System.getProperty("user.dir");
+        try {
+            System.setProperty("user.dir", tempDir.toString());
+            ReplayStorageService service = new ReplayStorageService(new LocalPreferences());
+            Path nestedDirectory = service.resolveReplayDirectory().resolve("nested");
+            Files.createDirectories(nestedDirectory);
+
+            Path nestedReplay = nestedDirectory.resolve("old.fafreplay");
+            Files.writeString(nestedReplay, "{\"game_type\":0,\"compression\":\"zstd\"}\nold");
+            Files.setLastModifiedTime(nestedReplay, FileTime.from(Instant.now().minus(2, ChronoUnit.DAYS)));
+
+            ReplayStorageService.ReplayCleanupResult result = service.purgeReplayFilesOlderThanOneDay();
+
+            assertThat(result.deletedFileCount(), is(0L));
+            assertThat(Files.exists(nestedReplay), is(true));
         } finally {
             System.setProperty("user.dir", originalUserDir);
         }
