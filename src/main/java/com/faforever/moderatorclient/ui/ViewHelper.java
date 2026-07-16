@@ -190,10 +190,16 @@ public class ViewHelper {
         changeTimeColumn.setMinWidth(180);
         tableView.getColumns().add(changeTimeColumn);
 
-        TableColumn<AvatarFX, String> ageColumn = new TableColumn<>("Age");
-        ageColumn.setCellValueFactory(o -> Bindings.createStringBinding(
-                () -> formatAge(o.getValue().getCreateTime()),
-                o.getValue().createTimeProperty()));
+        TableColumn<AvatarFX, OffsetDateTime> ageColumn = new TableColumn<>("Age");
+        ageColumn.setCellValueFactory(o -> o.getValue().createTimeProperty());
+        ageColumn.setCellFactory(column -> new TableCell<>() {
+            @Override
+            protected void updateItem(OffsetDateTime item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty ? null : formatAge(item));
+            }
+        });
+        ageColumn.setComparator(Comparator.nullsLast(Comparator.reverseOrder()));
         ageColumn.setMinWidth(90);
         tableView.getColumns().add(ageColumn);
         extractors.put(ageColumn, avatarFX -> formatAge(avatarFX.getCreateTime()));
