@@ -11,6 +11,7 @@ import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.AvatarService;
 import com.faforever.moderatorclient.api.domain.PermissionService;
 import com.faforever.moderatorclient.api.domain.UserService;
+import com.faforever.moderatorclient.config.ApplicationPaths;
 import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.mapstruct.GamePlayerStatsMapper;
 import com.faforever.moderatorclient.ui.*;
@@ -259,7 +260,8 @@ public class UserManagementController implements Controller<SplitPane> {
     @FXML
     private Button minimizeUserNotesButton;
 
-    private final File EXCLUDED_ITEMS_FILE = new File("data/excluded_items.json");
+    private final File EXCLUDED_ITEMS_FILE =
+            ApplicationPaths.resolveConfigurationDirectory().resolve("excluded_items.json").toFile();
 
     private final LocalPreferences localPreferences;
 

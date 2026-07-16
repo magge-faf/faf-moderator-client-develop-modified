@@ -15,6 +15,7 @@ Git / commit style
 - Do not spam many tiny commits for the same subject.
 - If several recent commits are about the same area, merge/fold them into one coherent commit instead of stacking more.
 - Use conventional commit style such as `fix(irc): ...`, `chore(irc): ...`, `fix(logging): ...`.
+- When Codex creates a commit, include `Co-Authored-By: Codex <codex@openai.com>` as the final line of the commit message.
 - Keep commits grouped by real topic, not by accidental micro-steps.
 - Before creating a new commit, inspect roughly the last seven commits (for example `git log -7 --oneline --stat`) and decide whether the current change belongs in one of them. If it does, amend/fold into that commit instead of adding another same-topic commit.
 - Before committing, inspect the staged file list and ask: "Would these changes still belong together if reviewed separately?" If the answer is no, split the commit by behavioral topic.

@@ -18,9 +18,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.FileTime;
 import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -41,6 +39,7 @@ public class ApplicationUpdateService {
     private static final URI LATEST_RELEASE_URI =
             URI.create("https://api.github.com/repos/magge-faf/faf-moderator-client-develop-modified/releases/latest");
     private static final DateTimeFormatter BACKUP_TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
+    private static final int CONFIGURATION_BACKUP_SLOT_COUNT = 10;
 
     private final ObjectMapper objectMapper;
     private final LocalPreferences localPreferences;
@@ -161,42 +160,14 @@ public class ApplicationUpdateService {
         }
     }
 
-    public BackupPurgeResult purgeBackupFilesOlderThan(int days) throws IOException {
-        Path backupDir = resolveConfiguredBackupDirectory();
-        if (days <= 0 || !Files.isDirectory(backupDir)) {
-            return new BackupPurgeResult(backupDir, days, 0L, 0L);
-        }
-
-        Instant cutoff = Instant.now().minus(Duration.ofDays(days));
-        List<Path> pathsToDelete;
-        try (var paths = Files.walk(backupDir)) {
-            pathsToDelete = paths
-                    .filter(Files::isRegularFile)
-                    .filter(path -> isOlderThan(path, cutoff))
-                    .toList();
-        }
-
-        long deletedFiles = 0L;
-        long deletedBytes = 0L;
-        for (Path path : pathsToDelete) {
-            long size = Files.size(path);
-            Files.deleteIfExists(path);
-            deletedFiles++;
-            deletedBytes += size;
-        }
-
-        return new BackupPurgeResult(backupDir, days, deletedFiles, deletedBytes);
-    }
-
     public Path createConfigurationBackupArchive() throws IOException {
         Path configurationDirectory = ApplicationPaths.resolveConfigurationDirectory();
         Files.createDirectories(configurationDirectory);
 
         Path backupDir = resolveConfiguredBackupDirectory();
         Files.createDirectories(backupDir);
-        purgeConfiguredBackupFilesIfEnabled();
 
-        Path backupArchive = backupDir.resolve("config-backup-" + BACKUP_TIMESTAMP.format(LocalDateTime.now()) + ".zip");
+        Path backupArchive = createConfigurationBackupArchivePath(backupDir);
         zipDirectory(configurationDirectory, backupArchive);
         return backupArchive;
     }
@@ -351,12 +322,33 @@ public class ApplicationUpdateService {
     private Path createBackupArchivePath(Path installRoot) throws IOException {
         Path backupDir = resolveConfiguredBackupDirectory();
         Files.createDirectories(backupDir);
-        purgeConfiguredBackupFilesIfEnabled();
 
         String installName = installRoot.getFileName() == null ? "faf-moderator-client" : installRoot.getFileName().toString();
         String backupName = installName + "-" + normalizeVersion(ApplicationVersion.CURRENT_VERSION) + "-"
                 + BACKUP_TIMESTAMP.format(LocalDateTime.now()) + ".zip";
         return backupDir.resolve(backupName);
+    }
+
+    private Path createConfigurationBackupArchivePath(Path backupDir) throws IOException {
+        for (int slot = 1; slot <= CONFIGURATION_BACKUP_SLOT_COUNT; slot++) {
+            Path candidate = backupDir.resolve(configurationBackupSlotName(slot));
+            if (!Files.exists(candidate)) {
+                return candidate;
+            }
+        }
+
+        Path oldestBackup = backupDir.resolve(configurationBackupSlotName(1));
+        for (int slot = 2; slot <= CONFIGURATION_BACKUP_SLOT_COUNT; slot++) {
+            Path candidate = backupDir.resolve(configurationBackupSlotName(slot));
+            if (Files.getLastModifiedTime(candidate).compareTo(Files.getLastModifiedTime(oldestBackup)) < 0) {
+                oldestBackup = candidate;
+            }
+        }
+        return oldestBackup;
+    }
+
+    private String configurationBackupSlotName(int slot) {
+        return "config-backup-%02d.zip".formatted(slot);
     }
 
     private void zipDirectory(Path sourceDirectory, Path zipPath) throws IOException {
@@ -586,34 +578,6 @@ public class ApplicationUpdateService {
         return false;
     }
 
-    private void purgeConfiguredBackupFilesIfEnabled() {
-        int retentionDays = localPreferences.getTabSettings().getUpdateBackupAutoPurgeDays();
-        if (retentionDays <= 0) {
-            return;
-        }
-        try {
-            BackupPurgeResult result = purgeBackupFilesOlderThan(retentionDays);
-            if (result.deletedFileCount() > 0) {
-                log.info("Auto-purged {} update archive files ({} bytes) older than {} days from {}",
-                        result.deletedFileCount(),
-                        result.deletedBytes(),
-                        result.ageDays(),
-                        result.directory());
-            }
-        } catch (IOException e) {
-            log.warn("Failed to auto-purge update archives from {}", resolveConfiguredBackupDirectory(), e);
-        }
-    }
-
-    private boolean isOlderThan(Path path, Instant cutoff) {
-        try {
-            FileTime lastModifiedTime = Files.getLastModifiedTime(path);
-            return lastModifiedTime.toInstant().isBefore(cutoff);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value;
     }
@@ -638,6 +602,4 @@ public class ApplicationUpdateService {
     public record BackupFolderStats(Path directory, long fileCount, long totalBytes) {
     }
 
-    public record BackupPurgeResult(Path directory, int ageDays, long deletedFileCount, long deletedBytes) {
-    }
 }

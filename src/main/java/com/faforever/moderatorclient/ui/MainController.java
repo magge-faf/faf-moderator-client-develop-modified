@@ -436,6 +436,12 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         } else {
             log.warn("Local preferences were not saved successfully.");
         }
+        try {
+            log.info("Backing up configuration folder on application exit.");
+            applicationUpdateService.createConfigurationBackupArchive();
+        } catch (Exception e) {
+            log.warn("Failed to back up configuration folder on application exit.", e);
+        }
     }
 
     @EventListener

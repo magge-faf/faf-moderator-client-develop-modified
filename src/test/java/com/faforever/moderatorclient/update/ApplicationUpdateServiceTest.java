@@ -7,8 +7,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.FileTime;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -65,22 +63,40 @@ class ApplicationUpdateServiceTest {
     }
 
     @Test
-    void purgeBackupFilesOlderThanDeletesOnlyOldFiles(@TempDir Path tempDir) throws Exception {
+    void createConfigurationBackupArchiveUsesTenRotatingSlots(@TempDir Path tempDir) throws Exception {
+        String originalUserDir = System.getProperty("user.dir");
         LocalPreferences localPreferences = new LocalPreferences();
-        localPreferences.getTabSettings().setUpdateBackupFolder(tempDir.toString());
+        Path backupDir = tempDir.resolve("backup");
+        localPreferences.getTabSettings().setUpdateBackupFolder(backupDir.toString());
         ApplicationUpdateService localService = new ApplicationUpdateService(new ObjectMapper(), localPreferences);
 
-        Path oldFile = tempDir.resolve("old-backup.zip");
-        Path newFile = tempDir.resolve("new-backup.zip");
-        Files.writeString(oldFile, "old");
-        Files.writeString(newFile, "new");
-        Files.setLastModifiedTime(oldFile, FileTime.from(Instant.now().minus(10, java.time.temporal.ChronoUnit.DAYS)));
+        try {
+            System.setProperty("user.dir", tempDir.toString());
+            Path configDir = tempDir.resolve("config");
+            Files.createDirectories(configDir);
+            Files.writeString(configDir.resolve("templatesAndReasons.json"), "first");
 
-        ApplicationUpdateService.BackupPurgeResult result = localService.purgeBackupFilesOlderThan(5);
+            for (int index = 1; index <= 10; index++) {
+                Path archive = localService.createConfigurationBackupArchive();
 
-        assertThat(result.deletedFileCount(), is(1L));
-        assertThat(Files.exists(oldFile), is(false));
-        assertThat(Files.exists(newFile), is(true));
+                assertThat(archive.getFileName().toString(), is("config-backup-%02d.zip".formatted(index)));
+                assertThat(Files.exists(archive), is(true));
+            }
+
+            Path firstArchive = backupDir.resolve("config-backup-01.zip");
+            long firstArchiveSize = Files.size(firstArchive);
+            Files.writeString(configDir.resolve("templatesAndReasons.json"), "second");
+
+            Path overwrittenArchive = localService.createConfigurationBackupArchive();
+
+            assertThat(overwrittenArchive, is(firstArchive));
+            try (var backupFiles = Files.list(backupDir)) {
+                assertThat(backupFiles.filter(Files::isRegularFile).count(), is(10L));
+            }
+            assertThat(Files.size(firstArchive) >= firstArchiveSize, is(true));
+        } finally {
+            System.setProperty("user.dir", originalUserDir);
+        }
     }
 
     @Test

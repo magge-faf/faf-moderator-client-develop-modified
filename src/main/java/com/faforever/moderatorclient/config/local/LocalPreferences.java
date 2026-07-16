@@ -335,9 +335,6 @@ public class LocalPreferences {
         boolean autoBackupConfigurationFolderOnSaveCheckBox = false;
         boolean autoPurgeTempReplaysOlderThanOneDayCheckBox = false;
 
-        // Numeric settings
-        int updateBackupAutoPurgeDays = 30;
-
         // TitledPanes
 
     }

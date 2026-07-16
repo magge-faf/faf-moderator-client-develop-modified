@@ -1,6 +1,5 @@
 package com.faforever.moderatorclient.ui.main_window;
 
-import com.faforever.moderatorclient.config.ApplicationPaths;
 import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.config.local.LocalPreferencesReaderWriter;
 import com.faforever.moderatorclient.replay.ReplayStorageService;
@@ -46,9 +45,6 @@ public class SettingsController implements Controller<Pane> {
     @FXML
     public ComboBox<Tab> defaultActiveTabComboBox;
     @FXML
-    public Button openConfigurationFolderButton;
-
-    @FXML
     public Button openAiPromptButton;
 
     @FXML
@@ -57,12 +53,6 @@ public class SettingsController implements Controller<Pane> {
     public CheckBox fetchBansOnStartupCheckBox;
     @FXML
     public CheckBox ircDebugTrafficCheckBox;
-    @FXML
-    public CheckBox autoBackupConfigurationFolderOnSaveCheckBox;
-    @FXML
-    public Label configurationFolderInfoLabel;
-    @FXML
-    public Label configurationBackupStatusLabel;
     @FXML
     public CheckBox autoPurgeTempReplaysOlderThanOneDayCheckBox;
     @FXML
@@ -77,8 +67,6 @@ public class SettingsController implements Controller<Pane> {
     public Label updateBackupFolderStatusLabel;
     @FXML
     public Label updateBackupFolderDefaultLabel;
-    @FXML
-    public Spinner<Integer> updateBackupAutoPurgeDaysSpinner;
 
     private String defaultUpdateBackupFolder;
 
@@ -116,9 +104,6 @@ public class SettingsController implements Controller<Pane> {
         ircDebugTrafficCheckBox.setSelected(localPreferences.getTabIrcChat().isDebugTraffic());
         ircDebugTrafficCheckBox.selectedProperty().addListener((obs, oldVal, newVal) ->
                 localPreferences.getTabIrcChat().setDebugTraffic(newVal));
-        autoBackupConfigurationFolderOnSaveCheckBox.setSelected(
-                localPreferences.getTabSettings().isAutoBackupConfigurationFolderOnSaveCheckBox()
-        );
         autoPurgeTempReplaysOlderThanOneDayCheckBox.setSelected(
                 localPreferences.getTabSettings().isAutoPurgeTempReplaysOlderThanOneDayCheckBox()
         );
@@ -131,19 +116,7 @@ public class SettingsController implements Controller<Pane> {
                         : configuredBackupFolder
         );
         updateBackupFolderTextField.setPromptText(defaultUpdateBackupFolder);
-        updateBackupAutoPurgeDaysSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(
-                0,
-                3650,
-                Math.max(0, localPreferences.getTabSettings().getUpdateBackupAutoPurgeDays())
-        ));
-        updateBackupAutoPurgeDaysSpinner.setEditable(true);
         updateBackupFolderTextField.textProperty().addListener((obs, oldVal, newVal) -> refreshUpdateBackupFolderInfo());
-        configurationFolderInfoLabel.setText(String.format(
-                Locale.ROOT,
-                "App data folder: %s. Older installs may still have %s; move files manually if you still need them.",
-                ApplicationPaths.resolveConfigurationDirectory(),
-                ApplicationPaths.resolveLegacyConfigurationDirectory().getFileName()
-        ));
         replayFolderInfoLabel.setText(String.format(
                 Locale.ROOT,
                 "Replay folder: %s. All replay downloads and temp replay files are stored here.",
@@ -151,10 +124,9 @@ public class SettingsController implements Controller<Pane> {
         ));
         updateBackupFolderDefaultLabel.setText(String.format(
                 Locale.ROOT,
-                "Use Default = %s. The root path is the folder where the software was started.",
+                "Default folder: %s. Leave the field empty or set it to this path to use the default.",
                 defaultUpdateBackupFolder
         ));
-        configurationBackupStatusLabel.setText("");
         replayFolderStatusLabel.setText("");
         refreshUpdateBackupFolderInfo();
         refreshReplayFolderInfo();
@@ -349,16 +321,6 @@ public class SettingsController implements Controller<Pane> {
         openPath(new File(fileName));
     }
 
-    public void onOpenConfigurationFolder() {
-        File folder = ApplicationPaths.resolveConfigurationDirectory().toFile();
-        try {
-            Files.createDirectories(folder.toPath());
-            openPath(folder);
-        } catch (IOException e) {
-            log.error("Failed to open configuration folder", e);
-        }
-    }
-
     public void onOpenAiPromptButton() throws IOException {
         openFile(CONFIGURATION_FOLDER + File.separator + "templateGamingModeratorTask.txt");
     }
@@ -383,11 +345,6 @@ public class SettingsController implements Controller<Pane> {
         }
     }
 
-    public void onUseDefaultUpdateBackupFolder() {
-        updateBackupFolderTextField.setText(defaultUpdateBackupFolder);
-        refreshUpdateBackupFolderInfo();
-    }
-
     public void onOpenUpdateBackupFolder() {
         try {
             Path folder = Optional.ofNullable(resolveBackupFolderFieldPath())
@@ -396,34 +353,6 @@ public class SettingsController implements Controller<Pane> {
             openPath(folder.toFile());
         } catch (IOException e) {
             log.error("Failed to open update backup folder", e);
-        }
-    }
-
-    public void onRefreshUpdateBackupFolderInfo() {
-        refreshUpdateBackupFolderInfo();
-    }
-
-    public void onPurgeOldUpdateBackups() {
-        int days = currentAutoPurgeDays();
-        if (days <= 0) {
-            updateBackupFolderStatusLabel.setText("Set auto purge days above 0 before running a manual purge.");
-            return;
-        }
-
-        try {
-            persistBackupFolderPreference(false);
-            ApplicationUpdateService.BackupPurgeResult result = applicationUpdateService.purgeBackupFilesOlderThan(days);
-            updateBackupFolderStatusLabel.setText(String.format(
-                    Locale.ROOT,
-                    "Purged %d old backup files older than %d days and freed %.2f MB.",
-                    result.deletedFileCount(),
-                    result.ageDays(),
-                    bytesToMegabytes(result.deletedBytes())
-            ));
-            refreshUpdateBackupFolderInfo();
-        } catch (IOException e) {
-            updateBackupFolderStatusLabel.setText("Failed to purge old backups: " + e.getMessage());
-            log.error("Failed to purge update backup folder", e);
         }
     }
 
@@ -437,22 +366,13 @@ public class SettingsController implements Controller<Pane> {
 
     }
 
-    public void onOpenPathToUserSettings() {
-        File directory = ApplicationPaths.resolveWorkingDirectory().toFile();
-        try {
-            openPath(directory);
-        } catch (IOException e) {
-            log.error("Failed to open application root {}", directory, e);
-        }
-    }
-
     public void onBackupConfigurationFolderNow() {
         try {
             persistBackupFolderPreference(false);
             Path backupArchive = applicationUpdateService.createConfigurationBackupArchive();
-            configurationBackupStatusLabel.setText("Backed up app data folder to " + backupArchive);
+            updateBackupFolderStatusLabel.setText("Backed up config folder to " + backupArchive);
         } catch (IOException e) {
-            configurationBackupStatusLabel.setText("Failed to back up app data folder: " + e.getMessage());
+            updateBackupFolderStatusLabel.setText("Failed to back up config folder: " + e.getMessage());
             log.error("Failed to back up configuration folder", e);
         }
     }
@@ -502,23 +422,20 @@ public class SettingsController implements Controller<Pane> {
     private LocalPreferencesReaderWriter localPreferencesReaderWriter;
 
     public boolean onSave() {
-        return saveSettings(true, true);
+        return saveSettings(true);
     }
 
     public boolean saveOnExit() {
-        return saveSettings(false, false);
+        return saveSettings(false);
     }
 
-    private boolean saveSettings(boolean createBackupArchive, boolean applyStyleSheet) {
-        log.info("Saving settings (createBackupArchive={}, applyStyleSheet={})", createBackupArchive, applyStyleSheet);
+    private boolean saveSettings(boolean applyStyleSheet) {
+        log.info("Saving settings (applyStyleSheet={})", applyStyleSheet);
 
         localPreferences.getAutoLogin().setEnabled(rememberLoginCheckBox.isSelected());
         localPreferences.getUi().setDarkMode(darkModeCheckBox.isSelected());
 
         localPreferences.getTabSettings().setFetchBansOnStartupCheckBox(fetchBansOnStartupCheckBox.isSelected());
-        localPreferences.getTabSettings().setAutoBackupConfigurationFolderOnSaveCheckBox(
-                autoBackupConfigurationFolderOnSaveCheckBox.isSelected()
-        );
         localPreferences.getTabSettings().setAutoPurgeTempReplaysOlderThanOneDayCheckBox(
                 autoPurgeTempReplaysOlderThanOneDayCheckBox.isSelected()
         );
@@ -531,15 +448,6 @@ public class SettingsController implements Controller<Pane> {
         }
 
         boolean saved = localPreferencesReaderWriter.write(localPreferences);
-        if (createBackupArchive && autoBackupConfigurationFolderOnSaveCheckBox.isSelected()) {
-            try {
-                Path backupArchive = applicationUpdateService.createConfigurationBackupArchive();
-                configurationBackupStatusLabel.setText("Auto-backed up app data folder to " + backupArchive);
-            } catch (IOException e) {
-                configurationBackupStatusLabel.setText("Auto-backup failed: " + e.getMessage());
-                log.error("Failed to auto-back up configuration folder", e);
-            }
-        }
         if (!applyStyleSheet) {
             return saved;
         }
@@ -572,15 +480,9 @@ public class SettingsController implements Controller<Pane> {
         } else {
             localPreferences.getTabSettings().setUpdateBackupFolder(Path.of(backupFolder).toAbsolutePath().normalize().toString());
         }
-        localPreferences.getTabSettings().setUpdateBackupAutoPurgeDays(currentAutoPurgeDays());
         if (refreshInfo) {
             refreshUpdateBackupFolderInfo();
         }
-    }
-
-    private int currentAutoPurgeDays() {
-        SpinnerValueFactory<Integer> valueFactory = updateBackupAutoPurgeDaysSpinner.getValueFactory();
-        return valueFactory == null || valueFactory.getValue() == null ? 0 : Math.max(0, valueFactory.getValue());
     }
 
     private void refreshUpdateBackupFolderInfo() {

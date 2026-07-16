@@ -4,6 +4,7 @@ import com.faforever.commons.api.dto.BanDurationType;
 import com.faforever.commons.api.dto.BanStatus;
 import com.faforever.moderatorclient.api.domain.BanService;
 import com.faforever.moderatorclient.api.domain.UserService;
+import com.faforever.moderatorclient.config.ApplicationPaths;
 import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.ui.domain.BanInfoFX;
 import com.faforever.moderatorclient.ui.domain.PlayerFX;
@@ -30,7 +31,6 @@ import org.springframework.stereotype.Component;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -79,8 +79,8 @@ public class BansController implements Controller<HBox> {
     private UserService userService;
 
     private final ObjectMapper objectMapper = new ObjectMapper().enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
-    public Path PATH_TEMP_BANNED_USERS_JSON = Paths.get("data", "temporary_banned_users_synced.json");
-    public Path PATH_PERM_BANNED_USERS_JSON = Paths.get("data", "permanent_banned_users_synced.json");
+    public Path PATH_TEMP_BANNED_USERS_JSON = ApplicationPaths.resolveConfigurationDirectory().resolve("temporary_banned_users_synced.json");
+    public Path PATH_PERM_BANNED_USERS_JSON = ApplicationPaths.resolveConfigurationDirectory().resolve("permanent_banned_users_synced.json");
 
     @FXML
     public void initialize() {
