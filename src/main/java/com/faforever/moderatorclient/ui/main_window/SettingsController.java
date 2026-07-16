@@ -473,10 +473,10 @@ public class SettingsController implements Controller<Pane> {
 
     public void onPurgeOldReplayFiles() {
         try {
-            ReplayStorageService.ReplayCleanupResult result = replayStorageService.purgeReplayFilesOlderThanOneDay();
+            ReplayStorageService.ReplayCleanupResult result = replayStorageService.purgeAllReplayFiles();
             replayFolderStatusLabel.setText(String.format(
                     Locale.ROOT,
-                    "Purged %d replay files older than 1 day and freed %.2f MB.",
+                    "Purged %d replay files and freed %.2f MB.",
                     result.deletedFileCount(),
                     bytesToMegabytes(result.deletedBytes())
             ));

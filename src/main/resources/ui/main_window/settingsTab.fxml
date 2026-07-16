@@ -34,6 +34,7 @@
                     <Label text="Starting Tab:"/>
                     <ComboBox fx:id="defaultActiveTabComboBox" prefWidth="150.0" visibleRowCount="20"/>
                 </HBox>
+                <CheckBox fx:id="rememberLoginCheckBox" mnemonicParsing="false" text="Remember login"/>
                 <CheckBox fx:id="darkModeCheckBox" mnemonicParsing="false" text="Dark Mode"/>
                 <CheckBox fx:id="fetchBansOnStartupCheckBox" mnemonicParsing="false" text="Load bans at startup"/>
                 <Button mnemonicParsing="false" onAction="#onSave" text="Save Settings"/>
@@ -69,8 +70,7 @@
                           text="Automatically remove temp replay files older than 1 day"/>
                 <HBox spacing="10">
                     <Button mnemonicParsing="false" onAction="#onOpenReplayFolder" text="Open Replay Folder"/>
-                    <Button mnemonicParsing="false" onAction="#onRefreshReplayFolderInfo" text="Refresh Size"/>
-                    <Button mnemonicParsing="false" onAction="#onPurgeOldReplayFiles" text="Purge Old Replays Now"/>
+                    <Button mnemonicParsing="false" onAction="#onPurgeOldReplayFiles" text="Purge Replays Now"/>
                 </HBox>
                 <Label fx:id="replayFolderStatusLabel" text="" wrapText="true"/>
             </VBox>
@@ -125,12 +125,6 @@
                     </items>
                 </ComboBox>
             </VBox>
-
-            <Separator/>
-
-            <children>
-                <CheckBox fx:id="rememberLoginCheckBox" mnemonicParsing="false" text="Remember login"/>
-            </children>
 
         </VBox>
     </ScrollPane>

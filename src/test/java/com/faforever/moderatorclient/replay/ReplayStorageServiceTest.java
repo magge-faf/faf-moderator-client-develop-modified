@@ -101,6 +101,29 @@ class ReplayStorageServiceTest {
     }
 
     @Test
+    void purgeAllReplayFilesDeletesReplayFilesRegardlessOfAge(@TempDir Path tempDir) throws Exception {
+        String originalUserDir = System.getProperty("user.dir");
+        try {
+            System.setProperty("user.dir", tempDir.toString());
+            ReplayStorageService service = new ReplayStorageService(new LocalPreferences());
+            service.ensureReplayDirectoryExists();
+
+            Path replay = service.resolveReplayDirectory().resolve("new.fafreplay");
+            Path invalidReplay = service.resolveReplayDirectory().resolve("invalid.fafreplay");
+            Files.writeString(replay, "{\"game_type\":0,\"compression\":\"zstd\"}\nnew");
+            Files.writeString(invalidReplay, "not a replay");
+
+            ReplayStorageService.ReplayCleanupResult result = service.purgeAllReplayFiles();
+
+            assertThat(result.deletedFileCount(), is(1L));
+            assertThat(Files.exists(replay), is(false));
+            assertThat(Files.exists(invalidReplay), is(true));
+        } finally {
+            System.setProperty("user.dir", originalUserDir);
+        }
+    }
+
+    @Test
     void describeReplayFolderReturnsStoredReplaySize(@TempDir Path tempDir) throws Exception {
         String originalUserDir = System.getProperty("user.dir");
         try {

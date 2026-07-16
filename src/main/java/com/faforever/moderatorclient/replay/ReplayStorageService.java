@@ -113,13 +113,21 @@ public class ReplayStorageService {
         return purgeReplayFilesOlderThan(TEMP_REPLAY_MAX_AGE);
     }
 
+    public ReplayCleanupResult purgeAllReplayFiles() throws IOException {
+        return purgeReplayFiles(null);
+    }
+
     public ReplayCleanupResult purgeReplayFilesOlderThan(Duration maxAge) throws IOException {
+        return purgeReplayFiles(maxAge);
+    }
+
+    private ReplayCleanupResult purgeReplayFiles(Duration maxAge) throws IOException {
         Path replayDir = resolveReplayDirectory().toAbsolutePath().normalize();
         if (!Files.isDirectory(replayDir)) {
             return new ReplayCleanupResult(replayDir, maxAge, 0L, 0L);
         }
 
-        Instant cutoff = Instant.now().minus(maxAge);
+        Instant cutoff = maxAge == null ? null : Instant.now().minus(maxAge);
         long deletedFiles = 0L;
         long deletedBytes = 0L;
 
@@ -169,8 +177,13 @@ public class ReplayStorageService {
         }
 
         try {
-            FileTime lastModifiedTime = Files.getLastModifiedTime(normalizedPath);
-            return lastModifiedTime.toInstant().isBefore(cutoff) && hasReplayHeader(normalizedPath);
+            if (cutoff != null) {
+                FileTime lastModifiedTime = Files.getLastModifiedTime(normalizedPath);
+                if (!lastModifiedTime.toInstant().isBefore(cutoff)) {
+                    return false;
+                }
+            }
+            return hasReplayHeader(normalizedPath);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

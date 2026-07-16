@@ -333,7 +333,7 @@ public class LocalPreferences {
         boolean darkModeCheckBox = true;
         boolean fetchBansOnStartupCheckBox = false;
         boolean autoBackupConfigurationFolderOnSaveCheckBox = false;
-        boolean autoPurgeTempReplaysOlderThanOneDayCheckBox = true;
+        boolean autoPurgeTempReplaysOlderThanOneDayCheckBox = false;
 
         // Numeric settings
         int updateBackupAutoPurgeDays = 30;
