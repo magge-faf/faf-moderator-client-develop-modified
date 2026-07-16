@@ -169,10 +169,74 @@
 }
 
 #chooseUpdateBackupFolderButton {
-    -fx-background-color: linear-gradient(to bottom, #4c7dca, #315b9b);
+    -fx-base: -fx-accent;
     -fx-text-fill: white;
     -fx-font-weight: bold;
-    -fx-padding: 8 16 8 16;
+}
+
+.settings-shell {
+    -fx-padding: 16;
+    -fx-background-color: -fx-base;
+}
+
+.settings-scroll {
+    -fx-background: transparent;
+    -fx-background-color: transparent;
+}
+
+.settings-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.settings-header {
+    -fx-padding: 0 0 4 0;
+}
+
+.settings-title {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: lightgray;
+}
+
+.settings-subtitle,
+.settings-help {
+    -fx-text-fill: derive(lightgray, -18%);
+}
+
+.settings-section {
+    -fx-background-color: derive(-fx-base, 8%);
+    -fx-background-radius: 4;
+    -fx-border-color: derive(-fx-base, 22%);
+    -fx-border-radius: 4;
+    -fx-padding: 12;
+}
+
+.settings-section-title {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: lightgray;
+}
+
+.settings-field-label {
+    -fx-font-weight: bold;
+    -fx-text-fill: derive(lightgray, -8%);
+}
+
+.settings-status {
+    -fx-text-fill: derive(lightgray, -10%);
+}
+
+.settings-section .text-field,
+.settings-section .combo-box {
+    -fx-background-radius: 3;
+    -fx-border-color: derive(-fx-base, 30%);
+    -fx-border-radius: 3;
+}
+
+.settings-action-row .button,
+.settings-button-wrap .button {
+    -fx-background-radius: 3;
+    -fx-padding: 7 12 7 12;
 }
 
 #connectButton,

@@ -11,6 +11,7 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 
 @Service
 @RequiredArgsConstructor
@@ -18,6 +19,7 @@ import java.nio.file.Path;
 public class LocalPreferencesReaderWriter {
 
     private final Path prefsPath = ApplicationPaths.resolvePreferencesFile();
+    private final Path legacyPrefsPath = ApplicationPaths.resolveLegacyPreferencesFile();
     private final ObjectMapper objectMapper;
 
     /**
@@ -25,16 +27,36 @@ public class LocalPreferencesReaderWriter {
      * Missing fields are automatically populated with defaults from the class.
      */
     public LocalPreferences read() {
-        if (Files.notExists(prefsPath)) {
+        Path readPath = migrateLegacyPreferencesFile();
+        if (Files.notExists(readPath)) {
             log.info("Preferences file does not exist. Using defaults.");
             return new LocalPreferences();
         }
 
-        try (BufferedReader reader = Files.newBufferedReader(prefsPath)) {
+        try (BufferedReader reader = Files.newBufferedReader(readPath)) {
             return objectMapper.readValue(reader, LocalPreferences.class);
         } catch (IOException e) {
             log.error("Failed to read preferences, using defaults", e);
             return new LocalPreferences();
+        }
+    }
+
+    private Path migrateLegacyPreferencesFile() {
+        if (Files.exists(prefsPath) || Files.notExists(legacyPrefsPath) || prefsPath.equals(legacyPrefsPath)) {
+            return prefsPath;
+        }
+
+        try {
+            if (prefsPath.getParent() != null && Files.notExists(prefsPath.getParent())) {
+                Files.createDirectories(prefsPath.getParent());
+            }
+            Files.move(legacyPrefsPath, prefsPath, StandardCopyOption.REPLACE_EXISTING);
+            log.info("Moved preferences file from {} to {}", legacyPrefsPath, prefsPath);
+            return prefsPath;
+        } catch (IOException e) {
+            log.warn("Failed to move legacy preferences file from {} to {}. Reading legacy file for this run.",
+                    legacyPrefsPath, prefsPath, e);
+            return legacyPrefsPath;
         }
     }
 

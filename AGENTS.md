@@ -42,6 +42,7 @@ Editing expectations
 
 Verification
 - Run focused verification after changes, usually the relevant tests/build.
+- Before running the full Gradle test suite, protect the real saved login token: export `HKCU\Software\JavaSoft\Prefs\com\faforever\moderatorclient\config\local`, run the suite, then import the export back. Current credential tests can clear the real Java Preferences node.
 - Report clearly what was changed, what was verified, and any remaining risk.
 
 Communication tone

@@ -23,6 +23,10 @@ public final class ApplicationPaths {
     }
 
     public static Path resolvePreferencesFile() {
+        return resolveConfigurationDirectory().resolve(PREFERENCES_FILE_NAME);
+    }
+
+    public static Path resolveLegacyPreferencesFile() {
         return resolveWorkingDirectory().resolve(PREFERENCES_FILE_NAME);
     }
 

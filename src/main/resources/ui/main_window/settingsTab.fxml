@@ -1,102 +1,124 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.scene.control.*?>
-<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.layout.*?>
 <?import javafx.scene.text.*?>
 
 <?import javafx.collections.FXCollections?>
 <?import java.lang.String?>
-<?import javafx.scene.layout.HBox?>
-<?import javafx.geometry.Insets?>
-<VBox fx:id="root" spacing="10" style="-fx-padding: 15px;" xmlns="http://javafx.com/javafx/20.0.1"
+<VBox fx:id="root" spacing="12" styleClass="settings-shell" xmlns="http://javafx.com/javafx/20.0.1"
       xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.faforever.moderatorclient.ui.main_window.SettingsController">
 
-    <Label style="-fx-font-size: 16pt; -fx-font-weight: bold;" text="Settings"/>
+    <VBox spacing="4" styleClass="settings-header">
+        <Label styleClass="settings-title" text="Settings"/>
+        <Label styleClass="settings-subtitle" text="Local preferences, storage folders, and moderator workflow defaults." wrapText="true"/>
+    </VBox>
 
-    <ScrollPane fitToWidth="true">
-        <VBox spacing="15">
-            <VBox spacing="5">
-                <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="Templates" textAlignment="CENTER"/>
-                <Button fx:id="templatesAndReasonsReportButton" mnemonicParsing="false"
-                        onAction="#templatesAndReasonsReportButton" prefWidth="350"
-                        text="View Templates for FAF Forum and Ban Reasons"/>
-                <Button fx:id="templatesFinishReportsButton" mnemonicParsing="false"
-                        onAction="#templatesFinishReportsButton" prefWidth="350"
-                        text="View Templates to 'edit' reports"/>
-                <Button fx:id="openAiPromptButton" mnemonicParsing="false" onAction="#onOpenAiPromptButton"
-                        prefWidth="350" text="View AI Prompt"/>
-            </VBox>
+    <ScrollPane fitToWidth="true" styleClass="settings-scroll">
+        <VBox spacing="12">
+            <GridPane hgap="12" vgap="12">
+                <columnConstraints>
+                    <ColumnConstraints percentWidth="50"/>
+                    <ColumnConstraints percentWidth="50"/>
+                </columnConstraints>
 
-            <Separator/>
+                <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="0" GridPane.rowIndex="0">
+                    <Label styleClass="settings-section-title" text="Start Up"/>
+                    <GridPane hgap="10" vgap="8">
+                        <columnConstraints>
+                            <ColumnConstraints minWidth="105"/>
+                            <ColumnConstraints/>
+                        </columnConstraints>
+                        <Label styleClass="settings-field-label" text="Starting Tab" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+                        <ComboBox fx:id="defaultActiveTabComboBox" maxWidth="220" prefWidth="220" visibleRowCount="20"
+                                  GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+                    </GridPane>
+                    <VBox spacing="6" styleClass="settings-toggle-list">
+                        <CheckBox fx:id="rememberLoginCheckBox" mnemonicParsing="false" text="Remember login"/>
+                        <Label styleClass="settings-help" text="If the saved session is invalid, you have to log in again." wrapText="true"/>
+                        <CheckBox fx:id="darkModeCheckBox" mnemonicParsing="false" text="Dark Mode"/>
+                        <CheckBox fx:id="fetchBansOnStartupCheckBox" mnemonicParsing="false" text="Load bans at startup"/>
+                    </VBox>
+                </VBox>
 
-            <VBox spacing="5">
-                <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="Start Up"/>
-                <HBox alignment="CENTER_LEFT" spacing="10">
-                    <Label text="Starting Tab:"/>
-                    <ComboBox fx:id="defaultActiveTabComboBox" prefWidth="150.0" visibleRowCount="20"/>
-                </HBox>
-                <CheckBox fx:id="rememberLoginCheckBox" mnemonicParsing="false" text="Remember login"/>
-                <Label text="If the saved session is invalid, you have to log in again." wrapText="true"/>
-                <CheckBox fx:id="darkModeCheckBox" mnemonicParsing="false" text="Dark Mode"/>
-                <CheckBox fx:id="fetchBansOnStartupCheckBox" mnemonicParsing="false" text="Load bans at startup"/>
-            </VBox>
+                <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                    <Label styleClass="settings-section-title" text="Templates"/>
+                    <Label styleClass="settings-help" text="Click a template to open it in Notepad, or Notepad++ if installed." wrapText="true"/>
+                    <FlowPane hgap="8" vgap="8" styleClass="settings-button-wrap">
+                        <Button fx:id="templatesAndReasonsReportButton" mnemonicParsing="false"
+                                onAction="#templatesAndReasonsReportButton"
+                                text="Forum and Ban Reasons"/>
+                        <Button fx:id="templatesFinishReportsButton" mnemonicParsing="false"
+                                onAction="#templatesFinishReportsButton"
+                                text="Report Resolution Templates"/>
+                        <Button fx:id="openAiPromptButton" mnemonicParsing="false" onAction="#onOpenAiPromptButton"
+                                text="AI Prompt"/>
+                    </FlowPane>
+                </VBox>
 
-            <Separator/>
+                <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="0" GridPane.rowIndex="1">
+                    <Label styleClass="settings-section-title" text="Replay Folder"/>
+                    <Label fx:id="replayFolderInfoLabel" styleClass="settings-help" wrapText="true"/>
+                    <CheckBox fx:id="autoPurgeTempReplaysOlderThanOneDayCheckBox" mnemonicParsing="false"
+                              text="Automatically remove temp replay files older than 1 day"/>
+                    <HBox spacing="8" styleClass="settings-action-row">
+                        <Button mnemonicParsing="false" onAction="#onOpenReplayFolder" text="Open Folder"/>
+                        <Button mnemonicParsing="false" onAction="#onPurgeOldReplayFiles" text="Purge Replays"/>
+                    </HBox>
+                    <Label fx:id="replayFolderStatusLabel" styleClass="settings-status" text="" wrapText="true"/>
+                </VBox>
 
-            <VBox spacing="5">
-                <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="Replay Folder"/>
-                <Label fx:id="replayFolderInfoLabel" wrapText="true"/>
-                <CheckBox fx:id="autoPurgeTempReplaysOlderThanOneDayCheckBox" mnemonicParsing="false"
-                          text="Automatically remove temp replay files older than 1 day"/>
-                <HBox spacing="10">
-                    <Button mnemonicParsing="false" onAction="#onOpenReplayFolder" text="Open Replay Folder"/>
-                    <Button mnemonicParsing="false" onAction="#onPurgeOldReplayFiles" text="Purge Replays Now"/>
-                </HBox>
-                <Label fx:id="replayFolderStatusLabel" text="" wrapText="true"/>
-            </VBox>
+                <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                    <Label styleClass="settings-section-title" text="IRC"/>
+                    <Label styleClass="settings-help" text="Advanced IRC diagnostics." wrapText="true"/>
+                    <CheckBox fx:id="ircDebugTrafficCheckBox" mnemonicParsing="false" text="Debug raw IRC traffic"/>
+                </VBox>
 
-            <Separator/>
+                <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="0" GridPane.rowIndex="2" GridPane.columnSpan="2">
+                    <Label styleClass="settings-section-title" text="Config Backups"/>
+                    <Label styleClass="settings-help" text="Config backups are saved on every close and when you click Back Up Config. The app keeps 10 backup files, then overwrites the oldest slot from the beginning." wrapText="true"/>
+                    <GridPane hgap="10" vgap="8">
+                        <columnConstraints>
+                            <ColumnConstraints minWidth="105"/>
+                            <ColumnConstraints hgrow="ALWAYS"/>
+                        </columnConstraints>
+                        <Label styleClass="settings-field-label" text="Backup Folder" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+                        <TextField fx:id="updateBackupFolderTextField" promptText="App root / backup"
+                                   GridPane.columnIndex="1" GridPane.rowIndex="0"/>
+                    </GridPane>
+                    <HBox spacing="8" styleClass="settings-action-row">
+                        <Button fx:id="chooseUpdateBackupFolderButton" mnemonicParsing="false"
+                                minWidth="95" onAction="#onChooseUpdateBackupFolder" text="Browse..."/>
+                        <Button mnemonicParsing="false" onAction="#onOpenUpdateBackupFolder" text="Open Folder"/>
+                        <Button mnemonicParsing="false" onAction="#onBackupConfigurationFolderNow" text="Back Up Config"/>
+                    </HBox>
+                    <Label fx:id="updateBackupFolderDefaultLabel" styleClass="settings-help" text="" wrapText="true"/>
+                    <Label fx:id="updateBackupFolderInfoLabel" styleClass="settings-status" text="Stored backups: 0.00 MB across 0 files." wrapText="true"/>
+                    <Label fx:id="updateBackupFolderStatusLabel" styleClass="settings-status" text="" wrapText="true"/>
+                </VBox>
 
-            <VBox spacing="5">
-                <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="Config Backups"/>
-                <Label text="Config backups are saved on every close and when you click Back Up Config Now. The app keeps 10 backup files, then overwrites the oldest slot from the beginning. Default folder: app root / backup." wrapText="true"/>
-                <TextField fx:id="updateBackupFolderTextField" promptText="App root / backup"/>
-                <HBox spacing="10">
-                    <Button fx:id="chooseUpdateBackupFolderButton" mnemonicParsing="false"
-                            onAction="#onChooseUpdateBackupFolder" text="Browse..."/>
-                    <Button mnemonicParsing="false" onAction="#onOpenUpdateBackupFolder" text="Open Folder"/>
-                    <Button mnemonicParsing="false" onAction="#onBackupConfigurationFolderNow" text="Back Up Config Now"/>
-                </HBox>
-                <Label fx:id="updateBackupFolderDefaultLabel" text="" wrapText="true"/>
-                <Label fx:id="updateBackupFolderInfoLabel" text="Stored backups: 0.00 MB across 0 files." wrapText="true"/>
-                <Label fx:id="updateBackupFolderStatusLabel" text="" wrapText="true"/>
-            </VBox>
-
-            <Separator/>
-
-            <VBox spacing="5">
-                <Text style="-fx-font-size: 14pt; -fx-font-weight: bold;" text="IRC"/>
-                <Label text="Advanced IRC diagnostics." wrapText="true"/>
-                <CheckBox fx:id="ircDebugTrafficCheckBox" mnemonicParsing="false" text="Debug raw IRC traffic"/>
-            </VBox>
-
-            <Separator/>
-
-            <VBox spacing="5">
-                <Text style="-fx-font-size: 12pt; -fx-font-weight: bold;"
-                      text="Select Browser for 'Search Forum' Button" textAlignment="CENTER"/>
-                <ComboBox fx:id="browserComboBox" minWidth="200">
-                    <items>
-                        <FXCollections fx:factory="observableArrayList">
-                            <String fx:value="Firefox"/>
-                            <String fx:value="Chrome"/>
-                            <String fx:value="Opera"/>
-                            <String fx:value="Microsoft Edge"/>
-                        </FXCollections>
-                    </items>
-                </ComboBox>
-            </VBox>
+                <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="0" GridPane.rowIndex="3" GridPane.columnSpan="2">
+                    <Label styleClass="settings-section-title" text="Browser"/>
+                    <GridPane hgap="10" vgap="8">
+                        <columnConstraints>
+                            <ColumnConstraints minWidth="185"/>
+                            <ColumnConstraints/>
+                        </columnConstraints>
+                        <Label styleClass="settings-field-label" text="Search Forum Browser" GridPane.columnIndex="0" GridPane.rowIndex="0"/>
+                        <ComboBox fx:id="browserComboBox" maxWidth="160" prefWidth="160" GridPane.columnIndex="1" GridPane.rowIndex="0">
+                            <items>
+                                <FXCollections fx:factory="observableArrayList">
+                                    <String fx:value="Firefox"/>
+                                    <String fx:value="Chrome"/>
+                                    <String fx:value="Opera"/>
+                                    <String fx:value="Microsoft Edge"/>
+                                </FXCollections>
+                            </items>
+                        </ComboBox>
+                    </GridPane>
+                </VBox>
+            </GridPane>
 
         </VBox>
     </ScrollPane>
