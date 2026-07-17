@@ -155,10 +155,12 @@ public final class ApplicationUpdateInstallerHelper {
 
         deleteIfExists(previousInstallDir, logPath);
         Files.createDirectories(previousInstallDir);
+        ReplacementState binReplacement = ReplacementState.fromTarget(installBin);
+        ReplacementState libReplacement = ReplacementState.fromTarget(installLib);
 
         try {
-            replaceDirectoryContents(installBin, stagedBin, previousInstallDir.resolve("bin"), logPath);
-            replaceDirectoryContents(installLib, stagedLib, previousInstallDir.resolve("lib"), logPath);
+            replaceDirectoryContents(installBin, stagedBin, previousInstallDir.resolve("bin"), binReplacement, logPath);
+            replaceDirectoryContents(installLib, stagedLib, previousInstallDir.resolve("lib"), libReplacement, logPath);
 
             if (!Files.isRegularFile(installBin.resolve("faf-moderator-client.bat")) && isWindows()) {
                 throw new IOException("Updated install is missing the Windows launcher after copy.");
@@ -168,24 +170,46 @@ public final class ApplicationUpdateInstallerHelper {
             }
         } catch (IOException | RuntimeException e) {
             log(logPath, "Restoring previous install directory contents after update failure.");
-            restoreDirectoryContents(previousInstallDir.resolve("bin"), installBin, logPath);
-            restoreDirectoryContents(previousInstallDir.resolve("lib"), installLib, logPath);
+            rollbackDirectoryReplacement(binReplacement, previousInstallDir.resolve("bin"), installBin, logPath);
+            rollbackDirectoryReplacement(libReplacement, previousInstallDir.resolve("lib"), installLib, logPath);
             throw e;
         }
     }
 
-    private static void replaceDirectoryContents(Path targetDir, Path stagedDir, Path previousDir, Path logPath) throws IOException {
-        if (Files.isDirectory(targetDir)) {
+    private static void replaceDirectoryContents(
+            Path targetDir,
+            Path stagedDir,
+            Path previousDir,
+            ReplacementState replacementState,
+            Path logPath
+    ) throws IOException {
+        if (replacementState.targetDirectoryExisted()) {
             Path previousDirStaging = previousDir.resolveSibling(previousDir.getFileName() + ".snapshot-tmp");
             deleteIfExists(previousDirStaging, logPath);
             log(logPath, "Snapshotting current contents of '" + targetDir + "' to '" + previousDir + "'.");
             copyDirectory(targetDir, previousDirStaging, logPath);
             Files.move(previousDirStaging, previousDir);
+            replacementState.markSnapshotCreated();
         }
 
         Files.createDirectories(targetDir);
         deleteDirectoryContents(targetDir, logPath);
         copyDirectory(stagedDir, targetDir, logPath);
+    }
+
+    private static void rollbackDirectoryReplacement(
+            ReplacementState replacementState,
+            Path previousDir,
+            Path targetDir,
+            Path logPath
+    ) throws IOException {
+        if (replacementState.snapshotCreated()) {
+            restoreDirectoryContents(previousDir, targetDir, logPath);
+            return;
+        }
+        if (!replacementState.targetPathExisted()) {
+            deleteIfExists(targetDir, logPath);
+        }
     }
 
     private static void restoreDirectoryContents(Path previousDir, Path targetDir, Path logPath) throws IOException {
@@ -197,6 +221,37 @@ public final class ApplicationUpdateInstallerHelper {
         deleteDirectoryContents(targetDir, logPath);
         log(logPath, "Restoring previous contents of '" + targetDir + "' from '" + previousDir + "'.");
         copyDirectory(previousDir, targetDir, logPath);
+    }
+
+    private static final class ReplacementState {
+        private final boolean targetPathExisted;
+        private final boolean targetDirectoryExisted;
+        private boolean snapshotCreated;
+
+        private ReplacementState(boolean targetPathExisted, boolean targetDirectoryExisted) {
+            this.targetPathExisted = targetPathExisted;
+            this.targetDirectoryExisted = targetDirectoryExisted;
+        }
+
+        private static ReplacementState fromTarget(Path targetDir) {
+            return new ReplacementState(Files.exists(targetDir), Files.isDirectory(targetDir));
+        }
+
+        private boolean targetPathExisted() {
+            return targetPathExisted;
+        }
+
+        private boolean targetDirectoryExisted() {
+            return targetDirectoryExisted;
+        }
+
+        private boolean snapshotCreated() {
+            return snapshotCreated;
+        }
+
+        private void markSnapshotCreated() {
+            snapshotCreated = true;
+        }
     }
 
     private static void deleteDirectoryContents(Path directory, Path logPath) throws IOException {

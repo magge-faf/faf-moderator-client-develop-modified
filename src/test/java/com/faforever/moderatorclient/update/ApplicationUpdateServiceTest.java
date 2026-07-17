@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.io.IOException;
+import java.lang.reflect.UndeclaredThrowableException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,6 +24,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ApplicationUpdateServiceTest {
 
@@ -454,6 +457,40 @@ class ApplicationUpdateServiceTest {
         assertThat(Files.exists(installRoot.resolve("lib").resolve("new.jar")), is(true));
         assertThat(Files.exists(previousInstall.resolve("bin").resolve("faf-moderator-client.bat")), is(true));
         assertThat(Files.exists(previousInstall.resolve("lib").resolve("old.jar")), is(true));
+    }
+
+    @Test
+    void installerHelperRollbackDeletesTargetsThatDidNotExistBeforeReplacement(@TempDir Path tempDir) throws Exception {
+        String originalOsName = System.getProperty("os.name");
+        Path installRoot = tempDir.resolve("install");
+        Path stageDir = tempDir.resolve("staged");
+        Path previousInstall = tempDir.resolve("previous-install");
+        Path logPath = tempDir.resolve("apply-update.log");
+
+        Files.createDirectories(installRoot);
+        Files.createDirectories(stageDir.resolve("bin"));
+        Files.createDirectories(stageDir.resolve("lib"));
+        Files.writeString(stageDir.resolve("bin").resolve("launcher.sh"), "new launcher");
+        Files.writeString(stageDir.resolve("lib").resolve("new.jar"), "new jar");
+
+        try {
+            System.setProperty("os.name", "Windows 11");
+
+            UndeclaredThrowableException thrown = assertThrows(UndeclaredThrowableException.class, () -> ReflectionTestUtils.invokeMethod(
+                    ApplicationUpdateInstallerHelper.class,
+                    "replaceInstallDirectories",
+                    installRoot,
+                    stageDir,
+                    previousInstall,
+                    logPath
+            ));
+
+            assertThat(thrown.getUndeclaredThrowable() instanceof IOException, is(true));
+            assertThat(Files.exists(installRoot.resolve("bin")), is(false));
+            assertThat(Files.exists(installRoot.resolve("lib")), is(false));
+        } finally {
+            System.setProperty("os.name", originalOsName);
+        }
     }
 
     @Test
