@@ -16,6 +16,7 @@ Git / commit style
 - If several recent commits are about the same area, merge/fold them into one coherent commit instead of stacking more.
 - Use conventional commit style such as `fix(irc): ...`, `chore(irc): ...`, `fix(logging): ...`.
 - When Codex creates a commit, include `Co-Authored-By: Codex <codex@openai.com>` as the final line of the commit message.
+- When Claude Code creates a commit, include `Co-Authored-By: Claude <noreply@anthropic.com>` as the final line of the commit message.
 - Keep commits grouped by real topic, not by accidental micro-steps.
 - Before creating a new commit, inspect roughly the last seven commits (for example `git log -7 --oneline --stat`) and decide whether the current change belongs in one of them. If it does, amend/fold into that commit instead of adding another same-topic commit.
 - When inspecting recent commits, also check whether the visible commit subjects/scopes would look repetitive or misleading in the history. Avoid broad repeated scopes like `fix(settings): ...` for different behavioral topics; prefer narrower scopes such as `fix(config): ...`, `fix(replays): ...`, or `feat(reports): ...` so related commits look related and unrelated commits do not look same-ish.
