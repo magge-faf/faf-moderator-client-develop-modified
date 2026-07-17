@@ -4,7 +4,7 @@
 
 ## Agent Instructions
 
-AI agents must read `/AGENTS.md` before analysis, edits, or commits. If your local development environment differs, adapt `/AGENTS.md` to match it.
+AI agents must read `/AGENTS.md` before analysis, edits, or commits. If your local development environment differs, ask the user to confirm before adapting `/AGENTS.md` to match it.
 
 This application enables faforever.com moderators to perform administrative actions. This involves:
 - managing of users, user groups and permissions
