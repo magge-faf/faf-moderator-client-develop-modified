@@ -49,14 +49,8 @@ public class IrcMentionNotificationService {
     }
 
     public void showMentionToast(String sender, String channel, String message) {
-        if (isWindows()) {
-            if (showWindowsNotification(sender, channel, message)) {
-                return;
-            }
-
-            if (showSystemNotification(sender, channel, message)) {
-                return;
-            }
+        if (isWindows() && showSystemNotification(sender, channel, message)) {
+            return;
         }
 
         Platform.runLater(() -> {
@@ -67,6 +61,11 @@ public class IrcMentionNotificationService {
 
             if (canShowInAppToast()) {
                 showToast(sender, channel, message);
+                return;
+            }
+
+            if (isWindows()) {
+                runWindowsNotificationAsync(sender, channel, message);
                 return;
             }
 
@@ -101,7 +100,7 @@ public class IrcMentionNotificationService {
         return true;
     }
 
-    private boolean showWindowsNotification(String sender, String channel, String message) {
+    private void runWindowsNotificationAsync(String sender, String channel, String message) {
         String title = abbreviate("IRC mention", 60);
         String body = abbreviate(sender + " in " + channel + System.lineSeparator() + message, 220);
         String script = """
@@ -116,7 +115,15 @@ public class IrcMentionNotificationService {
                 Start-Sleep -Milliseconds 5500
                 $notification.Dispose()
                 """.formatted(toPowerShellLiteral(title), toPowerShellLiteral(body));
-        return runWindowsNotificationCommand(script);
+
+        // Runs on a bounded worker that waits for the script to finish, instead of leaving an
+        // unobserved PowerShell process detached from the caller for the full balloon lifetime.
+        Thread.ofVirtual().name("irc-mention-toast").start(() -> {
+            if (!runWindowsNotificationCommand(script)) {
+                log.warn("Windows balloon notification failed; falling back to system tray notification.");
+                Platform.runLater(() -> showSystemNotification(sender, channel, message));
+            }
+        });
     }
 
     private synchronized TrayIcon getOrCreateTrayIcon() {
@@ -257,10 +264,6 @@ public class IrcMentionNotificationService {
     }
 
     private boolean runWindowsNotificationCommand(String script) {
-        return runWindowsNotificationCommand(script, false);
-    }
-
-    private boolean runWindowsNotificationCommand(String script, boolean waitForExit) {
         try {
             String encodedCommand = Base64.getEncoder()
                     .encodeToString(script.getBytes(StandardCharsets.UTF_16LE));
@@ -271,12 +274,10 @@ public class IrcMentionNotificationService {
                     "-WindowStyle", "Hidden",
                     "-EncodedCommand", encodedCommand
             ).start();
-            if (waitForExit) {
-                int exitCode = process.waitFor();
-                if (exitCode != 0) {
-                    log.warn("Windows notification command failed with exit code {}", exitCode);
-                    return false;
-                }
+            int exitCode = process.waitFor();
+            if (exitCode != 0) {
+                log.warn("Windows notification command failed with exit code {}", exitCode);
+                return false;
             }
             return true;
         } catch (IOException e) {

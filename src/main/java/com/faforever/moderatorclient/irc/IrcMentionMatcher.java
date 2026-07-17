@@ -12,7 +12,7 @@ public final class IrcMentionMatcher {
         }
 
         Pattern mentionPattern = Pattern.compile(
-                "(^|[^A-Za-z0-9-])" + Pattern.quote(nickname) + "([^A-Za-z0-9-]|$)",
+                "(^|[^A-Za-z0-9_-])" + Pattern.quote(nickname) + "([^A-Za-z0-9_-]|$)",
                 Pattern.CASE_INSENSITIVE
         );
         return mentionPattern.matcher(message).find();

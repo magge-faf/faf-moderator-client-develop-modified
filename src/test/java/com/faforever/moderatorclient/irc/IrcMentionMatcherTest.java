@@ -23,6 +23,11 @@ class IrcMentionMatcherTest {
     }
 
     @Test
+    void doesNotMatchNicknameInsideUnderscoreSeparatedIdentifier() {
+        assertFalse(IrcMentionMatcher.containsMention("magge_test", "magge"));
+    }
+
+    @Test
     void systemJoinNoiseShouldNotBeTreatedAsRealMention() {
         IrcChannelMessageEvent event = new IrcChannelMessageEvent(
                 "#moderators",

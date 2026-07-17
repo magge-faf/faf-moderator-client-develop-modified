@@ -20,6 +20,7 @@ import com.faforever.moderatorclient.irc.IrcMessageEntry;
 import com.faforever.moderatorclient.irc.IrcNoiseFilter;
 import com.faforever.moderatorclient.ui.Controller;
 import com.faforever.moderatorclient.ui.IrcMentionNotificationService;
+import com.faforever.moderatorclient.ui.StageHolder;
 import com.faforever.moderatorclient.ui.domain.PlayerFX;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -333,7 +334,7 @@ public class IrcChatController implements Controller<BorderPane> {
         String selectedChannel = Optional.ofNullable(channelListView.getSelectionModel().getSelectedItem())
                 .map(IrcChannelSnapshot::name)
                 .orElse(localPreferences.getTabIrcChat().getSelectedChannel());
-        if (selectedChannel != null && !selectedChannel.isBlank() && root != null && root.isVisible()) {
+        if (selectedChannel != null && !selectedChannel.isBlank() && root != null && root.isVisible() && isApplicationWindowActive()) {
             ircClient.markChannelRead(selectedChannel);
         }
 
@@ -658,8 +659,18 @@ public class IrcChatController implements Controller<BorderPane> {
         IrcChannelSnapshot selected = channelListView.getSelectionModel().getSelectedItem();
         return root != null
                 && root.isVisible()
+                && isApplicationWindowActive()
                 && selected != null
                 && selected.name().equalsIgnoreCase(channel);
+    }
+
+    private boolean isApplicationWindowActive() {
+        try {
+            var stage = StageHolder.getStage();
+            return stage.isShowing() && stage.isFocused() && !stage.isIconified();
+        } catch (IllegalStateException ex) {
+            return false;
+        }
     }
 
     private void triggerMentionNotification(String sender, String channel, String message) {
@@ -698,10 +709,9 @@ public class IrcChatController implements Controller<BorderPane> {
         runHistoryLoad(
                 "the last 8 hours of IRC history for " + channelName,
                 ircClient.requestHistorySince(channelName, Instant.now().minus(AUTO_HISTORY_LOOKBACK_HOURS, ChronoUnit.HOURS)),
-                () -> {
-                    autoLoadedHistoryChannels.remove(channelKey);
-                    maybeAutoLoadJoinedChannelHistories();
-                },
+                // Keep channelKey in autoLoadedHistoryChannels on failure so this channel isn't retried in a
+                // loop; still move on to try other joined channels that haven't been attempted yet.
+                this::maybeAutoLoadJoinedChannelHistories,
                 result -> maybeAutoLoadJoinedChannelHistories(),
                 true
         );
