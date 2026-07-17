@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -69,7 +70,8 @@ class FafModeratorClientApplicationContextTest {
         if (JAVAFX_STARTED.compareAndSet(false, true)) {
             CountDownLatch latch = new CountDownLatch(1);
             Platform.startup(latch::countDown);
-            latch.await();
+            boolean started = latch.await(10, TimeUnit.SECONDS);
+            assertThat("JavaFX toolkit did not start within 10 seconds", started, is(true));
         }
     }
 }
