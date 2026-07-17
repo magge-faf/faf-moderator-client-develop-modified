@@ -7,6 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
+import java.net.URL;
+
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -18,7 +20,11 @@ public class UiService {
         log.trace("Loading fxml from relative path: {}", relativePath);
         FXMLLoader loader = new FXMLLoader();
         loader.setControllerFactory(applicationContext::getBean);
-        loader.setLocation(getClass().getResource("/" + relativePath));
+        URL location = getClass().getResource("/" + relativePath);
+        if (location == null) {
+            throw new IllegalStateException("FXML resource not found on classpath: /" + relativePath);
+        }
+        loader.setLocation(location);
         loader.load();
         return loader.getController();
     }

@@ -1,5 +1,6 @@
 package com.faforever.moderatorclient.ui.main_window;
 
+import com.faforever.moderatorclient.config.ApplicationPaths;
 import com.faforever.moderatorclient.ui.Controller;
 import com.faforever.moderatorclient.ui.UserDataController;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -36,7 +37,8 @@ import java.util.function.Function;
 @Slf4j
 public class SmurfManagementController implements Controller<VBox> {
 
-    public static final Path SMURF_MANAGEMENT_USERS_JSON_PATH = Paths.get("data", "smurf_management.json");
+    public static final Path SMURF_MANAGEMENT_USERS_JSON_PATH =
+            ApplicationPaths.resolveConfigurationDirectory().resolve("smurf_management.json");
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final double WINDOW_WIDTH_RATIO = 0.8;
     private static final double WINDOW_HEIGHT_RATIO = 0.8;
@@ -443,7 +445,7 @@ public class SmurfManagementController implements Controller<VBox> {
     @FXML
     public void createBackupJson() {
         String timestamp = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        Path backupPath = Paths.get("data", "smurf_management_backup_" + timestamp + ".json");
+        Path backupPath = ApplicationPaths.resolveConfigurationDirectory().resolve("smurf_management_backup_" + timestamp + ".json");
         try {
             if (!Files.exists(SMURF_MANAGEMENT_USERS_JSON_PATH)) {
                 showAlert(Alert.AlertType.WARNING, "Backup Failed", "Original JSON file does not exist.");

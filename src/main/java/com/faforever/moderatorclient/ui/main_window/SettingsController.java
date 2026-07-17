@@ -2,11 +2,19 @@ package com.faforever.moderatorclient.ui.main_window;
 
 import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.config.local.LocalPreferencesReaderWriter;
+import com.faforever.moderatorclient.config.ApplicationPaths;
+import com.faforever.moderatorclient.replay.ReplayStorageService;
+import com.faforever.moderatorclient.update.ApplicationUpdateService;
 import com.faforever.moderatorclient.ui.Controller;
 import com.faforever.moderatorclient.ui.MainController;
+import com.faforever.moderatorclient.ui.ViewHelper;
+import javafx.animation.PauseTransition;
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
+import javafx.stage.DirectoryChooser;
+import javafx.util.Duration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,11 +25,13 @@ import javafx.util.StringConverter;
 import java.io.*;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Locale;
 import java.util.Objects;
-
-import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Component
 @Slf4j
@@ -29,6 +39,8 @@ import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLD
 public class SettingsController implements Controller<Pane> {
     private final LocalPreferences localPreferences;
     private final MainController mainController;
+    private final ApplicationUpdateService applicationUpdateService;
+    private final ReplayStorageService replayStorageService;
 
     public VBox root;
     @FXML
@@ -38,16 +50,42 @@ public class SettingsController implements Controller<Pane> {
     @FXML
     public ComboBox<Tab> defaultActiveTabComboBox;
     @FXML
-    public Button openConfigurationFolderButton;
-
-    @FXML
     public Button openAiPromptButton;
 
     @FXML
     public ComboBox<String> browserComboBox;
     @FXML
     public CheckBox fetchBansOnStartupCheckBox;
+    @FXML
+    public CheckBox ircDebugTrafficCheckBox;
+    @FXML
+    public CheckBox automaticConfigurationBackupsOnExitCheckBox;
+    @FXML
+    public CheckBox autoPurgeTempReplaysOlderThanOneDayCheckBox;
+    @FXML
+    public CheckBox enableManualReplayLookupCheckBox;
+    @FXML
+    public CheckBox showReportPlayerRoleLabelsCheckBox;
+    @FXML
+    public Label replayFolderInfoLabel;
+    @FXML
+    public Label replayFolderStatusLabel;
+    @FXML
+    public TextField updateBackupFolderTextField;
+    @FXML
+    public Label updateBackupFolderInfoLabel;
+    @FXML
+    public Label updateBackupFolderStatusLabel;
+    @FXML
+    public Label updateBackupFolderDefaultLabel;
+    @FXML
+    public Label updaterDataFolderInfoLabel;
+    @FXML
+    public Label updaterDataFolderStatusLabel;
 
+    private String defaultUpdateBackupFolder;
+    private final PauseTransition updateBackupFolderRefreshDelay = new PauseTransition(Duration.millis(250));
+    private final AtomicLong updateBackupFolderInfoGeneration = new AtomicLong();
 
     @Override
     public VBox getRoot() {return root;}
@@ -80,6 +118,55 @@ public class SettingsController implements Controller<Pane> {
         });
 
         fetchBansOnStartupCheckBox.setSelected(localPreferences.getTabSettings().isFetchBansOnStartupCheckBox());
+        ircDebugTrafficCheckBox.setSelected(localPreferences.getTabIrcChat().isDebugTraffic());
+        ircDebugTrafficCheckBox.selectedProperty().addListener((obs, oldVal, newVal) ->
+                localPreferences.getTabIrcChat().setDebugTraffic(newVal));
+        autoPurgeTempReplaysOlderThanOneDayCheckBox.setSelected(
+                localPreferences.getTabSettings().isAutoPurgeTempReplaysOlderThanOneDayCheckBox()
+        );
+        automaticConfigurationBackupsOnExitCheckBox.setSelected(
+                localPreferences.getTabSettings().isAutomaticConfigurationBackupsOnExitCheckBox()
+        );
+        enableManualReplayLookupCheckBox.setSelected(
+                localPreferences.getTabReports().isEnableManualReplayLookupCheckBox()
+        );
+        enableManualReplayLookupCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            localPreferences.getTabReports().setEnableManualReplayLookupCheckBox(newVal);
+            mainController.refreshManualReplayLookupVisibility();
+        });
+        showReportPlayerRoleLabelsCheckBox.setSelected(
+                localPreferences.getTabReports().isShowReportPlayerRoleLabelsCheckBox()
+        );
+        showReportPlayerRoleLabelsCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            localPreferences.getTabReports().setShowReportPlayerRoleLabelsCheckBox(newVal);
+            mainController.refreshReportPlayerRoleLabelsVisibility();
+        });
+
+        defaultUpdateBackupFolder = applicationUpdateService.resolveDefaultBackupDirectory().toString();
+        String configuredBackupFolder = localPreferences.getTabSettings().getUpdateBackupFolder();
+        updateBackupFolderTextField.setText(
+                configuredBackupFolder == null || configuredBackupFolder.isBlank()
+                        ? defaultUpdateBackupFolder
+                        : configuredBackupFolder
+        );
+        updateBackupFolderTextField.setPromptText(defaultUpdateBackupFolder);
+        updateBackupFolderRefreshDelay.setOnFinished(event -> refreshUpdateBackupFolderInfo());
+        updateBackupFolderTextField.textProperty().addListener((obs, oldVal, newVal) -> scheduleUpdateBackupFolderInfoRefresh());
+        replayFolderInfoLabel.setText(String.format(
+                Locale.ROOT,
+                "Replay folder: %s. All replay downloads and temp replay files are stored here.",
+                replayStorageService.resolveReplayDirectory()
+        ));
+        updateBackupFolderDefaultLabel.setText(String.format(
+                Locale.ROOT,
+                "Default folder: %s. Leave the field empty or set it to this path to use the default.",
+                defaultUpdateBackupFolder
+        ));
+        replayFolderStatusLabel.setText("");
+        updaterDataFolderStatusLabel.setText("");
+        refreshUpdateBackupFolderInfo();
+        refreshUpdaterFolderInfo();
+        refreshReplayFolderInfo();
 
         if (browserComboBox.getValue() == null) {
             browserComboBox.setValue(localPreferences.getUi().getBrowserComboBox());
@@ -134,6 +221,7 @@ public class SettingsController implements Controller<Pane> {
                     checkBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
                         try {
                             prefField.set(tabReports, newVal);
+                            refreshManualReplayLookupVisibility(fieldName);
                         } catch (IllegalAccessException ignored) {
                         }
                     });
@@ -155,113 +243,152 @@ public class SettingsController implements Controller<Pane> {
         }
     }
 
+    private void refreshManualReplayLookupVisibility(String fieldName) {
+        if ("enableManualReplayLookupCheckBox".equals(fieldName)) {
+            mainController.refreshManualReplayLookupVisibility();
+        }
+    }
 
-    private static final String jsonFileTemplatesAndReasons = CONFIGURATION_FOLDER + File.separator + "templatesAndReasons.json";
+
+    private static final String TEMPLATES_AND_REASONS_FILE_NAME = "templatesAndReasons.json";
     private static final String JSON_CONTENT_templatesAndReasons = """
             {
               "templates": [
                 {
                   "name": "Standard Ban",
-                  "format": "{reportIds}\\n\\nDAY_NUMBER day ban - ReplayID {gameIds} - {reason}"
+                  "format": "{reportIds}\\n\\nDAY_NUMBER Day Ban - ReplayID {gameIds} - {reason}"
                 },
                 {
-                  "name": "Your Custom Ban",
-                  "format": "{reportIds}\\n\\nDAY_NUMBER day ban - ReplayID {gameIds} - {reason}"
+                  "name": "Another Ban Template",
+                  "format": "{reportIds}\\n\\nDAY_NUMBER Day Ban - ReplayID {gameIds} - {reason}"
+                },
+                {
+                  "name": "Warning",
+                  "format": "{reportIds}\\n\\nWarning - ReplayID {gameIds} - {reason}"
                 }
               ],
               "reasons": [
-                "Offensive Language",
+                "Toxicity",
+                "Homophobic Behavior",
                 "Reclaiming Friendly Units",
                 "Attacking Friendly Units",
-                "CTRL+K All Units in Fullshare Game Mode",
+                "CTRL+K All Units in Fullshare/Union Game Mode",
+                "CTRL+K ACU in Union Game Mode",
                 "Harassment via Private Chat",
-                "Offensive Kick Messages",
-                "Racism",
-                "Offensive Game Titles",
                 "Leaving on Own Terms/Game Ruining",
                 "Abuse of Exploits",
-                "Bad/Illegal Username"
+                "Bad/Illegal Username",
+                "Leaving Before 5-Minute Rule",
+                "Offensive Game Titles",
+                "Offensive Kick Messages",
+                "Racism"
               ]
             }""";
 
     private void initTemplatesAndReasons(){
-        File file = new File(jsonFileTemplatesAndReasons);
+        File file = ApplicationPaths.resolveConfigurationFile(TEMPLATES_AND_REASONS_FILE_NAME).toFile();
         if (!file.exists()) {
             try {
-                Files.createDirectories(Paths.get(CONFIGURATION_FOLDER));
+                Files.createDirectories(ApplicationPaths.resolveConfigurationDirectory());
                 try (FileWriter writer = new FileWriter(file)) {
                     writer.write(JSON_CONTENT_templatesAndReasons);
-                    log.info("Created {}", jsonFileTemplatesAndReasons);
+                    log.info("Created {}", file);
                 }
             } catch (IOException e) {
-                log.warn("Failed to create {}", jsonFileTemplatesAndReasons, e);
+                log.warn("Failed to create {}", file, e);
             }
-        } else {
-            log.info(jsonFileTemplatesAndReasons +" already exists.");
         }
     }
 
-    private static final String jsonFileTemplatesFinishReports = CONFIGURATION_FOLDER + File.separator + "templatesFinishReports.json";
+    private static final String TEMPLATES_FINISH_REPORTS_FILE_NAME = "templatesFinishReports.json";
     private static final String JSON_CONTENT_templatesFinishReports = """
             {
               "templatesEditReports": [
                 {
-            	  "setReportStatusTo": "COMPLETED",
+                "setReportStatusTo": "COMPLETED",
                   "buttonName": "Completed - Standard",
                   "descriptionPublicNote": "Thank you for bringing this to our attention. Action was taken."
                 },
-            	{
-            	  "setReportStatusTo": "COMPLETED",
+                {
+                "setReportStatusTo": "COMPLETED",
                   "buttonName": "Completed - Replay Desync",
-                  "descriptionPublicNote": "Thank you for bringing this to our attention. Unfortunately, the game desyncs. We have made a note for the player in case it becomes a pattern. Please report any further violations."
+                  "descriptionPublicNote": "Thank you for bringing this to our attention. Unfortunately, the game desyncs. I have made a note for the player in case it becomes a pattern."
+                },
+              {
+                "setReportStatusTo": "COMPLETED",
+                  "buttonName": "Completed - Smurf",
+                  "descriptionPublicNote": "Thank you for bringing this to our attention. We will investigate."
+                },
+              {
+                "setReportStatusTo": "COMPLETED",
+                  "buttonName": "Completed - User Note",
+                  "descriptionPublicNote": "Thank you for bringing this to our attention. I have noted this for the user in case of a pattern. Please report any further violations."
+                },
+              {
+                "setReportStatusTo": "DISCARDED",
+                  "buttonName": "Discarded - Leave-5-Minute-Rule",
+                  "descriptionPublicNote": "Leaving a match is allowed after 5 minutes. I have noted this report for future reference in case a pattern emerges. Repeatedly leaving games may still violate other rules."
                 },
                 {
-            	  "setReportStatusTo": "DISCARDED",
-                  "buttonName": "Discarded - Standard",
-                  "descriptionPublicNote": "No additional information or proof was provided."
+                "setReportStatusTo": "DISCARDED",
+                  "buttonName": "Discarded - No Evidence",
+                  "descriptionPublicNote": "No clear evidence was provided."
                 },
-            	{
-            	  "setReportStatusTo": "DISCARDED",
+              {
+                "setReportStatusTo": "DISCARDED",
                   "buttonName": "Discarded - Replay Missing",
                   "descriptionPublicNote": "Please report again with the ReplayID."
                 },
-            	{
-            	  "setReportStatusTo": "DISCARDED",
+              {
+                "setReportStatusTo": "DISCARDED",
                   "buttonName": "Discarded - Timecode Missing",
                   "descriptionPublicNote": "Please report again with the specific timecode of the violation."
                 },
-            	{
-            	  "setReportStatusTo": "PROCESSING",
-                  "buttonName": "Processing - Investigation",
-                  "descriptionPublicNote": "Thank you for bringing this to our attention. We are investigating the case and it may take some time, until we set it to 'completed'."
+              {
+                "setReportStatusTo": "DISCARDED",
+                  "buttonName": "Discarded - Only Status",
+                  "descriptionPublicNote": ""
+                },
+              {
+                "setReportStatusTo": "DISCARDED",
+                  "buttonName": "Discarded - Insufficient Information",
+                  "descriptionPublicNote": "Please resubmit the report with clear details about the violation, including what happened, when it happened, and where it occurred."
+                },
+              {
+                "setReportStatusTo": "DISCARDED",
+                  "buttonName": "Discarded - Smurf - Insufficient Information",
+                  "descriptionPublicNote": "Please resubmit the report with clear details explaining why you believe this user is a smurf, including any relevant evidence."
+                },
+              {
+                "setReportStatusTo": "PROCESSING",
+                  "buttonName": "Processing - Review",
+                  "descriptionPublicNote": "Thank you for your report. The moderation team will review the report and update its status once the review is complete."
                 }
               ]
             }""";
 
     private void initTemplatesFinishReports(){
-        File file = new File(jsonFileTemplatesFinishReports);
+        File file = ApplicationPaths.resolveConfigurationFile(TEMPLATES_FINISH_REPORTS_FILE_NAME).toFile();
         if (!file.exists()) {
             try {
-                Files.createDirectories(Paths.get(CONFIGURATION_FOLDER));
+                Files.createDirectories(ApplicationPaths.resolveConfigurationDirectory());
                 try (FileWriter writer = new FileWriter(file)) {
                     writer.write(JSON_CONTENT_templatesFinishReports);
-                    log.info("Created {}", jsonFileTemplatesFinishReports);
+                    log.info("Created {}", file);
                 }
             } catch (IOException e) {
-                log.warn("Failed to create {}", jsonFileTemplatesFinishReports, e);
+                log.warn("Failed to create {}", file, e);
             }
-        } else {
-            log.info("{} already exists.", jsonFileTemplatesFinishReports);
         }
     }
 
     public void createTemplateGamingModeratorTask() {
-        File fileCompleted = new File(CONFIGURATION_FOLDER + File.separator + "templateGamingModeratorTask.txt");
+        File fileCompleted = ApplicationPaths.resolveConfigurationFile("templateGamingModeratorTask.txt").toFile();
         if (!fileCompleted.exists()) {
             String contentCompleted = """
-                    AI-Prompt: Gaming Moderator Task
-                    Reported Chat Log Assessing report from %reporter% against offender %offenderNames%:
-                    Itemize all instances of speech by %offenderNames%. Translate to English where necessary.""";
+                    Gaming Moderator Task for FAForever.com
+
+                    You are assessing a report submitted by %reporter% against %offenderNames%. Identify all chat messages that may violate the FAF rules. Translate any non-English insults into English where necessary, and assess their severity, context, and whether they warrant moderation action.""";
             try (FileWriter writer = new FileWriter(fileCompleted)) {
                 writer.write(contentCompleted);
                 log.info("Created {}", fileCompleted.getPath());
@@ -275,46 +402,160 @@ public class SettingsController implements Controller<Pane> {
         openPath(new File(fileName));
     }
 
-    public void onOpenConfigurationFolder() {
-        File folder = new File(CONFIGURATION_FOLDER);
-        if (folder.exists() && folder.isDirectory()) {
-            try {
-                openPath(folder);
-            } catch (IOException e) {
-                log.error("Failed to open configuration folder", e);
-            }
+    public void onOpenAiPromptButton() throws IOException {
+        openFile(ApplicationPaths.resolveConfigurationFile("templateGamingModeratorTask.txt").toString());
+    }
+
+    public void onChooseUpdateBackupFolder() {
+        DirectoryChooser directoryChooser = new DirectoryChooser();
+        directoryChooser.setTitle("Select Update Backup Folder");
+
+        Path initialDirectory = resolveBackupFolderFieldPathIfValid();
+        if (initialDirectory != null && Files.isDirectory(initialDirectory)) {
+            directoryChooser.setInitialDirectory(initialDirectory.toFile());
         } else {
-            log.warn("Configuration folder does not exist or is invalid: {}", folder.getAbsolutePath());
+            Path defaultPath = Path.of(defaultUpdateBackupFolder);
+            if (Files.isDirectory(defaultPath)) {
+                directoryChooser.setInitialDirectory(defaultPath.toFile());
+            }
+        }
+
+        File selectedDirectory = directoryChooser.showDialog(root.getScene().getWindow());
+        if (selectedDirectory != null) {
+            updateBackupFolderTextField.setText(selectedDirectory.getAbsolutePath());
         }
     }
 
-    public void onOpenAiPromptButton() throws IOException {
-        openFile(CONFIGURATION_FOLDER + File.separator + "templateGamingModeratorTask.txt");
+    public void onOpenUpdateBackupFolder() {
+        try {
+            Path folder = resolveBackupFolderFieldPathOrDefault();
+            Files.createDirectories(folder);
+            openPath(folder.toFile());
+        } catch (InvalidPathException e) {
+            showInvalidBackupFolderPath(e);
+        } catch (IOException e) {
+            log.error("Failed to open update backup folder", e);
+        }
     }
 
     public void templatesAndReasonsReportButton() throws IOException {
-        openFile(CONFIGURATION_FOLDER + File.separator +  "templatesAndReasons.json");
+        openFile(ApplicationPaths.resolveConfigurationFile(TEMPLATES_AND_REASONS_FILE_NAME).toString());
 
     }
 
     public void templatesFinishReportsButton() throws IOException {
-        openFile(CONFIGURATION_FOLDER + File.separator +  "templatesFinishReports.json");
+        openFile(ApplicationPaths.resolveConfigurationFile(TEMPLATES_FINISH_REPORTS_FILE_NAME).toString());
 
     }
 
-    public void onOpenPathToUserSettings() {
-        String path = System.getProperty("user.home") + File.separator + "AppData" + File.separator + "Roaming" + File.separator + "Mordor";
-        File directory = new File(path);
-
-        if (directory.exists() && directory.isDirectory()) {
-            try {
-                openPath(directory);
-            } catch (IOException e) {
-                log.error("Failed to open directory {}", path, e);
+    public void onBackupConfigurationFolderNow() {
+        try {
+            if (!persistBackupFolderPreference(false)) {
+                return;
             }
-        } else {
-            log.info("Directory does not exist: {}", path);
+            Path backupArchive = applicationUpdateService.createManualConfigurationBackupArchive();
+            updateBackupFolderStatusLabel.setText("Backed up config folder to " + backupArchive);
+        } catch (IOException e) {
+            updateBackupFolderStatusLabel.setText("Failed to back up config folder: " + e.getMessage());
+            log.error("Failed to back up configuration folder", e);
         }
+    }
+
+    public void onOpenUpdaterDataFolder() {
+        try {
+            Path updaterDataFolder = applicationUpdateService.resolveUpdaterBaseDirectory();
+            Files.createDirectories(updaterDataFolder);
+            openPath(updaterDataFolder.toFile());
+            updaterDataFolderStatusLabel.setText("Opened updater folder: " + updaterDataFolder);
+        } catch (IOException e) {
+            updaterDataFolderStatusLabel.setText("Failed to open updater folder: " + e.getMessage());
+            log.error("Failed to open updater folder", e);
+        }
+    }
+
+    public void onPurgeUpdaterDataFolder() {
+        runInBackground(() -> {
+            try {
+                ApplicationUpdateService.UpdaterFolderCleanupResult result = applicationUpdateService.purgeUpdaterFolder();
+                String statusText = String.format(
+                        Locale.ROOT,
+                        "Purged updater folder: removed %.2f MB across %d files from %s",
+                        bytesToMegabytes(result.deletedBytes()),
+                        result.deletedFileCount(),
+                        result.directory()
+                );
+                Platform.runLater(() -> {
+                    updaterDataFolderStatusLabel.setText(statusText);
+                    refreshUpdaterFolderInfo();
+                });
+            } catch (IOException e) {
+                log.error("Failed to purge updater folder", e);
+                Platform.runLater(() -> updaterDataFolderStatusLabel.setText("Failed to purge updater folder: " + e.getMessage()));
+            }
+        });
+    }
+
+    public void onDebugUpdateWindow() {
+        updaterDataFolderStatusLabel.setText("Loading latest GitHub release...");
+        Thread updateDebugThread = new Thread(() -> {
+            try {
+                applicationUpdateService.fetchLatestRelease().ifPresentOrElse(
+                        release -> Platform.runLater(() -> {
+                            updaterDataFolderStatusLabel.setText("Loaded " + release.displayName() + " from GitHub.");
+                            mainController.showUpdatePopupForDebug(release);
+                        }),
+                        () -> Platform.runLater(() -> updaterDataFolderStatusLabel.setText("No GitHub release found."))
+                );
+            } catch (Exception e) {
+                Platform.runLater(() -> updaterDataFolderStatusLabel.setText("Failed to load latest release: " + e.getMessage()));
+                log.warn("Failed to load latest release for updater debug window", e);
+            }
+        }, "update-debug-window");
+        updateDebugThread.setDaemon(true);
+        updateDebugThread.start();
+    }
+
+    public void onOpenReplayFolder() {
+        try {
+            replayStorageService.ensureReplayDirectoryExists();
+            openPath(replayStorageService.resolveReplayDirectory().toFile());
+        } catch (IOException e) {
+            replayFolderStatusLabel.setText("Failed to open replay folder: " + e.getMessage());
+            log.error("Failed to open replay folder", e);
+        }
+    }
+
+    public void onRefreshReplayFolderInfo() {
+        refreshReplayFolderInfo();
+    }
+
+    public void onPurgeOldReplayFiles() {
+        boolean confirmed = ViewHelper.confirmDialog(
+                "Purge all replay files",
+                "This will permanently delete all stored replay downloads and temp replay files. Continue?"
+        );
+        if (!confirmed) {
+            return;
+        }
+
+        runInBackground(() -> {
+            try {
+                ReplayStorageService.ReplayCleanupResult result = replayStorageService.purgeAllReplayFiles();
+                String statusText = String.format(
+                        Locale.ROOT,
+                        "Purged %d replay files and freed %.2f MB.",
+                        result.deletedFileCount(),
+                        bytesToMegabytes(result.deletedBytes())
+                );
+                Platform.runLater(() -> {
+                    replayFolderStatusLabel.setText(statusText);
+                    refreshReplayFolderInfo();
+                });
+            } catch (IOException e) {
+                log.error("Failed to purge replay folder", e);
+                Platform.runLater(() -> replayFolderStatusLabel.setText("Failed to purge replay files: " + e.getMessage()));
+            }
+        });
     }
 
     private static void openPath(File path) throws IOException {
@@ -331,25 +572,225 @@ public class SettingsController implements Controller<Pane> {
     @Autowired
     private LocalPreferencesReaderWriter localPreferencesReaderWriter;
 
-    public void onSave() {
-        log.info("onSave from SettingsController.java");
+    public boolean onSave() {
+        return saveSettings(true);
+    }
 
-        // Save preferences from UI
+    public boolean saveOnExit() {
+        return saveSettings(false);
+    }
+
+    private boolean saveSettings(boolean applyStyleSheet) {
+        log.info("Saving settings (applyStyleSheet={})", applyStyleSheet);
+
         localPreferences.getAutoLogin().setEnabled(rememberLoginCheckBox.isSelected());
         localPreferences.getUi().setDarkMode(darkModeCheckBox.isSelected());
 
         localPreferences.getTabSettings().setFetchBansOnStartupCheckBox(fetchBansOnStartupCheckBox.isSelected());
+        localPreferences.getTabSettings().setAutoPurgeTempReplaysOlderThanOneDayCheckBox(
+                autoPurgeTempReplaysOlderThanOneDayCheckBox.isSelected()
+        );
+        localPreferences.getTabSettings().setAutomaticConfigurationBackupsOnExitCheckBox(
+                automaticConfigurationBackupsOnExitCheckBox.isSelected()
+        );
+        localPreferences.getTabIrcChat().setDebugTraffic(ircDebugTrafficCheckBox.isSelected());
+        localPreferences.getTabReports().setEnableManualReplayLookupCheckBox(enableManualReplayLookupCheckBox.isSelected());
+        localPreferences.getTabReports().setShowReportPlayerRoleLabelsCheckBox(showReportPlayerRoleLabelsCheckBox.isSelected());
+        if (!persistBackupFolderPreference(true)) {
+            return false;
+        }
 
         Tab selectedTab = defaultActiveTabComboBox.getSelectionModel().getSelectedItem();
         if (selectedTab != null) {
             localPreferences.getUi().setStartUpTab(selectedTab.getId());
         }
 
-        localPreferencesReaderWriter.write(localPreferences);
+        boolean saved = localPreferencesReaderWriter.write(localPreferences);
+        if (!applyStyleSheet) {
+            return saved;
+        }
+
         Scene scene = root.getScene();
         String styleSheet = darkModeCheckBox.isSelected() ? "/style/main-dark.css" : "/style/main-light.css";
 
         scene.getStylesheets().clear();
         scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource(styleSheet)).toExternalForm());
+        return saved;
+    }
+
+    private Path resolveBackupFolderFieldPath() {
+        String value = updateBackupFolderTextField.getText();
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return Path.of(value).toAbsolutePath().normalize();
+    }
+
+    private Path resolveBackupFolderFieldPathIfValid() {
+        try {
+            return resolveBackupFolderFieldPath();
+        } catch (InvalidPathException e) {
+            log.debug("Ignoring invalid backup folder path: {}", updateBackupFolderTextField.getText(), e);
+            return null;
+        }
+    }
+
+    private Path resolveBackupFolderFieldPathOrDefault() {
+        return Optional.ofNullable(resolveBackupFolderFieldPath())
+                .orElseGet(() -> Path.of(defaultUpdateBackupFolder).toAbsolutePath().normalize());
+    }
+
+    private boolean persistBackupFolderPreference(boolean refreshInfo) {
+        String backupFolder = updateBackupFolderTextField.getText() == null ? "" : updateBackupFolderTextField.getText().trim();
+        if (backupFolder.isBlank()) {
+            localPreferences.getTabSettings().setUpdateBackupFolder("");
+            if (refreshInfo) {
+                refreshUpdateBackupFolderInfo();
+            }
+            return true;
+        }
+        try {
+            Path normalizedBackupFolder = resolveBackupFolderFieldPath();
+            Path defaultBackupFolder = Path.of(defaultUpdateBackupFolder).toAbsolutePath().normalize();
+            if (Objects.equals(normalizedBackupFolder, defaultBackupFolder)) {
+                localPreferences.getTabSettings().setUpdateBackupFolder("");
+            } else {
+                localPreferences.getTabSettings().setUpdateBackupFolder(normalizedBackupFolder.toString());
+            }
+        } catch (InvalidPathException e) {
+            showInvalidBackupFolderPath(e);
+            log.warn("Ignoring invalid backup folder path: {}", backupFolder, e);
+            return false;
+        }
+        if (refreshInfo) {
+            refreshUpdateBackupFolderInfo();
+        }
+        return true;
+    }
+
+    private void runInBackground(Runnable task) {
+        Thread thread = new Thread(task, "settings-background-task");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    private void refreshUpdateBackupFolderInfo() {
+        long generation = updateBackupFolderInfoGeneration.incrementAndGet();
+        String requestedText = updateBackupFolderTextField.getText();
+        Path backupFolder;
+        try {
+            backupFolder = resolveBackupFolderFieldPathOrDefault();
+        } catch (InvalidPathException e) {
+            showInvalidBackupFolderPath(e);
+            updateBackupFolderInfoLabel.setText("Stored backups: unavailable");
+            return;
+        }
+
+        runInBackground(() -> {
+            try {
+                ApplicationUpdateService.BackupFolderStats stats = applicationUpdateService.describeBackupFolder(backupFolder);
+                String infoText = String.format(
+                        Locale.ROOT,
+                        "Stored backups: %.2f MB across %d files in %s",
+                        bytesToMegabytes(stats.totalBytes()),
+                        stats.fileCount(),
+                        stats.directory()
+                );
+                Platform.runLater(() -> {
+                    if (!isCurrentBackupFolderInfoRequest(generation, requestedText)) {
+                        return;
+                    }
+                    updateBackupFolderInfoLabel.setText(infoText);
+                    String statusText = updateBackupFolderStatusLabel.getText();
+                    if (statusText == null
+                            || statusText.startsWith("Invalid backup folder path")
+                            || statusText.startsWith("Unable to inspect backup folder")) {
+                        updateBackupFolderStatusLabel.setText("");
+                    }
+                });
+            } catch (Exception e) {
+                log.error("Failed to refresh update backup folder info", e);
+                Platform.runLater(() -> {
+                    if (!isCurrentBackupFolderInfoRequest(generation, requestedText)) {
+                        return;
+                    }
+                    updateBackupFolderInfoLabel.setText("Stored backups: unavailable");
+                    updateBackupFolderStatusLabel.setText("Unable to inspect backup folder: " + e.getMessage());
+                });
+            }
+        });
+    }
+
+    private void scheduleUpdateBackupFolderInfoRefresh() {
+        updateBackupFolderRefreshDelay.playFromStart();
+    }
+
+    private boolean isCurrentBackupFolderInfoRequest(long generation, String requestedText) {
+        return root != null
+                && generation == updateBackupFolderInfoGeneration.get()
+                && Objects.equals(requestedText, updateBackupFolderTextField.getText());
+    }
+
+    private void showInvalidBackupFolderPath(InvalidPathException e) {
+        updateBackupFolderInfoGeneration.incrementAndGet();
+        updateBackupFolderStatusLabel.setText("Invalid backup folder path: " + e.getMessage());
+    }
+
+    private void refreshUpdaterFolderInfo() {
+        runInBackground(() -> {
+            try {
+                ApplicationUpdateService.UpdaterFolderStats stats = applicationUpdateService.describeUpdaterFolder();
+                String infoText = String.format(
+                        Locale.ROOT,
+                        "Updater sessions, downloaded release archives, installer scripts, and apply-update.log files are stored in %s. Stored updater data: %.2f MB across %d files.",
+                        stats.directory(),
+                        bytesToMegabytes(stats.totalBytes()),
+                        stats.fileCount()
+                );
+                Platform.runLater(() -> {
+                    updaterDataFolderInfoLabel.setText(infoText);
+                    if (updaterDataFolderStatusLabel.getText() == null) {
+                        updaterDataFolderStatusLabel.setText("");
+                    }
+                });
+            } catch (IOException e) {
+                log.error("Failed to refresh updater folder info", e);
+                Platform.runLater(() -> {
+                    updaterDataFolderInfoLabel.setText("Updater folder: unavailable");
+                    updaterDataFolderStatusLabel.setText("Unable to inspect updater folder: " + e.getMessage());
+                });
+            }
+        });
+    }
+
+    private double bytesToMegabytes(long bytes) {
+        return bytes / (1024d * 1024d);
+    }
+
+    private void refreshReplayFolderInfo() {
+        runInBackground(() -> {
+            try {
+                ReplayStorageService.ReplayFolderStats stats = replayStorageService.describeReplayFolder();
+                String infoText = String.format(
+                        Locale.ROOT,
+                        "Replay folder: %s. Stored replays: %.2f MB across %d files.",
+                        stats.directory(),
+                        bytesToMegabytes(stats.totalBytes()),
+                        stats.fileCount()
+                );
+                Platform.runLater(() -> {
+                    replayFolderInfoLabel.setText(infoText);
+                    if (replayFolderStatusLabel.getText() == null) {
+                        replayFolderStatusLabel.setText("");
+                    }
+                });
+            } catch (IOException e) {
+                log.error("Failed to refresh replay folder info", e);
+                Platform.runLater(() -> {
+                    replayFolderInfoLabel.setText("Replay folder: unavailable");
+                    replayFolderStatusLabel.setText("Unable to inspect replay folder: " + e.getMessage());
+                });
+            }
+        });
     }
 }

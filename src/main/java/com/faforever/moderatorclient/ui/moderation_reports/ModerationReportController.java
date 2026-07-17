@@ -14,7 +14,9 @@ import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.BanService;
 import com.faforever.moderatorclient.api.domain.ModerationReportService;
 import com.faforever.moderatorclient.api.domain.UserService;
+import com.faforever.moderatorclient.config.ApplicationPaths;
 import com.faforever.moderatorclient.config.TemplateAndReasonConfig;
+import com.faforever.moderatorclient.replay.ReplayStorageService;
 import com.faforever.moderatorclient.ui.*;
 import com.faforever.moderatorclient.ui.domain.BanInfoFX;
 import com.faforever.moderatorclient.ui.domain.GameFX;
@@ -36,6 +38,7 @@ import com.google.common.base.Strings;
 import javafx.application.Platform;
 import javafx.beans.property.LongProperty;
 import javafx.beans.property.SimpleLongProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.transformation.FilteredList;
@@ -54,6 +57,7 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.StrokeLineCap;
@@ -79,6 +83,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -92,7 +97,6 @@ import java.util.stream.Collectors;
 
 import javafx.scene.paint.Color;
 
-import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
 import static java.text.MessageFormat.format;
 
 
@@ -101,6 +105,8 @@ import static java.text.MessageFormat.format;
 @Slf4j
 @RequiredArgsConstructor
 public class ModerationReportController implements Controller<Region> {
+    static final String WARNING_TEMPLATE_NAME = "Warning";
+    static final String WARNING_TEMPLATE_FORMAT = "{reportIds}\n\nWarning - ReplayID {gameIds} - {reason}";
     private static final String CHEATS_ENABLED_KEY = "CheatsEnabled";
     private static final String VICTORY_KEY = "Victory";
     private static final String SHARE_KEY = "Share";
@@ -119,20 +125,21 @@ public class ModerationReportController implements Controller<Region> {
     private final UiService uiService;
     private final FafApiCommunicationService fafApiCommunicationService;
     private final PlatformService platformService;
+    private final ObservableList<PlayerFX> accountPlayersOfCurrentlySelectedReport = FXCollections.observableArrayList();
     private final ObservableList<PlayerFX> reportedPlayersOfCurrentlySelectedReport = FXCollections.observableArrayList();
     private final HttpClient httpClient = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.ALWAYS)
             .build();
     private final BanService banService;
     private final UserService userService;
-    public Button createReportForumButton;
+    private final ReplayStorageService replayStorageService;
+    public Button createReportForumReporterButton;
+    public Button createReportForumOffenderButton;
     public TableColumn lastActivity;
     @FXML
     public Button copyModeratorEventsButton;
     @FXML
     public Button copyChatLogButtonOffenderOnly;
-    @FXML
-    public Button referenceOnlyButton;
     @FXML
     public Text moderatorStatisticsLastWeekText;
     @FXML
@@ -193,6 +200,8 @@ public class ModerationReportController implements Controller<Region> {
     public TextField getModeratorEventsForReplayIdTextField;
     @FXML
     public Button getModeratorEventsReplayIdButton;
+    @FXML
+    public Text manualReplayLookupInfoText;
     @FXML
     public CheckBox pingOfTypeMoveFilterCheckBox;
     @FXML
@@ -270,34 +279,36 @@ public class ModerationReportController implements Controller<Region> {
     public void onStartReplay() {
         String replayId = startReplayButton.getId();
         String replayUrl = String.format(replayDownLoadFormat, replayId);
-        Path tempFilePath = null;
+        Path stagingFilePath = null;
         try {
-            tempFilePath = Files.createTempFile("faf_replay_", ".fafreplay");
+            Path resolvedReplayPath = replayStorageService.resolveReplayFile(Integer.parseInt(replayId));
+            stagingFilePath = replayStorageService.createTemporaryReplayFile("download_" + replayId + "_");
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(replayUrl))
                     .build();
 
-            HttpResponse<Path> response = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(tempFilePath));
+            HttpResponse<Path> response = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(stagingFilePath));
 
             if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                Files.move(stagingFilePath, resolvedReplayPath, StandardCopyOption.REPLACE_EXISTING);
                 if (!GraphicsEnvironment.isHeadless() && Desktop.isDesktopSupported()
                         && Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
-                    Desktop.getDesktop().open(tempFilePath.toFile());
+                    Desktop.getDesktop().open(resolvedReplayPath.toFile());
                 } else {
-                    new ProcessBuilder("cmd", "/c", "start", "", tempFilePath.toAbsolutePath().toString()).start();
+                    new ProcessBuilder("cmd", "/c", "start", "", resolvedReplayPath.toAbsolutePath().toString()).start();
                 }
             } else {
                 log.error("Failed to download replay {}: HTTP {}", replayId, response.statusCode());
-                Files.deleteIfExists(tempFilePath);
+                Files.deleteIfExists(stagingFilePath);
             }
         } catch (IOException | InterruptedException e) {
             log.error("Failed to start replay {} from {}", replayId, replayUrl, e);
-            if (tempFilePath != null) {
+            if (stagingFilePath != null) {
                 try {
-                    Files.deleteIfExists(tempFilePath);
+                    Files.deleteIfExists(stagingFilePath);
                 } catch (IOException cleanupException) {
-                    log.warn("Failed to delete temp file {}", tempFilePath, cleanupException);
+                    log.warn("Failed to delete temp file {}", stagingFilePath, cleanupException);
                 }
             }
             if (e instanceof InterruptedException) {
@@ -329,10 +340,13 @@ public class ModerationReportController implements Controller<Region> {
                 .distinct()
                 .collect(Collectors.joining(","));
 
-        removeTrailingComma(new StringBuilder(selectedReportIds));
-        removeTrailingComma(new StringBuilder(selectedGameIds));
+        TemplateAndReasonConfig templateAndReasonConfig = loadTemplateAndReasonConfig();
+        if (templateAndReasonConfig == null || templateAndReasonConfig.getTemplates() == null || templateAndReasonConfig.getTemplates().isEmpty()) {
+            log.warn("No ban template found in templatesAndReasons.json");
+            return;
+        }
 
-        String result = selectedReportIds + "\n\n" + "DAY_NUMBER day ban - ReplayID " + selectedGameIds + " - SOME_REASON";
+        String result = formatTemplate(templateAndReasonConfig.getTemplates().getFirst(), selectedReportIds, selectedGameIds, "SOME_REASON");
         ClipboardContent clipboardContent = new ClipboardContent();
         clipboardContent.putString(result);
         Clipboard.getSystemClipboard().setContent(clipboardContent);
@@ -407,8 +421,16 @@ public class ModerationReportController implements Controller<Region> {
                     gridPane.add(reasonCheckBoxes.get(i), 0, i + 1);
                 }
 
-                Button okButton = new Button("OK");
-                gridPane.add(okButton, 0, reasonCheckBoxes.size() + 1);
+                Button okButton = new Button("Copy Ban Template");
+                Button warningOkButton = new Button("Copy Warning Template");
+                Button referenceOkButton = new Button("Copy Reference Template");
+                HBox buttonRow = new HBox(10, okButton, warningOkButton, referenceOkButton);
+                for (Button button : List.of(okButton, warningOkButton, referenceOkButton)) {
+                    button.setMinWidth(150);
+                    button.setMaxWidth(Double.MAX_VALUE);
+                    HBox.setHgrow(button, javafx.scene.layout.Priority.ALWAYS);
+                }
+                gridPane.add(buttonRow, 0, reasonCheckBoxes.size() + 1, 2, 1);
 
                 Scene scene = new Scene(gridPane);
                 templateStage.setScene(scene);
@@ -420,40 +442,19 @@ public class ModerationReportController implements Controller<Region> {
                         return;
                     }
 
-                    StringBuilder selectedReasons = new StringBuilder();
-                    for (CheckBox checkBox : reasonCheckBoxes) {
-                        if (checkBox.isSelected()) {
-                            selectedReasons.append(checkBox.getText()).append(", ");
-                        }
-                    }
+                    copyTemplateToClipboard(selectedTemplate, reasonCheckBoxes, selectedIds, selectedGameIds);
+                    closeTemplateStageAfterCopy(templateStage);
+                });
 
-                    if (!selectedReasons.isEmpty()) {
-                        selectedReasons.setLength(selectedReasons.length() - 2); // Remove trailing comma
-                    }
+                warningOkButton.setOnAction(event -> {
+                    TemplateAndReasonConfig warningTemplate = findWarningTemplate(templates);
+                    copyTemplateToClipboard(warningTemplate, reasonCheckBoxes, selectedIds, selectedGameIds);
+                    closeTemplateStageAfterCopy(templateStage);
+                });
 
-                    // Format result based on the template
-                    String result = selectedTemplate.getFormat()
-                            .replace("{reportIds}", selectedIds)
-                            .replace("{reason}", selectedReasons.toString());
-
-                    if (selectedGameIds.isEmpty()) {
-                        result = result.replace("ReplayID", "");
-                        result = result.replace(" -  {gameIds}", "");
-                    } else {
-                        result = result.replace("{gameIds}", selectedGameIds);
-                    }
-
-                    // Copy result to clipboard
-                    ClipboardContent clipboardContent = new ClipboardContent();
-                    clipboardContent.putString(result);
-                    Clipboard.getSystemClipboard().setContent(clipboardContent);
-
-                    useTemplateWithReasonsButton.setText("Copied");
-                    templateStage.close();
-
-                    PauseTransition pause = new PauseTransition(Duration.millis(750));
-                    pause.setOnFinished(e -> useTemplateWithReasonsButton.setText("Template With Reasons"));
-                    pause.play();
+                referenceOkButton.setOnAction(event -> {
+                    copyReferenceTemplateToClipboard(reasonCheckBoxes, selectedIds, selectedGameIds);
+                    closeTemplateStageAfterCopy(templateStage);
                 });
             });
         } catch (Exception e) {
@@ -461,14 +462,86 @@ public class ModerationReportController implements Controller<Region> {
         }
     }
 
+    private void copyTemplateToClipboard(TemplateAndReasonConfig selectedTemplate, List<CheckBox> reasonCheckBoxes, String selectedIds, String selectedGameIds) {
+        String selectedReasons = reasonCheckBoxes.stream()
+                .filter(CheckBox::isSelected)
+                .map(CheckBox::getText)
+                .collect(Collectors.joining(", "));
+
+        String result = formatTemplate(selectedTemplate, selectedIds, selectedGameIds, selectedReasons);
+
+        ClipboardContent clipboardContent = new ClipboardContent();
+        clipboardContent.putString(result);
+        Clipboard.getSystemClipboard().setContent(clipboardContent);
+    }
+
+    private String formatTemplate(TemplateAndReasonConfig selectedTemplate, String selectedIds, String selectedGameIds, String selectedReasons) {
+        String result = selectedTemplate.getFormat()
+                .replace("{reportIds}", selectedIds)
+                .replace("{reason}", selectedReasons);
+
+        if (selectedGameIds.isEmpty()) {
+            result = result.replace("ReplayID", "");
+            result = result.replace(" -  {gameIds}", "");
+            result = result.replace("{gameIds}", "");
+        } else {
+            result = result.replace("{gameIds}", selectedGameIds);
+        }
+
+        return result;
+    }
+
+    private void copyReferenceTemplateToClipboard(List<CheckBox> reasonCheckBoxes, String selectedIds, String selectedGameIds) {
+        String selectedReasons = reasonCheckBoxes.stream()
+                .filter(CheckBox::isSelected)
+                .map(CheckBox::getText)
+                .collect(Collectors.joining(", "));
+
+        String result;
+        if (selectedGameIds.isEmpty()) {
+            result = selectedIds + "\n\n" + "Reference - " + selectedReasons;
+        } else {
+            result = selectedIds + "\n\n" + "Reference - ReplayID " + selectedGameIds + " - " + selectedReasons;
+        }
+
+        ClipboardContent clipboardContent = new ClipboardContent();
+        clipboardContent.putString(result);
+        Clipboard.getSystemClipboard().setContent(clipboardContent);
+    }
+
+    private void closeTemplateStageAfterCopy(Stage templateStage) {
+        useTemplateWithReasonsButton.setText("Copied");
+        templateStage.close();
+
+        PauseTransition pause = new PauseTransition(Duration.millis(750));
+        pause.setOnFinished(e -> useTemplateWithReasonsButton.setText("Template With Reasons"));
+        pause.play();
+    }
+
     private TemplateAndReasonConfig loadTemplateAndReasonConfig() {
-        File templatesAndReasonsFile = new File(CONFIGURATION_FOLDER + File.separator + "templatesAndReasons.json");
+        File templatesAndReasonsFile = ApplicationPaths.resolveConfigurationFile("templatesAndReasons.json").toFile();
         try {
             return objectMapper.readValue(templatesAndReasonsFile, TemplateAndReasonConfig.class);
         } catch (IOException e) {
             log.warn("Failed to load templates and reasons config", e);
         }
         return null;
+    }
+
+    static TemplateAndReasonConfig findWarningTemplate(List<TemplateAndReasonConfig> templates) {
+        if (templates != null) {
+            Optional<TemplateAndReasonConfig> warningTemplate = templates.stream()
+                    .filter(template -> WARNING_TEMPLATE_NAME.equalsIgnoreCase(template.getName()))
+                    .findFirst();
+            if (warningTemplate.isPresent()) {
+                return warningTemplate.get();
+            }
+        }
+
+        TemplateAndReasonConfig warningTemplate = new TemplateAndReasonConfig();
+        warningTemplate.setName(WARNING_TEMPLATE_NAME);
+        warningTemplate.setFormat(WARNING_TEMPLATE_FORMAT);
+        return warningTemplate;
     }
 
     private void showInTableRepeatedOffenders(List<ModerationReportFX> reps) {
@@ -686,43 +759,6 @@ public class ModerationReportController implements Controller<Region> {
         })*/;
     }
 
-    public void onReferenceOnly() {
-        ObservableList<ModerationReportFX> selectedItems = reportTableView.getSelectionModel().getSelectedItems();
-        if (selectedItems == null || selectedItems.isEmpty()) {
-            return;
-        }
-
-        String selectedReportIds = selectedItems.stream()
-                .map(item -> String.valueOf(item.getId()))
-                .collect(Collectors.joining(","));
-
-        String selectedGameIds = selectedItems.stream()
-                .map(ModerationReportFX::getGame)
-                .filter(Objects::nonNull)
-                .map(game -> String.valueOf(game.getId()))
-                .distinct()
-                .collect(Collectors.joining(","));
-
-        removeTrailingComma(new StringBuilder(selectedReportIds));
-        removeTrailingComma(new StringBuilder(selectedGameIds));
-
-        String result;
-        if (selectedGameIds.isEmpty()) {
-            result = selectedReportIds + "\n\n" + "Reference - REFERENCE_REASON";
-        } else {
-            result = selectedReportIds + "\n\n" + "Reference - ReplayID " + selectedGameIds + " - REFERENCE_REASON";
-        }
-
-        ClipboardContent clipboardContent = new ClipboardContent();
-        clipboardContent.putString(result);
-        Clipboard.getSystemClipboard().setContent(clipboardContent);
-
-        referenceOnlyButton.setText("Copied");
-        PauseTransition pause = new PauseTransition(Duration.millis(750));
-        pause.setOnFinished(e -> referenceOnlyButton.setText("Reference Only"));
-        pause.play();
-    }
-
     public static class ModeratorStatistics {
         private final StringProperty moderator;
         private final LongProperty completedReports;
@@ -930,6 +966,20 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private void resetButtonsToInvalidState() {
+        resetGameButtonsToInvalidState();
+        copyReporterIdButton.setText(formatPlayerRoleButtonText("Reporter", "Reporter n/a"));
+        copyReporterIdButton.setId("");
+        copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", "Reported User n/a"));
+        copyReportedUserIdButton.setId("");
+        createReportForumReporterButton.setId("");
+        createReportForumReporterButton.setText("Search Forum Reporter:\nn/a");
+        createReportForumOffenderButton.setId("");
+        createReportForumOffenderButton.setText("Search Forum Offender:\nn/a");
+        accountPlayersOfCurrentlySelectedReport.clear();
+        reportedPlayersOfCurrentlySelectedReport.clear();
+    }
+
+    private void resetGameButtonsToInvalidState() {
         copyChatLogButton.setText("Chat Log n/a");
         copyChatLogButton.setId("");
         copyChatLogButtonOffenderOnly.setText("Chat Offender n/a");
@@ -948,12 +998,39 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private void initializeUserTableView() {
-        ViewHelper.buildUserTableView(platformService, reportedPlayerTableView, reportedPlayersOfCurrentlySelectedReport, this::addBan,
+        ViewHelper.buildUserTableView(platformService, reportedPlayerTableView, accountPlayersOfCurrentlySelectedReport, null,
                 playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), false, fafApiCommunicationService, userService, uiService, null);
+        TableColumn<PlayerFX, String> roleColumn = new TableColumn<>("Role");
+        roleColumn.setId("Role");
+        roleColumn.setCellValueFactory(param -> new SimpleStringProperty(getReportAccountRole(param.getValue())));
+        roleColumn.setPrefWidth(90);
+        reportedPlayerTableView.getColumns().addFirst(roleColumn);
+        reportedPlayerTableView.getColumns().add(createReportAccountBanColumn());
         Platform.runLater(() -> {
             loadColumnLayout(reportTableView, localPreferences);
             loadSplitPanePositions(root, localPreferences);
         });
+    }
+
+    private TableColumn<PlayerFX, PlayerFX> createReportAccountBanColumn() {
+        TableColumn<PlayerFX, PlayerFX> banColumn = new TableColumn<>("Ban");
+        banColumn.setId("Ban");
+        banColumn.setCellValueFactory(param -> new SimpleObjectProperty<>(param.getValue()));
+        banColumn.setCellFactory(param -> new TableCell<>() {
+            @Override
+            protected void updateItem(PlayerFX item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setGraphic(null);
+                    return;
+                }
+
+                Button button = new Button("Add ban");
+                button.setOnAction(event -> addBan(item));
+                setGraphic(button);
+            }
+        });
+        return banColumn;
     }
 
     public void onSave() {
@@ -1054,21 +1131,36 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private void updateReportDetails(ModerationReportFX newValue) {
-        reportedPlayersOfCurrentlySelectedReport.setAll(newValue.getReportedUsers());
+        Collection<PlayerFX> reportedUsers = newValue.getReportedUsers() == null
+                ? Collections.emptySet()
+                : newValue.getReportedUsers();
+        reportedPlayersOfCurrentlySelectedReport.setAll(reportedUsers);
+        accountPlayersOfCurrentlySelectedReport.setAll(getReportAccountRows(newValue));
         currentlySelectedItemNotNull = newValue;
 
         copyReportIdButton.setText("Report ID: " + newValue.getId());
         copyReportIdButton.setId(newValue.getId());
 
-        copyReporterIdButton.setText(newValue.getReporter().getRepresentation());
-        copyReporterIdButton.setId(newValue.getReporter().getRepresentation());
+        String reporterRepresentation = newValue.getReporter() == null
+                ? "Reporter n/a"
+                : newValue.getReporter().getRepresentation();
+        copyReporterIdButton.setText(formatPlayerRoleButtonText("Reporter", reporterRepresentation));
+        copyReporterIdButton.setId(newValue.getReporter() == null ? "" : reporterRepresentation);
+        createReportForumReporterButton.setId(newValue.getReporter() == null ? "" : newValue.getReporter().getId());
+        createReportForumReporterButton.setText("Search Forum Reporter:\n" + reporterRepresentation);
 
         // Since ~2023, reports have only one offender; legacy reports may have several.
         for (PlayerFX offender : reportedPlayersOfCurrentlySelectedReport) {
             copyReportedUserIdButton.setId(offender.getRepresentation());
-            copyReportedUserIdButton.setText(offender.getRepresentation());
-            createReportForumButton.setId(offender.getId());
-            createReportForumButton.setText("Search Forum:\n" + offender.getRepresentation());
+            copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", offender.getRepresentation()));
+            createReportForumOffenderButton.setId(offender.getId());
+            createReportForumOffenderButton.setText("Search Forum Offender:\n" + offender.getRepresentation());
+        }
+        if (reportedPlayersOfCurrentlySelectedReport.isEmpty()) {
+            copyReportedUserIdButton.setId("");
+            copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", "Reported User n/a"));
+            createReportForumOffenderButton.setId("");
+            createReportForumOffenderButton.setText("Search Forum Offender:\nn/a");
         }
 
         if (newValue.getGame() != null) {
@@ -1082,8 +1174,32 @@ public class ModerationReportController implements Controller<Region> {
                 showChatLog(currentlySelectedItemNotNull);
             }
         } else {
-            resetButtonsToInvalidState();
+            resetGameButtonsToInvalidState();
         }
+    }
+
+    private static List<PlayerFX> getReportAccountRows(ModerationReportFX report) {
+        List<PlayerFX> accountRows = new ArrayList<>();
+        if (report.getReporter() != null) {
+            accountRows.add(report.getReporter());
+        }
+        if (report.getReportedUsers() != null) {
+            accountRows.addAll(report.getReportedUsers());
+        }
+        return accountRows;
+    }
+
+    private String getReportAccountRole(PlayerFX player) {
+        if (player == null || currentlySelectedItemNotNull == null) {
+            return "";
+        }
+
+        PlayerFX reporter = currentlySelectedItemNotNull.getReporter();
+        if (reporter != null && Objects.equals(reporter.getId(), player.getId())) {
+            return "Reporter";
+        }
+
+        return "Offender";
     }
 
     public void loadCheckboxStates() {
@@ -1119,6 +1235,8 @@ public class ModerationReportController implements Controller<Region> {
         chatLogTextFlow.getChildren().clear();
         chatLogTextFlow.getChildren().add(messageTextNoSelection);
         bindUIElementsToPreferences();
+        refreshManualReplayLookupVisibility();
+        refreshReportPlayerRoleButtonText();
 
         if (fetchReportsOnStartupCheckBox.isSelected()) {
             onRefreshInitialReports();
@@ -1455,7 +1573,7 @@ public class ModerationReportController implements Controller<Region> {
                                 .map(PlayerFX::getRepresentation)
                                 .collect(Collectors.joining(", "));
                         String reporter = String.valueOf(report.getReporter().getRepresentation());
-                        String filePathGamingModeratorTask = CONFIGURATION_FOLDER + File.separator + "templateGamingModeratorTask.txt";
+                        String filePathGamingModeratorTask = ApplicationPaths.resolveConfigurationFile("templateGamingModeratorTask.txt").toString();
                         StringBuilder contentGamingModeratorTask = new StringBuilder();
                         try (BufferedReader br = new BufferedReader(new FileReader(filePathGamingModeratorTask))) {
                             String line;
@@ -1617,7 +1735,7 @@ public class ModerationReportController implements Controller<Region> {
 
     private Path createTempFile(GameFX game) {
         try {
-            return Files.createTempFile(format("faf_replay_" + game.getId()), "");
+            return replayStorageService.createTemporaryReplayFile("analysis-" + game.getId() + "-");
         } catch (IOException e) {
             log.error("An error occurred while creating a temporary file.", e);
             return null;
@@ -1629,7 +1747,7 @@ public class ModerationReportController implements Controller<Region> {
             FafApiCommunicationService.checkRateLimit();
 
             String replayUrl = game.getReplayUrl(replayDownLoadFormat);
-            log.info("Downloading replay from {} to {}", replayUrl, tempFilePath);
+            log.debug("Downloading replay from {} to {}", replayUrl, tempFilePath);
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(replayUrl))
@@ -1664,84 +1782,96 @@ public class ModerationReportController implements Controller<Region> {
 
     private void processAndDisplayReplay(String header, Path tempFilePath, String promptAI) {
         try {
-            ReplayDataParser replayDataParser = new ReplayDataParser(tempFilePath, objectMapper);
-            String chatLog = generateChatLog(replayDataParser);
+            try (ReplayStorageService.PreparedReplay preparedReplay = replayStorageService.prepareReplayForParsing(tempFilePath)) {
+                ReplayDataParser replayDataParser = new ReplayDataParser(preparedReplay.path(), objectMapper);
+                String chatLog = generateChatLog(replayDataParser);
 
-            StringBuilder chatLogFiltered = new StringBuilder();
-            StringBuilder chatLogFilteredOffenderOnly = new StringBuilder();
-            String reportedUser = extractName(copyReportedUserIdButton.getText());
+                StringBuilder chatLogFiltered = new StringBuilder();
+                StringBuilder chatLogFilteredOffenderOnly = new StringBuilder();
+                String reportedUser = extractName(copyReportedUserIdButton.getText());
 
-            chatLogFiltered.append(header);
+                chatLogFiltered.append(header);
 
-            String metadataInfo = generateMetadataInfo(replayDataParser);
-            chatLogFiltered.append(metadataInfo);
+                String metadataInfo = generateMetadataInfo(replayDataParser);
+                chatLogFiltered.append(metadataInfo);
 
-            String filteredChatLog = filterAndAppendChatLog(chatLog);
-            chatLogFiltered.append(filteredChatLog);
+                String filteredChatLog = filterAndAppendChatLog(chatLog);
+                chatLogFiltered.append(filteredChatLog);
 
-            Map<Integer, PlayerInfo> playerInfoMap = replayDataParser.getArmies().entrySet().stream()
-                    .filter(entry -> entry.getValue().containsKey("PlayerName"))
-                    .collect(Collectors.toMap(
-                            entry -> entry.getKey() + 1,
-                            entry -> new PlayerInfo(entry.getKey() + 1, (String) entry.getValue().get("PlayerName"))
-                    ));
+                Map<Integer, PlayerInfo> playerInfoMap = replayDataParser.getArmies().entrySet().stream()
+                        .filter(entry -> entry.getValue().containsKey("PlayerName"))
+                        .collect(Collectors.toMap(
+                                entry -> entry.getKey() + 1,
+                                entry -> new PlayerInfo(entry.getKey() + 1, (String) entry.getValue().get("PlayerName"))
+                        ));
 
-            List<ModeratorEvent> moderatorEvents = replayDataParser.getModeratorEvents();
-            showModeratorEvent(moderatorEvents, playerInfoMap);
+                List<ModeratorEvent> moderatorEvents = replayDataParser.getModeratorEvents();
+                showModeratorEvent(moderatorEvents, playerInfoMap);
 
-            List<PaintingBrushStroke> paintingStrokes = extractPaintingStrokes(replayDataParser);
-            Platform.runLater(() -> {
-                currentPaintingStrokes = paintingStrokes;
-                paintingMinX = Float.MAX_VALUE; paintingMaxX = -Float.MAX_VALUE;
-                paintingMinZ = Float.MAX_VALUE; paintingMaxZ = -Float.MAX_VALUE;
-                for (PaintingBrushStroke s : paintingStrokes) {
-                    for (float[] pt : s.points()) {
-                        if (pt[0] < paintingMinX) paintingMinX = pt[0];
-                        if (pt[0] > paintingMaxX) paintingMaxX = pt[0];
-                        if (pt[1] < paintingMinZ) paintingMinZ = pt[1];
-                        if (pt[1] > paintingMaxZ) paintingMaxZ = pt[1];
+                List<PaintingBrushStroke> paintingStrokes = extractPaintingStrokes(replayDataParser);
+                Platform.runLater(() -> {
+                    currentPaintingStrokes = paintingStrokes;
+                    paintingMinX = Float.MAX_VALUE; paintingMaxX = -Float.MAX_VALUE;
+                    paintingMinZ = Float.MAX_VALUE; paintingMaxZ = -Float.MAX_VALUE;
+                    for (PaintingBrushStroke s : paintingStrokes) {
+                        for (float[] pt : s.points()) {
+                            if (pt[0] < paintingMinX) paintingMinX = pt[0];
+                            if (pt[0] > paintingMaxX) paintingMaxX = pt[0];
+                            if (pt[1] < paintingMinZ) paintingMinZ = pt[1];
+                            if (pt[1] > paintingMaxZ) paintingMaxZ = pt[1];
+                        }
+                    }
+                    long maxSec = paintingStrokes.isEmpty() ? 0
+                            : paintingStrokes.stream().mapToLong(s -> s.time().getSeconds()).max().orElse(0);
+                    paintingTimeSlider.setMin(0);
+                    paintingTimeSlider.setMax(Math.max(maxSec, 1));
+                    paintingTimeSlider.setValue(maxSec);
+                    paintingTimeLabel.setText(formatDurationHMS(maxSec));
+                    renderPaintingStrokes(paintingStrokes);
+                });
+
+                chatLogFiltered.append("\n").append(promptAI);
+
+                for (String line : filteredChatLog.split("\n")) {
+                    if (line.contains(reportedUser)) {
+                        chatLogFilteredOffenderOnly.append(line).append("\n");
                     }
                 }
-                long maxSec = paintingStrokes.isEmpty() ? 0
-                        : paintingStrokes.stream().mapToLong(s -> s.time().getSeconds()).max().orElse(0);
-                paintingTimeSlider.setMin(0);
-                paintingTimeSlider.setMax(Math.max(maxSec, 1));
-                paintingTimeSlider.setValue(maxSec);
-                paintingTimeLabel.setText(formatDurationHMS(maxSec));
-                renderPaintingStrokes(paintingStrokes);
-            });
 
-            chatLogFiltered.append("\n").append(promptAI);
+                chatLogFilteredOffenderOnly.append("\n\n").append(promptAI);
 
-            for (String line : filteredChatLog.split("\n")) {
-                if (line.contains(reportedUser)) {
-                    chatLogFilteredOffenderOnly.append(line).append("\n");
-                }
+                Platform.runLater(() -> {
+                    copyChatLogButton.setId(chatLogFiltered.toString());
+                    copyChatLogButton.setText("Copy Chat Log");
+
+                    copyChatLogButtonOffenderOnly.setText("Copy Chat Offender");
+                    copyChatLogButtonOffenderOnly.setId(chatLogFilteredOffenderOnly.toString());
+
+                    updateChatLogToColorTextFlow(chatLogTextFlow, String.valueOf(chatLogFiltered),
+                            extractName(copyReporterIdButton.getText()),
+                            extractName(copyReportedUserIdButton.getText()));
+                });
             }
-
-            chatLogFilteredOffenderOnly.append("\n\n").append(promptAI);
-
-            Platform.runLater(() -> {
-                copyChatLogButton.setId(chatLogFiltered.toString());
-                copyChatLogButton.setText("Copy Chat Log");
-
-                copyChatLogButtonOffenderOnly.setText("Copy Chat Offender");
-                copyChatLogButtonOffenderOnly.setId(chatLogFilteredOffenderOnly.toString());
-
-                updateChatLogToColorTextFlow(chatLogTextFlow, String.valueOf(chatLogFiltered),
-                        extractName(copyReporterIdButton.getText()),
-                        extractName(copyReportedUserIdButton.getText()));
-            });
         } catch (Exception e) {
             log.error("An error occurred while parsing replay data.", e);
         }
     }
 
-    private String extractName(String fullNameWithId) {
-        if (fullNameWithId.contains("[")) {
-            return fullNameWithId.split("\\[")[0].trim();
+    static String extractName(String fullNameWithId) {
+        if (fullNameWithId == null) {
+            return "";
         }
-        return fullNameWithId.trim();
+
+        String name = fullNameWithId.trim();
+        int rolePrefixEnd = name.lastIndexOf('\n');
+        if (rolePrefixEnd >= 0) {
+            name = name.substring(rolePrefixEnd + 1).trim();
+        }
+
+        if (name.contains("[")) {
+            return name.split("\\[")[0].trim();
+        }
+        return name;
     }
 
     private static final Font MONO = Font.font("Courier New", 12);
@@ -2317,9 +2447,20 @@ public class ModerationReportController implements Controller<Region> {
         return filteredChatLog.toString();
     }
 
-    public void onCreateReportForumButton() throws IOException {
-        String reportedUserId = createReportForumButton.getId();
-        String url = "https://forum.faforever.com/search?term=" + reportedUserId +
+    public void onCreateReportForumReporterButton() throws IOException {
+        openForumSearch(createReportForumReporterButton.getId());
+    }
+
+    public void onCreateReportForumOffenderButton() throws IOException {
+        openForumSearch(createReportForumOffenderButton.getId());
+    }
+
+    private void openForumSearch(String userId) throws IOException {
+        if (userId == null || userId.isBlank()) {
+            return;
+        }
+
+        String url = "https://forum.faforever.com/search?term=" + userId +
                 "&in=titlesposts&matchWords=all&sortBy=relevance&sortDirection=desc&showAs=posts";
 
         String browser = String.valueOf(localPreferences.getUi().getBrowserComboBox());
@@ -2529,6 +2670,47 @@ public class ModerationReportController implements Controller<Region> {
                 log.warn("Cannot access field {}", fieldName, e);
             }
         }
+
+    }
+
+    public void refreshManualReplayLookupVisibility() {
+        boolean visible = localPreferences.getTabReports().isEnableManualReplayLookupCheckBox();
+        manualReplayLookupInfoText.setVisible(visible);
+        manualReplayLookupInfoText.setManaged(visible);
+        getModeratorEventsForReplayIdTextField.setVisible(visible);
+        getModeratorEventsForReplayIdTextField.setManaged(visible);
+        getModeratorEventsReplayIdButton.setVisible(visible);
+        getModeratorEventsReplayIdButton.setManaged(visible);
+    }
+
+    public void refreshReportPlayerRoleButtonText() {
+        if (currentlySelectedItemNotNull == null) {
+            copyReporterIdButton.setText(formatPlayerRoleButtonText("Reporter", "Reporter n/a"));
+            copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", "Reported User n/a"));
+            return;
+        }
+
+        String reporterRepresentation = currentlySelectedItemNotNull.getReporter() == null
+                ? "Reporter n/a"
+                : currentlySelectedItemNotNull.getReporter().getRepresentation();
+        copyReporterIdButton.setText(formatPlayerRoleButtonText("Reporter", reporterRepresentation));
+
+        Collection<PlayerFX> reportedUsers = currentlySelectedItemNotNull.getReportedUsers();
+        if (reportedUsers == null || reportedUsers.isEmpty()) {
+            copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", "Reported User n/a"));
+        } else {
+            for (PlayerFX offender : reportedUsers) {
+                copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", offender.getRepresentation()));
+            }
+        }
+    }
+
+    private String formatPlayerRoleButtonText(String role, String playerText) {
+        if (!localPreferences.getTabReports().isShowReportPlayerRoleLabelsCheckBox()) {
+            return playerText;
+        }
+
+        return role + ":\n" + playerText;
     }
 
     public static void saveSplitPanePositions(SplitPane splitPane, LocalPreferences localPreferences) {

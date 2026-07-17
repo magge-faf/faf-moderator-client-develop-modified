@@ -1,5 +1,6 @@
 package com.faforever.moderatorclient.ui.main_window;
 
+import com.faforever.moderatorclient.config.ApplicationPaths;
 import com.faforever.moderatorclient.ui.Controller;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -36,7 +36,8 @@ public class ExcludedHardwareItemsController implements Controller<VBox> {
     private static final ObjectMapper OBJECT_MAPPER =
             new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
-    private static final File EXCLUDED_ITEMS_FILE = new File("data/excluded_items.json");
+    private static final File EXCLUDED_ITEMS_FILE =
+            ApplicationPaths.resolveConfigurationDirectory().resolve("excluded_items.json").toFile();
 
     private static final Map<String, String> DISPLAY_NAMES;
     static {
@@ -329,7 +330,7 @@ public class ExcludedHardwareItemsController implements Controller<VBox> {
     @FXML
     public void handleOnCreateJsonBackup() {
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
-        Path backupPath = Paths.get("data", "excluded_items_backup_" + timestamp + ".json");
+        Path backupPath = ApplicationPaths.resolveConfigurationDirectory().resolve("excluded_items_backup_" + timestamp + ".json");
         try {
             if (!EXCLUDED_ITEMS_FILE.exists()) {
                 showAlert(Alert.AlertType.WARNING, "Backup Failed",

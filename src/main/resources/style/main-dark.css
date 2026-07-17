@@ -89,15 +89,207 @@
 }
 
 .irc-subtle-label {
-    -fx-text-fill: #9ea7b3;
+    -fx-text-fill: derive(lightgray, -18%);
+}
+
+.irc-shell {
+    -fx-background-color: -fx-base;
+}
+
+.irc-top {
+    -fx-background-color: transparent;
+}
+
+.irc-hero,
+.irc-panel,
+.irc-composer {
+    -fx-background-color: derive(-fx-base, 8%);
+    -fx-background-radius: 4;
+    -fx-border-color: derive(-fx-base, 22%);
+    -fx-border-radius: 4;
+    -fx-padding: 12;
+}
+
+.irc-hero {
+    -fx-padding: 10 12 10 12;
+}
+
+.irc-title {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: lightgray;
+}
+
+.irc-section-title {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: lightgray;
+}
+
+.irc-status-block {
+    -fx-background-color: derive(-fx-base, 14%);
+    -fx-background-radius: 4;
+    -fx-padding: 6 8 6 8;
+}
+
+.irc-status-dot {
+    -fx-font-size: 18px;
+}
+
+.irc-status-label {
+    -fx-font-weight: bold;
+    -fx-text-fill: lightgray;
+}
+
+.irc-history-warning {
+    -fx-text-fill: #d0a733;
+}
+
+.irc-panel .text-field,
+.irc-composer .text-field,
+.irc-panel .date-picker,
+.irc-panel .date-picker .text-field {
+    -fx-background-color: -fx-control-inner-background;
+    -fx-background-radius: 3;
+    -fx-border-color: derive(-fx-base, 30%);
+    -fx-border-radius: 3;
+    -fx-text-fill: lightgray;
+    -fx-prompt-text-fill: gray;
+}
+
+.irc-panel .date-picker .arrow-button {
+    -fx-background-color: derive(-fx-base, 25%);
+    -fx-background-radius: 0 3 3 0;
+}
+
+.irc-panel .button,
+.irc-composer .button {
+    -fx-background-radius: 3;
+    -fx-padding: 8 14 8 14;
+}
+
+#chooseUpdateBackupFolderButton {
+    -fx-base: -fx-accent;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+}
+
+.settings-shell {
+    -fx-padding: 16;
+    -fx-background-color: -fx-base;
+}
+
+.settings-scroll {
+    -fx-background: transparent;
+    -fx-background-color: transparent;
+}
+
+.settings-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.settings-header {
+    -fx-padding: 0 0 4 0;
+}
+
+.settings-title {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: lightgray;
+}
+
+.settings-subtitle,
+.settings-help {
+    -fx-text-fill: derive(lightgray, -18%);
+}
+
+.settings-section {
+    -fx-background-color: derive(-fx-base, 8%);
+    -fx-background-radius: 4;
+    -fx-border-color: derive(-fx-base, 22%);
+    -fx-border-radius: 4;
+    -fx-padding: 12;
+}
+
+.settings-section-title {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: lightgray;
+}
+
+.settings-field-label {
+    -fx-font-weight: bold;
+    -fx-text-fill: derive(lightgray, -8%);
+}
+
+.settings-status {
+    -fx-text-fill: derive(lightgray, -10%);
+}
+
+.settings-section .text-field,
+.settings-section .combo-box {
+    -fx-background-radius: 3;
+    -fx-border-color: derive(-fx-base, 30%);
+    -fx-border-radius: 3;
+}
+
+.settings-action-row .button,
+.settings-button-wrap .button {
+    -fx-background-radius: 3;
+    -fx-padding: 7 12 7 12;
+}
+
+#connectButton,
+#loadHistorySinceButton,
+#joinChannelButton,
+#sendMessageButton,
+#testMentionNotificationButton,
+#pmSelectedUserButton {
+    -fx-base: -fx-accent;
+    -fx-text-fill: white;
+}
+
+#disconnectButton,
+#leaveChannelButton,
+#kickGameButton,
+#kickClientButton,
+#kickGameAndClientButton {
+    -fx-background-color: derive(-fx-base, 25%);
+}
+
+.irc-panel .list-view {
+    -fx-background-color: -fx-control-inner-background;
+    -fx-background-insets: 0;
+    -fx-padding: 4;
+    -fx-background-radius: 3;
+}
+
+.irc-panel .list-view .scroll-bar:vertical {
+    -fx-scale-x: 1;
+    -fx-padding: 0;
+    -fx-opacity: 1;
+}
+
+.irc-panel .list-cell {
+    -fx-background-color: transparent;
+    -fx-background-radius: 0;
+    -fx-padding: 8 10 8 10;
+}
+
+.irc-panel .list-cell:selected {
+    -fx-background-color: derive(-fx-accent, -10%);
 }
 
 .irc-topic-label {
-    -fx-font-style: italic;
+    -fx-font-style: normal;
+    -fx-text-fill: derive(lightgray, -5%);
+    -fx-background-color: -fx-control-inner-background;
+    -fx-background-radius: 3;
+    -fx-padding: 8 10 8 10;
 }
 
 .irc-message-cell {
-    -fx-padding: 6 0 6 0;
+    -fx-padding: 6 2 6 2;
 }
 
 .irc-message-meta {

@@ -4,7 +4,6 @@ import com.faforever.moderatorclient.ui.caches.AvatarCache;
 import com.faforever.moderatorclient.ui.domain.AvatarAssignmentFX;
 import com.faforever.moderatorclient.ui.domain.AvatarFX;
 import javafx.application.Platform;
-import javafx.scene.control.Label;
 import javafx.scene.control.TableCell;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -38,12 +37,6 @@ public class UrlImageViewTableCell<T> extends TableCell<T, String> {
 
     private static final Set<String> loadingUrls = ConcurrentHashMap.newKeySet();
     private static final Map<String, Future<?>> runningTasks = new ConcurrentHashMap<>();
-
-    private static Label loadProgressLabel;
-
-    public static void setLoadProgressLabel(Label label) {
-        loadProgressLabel = label;
-    }
 
     public static void resetCounters() {
         totalRequested.set(0);
@@ -144,10 +137,6 @@ public class UrlImageViewTableCell<T> extends TableCell<T, String> {
     }
 
     public static void updateProgressLabel() {
-        if (loadProgressLabel != null) {
-            Platform.runLater(() ->
-                    loadProgressLabel.setText("Previews requested: " + totalRequested.get() + ", loaded: " + totalCompleted.get()));
-        }
     }
 
     private String cacheKeyFrom(String item, Object rawData) {

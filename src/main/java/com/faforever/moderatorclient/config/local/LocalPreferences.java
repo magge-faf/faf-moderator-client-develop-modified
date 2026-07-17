@@ -1,14 +1,19 @@
 package com.faforever.moderatorclient.config.local;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.prefs.Preferences;
+import java.util.prefs.BackingStoreException;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Data
@@ -34,6 +39,281 @@ public class LocalPreferences {
     private TabApiHistory tabApiHistory = new TabApiHistory();
     private TabIrcChat tabIrcChat = new TabIrcChat();
 
+    public LocalPreferences() {
+        applyDefaultLayoutPreferences();
+    }
+
+    /**
+     * Backfills default layout values (table column widths/order, divider positions) into the nested
+     * preference sections. Safe to call again after Jackson deserialization has replaced those nested
+     * objects: only keys/lists that are still missing are filled in, existing saved values are untouched.
+     */
+    void applyDefaultLayoutPreferences() {
+        // tabUserManagement
+        backfillMap(tabUserManagement.userSearchTableTableColumnWidthsTabUserManagement, Map.ofEntries(
+                Map.entry("AccountLink", 174.58984375),
+                Map.entry("Email", 175.541015625),
+                Map.entry("RegistrationDate", 124.650390625),
+                Map.entry("CPUName", 268.609375),
+                Map.entry("UIDCreated", 109.111328125),
+                Map.entry("ProcessorId", 118.29296875),
+                Map.entry("DeviceID", 67.517578125),
+                Map.entry("MemoryS/N", 91.7109375),
+                Map.entry("Hash", 221.798828125),
+                Map.entry("VolumeS/N", 200.0),
+                Map.entry("Name", 96.951171875),
+                Map.entry("UIDLastUsed", 109.111328125),
+                Map.entry("S/N", 200.0),
+                Map.entry("LastLogin", 124.650390625),
+                Map.entry("UserAgent", 146.0),
+                Map.entry("Manufacturer", 230.546875),
+                Map.entry("ID", 54.0),
+                Map.entry("UUID", 252.220703125),
+                Map.entry("IPAddress", 94.9609375)
+        ));
+        backfillList(tabUserManagement.userSearchTableColumnOrderTabUserManagement, List.of("ID", "Name", "Email", "RegistrationDate", "LastLogin", "Hash", "UUID", "UIDCreated", "UIDLastUsed", "MemoryS/N", "IPAddress", "DeviceID", "AccountLink", "UserAgent", "Manufacturer", "CPUName", "ProcessorId", "S/N", "VolumeS/N"));
+        backfillList(tabUserManagement.rootSplitPaneDividerPositionsTabUserManagement, List.of(0.39481268011527376));
+        backfillMap(tabUserManagement.userBansTableColumnWidths, Map.ofEntries(
+                Map.entry("ID", 80.0),
+                Map.entry("Level", 80.0),
+                Map.entry("Status", 80.0),
+                Map.entry("Duration", 195.794921875),
+                Map.entry("Expiresat", 74.537109375),
+                Map.entry("Reason", 923.244140625),
+                Map.entry("Author", 153.0),
+                Map.entry("RevocationReason", 250.0),
+                Map.entry("RevocationAuthor", 150.0),
+                Map.entry("Revocationat", 180.0),
+                Map.entry("CreatedTime", 180.0),
+                Map.entry("UpdateTime", 180.0)
+        ));
+        backfillList(tabUserManagement.userBansTableColumnOrder, List.of("ID", "Level", "Status", "Duration", "Expiresat", "Reason", "Author", "RevocationReason", "RevocationAuthor", "Revocationat", "CreatedTime", "UpdateTime"));
+        backfillMap(tabUserManagement.userNoteTableColumnWidths, Map.ofEntries(
+                Map.entry("ID", 80.0),
+                Map.entry("Watched", 80.0),
+                Map.entry("Note", 600.0),
+                Map.entry("Author", 150.0),
+                Map.entry("Created", 160.0),
+                Map.entry("Lastupdate", 160.0)
+        ));
+        backfillList(tabUserManagement.userNoteTableColumnOrder, List.of("ID", "Watched", "Note", "Author", "Created", "Lastupdate"));
+        backfillMap(tabUserManagement.userNameHistoryTableColumnWidths, Map.ofEntries(
+                Map.entry("ID", 80.0),
+                Map.entry("ChangeTime", 180.0),
+                Map.entry("PreviousName", 200.0)
+        ));
+        backfillList(tabUserManagement.userNameHistoryTableColumnOrder, List.of("ID", "ChangeTime", "PreviousName"));
+        backfillMap(tabUserManagement.userLastGamesTableColumnWidths, Map.ofEntries(
+                Map.entry("GameID", 100.0),
+                Map.entry("GameName", 845.7109375),
+                Map.entry("GameValidity", 206.0),
+                Map.entry("RatingBeforeGame", 150.0),
+                Map.entry("RatingChange", 100.0),
+                Map.entry("ScoreTime", 150.0),
+                Map.entry("Replay", 150.0)
+        ));
+        backfillList(tabUserManagement.userLastGamesTableColumnOrder, List.of("GameID", "GameName", "GameValidity", "RatingBeforeGame", "RatingChange", "ScoreTime", "Replay"));
+        backfillMap(tabUserManagement.userAvatarsTableColumnWidths, Map.ofEntries(
+                Map.entry("AssignmentID", 140.0),
+                Map.entry("AvatarID", 80.0),
+                Map.entry("Preview", 80.0),
+                Map.entry("Tooltip", 184.0),
+                Map.entry("Selected", 80.0),
+                Map.entry("ExpiresAt", 180.0)
+        ));
+        backfillList(tabUserManagement.userAvatarsTableColumnOrder, List.of("AssignmentID", "AvatarID", "Preview", "Tooltip", "Selected", "ExpiresAt"));
+        backfillMap(tabUserManagement.userGroupsTableColumnWidths, Map.ofEntries(
+                Map.entry("ID", 80.0),
+                Map.entry("GroupName", 150.0),
+                Map.entry("Public", 80.0)
+        ));
+        backfillList(tabUserManagement.userGroupsTableColumnOrder, List.of("ID", "GroupName", "Public"));
+        backfillMap(tabUserManagement.permissionsTableColumnWidths, Map.ofEntries(
+                Map.entry("ID", 80.0),
+                Map.entry("PermissionName", 150.0)
+        ));
+        backfillList(tabUserManagement.permissionsTableColumnOrder, List.of("ID", "PermissionName"));
+        // tabReports
+        backfillMap(tabReports.reportTableColumnWidthsTabReports, Map.ofEntries(
+                Map.entry("lastModeratorColumn", 108.982421875),
+                Map.entry("reportDescriptionColumn", 946.251953125),
+                Map.entry("statusColumn", 15.0),
+                Map.entry("reportedUsersColumn", 116.998046875),
+                Map.entry("privateNoteColumn", 149.0),
+                Map.entry("incidentTimeCodeColumn", 225.6484375),
+                Map.entry("moderatorPrivateNoticeColumn", 454.0),
+                Map.entry("reporterColumn", 117.34375),
+                Map.entry("gameColumn", 69.84375),
+                Map.entry("createTimeColumn", 133.0),
+                Map.entry("idColumn", 48.34375)
+        ));
+        backfillList(tabReports.reportTableColumnOrderTabReports, List.of("idColumn", "reporterColumn", "statusColumn", "reportedUsersColumn", "reportDescriptionColumn", "gameColumn", "incidentTimeCodeColumn", "privateNoteColumn", "moderatorPrivateNoticeColumn", "lastModeratorColumn", "createTimeColumn"));
+        backfillList(tabReports.rootSplitPaneDividerPositionsTabReports, List.of(0.5295389048991355));
+        // tabRecentNotes
+        backfillMap(tabRecentNotes.columnWidthsTabRecentNotes, Map.ofEntries(
+                Map.entry("playerIdColumn", 191.46484375),
+                Map.entry("authorIdColumn", 92.9453125),
+                Map.entry("noteColumn", 805.0),
+                Map.entry("noteCreatedColumn", 124.650390625),
+                Map.entry("noteUpdatedColumn", 124.650390625),
+                Map.entry("noteIdColumn", 65.244140625)
+        ));
+        backfillList(tabRecentNotes.columnOrderTabRecentNotes, List.of("noteCreatedColumn", "noteUpdatedColumn", "noteIdColumn", "authorIdColumn", "playerIdColumn", "noteColumn"));
+        // tabBans
+        backfillMap(tabBans.columnWidthsTabBans, Map.ofEntries(
+                Map.entry("Status", 17.0),
+                Map.entry("RevocationReason", 250.0),
+                Map.entry("CreatedTime", 180.0),
+                Map.entry("RevocationAuthor", 150.0),
+                Map.entry("Duration", 173.0),
+                Map.entry("AffectedPlayer", 257.9453125),
+                Map.entry("Reason", 871.0),
+                Map.entry("Revocationat", 180.0),
+                Map.entry("UpdateTime", 180.0),
+                Map.entry("Author", 180.6953125),
+                Map.entry("Level", 26.0),
+                Map.entry("ID", 64.0),
+                Map.entry("Expiresat", 134.494140625)
+        ));
+        backfillList(tabBans.columnOrderTabBans, List.of("Level", "ID", "Status", "Duration", "AffectedPlayer", "Expiresat", "Reason", "Author", "CreatedTime", "UpdateTime", "RevocationReason", "RevocationAuthor", "Revocationat"));
+        // tabAvatars
+        backfillMap(tabAvatars.avatarTableColumnWidths, Map.ofEntries(
+                Map.entry("#", 35.40625),
+                Map.entry("AvatarID", 72.83203125),
+                Map.entry("Preview", 64.76953125),
+                Map.entry("Tooltip", 281.248046875),
+                Map.entry("Created", 180.0),
+                Map.entry("URL", 534.537109375),
+                Map.entry("Assignments", 90.0),
+                Map.entry("Inuse", 80.0),
+                Map.entry("Age", 90.0)
+        ));
+        backfillList(tabAvatars.avatarTableColumnOrder, List.of("#", "AvatarID", "Preview", "Tooltip", "Created", "URL", "Assignments", "Inuse", "Age"));
+        backfillMap(tabAvatars.avatarAssignmentTableColumnWidths, Map.ofEntries(
+                Map.entry("ID", 80.0),
+                Map.entry("UserID", 80.0),
+                Map.entry("Username", 150.0),
+                Map.entry("Selected", 80.0),
+                Map.entry("Expiresat", 180.0),
+                Map.entry("Assignedat", 180.0),
+                Map.entry("Remove", 90.0)
+        ));
+        backfillList(tabAvatars.avatarAssignmentTableColumnOrder, List.of("ID", "UserID", "Username", "Selected", "Expiresat", "Assignedat", "Remove"));
+        // tabMapVault
+        backfillMap(tabMapVault.mapSearchTableColumnWidths, Map.ofEntries(
+                Map.entry("MapID", 100.0),
+                Map.entry("Name", 200.0),
+                Map.entry("Author", 200.0),
+                Map.entry("Recommended", 100.0),
+                Map.entry("Firstupload", 160.0),
+                Map.entry("Lastupdate", 160.0)
+        ));
+        backfillList(tabMapVault.mapSearchTableColumnOrder, List.of("MapID", "Name", "Author", "Recommended", "Firstupload", "Lastupdate"));
+        backfillMap(tabMapVault.mapVersionTableColumnWidths, Map.ofEntries(
+                Map.entry("VersionID", 100.0),
+                Map.entry("VersionNo.", 100.0),
+                Map.entry("Ranked", 80.0),
+                Map.entry("Hidden", 80.0),
+                Map.entry("MaxPlayers", 130.0),
+                Map.entry("Width", 80.0),
+                Map.entry("Height", 80.0),
+                Map.entry("Description", 300.0),
+                Map.entry("Uploaded", 160.0),
+                Map.entry("Lastupdate", 160.0)
+        ));
+        backfillList(tabMapVault.mapVersionTableColumnOrder, List.of("VersionID", "VersionNo.", "Ranked", "Hidden", "MaxPlayers", "Width", "Height", "Description", "Uploaded", "Lastupdate"));
+        // tabModVault
+        backfillMap(tabModVault.modSearchTableColumnWidths, Map.ofEntries(
+                Map.entry("ModID", 100.0),
+                Map.entry("Name", 200.0),
+                Map.entry("Uploader", 200.0),
+                Map.entry("Author", 200.0),
+                Map.entry("Recommended", 100.0),
+                Map.entry("Firstupload", 160.0),
+                Map.entry("Lastupdate", 160.0)
+        ));
+        backfillList(tabModVault.modSearchTableColumnOrder, List.of("ModID", "Name", "Uploader", "Author", "Recommended", "Firstupload", "Lastupdate"));
+        backfillMap(tabModVault.modVersionTableColumnWidths, Map.ofEntries(
+                Map.entry("VersionID", 100.0),
+                Map.entry("VersionNo.", 100.0),
+                Map.entry("UID", 280.0),
+                Map.entry("Ranked", 80.0),
+                Map.entry("Hidden", 80.0),
+                Map.entry("Description", 300.0),
+                Map.entry("Uploaded", 160.0),
+                Map.entry("Lastupdate", 160.0)
+        ));
+        backfillList(tabModVault.modVersionTableColumnOrder, List.of("VersionID", "VersionNo.", "UID", "Ranked", "Hidden", "Description", "Uploaded", "Lastupdate"));
+        // tabRecentActivity
+        backfillMap(tabRecentActivity.userRegistrationFeedTableColumnWidths, Map.ofEntries(
+                Map.entry("ID", 48.8125),
+                Map.entry("Name", 127.697265625),
+                Map.entry("Email", 260.201171875),
+                Map.entry("RegistrationDate", 128.494140625),
+                Map.entry("LastLogin", 128.494140625),
+                Map.entry("AccountLink", 168.58984375),
+                Map.entry("IPAddress", 237.220703125),
+                Map.entry("UserAgent", 117.53125),
+                Map.entry("Hash", 80.0),
+                Map.entry("UUID", 80.0),
+                Map.entry("MemoryS/N", 80.0),
+                Map.entry("DeviceID", 80.0),
+                Map.entry("Manufacturer", 80.0),
+                Map.entry("CPUName", 80.0),
+                Map.entry("ProcessorId", 80.0),
+                Map.entry("S/N", 200.0),
+                Map.entry("VolumeS/N", 80.0),
+                Map.entry("Ban", 80.0),
+                Map.entry("UIDCreated", 80.0),
+                Map.entry("UIDLastUsed", 80.0)
+        ));
+        backfillList(tabRecentActivity.userRegistrationFeedTableColumnOrder, List.of("ID", "Name", "Email", "RegistrationDate", "LastLogin", "AccountLink", "IPAddress", "UserAgent", "Hash", "UUID", "MemoryS/N", "DeviceID", "Manufacturer", "CPUName", "ProcessorId", "S/N", "VolumeS/N", "Ban", "UIDCreated", "UIDLastUsed"));
+        backfillMap(tabRecentActivity.teamkillFeedTableColumnWidths, Map.ofEntries(
+                Map.entry("ID", 80.0),
+                Map.entry("Killer", 180.0),
+                Map.entry("Victim", 180.0),
+                Map.entry("GameID", 100.0),
+                Map.entry("GameTime", 100.0),
+                Map.entry("ReportedAt", 180.0)
+        ));
+        backfillList(tabRecentActivity.teamkillFeedTableColumnOrder, List.of("ID", "Killer", "Victim", "GameID", "GameTime", "ReportedAt"));
+        backfillMap(tabRecentActivity.mapUploadFeedTableColumnWidths, Map.ofEntries(
+                Map.entry("MapVersionID", 100.0),
+                Map.entry("MapID", 80.0),
+                Map.entry("MapName", 150.0),
+                Map.entry("Uploader", 150.0),
+                Map.entry("Version", 80.0),
+                Map.entry("Ranked", 80.0),
+                Map.entry("Hidden", 80.0),
+                Map.entry("Width", 80.0),
+                Map.entry("Height", 80.0),
+                Map.entry("Maxplayers", 80.0),
+                Map.entry("Versiondescription", 250.0),
+                Map.entry("DownloadURL", 400.0),
+                Map.entry("Action", 80.0)
+        ));
+        backfillList(tabRecentActivity.mapUploadFeedTableColumnOrder, List.of("MapVersionID", "MapID", "MapName", "Uploader", "Version", "Ranked", "Hidden", "Width", "Height", "Maxplayers", "Versiondescription", "DownloadURL", "Action"));
+        // tabApiHistory
+        backfillMap(tabApiHistory.historyTableColumnWidths, Map.ofEntries(
+                Map.entry("timeColumn", 60.015625),
+                Map.entry("methodColumn", 70.0),
+                Map.entry("urlColumn", 1353.0),
+                Map.entry("statusColumn", 70.0),
+                Map.entry("durationColumn", 90.0)
+        ));
+        backfillList(tabApiHistory.historyTableColumnOrder, List.of("timeColumn", "methodColumn", "urlColumn", "statusColumn", "durationColumn"));
+    }
+
+    private static void backfillMap(Map<String, Double> target, Map<String, Double> defaults) {
+        defaults.forEach(target::putIfAbsent);
+    }
+
+    private static <T> void backfillList(List<T> target, List<T> defaults) {
+        if (target.isEmpty()) {
+            target.addAll(defaults);
+        }
+    }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     @Data
     public static class AutoLogin {
@@ -42,8 +322,10 @@ public class LocalPreferences {
         private static final String ENCRYPTED_TOKEN_KEY = "encryptedRefreshToken";
         private static final String LOBBY_REFRESH_TOKEN_KEY = "lobbyRefreshToken";
         private static final String ENCRYPTED_LOBBY_TOKEN_KEY = "encryptedLobbyRefreshToken";
+        private static final Pattern PLAUSIBLE_REFRESH_TOKEN_PATTERN =
+                Pattern.compile("[A-Za-z0-9._~+/=-]{20,}");
 
-        boolean enabled;
+        boolean enabled = true;
         String environment;
         @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         String refreshToken;
@@ -59,11 +341,25 @@ public class LocalPreferences {
             // Try to get from encrypted Preferences store
             String encryptedToken = CREDENTIAL_PREFERENCES.get(ENCRYPTED_TOKEN_KEY, null);
             if (encryptedToken != null) {
-                return decryptToken(encryptedToken);
+                String decryptedToken = decryptToken(encryptedToken);
+                if (decryptedToken != null) {
+                    return decryptedToken;
+                }
+
+                String legacyDecryptedToken = decryptLegacyToken(encryptedToken);
+                if (legacyDecryptedToken != null) {
+                    // Migrate legacy XOR-encrypted tokens to the current AES format after a successful read.
+                    setRefreshToken(legacyDecryptedToken);
+                    return legacyDecryptedToken;
+                }
             }
 
             // Fallback to legacy plaintext Preferences (for migration)
-            return CREDENTIAL_PREFERENCES.get(REFRESH_TOKEN_KEY, null);
+            String legacyPlaintextToken = CREDENTIAL_PREFERENCES.get(REFRESH_TOKEN_KEY, null);
+            if (legacyPlaintextToken != null) {
+                setRefreshToken(legacyPlaintextToken);
+            }
+            return legacyPlaintextToken;
         }
 
         public void setRefreshToken(String refreshToken) {
@@ -76,6 +372,7 @@ public class LocalPreferences {
             if (refreshToken == null || refreshToken.isBlank()) {
                 CREDENTIAL_PREFERENCES.remove(ENCRYPTED_TOKEN_KEY);
                 CREDENTIAL_PREFERENCES.remove(REFRESH_TOKEN_KEY);
+                flushPreferences();
                 this.refreshToken = null;
             } else {
                 // Store encrypted in Preferences
@@ -83,6 +380,7 @@ public class LocalPreferences {
                 CREDENTIAL_PREFERENCES.put(ENCRYPTED_TOKEN_KEY, encrypted);
                 // Remove legacy plaintext entry
                 CREDENTIAL_PREFERENCES.remove(REFRESH_TOKEN_KEY);
+                flushPreferences();
                 // Don't store in JSON field
                 this.refreshToken = null;
             }
@@ -95,10 +393,23 @@ public class LocalPreferences {
 
             String encryptedToken = CREDENTIAL_PREFERENCES.get(ENCRYPTED_LOBBY_TOKEN_KEY, null);
             if (encryptedToken != null) {
-                return decryptToken(encryptedToken);
+                String decryptedToken = decryptToken(encryptedToken);
+                if (decryptedToken != null) {
+                    return decryptedToken;
+                }
+
+                String legacyDecryptedToken = decryptLegacyToken(encryptedToken);
+                if (legacyDecryptedToken != null) {
+                    setLobbyRefreshToken(legacyDecryptedToken);
+                    return legacyDecryptedToken;
+                }
             }
 
-            return CREDENTIAL_PREFERENCES.get(LOBBY_REFRESH_TOKEN_KEY, null);
+            String legacyPlaintextToken = CREDENTIAL_PREFERENCES.get(LOBBY_REFRESH_TOKEN_KEY, null);
+            if (legacyPlaintextToken != null) {
+                setLobbyRefreshToken(legacyPlaintextToken);
+            }
+            return legacyPlaintextToken;
         }
 
         public void setLobbyRefreshToken(String refreshToken) {
@@ -109,11 +420,13 @@ public class LocalPreferences {
             if (refreshToken == null || refreshToken.isBlank()) {
                 CREDENTIAL_PREFERENCES.remove(ENCRYPTED_LOBBY_TOKEN_KEY);
                 CREDENTIAL_PREFERENCES.remove(LOBBY_REFRESH_TOKEN_KEY);
+                flushPreferences();
                 this.lobbyRefreshToken = null;
             } else {
                 String encrypted = encryptToken(refreshToken);
                 CREDENTIAL_PREFERENCES.put(ENCRYPTED_LOBBY_TOKEN_KEY, encrypted);
                 CREDENTIAL_PREFERENCES.remove(LOBBY_REFRESH_TOKEN_KEY);
+                flushPreferences();
                 this.lobbyRefreshToken = null;
             }
         }
@@ -143,7 +456,11 @@ public class LocalPreferences {
         private String decryptToken(String encryptedToken) {
             try {
                 javax.crypto.SecretKey secretKey = getOrGenerateSecretKey();
-                byte[] combined = java.util.Base64.getDecoder().decode(encryptedToken);
+                byte[] combined = Base64.getDecoder().decode(encryptedToken);
+
+                if (combined.length <= 12) {
+                    return null;
+                }
 
                 // Extract IV and encrypted data
                 byte[] iv = new byte[12];
@@ -163,11 +480,33 @@ public class LocalPreferences {
             }
         }
 
+        private String decryptLegacyToken(String encryptedToken) {
+            try {
+                String key = getLegacySystemKey();
+                byte[] encrypted = Base64.getDecoder().decode(encryptedToken);
+                byte[] keyBytes = key.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                byte[] decrypted = new byte[encrypted.length];
+
+                for (int i = 0; i < encrypted.length; i++) {
+                    decrypted[i] = (byte) (encrypted[i] ^ keyBytes[i % keyBytes.length]);
+                }
+
+                String decryptedToken = new String(decrypted, java.nio.charset.StandardCharsets.UTF_8);
+                return isPlausibleRefreshToken(decryptedToken) ? decryptedToken : null;
+            } catch (Exception e) {
+                return null;
+            }
+        }
+
+        private boolean isPlausibleRefreshToken(String token) {
+            return token != null && PLAUSIBLE_REFRESH_TOKEN_PATTERN.matcher(token).matches();
+        }
+
         private javax.crypto.SecretKey getOrGenerateSecretKey() {
             try {
                 String encodedKey = CREDENTIAL_PREFERENCES.get("aesKey", null);
                 if (encodedKey != null) {
-                    byte[] keyBytes = java.util.Base64.getDecoder().decode(encodedKey);
+                    byte[] keyBytes = Base64.getDecoder().decode(encodedKey);
                     return new javax.crypto.spec.SecretKeySpec(keyBytes, "AES");
                 }
 
@@ -177,12 +516,30 @@ public class LocalPreferences {
                 javax.crypto.SecretKey secretKey = keyGen.generateKey();
 
                 // Store it
-                encodedKey = java.util.Base64.getEncoder().encodeToString(secretKey.getEncoded());
+                encodedKey = Base64.getEncoder().encodeToString(secretKey.getEncoded());
                 CREDENTIAL_PREFERENCES.put("aesKey", encodedKey);
+                flushPreferences();
 
                 return secretKey;
             } catch (Exception e) {
                 throw new RuntimeException("Failed to initialize encryption key", e);
+            }
+        }
+
+        private String getLegacySystemKey() {
+            String osName = System.getProperty("os.name", "");
+            String osVersion = System.getProperty("os.version", "");
+            String userName = System.getProperty("user.name", "");
+            String userHome = System.getProperty("user.home", "");
+
+            return osName + osVersion + userName + userHome + "faf-moderator-salt";
+        }
+
+        private void flushPreferences() {
+            try {
+                CREDENTIAL_PREFERENCES.flush();
+            } catch (BackingStoreException e) {
+                throw new RuntimeException("Failed to persist credential preferences", e);
             }
         }
     }
@@ -256,6 +613,7 @@ public class LocalPreferences {
     @Data
     public static class TabSettings {
         // TextFields
+        String updateBackupFolder = "";
 
         // TextArea
 
@@ -265,6 +623,9 @@ public class LocalPreferences {
         boolean rememberLoginCheckBox = true;
         boolean darkModeCheckBox = true;
         boolean fetchBansOnStartupCheckBox = false;
+        boolean autoBackupConfigurationFolderOnSaveCheckBox = false;
+        boolean automaticConfigurationBackupsOnExitCheckBox = true;
+        boolean autoPurgeTempReplaysOlderThanOneDayCheckBox = false;
 
         // TitledPanes
 
@@ -290,6 +651,8 @@ public class LocalPreferences {
         boolean showNotifyChatMessages = true;
 
         boolean fetchReportsOnStartupCheckBox = true;
+        boolean enableManualReplayLookupCheckBox = false;
+        boolean showReportPlayerRoleLabelsCheckBox = true;
 
         // TextFields
         String thresholdToShowSelfDestructionUnitsEventTextField = "0";
@@ -312,7 +675,45 @@ public class LocalPreferences {
     @JsonIgnoreProperties(ignoreUnknown = true)
     @Data
     public static class VersionReminder {
-        private long lastReminderEpoch = 0; // timestamp in milliseconds
+        private long lastReminderEpoch = 0; // legacy timestamp in milliseconds
+        private long nextReminderEpoch = 0;
+        private int reminderDelayDays = 3;
+        private String reminderVersionTag = "";
+        private boolean skipAutomaticUpdateRestartConfirmation = false;
+        @JsonIgnore
+        private transient boolean suppressCurrentSession = false;
+
+        public long getEffectiveNextReminderEpoch() {
+            if (nextReminderEpoch > 0) {
+                return nextReminderEpoch;
+            }
+            if (lastReminderEpoch > 0) {
+                return lastReminderEpoch + TimeUnit.DAYS.toMillis(Math.max(1, reminderDelayDays));
+            }
+            return 0;
+        }
+
+        public void scheduleAfterDays(String versionTag, int days) {
+            reminderDelayDays = Math.max(1, days);
+            reminderVersionTag = versionTag == null ? "" : versionTag;
+            nextReminderEpoch = System.currentTimeMillis() + TimeUnit.DAYS.toMillis(reminderDelayDays);
+            lastReminderEpoch = 0;
+        }
+
+        public void scheduleForNextStart(String versionTag, int preferredDelayDays) {
+            reminderDelayDays = Math.max(1, preferredDelayDays);
+            reminderVersionTag = versionTag == null ? "" : versionTag;
+            suppressCurrentSession = true;
+        }
+
+        public boolean shouldSuppressForCurrentSession(String versionTag) {
+            if (!suppressCurrentSession) {
+                return false;
+            }
+            String normalizedReminderVersion = reminderVersionTag == null ? "" : reminderVersionTag;
+            String normalizedVersion = versionTag == null ? "" : versionTag;
+            return normalizedReminderVersion.equals(normalizedVersion);
+        }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -418,9 +819,13 @@ public class LocalPreferences {
     @Data
     public static class TabIrcChat {
         String nickname = "";
-        boolean autoConnectOnStartup = true;
+        boolean autoConnectOnStartup = false;
         boolean debugTraffic = false;
-        boolean suppressJoinLeaveNoise = false;
+        boolean suppressJoinLeaveNoise = true;
+        boolean autoLoadLastDayHistory = true;
+        boolean showIrcLocalLog = true;
+        boolean mentionSoundEnabled = true;
+        boolean mentionToastEnabled = true;
         String selectedChannel = "#aeolus";
         List<String> autoJoinChannels = new ArrayList<>(List.of("#aeolus", "#moderators"));
     }

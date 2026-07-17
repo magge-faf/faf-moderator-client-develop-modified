@@ -4,10 +4,11 @@ import com.faforever.commons.api.dto.BanDurationType;
 import com.faforever.commons.api.dto.BanStatus;
 import com.faforever.moderatorclient.api.domain.BanService;
 import com.faforever.moderatorclient.api.domain.UserService;
+import com.faforever.moderatorclient.config.ApplicationPaths;
 import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.ui.domain.BanInfoFX;
 import com.faforever.moderatorclient.ui.domain.PlayerFX;
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
@@ -30,7 +31,6 @@ import org.springframework.stereotype.Component;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -79,8 +79,8 @@ public class BansController implements Controller<HBox> {
     private UserService userService;
 
     private final ObjectMapper objectMapper = new ObjectMapper().enable(com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
-    public Path PATH_TEMP_BANNED_USERS_JSON = Paths.get("data", "temporary_banned_users_synced.json");
-    public Path PATH_PERM_BANNED_USERS_JSON = Paths.get("data", "permanent_banned_users_synced.json");
+    public Path PATH_TEMP_BANNED_USERS_JSON = ApplicationPaths.resolveConfigurationDirectory().resolve("temporary_banned_users_synced.json");
+    public Path PATH_PERM_BANNED_USERS_JSON = ApplicationPaths.resolveConfigurationDirectory().resolve("permanent_banned_users_synced.json");
 
     @FXML
     public void initialize() {
@@ -206,7 +206,7 @@ public class BansController implements Controller<HBox> {
                     File bannedUsersFile = destinationPath.toFile();
 
                     if (bannedUsersFile.exists()) {
-                        List<Map<String, Object>> existingRawData = objectMapper.readValue(bannedUsersFile, new TypeReference<>() {});
+                        List<Map<String, Object>> existingRawData = readBannedUsersData(bannedUsersFile);
                         List<Map<String, Object>> updatedData = existingRawData.stream()
                                 .filter(userData -> {
                                     if (userData.containsKey("userInfo")) {
@@ -331,8 +331,7 @@ public class BansController implements Controller<HBox> {
 
         if (bannedUsersFile.exists()) {
             try {
-                List<Map<String, Object>> bannedUsersData = objectMapper.readValue(bannedUsersFile,
-                        new TypeReference<>() {});
+                List<Map<String, Object>> bannedUsersData = readBannedUsersData(bannedUsersFile);
 
                 for (Map<String, Object> userData : bannedUsersData) {
                     if (userData.containsKey("userInfo")) {
@@ -347,6 +346,11 @@ public class BansController implements Controller<HBox> {
             }
         }
         return userIds;
+    }
+
+    private List<Map<String, Object>> readBannedUsersData(File bannedUsersFile) throws IOException {
+        JavaType bannedUsersListType = objectMapper.getTypeFactory().constructCollectionType(List.class, Map.class);
+        return objectMapper.readValue(bannedUsersFile, bannedUsersListType);
     }
 
     private void updateEditBanButtonText(BanInfoFX selectedBan) {

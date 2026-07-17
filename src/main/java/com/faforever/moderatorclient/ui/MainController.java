@@ -9,23 +9,37 @@ import com.faforever.moderatorclient.api.event.FafApiFailGetEvent;
 import com.faforever.moderatorclient.api.event.FafApiFailModifyEvent;
 import com.faforever.moderatorclient.api.event.FafUserFailModifyEvent;
 import com.faforever.moderatorclient.api.event.TokenExpiredEvent;
+import com.faforever.moderatorclient.config.ApplicationPaths;
 import com.faforever.moderatorclient.config.ApplicationProperties;
 import com.faforever.moderatorclient.config.ApplicationVersion;
 import com.faforever.moderatorclient.config.EnvironmentProperties;
 import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.config.local.LocalPreferencesReaderWriter;
+import com.faforever.moderatorclient.replay.ReplayStorageService;
+import com.faforever.moderatorclient.update.ApplicationUpdateService;
+import com.faforever.moderatorclient.update.GithubRelease;
+import com.faforever.moderatorclient.update.GithubReleaseAsset;
 import com.faforever.moderatorclient.ui.main_window.*;
 import com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.DialogPane;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
+import javafx.scene.control.TextArea;
 import javafx.scene.image.Image;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 import lombok.RequiredArgsConstructor;
@@ -36,10 +50,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.text.MessageFormat;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Component
 @Slf4j
@@ -57,6 +73,8 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     private final LobbyOAuthService lobbyOAuthService;
     private final UiService uiService;
     private final PlatformService platformService;
+    private final ApplicationUpdateService applicationUpdateService;
+    private final ReplayStorageService replayStorageService;
     public TabPane root;
     public Tab userManagementTab;
     public Tab matchmakerMapPoolTab;
@@ -79,6 +97,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     public Tab replayAnalysisControllerTab;
     public Tab excludedHardwareItemsTab;
     public Tab apiHistoryTab;
+    public Tab changelogTab;
 
     private SettingsController settingsController;
     private ModerationReportController moderationReportController;
@@ -101,12 +120,11 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     private ReplayAnalysisController replayAnalysisController;
     private ExcludedHardwareItemsController excludedHardwareItemsController;
     private ApiHistoryController apiHistoryController;
+    private ChangelogController changelogController;
 
     private final Map<Tab, Boolean> dataLoadingState = new HashMap<>();
 
     private final FafApiCommunicationService communicationService;
-    public static final String CONFIGURATION_FOLDER = "data";
-
     @Override
     public TabPane getRoot() {
         return root;
@@ -123,6 +141,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     }
 
     private void initializeAfterLogin() {
+        replayStorageService.purgeReplayFilesIfEnabled();
         initUserManagementTab();
         initMatchmakerMapPoolTab();
         initMapVaultTab();
@@ -144,6 +163,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         initReplayAnalysisControllerTab();
         initExcludedHardwareItemsTab();
         initApiHistoryTab();
+        initChangelogTab();
         selectActiveTab();
     }
 
@@ -169,8 +189,18 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     }
 
     private void initApiHistoryTab() {
-        apiHistoryController = uiService.loadFxml("ui/main_window/apiHistoryTab.fxml");
-        apiHistoryTab.setContent(apiHistoryController.getRoot());
+        if (checkPermissionForTab(apiHistoryTab, GroupPermission.ROLE_ADMIN_MODERATION_REPORT)) {
+            apiHistoryController = uiService.loadFxml("ui/main_window/apiHistoryTab.fxml");
+            apiHistoryTab.setContent(apiHistoryController.getRoot());
+        }
+    }
+
+    private void initChangelogTab() {
+        if (checkPermissionForTab(changelogTab, GroupPermission.ROLE_ADMIN_MODERATION_REPORT)) {
+            changelogController = uiService.loadFxml("ui/main_window/changelogTab.fxml");
+            changelogTab.setContent(changelogController.getRoot());
+            initLoading(changelogTab, changelogController::loadIfNeeded);
+        }
     }
 
     private void initReplayAnalysisControllerTab() {
@@ -180,8 +210,10 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     }
 
     private void initSettingsTab() {
-        settingsController = uiService.loadFxml("ui/main_window/settingsTab.fxml");
-        settingsTab.setContent(settingsController.getRoot());
+        if (checkPermissionForTab(settingsTab, GroupPermission.ROLE_ADMIN_MODERATION_REPORT)) {
+            settingsController = uiService.loadFxml("ui/main_window/settingsTab.fxml");
+            settingsTab.setContent(settingsController.getRoot());
+        }
     }
 
     private void initReportStatisticsTab() {
@@ -248,6 +280,18 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         }
     }
 
+    public void refreshManualReplayLookupVisibility() {
+        if (moderationReportController != null) {
+            moderationReportController.refreshManualReplayLookupVisibility();
+        }
+    }
+
+    public void refreshReportPlayerRoleLabelsVisibility() {
+        if (moderationReportController != null) {
+            moderationReportController.refreshReportPlayerRoleButtonText();
+        }
+    }
+
     private void initMapVaultTab() {
         mapVaultController = uiService.loadFxml("ui/main_window/mapVault.fxml");
         mapVaultTab.setContent(mapVaultController.getRoot());
@@ -308,8 +352,10 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     }
 
     private void initIrcChatTab() {
-        ircChatController = uiService.loadFxml("ui/main_window/ircChatTab.fxml");
-        ircChatTab.setContent(ircChatController.getRoot());
+        if (checkPermissionForTab(ircChatTab, GroupPermission.ROLE_ADMIN_MODERATION_REPORT)) {
+            ircChatController = uiService.loadFxml("ui/main_window/ircChatTab.fxml");
+            ircChatTab.setContent(ircChatController.getRoot());
+        }
     }
 
     private void initVotingTab() {
@@ -330,24 +376,12 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     }
 
     public void display() {
-        if (localPreferences.getAutoLogin().isEnabled()) {
-            String environment = localPreferences.getAutoLogin().getEnvironment();
-            String refreshToken = localPreferences.getAutoLogin().getRefreshToken();
+        String environment = localPreferences.getAutoLogin().getEnvironment();
+        String refreshToken = localPreferences.getAutoLogin().getRefreshToken();
+        boolean hasAutoLoginCredentials = environment != null && !environment.isBlank()
+                && refreshToken != null && !refreshToken.isBlank();
 
-            if (environment == null || environment.isBlank()) {
-                log.warn("Auto login configuration is missing the environment. Disabling auto login and showing login dialog.");
-                localPreferences.getAutoLogin().setEnabled(false);
-                display();
-                return;
-            }
-
-            if (refreshToken == null || refreshToken.isBlank()) {
-                log.warn("Auto login configuration is missing the refresh token. Disabling auto login and showing login dialog.");
-                localPreferences.getAutoLogin().setEnabled(false);
-                display();
-                return;
-            }
-
+        if (localPreferences.getAutoLogin().isEnabled() && hasAutoLoginCredentials) {
             EnvironmentProperties environmentProperties = applicationProperties.getEnvironments().get(environment);
             if (environmentProperties == null) {
                 log.warn("No environment configuration found for key '{}'. Disabling auto login and showing login dialog.", environment);
@@ -401,7 +435,9 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     @Override
     public void destroy() {
         log.info("Application exit received: saving local preferences to disk.");
-        if (settingsController != null) settingsController.onSave();
+        boolean preferencesSaved = settingsController != null
+                ? settingsController.saveOnExit()
+                : localPreferencesReaderWriter.write(localPreferences);
         if (moderationReportController != null) moderationReportController.onSave();
         if (userManagementController != null) userManagementController.onSave();
         if (bansController != null) bansController.onSave();
@@ -416,8 +452,21 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         if (userGroupsController != null) userGroupsController.onSave();
         if (recentActivityController != null) recentActivityController.onSave();
         if (apiHistoryController != null) apiHistoryController.onSave();
-        localPreferencesReaderWriter.write(localPreferences);
-        log.info("Local preferences saved successfully.");
+        if (preferencesSaved) {
+            log.info("Local preferences saved successfully.");
+        } else {
+            log.warn("Local preferences were not saved successfully.");
+        }
+        if (localPreferences.getTabSettings().isAutomaticConfigurationBackupsOnExitCheckBox()) {
+            try {
+                log.info("Backing up configuration folder on application exit.");
+                applicationUpdateService.createConfigurationBackupArchive();
+            } catch (Exception e) {
+                log.warn("Failed to back up configuration folder on application exit.", e);
+            }
+        } else {
+            log.info("Automatic configuration backup on exit is disabled.");
+        }
     }
 
     @EventListener
@@ -444,33 +493,18 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     }
 
     private void checkForNewVersion() {
-        long lastReminder = localPreferences.getVersionReminder().getLastReminderEpoch();
-        long now = System.currentTimeMillis();
-
-        // Only show popup if more than 3 days passed since the last reminder
-        if (now - lastReminder < 3L * 24 * 60 * 60 * 1000) {
+        if (!applicationUpdateService.isPackagedReleaseInstall()) {
+            log.debug("Skipping update check because this run is not a packaged release install.");
             return;
         }
 
         Thread versionCheckThread = new Thread(() -> {
             try {
-                String url = "https://api.github.com/repos/magge-faf/faf-moderator-client-develop-modified/releases/latest";
-                var conn = new java.net.URI(url).toURL().openConnection();
-                conn.setConnectTimeout(10_000);
-                conn.setReadTimeout(30_000);
-                conn.setRequestProperty("Accept", "application/vnd.github.v3+json");
-                conn.setRequestProperty("User-Agent", "Java-Client");
-
-                String json;
-                try (InputStream inputStream = conn.getInputStream()) {
-                    json = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-                }
-                com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(json);
-                String latestVersion = node.get("tag_name").asText();
-
-                if (isNewerVersion(latestVersion)) {
-                    Platform.runLater(() -> showUpdatePopup(latestVersion));
-                }
+                applicationUpdateService.fetchLatestRelease().ifPresent(release -> {
+                    if (applicationUpdateService.shouldShowUpdate(release, localPreferences.getVersionReminder())) {
+                        Platform.runLater(() -> showUpdatePopup(release, true));
+                    }
+                });
             } catch (Exception e) {
                 log.warn("Failed to check for new version", e);
             }
@@ -480,44 +514,247 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     }
 
     private boolean isNewerVersion(String latest) {
-        return latest.compareTo(ApplicationVersion.CURRENT_VERSION) > 0;
+        return applicationUpdateService.isNewerVersion(latest);
     }
 
-    private void showUpdatePopup(String latestVersion) {
-        String downloadUrl = "https://github.com/magge-faf/faf-moderator-client-develop-modified/releases/latest";
+    public void showUpdatePopupForDebug(GithubRelease release) {
+        showUpdatePopup(release, false);
+    }
 
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("Update Available");
-        alert.setHeaderText("Version " + latestVersion + " is available");
+    private void showUpdatePopup(GithubRelease release, boolean scheduleReminderOnDismiss) {
+        Optional<String> autoUpdateUnavailableReason = applicationUpdateService.describeAutomaticUpdateUnavailableReason(release);
 
-        Label message = new Label(
-                "You are running " + ApplicationVersion.CURRENT_VERSION + ".\n" +
-                "Download the latest release to get the newest features and fixes."
-        );
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Update Available");
+        dialog.setHeaderText("Version " + release.displayName() + " is available");
+
+        ButtonType updateButtonType = new ButtonType("Backup + Update FAF Moderator Client", ButtonBar.ButtonData.OK_DONE);
+        ButtonType closeButtonType = new ButtonType("Not Now", ButtonBar.ButtonData.CANCEL_CLOSE);
+
+        dialog.getDialogPane().getButtonTypes().addAll(updateButtonType, closeButtonType);
+
+        Label message = new Label("You are running " + ApplicationVersion.CURRENT_VERSION + ".");
         message.setWrapText(true);
-        alert.getDialogPane().setContent(new VBox(message));
 
-        ButtonType openButton = new ButtonType("Open Download Page", ButtonBar.ButtonData.OK_DONE);
-        ButtonType remindButton = new ButtonType("Remind Me in 3 Days", ButtonBar.ButtonData.CANCEL_CLOSE);
-        alert.getButtonTypes().setAll(openButton, remindButton);
-
-        String stylesheet = localPreferences.getTabSettings().isDarkModeCheckBox()
-                ? "/style/main-dark.css" : "/style/main-light.css";
-        alert.getDialogPane().getStylesheets().add(
-                Objects.requireNonNull(getClass().getResource(stylesheet)).toExternalForm()
+        Label autoUpdateRequirement = new Label(
+                "Automatic update uses the Java runtime that started this client. Use Manual Download if automatic update is unavailable."
         );
+        autoUpdateRequirement.setWrapText(true);
 
-        alert.showAndWait().ifPresent(result -> {
-            if (result == openButton) {
-                platformService.showDocument(downloadUrl);
+        Button changelogButton = new Button("Show Change Log");
+        changelogButton.setOnAction(event -> showChangelogDialog(release));
+
+        Button downloadButton = new Button("Manual Download");
+        downloadButton.setOnAction(event -> platformService.showDocument(
+                applicationUpdateService.findMatchingAsset(release)
+                        .map(GithubReleaseAsset::browserDownloadUrl)
+                        .orElse(release.htmlUrl())
+        ));
+
+        VBox content = new VBox(12, message, autoUpdateRequirement, new HBox(8, changelogButton, downloadButton));
+        if (autoUpdateUnavailableReason.isPresent()) {
+            Label autoUpdateInfo = new Label(autoUpdateUnavailableReason.get());
+            autoUpdateInfo.setWrapText(true);
+            content.getChildren().add(autoUpdateInfo);
+        }
+
+        dialog.getDialogPane().setContent(content);
+        applyDialogStyles(dialog.getDialogPane());
+
+        ButtonType result = dialog.showAndWait().orElse(closeButtonType);
+        if (result == updateButtonType) {
+            if (autoUpdateUnavailableReason.isPresent()) {
+                showAutomaticUpdateUnavailable(autoUpdateUnavailableReason.get());
+                return;
+            }
+            startAutomaticUpdate(release);
+            return;
+        }
+
+        if (scheduleReminderOnDismiss) {
+            localPreferences.getVersionReminder().scheduleForNextStart(
+                    release.tagName(),
+                    localPreferences.getVersionReminder().getReminderDelayDays()
+            );
+            localPreferencesReaderWriter.write(localPreferences);
+        }
+    }
+
+    private void showAutomaticUpdateUnavailable(String detail) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Self-Update Unavailable");
+        alert.setHeaderText("Backup + Update FAF Moderator Client is not available here");
+        alert.setContentText(detail);
+        applyDialogStyles(alert.getDialogPane());
+        alert.showAndWait();
+    }
+
+    private void startAutomaticUpdate(GithubRelease release) {
+        Stage mainStage = null;
+        if (root != null && root.getScene() != null && root.getScene().getWindow() instanceof Stage stage) {
+            mainStage = stage;
+            mainStage.hide();
+        }
+
+        Alert progressAlert = new Alert(Alert.AlertType.INFORMATION);
+        progressAlert.setTitle("Preparing Update");
+        progressAlert.setHeaderText("Preparing " + release.displayName());
+
+        Label statusLabel = new Label("Starting update preparation...");
+        statusLabel.setWrapText(true);
+        TextArea updateLogArea = new TextArea();
+        updateLogArea.setEditable(false);
+        updateLogArea.setWrapText(true);
+        updateLogArea.setPrefRowCount(8);
+        updateLogArea.setMinWidth(520);
+        appendUpdateProgress(updateLogArea, statusLabel, "Starting update preparation...");
+
+        VBox content = new VBox(12, new ProgressIndicator(), statusLabel, updateLogArea);
+        progressAlert.getDialogPane().setContent(content);
+        progressAlert.getButtonTypes().clear();
+        applyDialogStyles(progressAlert.getDialogPane());
+
+        progressAlert.initModality(Modality.APPLICATION_MODAL);
+        progressAlert.setOnCloseRequest(event -> event.consume());
+
+        Stage finalMainStage = mainStage;
+        Thread updateThread = new Thread(() -> {
+            try {
+                localPreferencesReaderWriter.write(localPreferences);
+                boolean launchedInstaller = applicationUpdateService.prepareUpdateAndLaunchInstaller(
+                        release,
+                        status -> Platform.runLater(() -> appendUpdateProgress(updateLogArea, statusLabel, status)),
+                        () -> confirmAutomaticUpdateApply(release, updateLogArea, statusLabel)
+                );
+                if (!launchedInstaller) {
+                    Platform.runLater(() -> {
+                        progressAlert.close();
+                        if (finalMainStage != null) {
+                            finalMainStage.show();
+                            finalMainStage.toFront();
+                        }
+                    });
+                    return;
+                }
+
+                Platform.runLater(() -> appendUpdateProgress(updateLogArea, statusLabel, "Closing client so the installer can replace files..."));
+                Platform.runLater(() -> {
+                    progressAlert.close();
+                    Platform.exit();
+                    System.exit(0);
+                });
+            } catch (Exception e) {
+                log.warn("Failed to prepare automatic update", e);
+                Platform.runLater(() -> {
+                    progressAlert.close();
+                    if (finalMainStage != null) {
+                        finalMainStage.show();
+                        finalMainStage.toFront();
+                    }
+                    ViewHelper.exceptionDialog(
+                            "Automatic update failed",
+                            "The update could not be prepared. Your current installation is still intact.",
+                            e,
+                            Optional.ofNullable(release.htmlUrl())
+                    );
+                });
             }
         });
+        updateThread.setDaemon(true);
+        updateThread.start();
 
-        localPreferences.getVersionReminder().setLastReminderEpoch(System.currentTimeMillis());
-        try {
-            localPreferencesReaderWriter.write(localPreferences);
-        } catch (Exception e) {
-            log.warn("Failed to save version reminder timestamp", e);
+        progressAlert.show();
+    }
+
+    private boolean confirmAutomaticUpdateApply(GithubRelease release, TextArea updateLogArea, Label statusLabel) {
+        if (localPreferences.getVersionReminder().isSkipAutomaticUpdateRestartConfirmation()) {
+            return true;
         }
+
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicBoolean confirmed = new AtomicBoolean(false);
+
+        Platform.runLater(() -> {
+            appendUpdateProgress(updateLogArea, statusLabel, "Waiting for FAF Moderator Client update confirmation...");
+
+            Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+            alert.setTitle("FAF Moderator Client Update");
+            alert.setHeaderText("Ready to apply " + release.displayName() + " to the FAF Moderator Client");
+
+            Label message = new Label("""
+                    The update is downloaded, extracted, validated, and backed up.
+
+                    Only the FAF Moderator Client will restart. Your PC will not restart.
+
+                    The client will close, replace the application files, and start again. Your existing config will be restored before the new client starts.
+                    """);
+            message.setWrapText(true);
+
+            CheckBox rememberChoice = new CheckBox("Do not ask again before applying automatic FAF Moderator Client updates");
+            VBox content = new VBox(10, message, rememberChoice);
+            alert.getDialogPane().setContent(content);
+            alert.getButtonTypes().setAll(
+                    new ButtonType("Apply Update to FAF Moderator Client", ButtonBar.ButtonData.OK_DONE),
+                    new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE)
+            );
+            applyDialogStyles(alert.getDialogPane());
+
+            ButtonType result = alert.showAndWait().orElse(ButtonType.CANCEL);
+            boolean restartNow = result.getButtonData() == ButtonBar.ButtonData.OK_DONE;
+            if (restartNow && rememberChoice.isSelected()) {
+                localPreferences.getVersionReminder().setSkipAutomaticUpdateRestartConfirmation(true);
+                localPreferencesReaderWriter.write(localPreferences);
+            }
+            confirmed.set(restartNow);
+            latch.countDown();
+        });
+
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+        return confirmed.get();
+    }
+
+    private void appendUpdateProgress(TextArea updateLogArea, Label statusLabel, String status) {
+        statusLabel.setText(status);
+        String timestamp = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+        updateLogArea.appendText("[" + timestamp + "] " + status + System.lineSeparator());
+        updateLogArea.setScrollTop(Double.MAX_VALUE);
+    }
+
+    private void showChangelogDialog(GithubRelease release) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Latest Change Log");
+        alert.setHeaderText(release.displayName());
+
+        String published = release.publishedAt() == null
+                ? "Unknown publish date"
+                : "Published: " + DateTimeFormatter.ISO_LOCAL_DATE.format(release.publishedAt());
+        Label publishedLabel = new Label(published);
+
+        TextArea changelogArea = new TextArea(release.changelogText().isBlank()
+                ? "No changelog text was published for this release."
+                : release.changelogText());
+        changelogArea.setEditable(false);
+        changelogArea.setWrapText(true);
+        changelogArea.setPrefRowCount(20);
+        changelogArea.setPrefColumnCount(80);
+
+        VBox content = new VBox(10, publishedLabel, changelogArea);
+        alert.getDialogPane().setContent(content);
+        alert.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
+        applyDialogStyles(alert.getDialogPane());
+        alert.showAndWait();
+    }
+
+    private void applyDialogStyles(DialogPane dialogPane) {
+        String stylesheet = localPreferences.getTabSettings().isDarkModeCheckBox()
+                ? "/style/main-dark.css" : "/style/main-light.css";
+        dialogPane.getStylesheets().add(
+                Objects.requireNonNull(getClass().getResource(stylesheet)).toExternalForm()
+        );
     }
 }

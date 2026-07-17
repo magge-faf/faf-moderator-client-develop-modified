@@ -37,8 +37,8 @@
 
                 <Text>Copy to Clipboard:</Text>
                 <Button fx:id="copyReportIdButton" text="Report ID" onAction="#onCopyReportID" minWidth="150"/>
-                <Button fx:id="copyReporterIdButton" text="Reporter ID" onAction="#onCopyReporterIdButton" minWidth="150"/>
-                <Button fx:id="copyReportedUserIdButton" text="Offender ID" onAction="#onCopyReportedUserID" minWidth="150"/>
+                <Button fx:id="copyReporterIdButton" alignment="CENTER" textAlignment="CENTER" text="Reporter ID" onAction="#onCopyReporterIdButton" minWidth="150"/>
+                <Button fx:id="copyReportedUserIdButton" alignment="CENTER" textAlignment="CENTER" text="Offender ID" onAction="#onCopyReportedUserID" minWidth="150"/>
                 <Button fx:id="copyGameIdButton" text="Game ID" onAction="#onCopyGameID" minWidth="150"/>
 
                 <Separator minHeight="5"/>
@@ -50,20 +50,24 @@
                 <Separator minHeight="5"/>
 
                 <Button fx:id="startReplayButton" text="Start Replay" onAction="#onStartReplay" minWidth="150"/>
+                <Text fx:id="manualReplayLookupInfoText" text="Manual replay lookup:" wrappingWidth="150"/>
                 <TextField fx:id="getModeratorEventsForReplayIdTextField" promptText="Enter Replay ID" minWidth="150"/>
                 <Button fx:id="getModeratorEventsReplayIdButton" text="Get Chat/Events" onAction="#onModeratorEventsReplayIdButton" minWidth="150"/>
 
                 <Separator minHeight="5"/>
 
-                <Text>Select Reports and apply:</Text>
-                <Button fx:id="useTemplateWithoutReasonsButton" text="Template No Reasons" onAction="#onUseTemplateWithoutReasonsButton" minWidth="150"/>
-                <Button fx:id="useTemplateWithReasonsButton" text="Template With Reasons" onAction="#onUseTemplateWithReasonsButton" minWidth="150"/>
-                <Button fx:id="referenceOnlyButton" text="Reference Only" onAction="#onReferenceOnly" minWidth="150"/>
+                <VBox spacing="3" fillWidth="true">
+                    <Text>Select Reports and apply:</Text>
+                    <Button fx:id="useTemplateWithoutReasonsButton" text="Template No Reasons" onAction="#onUseTemplateWithoutReasonsButton" minWidth="150"/>
+                    <Button fx:id="useTemplateWithReasonsButton" text="Template With Reasons" onAction="#onUseTemplateWithReasonsButton" minWidth="150"/>
+                </VBox>
 
                 <Separator minHeight="5"/>
 
-                <Button fx:id="createReportForumButton" mnemonicParsing="false" minWidth="150" onAction="#onCreateReportForumButton"
-                        text="Search Forum"/>
+                <Button fx:id="createReportForumReporterButton" mnemonicParsing="false" minWidth="150" onAction="#onCreateReportForumReporterButton"
+                        text="Search Forum Reporter"/>
+                <Button fx:id="createReportForumOffenderButton" mnemonicParsing="false" minWidth="150" onAction="#onCreateReportForumOffenderButton"
+                        text="Search Forum Offender"/>
             </VBox>
         </ScrollPane>
         <TableView fx:id="reportTableView" maxHeight="Infinity" maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
@@ -234,7 +238,7 @@
                 <Label text="Show Self-Destruction Events"/>
                 <HBox spacing="5">
                     <CheckBox fx:id="showSelfDestructionUnitsCheckBox"
-                              text="Show the event 'Self-destructed' for more than the following amount of units:"/>
+                              text="Show the event 'Self-destructed' for at least this many units:"/>
                     <TextField fx:id="thresholdToShowSelfDestructionUnitsEventTextField"
                                promptText="0"
                                maxWidth="50"/>
