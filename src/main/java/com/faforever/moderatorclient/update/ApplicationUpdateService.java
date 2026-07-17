@@ -63,6 +63,22 @@ public class ApplicationUpdateService {
         return Optional.ofNullable(objectMapper.readValue(response.body(), GithubRelease.class));
     }
 
+    public List<GithubRelease> fetchRecentReleases() throws IOException, InterruptedException {
+        URI releasesUri = URI.create("https://api.github.com/repos/magge-faf/faf-moderator-client-develop-modified/releases?per_page=30");
+        HttpRequest request = HttpRequest.newBuilder(releasesUri)
+                .header("Accept", "application/vnd.github+json")
+                .header("User-Agent", "faf-moderator-client")
+                .GET()
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw new IOException("GitHub release lookup failed with HTTP " + response.statusCode());
+        }
+
+        return List.of(objectMapper.readValue(response.body(), GithubRelease[].class));
+    }
+
     public boolean isNewerVersion(String latestVersion) {
         return compareVersions(latestVersion, ApplicationVersion.CURRENT_VERSION) > 0;
     }
@@ -104,6 +120,10 @@ public class ApplicationUpdateService {
 
     public boolean canSelfUpdate(GithubRelease release) {
         return describeAutomaticUpdateUnavailableReason(release).isEmpty();
+    }
+
+    public boolean isPackagedReleaseInstall() {
+        return resolveInstallLocation().isPresent();
     }
 
     public Optional<String> describeAutomaticUpdateUnavailableReason(GithubRelease release) {
@@ -161,13 +181,23 @@ public class ApplicationUpdateService {
     }
 
     public Path createConfigurationBackupArchive() throws IOException {
+        return createConfigurationBackupArchive(true);
+    }
+
+    public Path createManualConfigurationBackupArchive() throws IOException {
+        return createConfigurationBackupArchive(false);
+    }
+
+    private Path createConfigurationBackupArchive(boolean useRotatingSlot) throws IOException {
         Path configurationDirectory = ApplicationPaths.resolveConfigurationDirectory();
         Files.createDirectories(configurationDirectory);
 
         Path backupDir = resolveConfiguredBackupDirectory();
         Files.createDirectories(backupDir);
 
-        Path backupArchive = createConfigurationBackupArchivePath(backupDir);
+        Path backupArchive = useRotatingSlot
+                ? createConfigurationBackupArchivePath(backupDir)
+                : createManualConfigurationBackupArchivePath(backupDir);
         zipDirectory(configurationDirectory, backupArchive);
         return backupArchive;
     }
@@ -345,6 +375,15 @@ public class ApplicationUpdateService {
             }
         }
         return oldestBackup;
+    }
+
+    private Path createManualConfigurationBackupArchivePath(Path backupDir) {
+        String backupName = "config-manual-backup-" + BACKUP_TIMESTAMP.format(LocalDateTime.now());
+        Path candidate = backupDir.resolve(backupName + ".zip");
+        for (int index = 2; Files.exists(candidate); index++) {
+            candidate = backupDir.resolve(backupName + "-" + index + ".zip");
+        }
+        return candidate;
     }
 
     private String configurationBackupSlotName(int slot) {

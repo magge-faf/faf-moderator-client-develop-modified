@@ -54,7 +54,13 @@ public class SettingsController implements Controller<Pane> {
     @FXML
     public CheckBox ircDebugTrafficCheckBox;
     @FXML
+    public CheckBox automaticConfigurationBackupsOnExitCheckBox;
+    @FXML
     public CheckBox autoPurgeTempReplaysOlderThanOneDayCheckBox;
+    @FXML
+    public CheckBox enableManualReplayLookupCheckBox;
+    @FXML
+    public CheckBox showReportPlayerRoleLabelsCheckBox;
     @FXML
     public Label replayFolderInfoLabel;
     @FXML
@@ -107,6 +113,23 @@ public class SettingsController implements Controller<Pane> {
         autoPurgeTempReplaysOlderThanOneDayCheckBox.setSelected(
                 localPreferences.getTabSettings().isAutoPurgeTempReplaysOlderThanOneDayCheckBox()
         );
+        automaticConfigurationBackupsOnExitCheckBox.setSelected(
+                localPreferences.getTabSettings().isAutomaticConfigurationBackupsOnExitCheckBox()
+        );
+        enableManualReplayLookupCheckBox.setSelected(
+                localPreferences.getTabReports().isEnableManualReplayLookupCheckBox()
+        );
+        enableManualReplayLookupCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            localPreferences.getTabReports().setEnableManualReplayLookupCheckBox(newVal);
+            mainController.refreshManualReplayLookupVisibility();
+        });
+        showReportPlayerRoleLabelsCheckBox.setSelected(
+                localPreferences.getTabReports().isShowReportPlayerRoleLabelsCheckBox()
+        );
+        showReportPlayerRoleLabelsCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            localPreferences.getTabReports().setShowReportPlayerRoleLabelsCheckBox(newVal);
+            mainController.refreshReportPlayerRoleLabelsVisibility();
+        });
 
         defaultUpdateBackupFolder = applicationUpdateService.resolveDefaultBackupDirectory().toString();
         String configuredBackupFolder = localPreferences.getTabSettings().getUpdateBackupFolder();
@@ -184,6 +207,7 @@ public class SettingsController implements Controller<Pane> {
                     checkBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
                         try {
                             prefField.set(tabReports, newVal);
+                            refreshManualReplayLookupVisibility(fieldName);
                         } catch (IllegalAccessException ignored) {
                         }
                     });
@@ -205,6 +229,12 @@ public class SettingsController implements Controller<Pane> {
         }
     }
 
+    private void refreshManualReplayLookupVisibility(String fieldName) {
+        if ("enableManualReplayLookupCheckBox".equals(fieldName)) {
+            mainController.refreshManualReplayLookupVisibility();
+        }
+    }
+
 
     private static final String jsonFileTemplatesAndReasons = CONFIGURATION_FOLDER + File.separator + "templatesAndReasons.json";
     private static final String JSON_CONTENT_templatesAndReasons = """
@@ -212,25 +242,28 @@ public class SettingsController implements Controller<Pane> {
               "templates": [
                 {
                   "name": "Standard Ban",
-                  "format": "{reportIds}\\n\\nDAY_NUMBER day ban - ReplayID {gameIds} - {reason}"
+                  "format": "{reportIds}\\n\\nDAY_NUMBER Day Ban - ReplayID {gameIds} - {reason}"
                 },
                 {
-                  "name": "Your Custom Ban",
-                  "format": "{reportIds}\\n\\nDAY_NUMBER day ban - ReplayID {gameIds} - {reason}"
+                  "name": "Another Ban Template",
+                  "format": "{reportIds}\\n\\nDAY_NUMBER Day Ban - ReplayID {gameIds} - {reason}"
                 }
               ],
               "reasons": [
-                "Offensive Language",
+                "Toxicity",
+                "Homophobic Behavior",
                 "Reclaiming Friendly Units",
                 "Attacking Friendly Units",
-                "CTRL+K All Units in Fullshare Game Mode",
+                "CTRL+K All Units in Fullshare/Union Game Mode",
+                "CTRL+K ACU in Union Game Mode",
                 "Harassment via Private Chat",
-                "Offensive Kick Messages",
-                "Racism",
-                "Offensive Game Titles",
                 "Leaving on Own Terms/Game Ruining",
                 "Abuse of Exploits",
-                "Bad/Illegal Username"
+                "Bad/Illegal Username",
+                "Leaving Before 5-Minute Rule",
+                "Offensive Game Titles",
+                "Offensive Kick Messages",
+                "Racism"
               ]
             }""";
 
@@ -254,34 +287,59 @@ public class SettingsController implements Controller<Pane> {
             {
               "templatesEditReports": [
                 {
-            	  "setReportStatusTo": "COMPLETED",
+                "setReportStatusTo": "COMPLETED",
                   "buttonName": "Completed - Standard",
                   "descriptionPublicNote": "Thank you for bringing this to our attention. Action was taken."
                 },
-            	{
-            	  "setReportStatusTo": "COMPLETED",
+                {
+                "setReportStatusTo": "COMPLETED",
                   "buttonName": "Completed - Replay Desync",
-                  "descriptionPublicNote": "Thank you for bringing this to our attention. Unfortunately, the game desyncs. We have made a note for the player in case it becomes a pattern. Please report any further violations."
+                  "descriptionPublicNote": "Thank you for bringing this to our attention. Unfortunately, the game desyncs. I have made a note for the player in case it becomes a pattern."
+                },
+              {
+                "setReportStatusTo": "COMPLETED",
+                  "buttonName": "Completed - Smurf",
+                  "descriptionPublicNote": "Thank you for bringing this to our attention. We will investigate."
+                },
+              {
+                "setReportStatusTo": "COMPLETED",
+                  "buttonName": "Completed - User Note",
+                  "descriptionPublicNote": "Thank you for bringing this to our attention. I have noted this for the user in case of a pattern. Please report any further violations."
+                },
+              {
+                "setReportStatusTo": "DISCARDED",
+                  "buttonName": "Discarded - Leave-5-Minute-Rule",
+                  "descriptionPublicNote": "Leaving a match is allowed after 5 minutes. I have noted this report for future reference in case a pattern emerges. Repeatedly leaving games may still violate other rules."
                 },
                 {
-            	  "setReportStatusTo": "DISCARDED",
-                  "buttonName": "Discarded - Standard",
-                  "descriptionPublicNote": "No additional information or proof was provided."
+                "setReportStatusTo": "DISCARDED",
+                  "buttonName": "Discarded - No Evidence",
+                  "descriptionPublicNote": "No clear evidence was provided."
                 },
-            	{
-            	  "setReportStatusTo": "DISCARDED",
+              {
+                "setReportStatusTo": "DISCARDED",
                   "buttonName": "Discarded - Replay Missing",
                   "descriptionPublicNote": "Please report again with the ReplayID."
                 },
-            	{
-            	  "setReportStatusTo": "DISCARDED",
+              {
+                "setReportStatusTo": "DISCARDED",
                   "buttonName": "Discarded - Timecode Missing",
                   "descriptionPublicNote": "Please report again with the specific timecode of the violation."
                 },
-            	{
-            	  "setReportStatusTo": "PROCESSING",
-                  "buttonName": "Processing - Investigation",
-                  "descriptionPublicNote": "Thank you for bringing this to our attention. We are investigating the case and it may take some time, until we set it to 'completed'."
+              {
+                "setReportStatusTo": "DISCARDED",
+                  "buttonName": "Discarded - Only Status",
+                  "descriptionPublicNote": ""
+                },
+              {
+                "setReportStatusTo": "DISCARDED",
+                  "buttonName": "Discarded - Insufficient Information",
+                  "descriptionPublicNote": "Please resubmit the report with clear details about the violation, including what happened, when it happened, and where it occurred."
+                },
+              {
+                "setReportStatusTo": "PROCESSING",
+                  "buttonName": "Processing - Review",
+                  "descriptionPublicNote": "Thank you for your report. The moderation team will review the report and update its status once the review is complete."
                 }
               ]
             }""";
@@ -305,9 +363,9 @@ public class SettingsController implements Controller<Pane> {
         File fileCompleted = new File(CONFIGURATION_FOLDER + File.separator + "templateGamingModeratorTask.txt");
         if (!fileCompleted.exists()) {
             String contentCompleted = """
-                    AI-Prompt: Gaming Moderator Task
-                    Reported Chat Log Assessing report from %reporter% against offender %offenderNames%:
-                    Itemize all instances of speech by %offenderNames%. Translate to English where necessary.""";
+                    Gaming Moderator Task for FAForever.com
+
+                    You are assessing a report submitted by %reporter% against %offenderNames%. Identify all chat messages that may violate the FAF rules. Translate any non-English insults into English where necessary, and assess their severity, context, and whether they warrant moderation action.""";
             try (FileWriter writer = new FileWriter(fileCompleted)) {
                 writer.write(contentCompleted);
                 log.info("Created {}", fileCompleted.getPath());
@@ -369,7 +427,7 @@ public class SettingsController implements Controller<Pane> {
     public void onBackupConfigurationFolderNow() {
         try {
             persistBackupFolderPreference(false);
-            Path backupArchive = applicationUpdateService.createConfigurationBackupArchive();
+            Path backupArchive = applicationUpdateService.createManualConfigurationBackupArchive();
             updateBackupFolderStatusLabel.setText("Backed up config folder to " + backupArchive);
         } catch (IOException e) {
             updateBackupFolderStatusLabel.setText("Failed to back up config folder: " + e.getMessage());
@@ -439,7 +497,12 @@ public class SettingsController implements Controller<Pane> {
         localPreferences.getTabSettings().setAutoPurgeTempReplaysOlderThanOneDayCheckBox(
                 autoPurgeTempReplaysOlderThanOneDayCheckBox.isSelected()
         );
+        localPreferences.getTabSettings().setAutomaticConfigurationBackupsOnExitCheckBox(
+                automaticConfigurationBackupsOnExitCheckBox.isSelected()
+        );
         localPreferences.getTabIrcChat().setDebugTraffic(ircDebugTrafficCheckBox.isSelected());
+        localPreferences.getTabReports().setEnableManualReplayLookupCheckBox(enableManualReplayLookupCheckBox.isSelected());
+        localPreferences.getTabReports().setShowReportPlayerRoleLabelsCheckBox(showReportPlayerRoleLabelsCheckBox.isSelected());
         persistBackupFolderPreference(true);
 
         Tab selectedTab = defaultActiveTabComboBox.getSelectionModel().getSelectedItem();

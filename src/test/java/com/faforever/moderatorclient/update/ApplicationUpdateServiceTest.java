@@ -123,4 +123,29 @@ class ApplicationUpdateServiceTest {
             System.setProperty("user.dir", originalUserDir);
         }
     }
+
+    @Test
+    void createManualConfigurationBackupArchiveUsesTimestampedFileOutsideRotatingSlots(@TempDir Path tempDir) throws Exception {
+        String originalUserDir = System.getProperty("user.dir");
+        try {
+            System.setProperty("user.dir", tempDir.toString());
+            Path configDir = tempDir.resolve("config");
+            Files.createDirectories(configDir);
+            Files.writeString(configDir.resolve("templatesAndReasons.json"), "{}");
+
+            LocalPreferences localPreferences = new LocalPreferences();
+            Path backupDir = tempDir.resolve("backup");
+            localPreferences.getTabSettings().setUpdateBackupFolder(backupDir.toString());
+            ApplicationUpdateService localService = new ApplicationUpdateService(new ObjectMapper(), localPreferences);
+
+            Path archive = localService.createManualConfigurationBackupArchive();
+
+            assertThat(archive.getParent(), is(backupDir));
+            assertThat(archive.getFileName().toString().startsWith("config-manual-backup-"), is(true));
+            assertThat(archive.getFileName().toString().endsWith(".zip"), is(true));
+            assertThat(Files.exists(backupDir.resolve("config-backup-01.zip")), is(false));
+        } finally {
+            System.setProperty("user.dir", originalUserDir);
+        }
+    }
 }

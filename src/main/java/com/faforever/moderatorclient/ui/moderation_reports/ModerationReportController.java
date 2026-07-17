@@ -55,6 +55,7 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.StrokeLineCap;
@@ -134,8 +135,6 @@ public class ModerationReportController implements Controller<Region> {
     @FXML
     public Button copyChatLogButtonOffenderOnly;
     @FXML
-    public Button referenceOnlyButton;
-    @FXML
     public Text moderatorStatisticsLastWeekText;
     @FXML
     public Text moderatorStatisticsThisWeekText;
@@ -195,6 +194,8 @@ public class ModerationReportController implements Controller<Region> {
     public TextField getModeratorEventsForReplayIdTextField;
     @FXML
     public Button getModeratorEventsReplayIdButton;
+    @FXML
+    public Text manualReplayLookupInfoText;
     @FXML
     public CheckBox pingOfTypeMoveFilterCheckBox;
     @FXML
@@ -331,10 +332,13 @@ public class ModerationReportController implements Controller<Region> {
                 .distinct()
                 .collect(Collectors.joining(","));
 
-        removeTrailingComma(new StringBuilder(selectedReportIds));
-        removeTrailingComma(new StringBuilder(selectedGameIds));
+        TemplateAndReasonConfig templateAndReasonConfig = loadTemplateAndReasonConfig();
+        if (templateAndReasonConfig == null || templateAndReasonConfig.getTemplates() == null || templateAndReasonConfig.getTemplates().isEmpty()) {
+            log.warn("No ban template found in templatesAndReasons.json");
+            return;
+        }
 
-        String result = selectedReportIds + "\n\n" + "DAY_NUMBER day ban - ReplayID " + selectedGameIds + " - SOME_REASON";
+        String result = formatTemplate(templateAndReasonConfig.getTemplates().getFirst(), selectedReportIds, selectedGameIds, "SOME_REASON");
         ClipboardContent clipboardContent = new ClipboardContent();
         clipboardContent.putString(result);
         Clipboard.getSystemClipboard().setContent(clipboardContent);
@@ -409,8 +413,16 @@ public class ModerationReportController implements Controller<Region> {
                     gridPane.add(reasonCheckBoxes.get(i), 0, i + 1);
                 }
 
-                Button okButton = new Button("OK");
-                gridPane.add(okButton, 0, reasonCheckBoxes.size() + 1);
+                Button okButton = new Button("Copy Ban Template");
+                Button warningOkButton = new Button("Copy Warning Template");
+                Button referenceOkButton = new Button("Copy Reference Template");
+                HBox buttonRow = new HBox(10, okButton, warningOkButton, referenceOkButton);
+                for (Button button : List.of(okButton, warningOkButton, referenceOkButton)) {
+                    button.setMinWidth(150);
+                    button.setMaxWidth(Double.MAX_VALUE);
+                    HBox.setHgrow(button, javafx.scene.layout.Priority.ALWAYS);
+                }
+                gridPane.add(buttonRow, 0, reasonCheckBoxes.size() + 1, 2, 1);
 
                 Scene scene = new Scene(gridPane);
                 templateStage.setScene(scene);
@@ -422,45 +434,87 @@ public class ModerationReportController implements Controller<Region> {
                         return;
                     }
 
-                    StringBuilder selectedReasons = new StringBuilder();
-                    for (CheckBox checkBox : reasonCheckBoxes) {
-                        if (checkBox.isSelected()) {
-                            selectedReasons.append(checkBox.getText()).append(", ");
-                        }
+                    copyTemplateToClipboard(selectedTemplate, reasonCheckBoxes, selectedIds, selectedGameIds);
+                    closeTemplateStageAfterCopy(templateStage);
+                });
+
+                warningOkButton.setOnAction(event -> {
+                    TemplateAndReasonConfig warningTemplate = templates.stream()
+                            .filter(template -> "Warning".equalsIgnoreCase(template.getName()))
+                            .findFirst()
+                            .orElse(null);
+                    if (warningTemplate == null) {
+                        log.warn("Warning template not found in templatesAndReasons.json");
+                        return;
                     }
 
-                    if (!selectedReasons.isEmpty()) {
-                        selectedReasons.setLength(selectedReasons.length() - 2); // Remove trailing comma
-                    }
+                    copyTemplateToClipboard(warningTemplate, reasonCheckBoxes, selectedIds, selectedGameIds);
+                    closeTemplateStageAfterCopy(templateStage);
+                });
 
-                    // Format result based on the template
-                    String result = selectedTemplate.getFormat()
-                            .replace("{reportIds}", selectedIds)
-                            .replace("{reason}", selectedReasons.toString());
-
-                    if (selectedGameIds.isEmpty()) {
-                        result = result.replace("ReplayID", "");
-                        result = result.replace(" -  {gameIds}", "");
-                    } else {
-                        result = result.replace("{gameIds}", selectedGameIds);
-                    }
-
-                    // Copy result to clipboard
-                    ClipboardContent clipboardContent = new ClipboardContent();
-                    clipboardContent.putString(result);
-                    Clipboard.getSystemClipboard().setContent(clipboardContent);
-
-                    useTemplateWithReasonsButton.setText("Copied");
-                    templateStage.close();
-
-                    PauseTransition pause = new PauseTransition(Duration.millis(750));
-                    pause.setOnFinished(e -> useTemplateWithReasonsButton.setText("Template With Reasons"));
-                    pause.play();
+                referenceOkButton.setOnAction(event -> {
+                    copyReferenceTemplateToClipboard(reasonCheckBoxes, selectedIds, selectedGameIds);
+                    closeTemplateStageAfterCopy(templateStage);
                 });
             });
         } catch (Exception e) {
             log.warn("Error in template-with-reasons button", e);
         }
+    }
+
+    private void copyTemplateToClipboard(TemplateAndReasonConfig selectedTemplate, List<CheckBox> reasonCheckBoxes, String selectedIds, String selectedGameIds) {
+        String selectedReasons = reasonCheckBoxes.stream()
+                .filter(CheckBox::isSelected)
+                .map(CheckBox::getText)
+                .collect(Collectors.joining(", "));
+
+        String result = formatTemplate(selectedTemplate, selectedIds, selectedGameIds, selectedReasons);
+
+        ClipboardContent clipboardContent = new ClipboardContent();
+        clipboardContent.putString(result);
+        Clipboard.getSystemClipboard().setContent(clipboardContent);
+    }
+
+    private String formatTemplate(TemplateAndReasonConfig selectedTemplate, String selectedIds, String selectedGameIds, String selectedReasons) {
+        String result = selectedTemplate.getFormat()
+                .replace("{reportIds}", selectedIds)
+                .replace("{reason}", selectedReasons);
+
+        if (selectedGameIds.isEmpty()) {
+            result = result.replace("ReplayID", "");
+            result = result.replace(" -  {gameIds}", "");
+        } else {
+            result = result.replace("{gameIds}", selectedGameIds);
+        }
+
+        return result;
+    }
+
+    private void copyReferenceTemplateToClipboard(List<CheckBox> reasonCheckBoxes, String selectedIds, String selectedGameIds) {
+        String selectedReasons = reasonCheckBoxes.stream()
+                .filter(CheckBox::isSelected)
+                .map(CheckBox::getText)
+                .collect(Collectors.joining(", "));
+
+        String result;
+        if (selectedGameIds.isEmpty()) {
+            result = selectedIds + "\n\n" + "Reference - " + selectedReasons;
+        } else {
+            result = selectedIds + "\n\n" + "Reference - ReplayID " + selectedGameIds + " - " + selectedReasons;
+        }
+
+        ClipboardContent clipboardContent = new ClipboardContent();
+        clipboardContent.putString(result);
+        Clipboard.getSystemClipboard().setContent(clipboardContent);
+    }
+
+    private void closeTemplateStageAfterCopy(Stage templateStage) {
+        useTemplateWithReasonsButton.setText("Copied");
+        templateStage.close();
+
+        PauseTransition pause = new PauseTransition(Duration.millis(750));
+        pause.setOnFinished(e -> useTemplateWithReasonsButton.setText("Template With Reasons"));
+        pause.play();
     }
 
     private TemplateAndReasonConfig loadTemplateAndReasonConfig() {
@@ -688,43 +742,6 @@ public class ModerationReportController implements Controller<Region> {
         })*/;
     }
 
-    public void onReferenceOnly() {
-        ObservableList<ModerationReportFX> selectedItems = reportTableView.getSelectionModel().getSelectedItems();
-        if (selectedItems == null || selectedItems.isEmpty()) {
-            return;
-        }
-
-        String selectedReportIds = selectedItems.stream()
-                .map(item -> String.valueOf(item.getId()))
-                .collect(Collectors.joining(","));
-
-        String selectedGameIds = selectedItems.stream()
-                .map(ModerationReportFX::getGame)
-                .filter(Objects::nonNull)
-                .map(game -> String.valueOf(game.getId()))
-                .distinct()
-                .collect(Collectors.joining(","));
-
-        removeTrailingComma(new StringBuilder(selectedReportIds));
-        removeTrailingComma(new StringBuilder(selectedGameIds));
-
-        String result;
-        if (selectedGameIds.isEmpty()) {
-            result = selectedReportIds + "\n\n" + "Reference - REFERENCE_REASON";
-        } else {
-            result = selectedReportIds + "\n\n" + "Reference - ReplayID " + selectedGameIds + " - REFERENCE_REASON";
-        }
-
-        ClipboardContent clipboardContent = new ClipboardContent();
-        clipboardContent.putString(result);
-        Clipboard.getSystemClipboard().setContent(clipboardContent);
-
-        referenceOnlyButton.setText("Copied");
-        PauseTransition pause = new PauseTransition(Duration.millis(750));
-        pause.setOnFinished(e -> referenceOnlyButton.setText("Reference Only"));
-        pause.play();
-    }
-
     public static class ModeratorStatistics {
         private final StringProperty moderator;
         private final LongProperty completedReports;
@@ -938,6 +955,10 @@ public class ModerationReportController implements Controller<Region> {
         copyChatLogButtonOffenderOnly.setId("");
         copyModeratorEventsButton.setText("Moderator Events n/a");
         copyModeratorEventsButton.setId("");
+        copyReporterIdButton.setText(formatPlayerRoleButtonText("Reporter", "Reporter n/a"));
+        copyReporterIdButton.setId("");
+        copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", "Reported User n/a"));
+        copyReportedUserIdButton.setId("");
         copyGameIdButton.setText("Game ID n/a");
         copyGameIdButton.setId("");
         startReplayButton.setText("Replay n/a");
@@ -1068,19 +1089,19 @@ public class ModerationReportController implements Controller<Region> {
         String reporterRepresentation = newValue.getReporter() == null
                 ? "Reporter n/a"
                 : newValue.getReporter().getRepresentation();
-        copyReporterIdButton.setText(reporterRepresentation);
+        copyReporterIdButton.setText(formatPlayerRoleButtonText("Reporter", reporterRepresentation));
         copyReporterIdButton.setId(newValue.getReporter() == null ? "" : reporterRepresentation);
 
         // Since ~2023, reports have only one offender; legacy reports may have several.
         for (PlayerFX offender : reportedPlayersOfCurrentlySelectedReport) {
             copyReportedUserIdButton.setId(offender.getRepresentation());
-            copyReportedUserIdButton.setText(offender.getRepresentation());
+            copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", offender.getRepresentation()));
             createReportForumButton.setId(offender.getId());
             createReportForumButton.setText("Search Forum:\n" + offender.getRepresentation());
         }
         if (reportedPlayersOfCurrentlySelectedReport.isEmpty()) {
             copyReportedUserIdButton.setId("");
-            copyReportedUserIdButton.setText("Reported User n/a");
+            copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", "Reported User n/a"));
             createReportForumButton.setId("");
             createReportForumButton.setText("Search Forum:\nn/a");
         }
@@ -1133,6 +1154,8 @@ public class ModerationReportController implements Controller<Region> {
         chatLogTextFlow.getChildren().clear();
         chatLogTextFlow.getChildren().add(messageTextNoSelection);
         bindUIElementsToPreferences();
+        refreshManualReplayLookupVisibility();
+        refreshReportPlayerRoleButtonText();
 
         if (fetchReportsOnStartupCheckBox.isSelected()) {
             onRefreshInitialReports();
@@ -2545,6 +2568,35 @@ public class ModerationReportController implements Controller<Region> {
                 log.warn("Cannot access field {}", fieldName, e);
             }
         }
+
+    }
+
+    public void refreshManualReplayLookupVisibility() {
+        boolean visible = localPreferences.getTabReports().isEnableManualReplayLookupCheckBox();
+        manualReplayLookupInfoText.setVisible(visible);
+        manualReplayLookupInfoText.setManaged(visible);
+        getModeratorEventsForReplayIdTextField.setVisible(visible);
+        getModeratorEventsForReplayIdTextField.setManaged(visible);
+        getModeratorEventsReplayIdButton.setVisible(visible);
+        getModeratorEventsReplayIdButton.setManaged(visible);
+    }
+
+    public void refreshReportPlayerRoleButtonText() {
+        if (currentlySelectedItemNotNull == null) {
+            copyReporterIdButton.setText(formatPlayerRoleButtonText("Reporter", "Reporter n/a"));
+            copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", "Reported User n/a"));
+            return;
+        }
+
+        updateReportDetails(currentlySelectedItemNotNull);
+    }
+
+    private String formatPlayerRoleButtonText(String role, String playerText) {
+        if (!localPreferences.getTabReports().isShowReportPlayerRoleLabelsCheckBox()) {
+            return playerText;
+        }
+
+        return role + ":\n" + playerText;
     }
 
     public static void saveSplitPanePositions(SplitPane splitPane, LocalPreferences localPreferences) {

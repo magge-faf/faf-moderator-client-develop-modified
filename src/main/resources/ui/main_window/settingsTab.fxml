@@ -76,8 +76,19 @@
                 </VBox>
 
                 <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="0" GridPane.rowIndex="2" GridPane.columnSpan="2">
+                    <Label styleClass="settings-section-title" text="Advanced Report Tools"/>
+                    <Label styleClass="settings-help" text="Enable manual replay ID lookup to enter a replay ID without selecting a report and fetch its chat log and moderator events." wrapText="true"/>
+                    <CheckBox fx:id="enableManualReplayLookupCheckBox" mnemonicParsing="false"
+                              text="Show manual replay ID field and Get Chat/Events button"/>
+                    <CheckBox fx:id="showReportPlayerRoleLabelsCheckBox" mnemonicParsing="false"
+                              text="Show Reporter and Offender prefix in report buttons"/>
+                </VBox>
+
+                <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="0" GridPane.rowIndex="3" GridPane.columnSpan="2">
                     <Label styleClass="settings-section-title" text="Config Backups"/>
-                    <Label styleClass="settings-help" text="Config backups are saved on every close and when you click Back Up Config. The app keeps 10 backup files, then overwrites the oldest slot from the beginning." wrapText="true"/>
+                    <Label styleClass="settings-help" text="Automatic backups use 10 rotating slots. Manual backups are timestamped and do not overwrite those slots." wrapText="true"/>
+                    <CheckBox fx:id="automaticConfigurationBackupsOnExitCheckBox" mnemonicParsing="false"
+                              text="Back up config automatically when the app closes"/>
                     <GridPane hgap="10" vgap="8">
                         <columnConstraints>
                             <ColumnConstraints minWidth="105"/>
@@ -98,7 +109,7 @@
                     <Label fx:id="updateBackupFolderStatusLabel" styleClass="settings-status" text="" wrapText="true"/>
                 </VBox>
 
-                <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="0" GridPane.rowIndex="3" GridPane.columnSpan="2">
+                <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="0" GridPane.rowIndex="4" GridPane.columnSpan="2">
                     <Label styleClass="settings-section-title" text="Browser"/>
                     <GridPane hgap="10" vgap="8">
                         <columnConstraints>

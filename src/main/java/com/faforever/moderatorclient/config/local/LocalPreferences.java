@@ -333,6 +333,7 @@ public class LocalPreferences {
         boolean darkModeCheckBox = true;
         boolean fetchBansOnStartupCheckBox = false;
         boolean autoBackupConfigurationFolderOnSaveCheckBox = false;
+        boolean automaticConfigurationBackupsOnExitCheckBox = true;
         boolean autoPurgeTempReplaysOlderThanOneDayCheckBox = false;
 
         // TitledPanes
@@ -359,6 +360,8 @@ public class LocalPreferences {
         boolean showNotifyChatMessages = true;
 
         boolean fetchReportsOnStartupCheckBox = true;
+        boolean enableManualReplayLookupCheckBox = false;
+        boolean showReportPlayerRoleLabelsCheckBox = true;
 
         // TextFields
         String thresholdToShowSelfDestructionUnitsEventTextField = "0";

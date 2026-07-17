@@ -28,4 +28,5 @@
     <Tab fx:id="excludedHardwareItemsTab" closable="false" text="Manage Excluded Items"/>
     <Tab fx:id="apiHistoryTab" closable="false" text="API History"/>
     <Tab fx:id="ircChatTab" closable="false" text="IRC Chat / Moderation Tools"/>
+    <Tab fx:id="changelogTab" closable="false" text="Changelog"/>
 </TabPane>

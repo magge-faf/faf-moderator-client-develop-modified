@@ -93,6 +93,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     public Tab replayAnalysisControllerTab;
     public Tab excludedHardwareItemsTab;
     public Tab apiHistoryTab;
+    public Tab changelogTab;
 
     private SettingsController settingsController;
     private ModerationReportController moderationReportController;
@@ -115,6 +116,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     private ReplayAnalysisController replayAnalysisController;
     private ExcludedHardwareItemsController excludedHardwareItemsController;
     private ApiHistoryController apiHistoryController;
+    private ChangelogController changelogController;
 
     private final Map<Tab, Boolean> dataLoadingState = new HashMap<>();
 
@@ -159,6 +161,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         initReplayAnalysisControllerTab();
         initExcludedHardwareItemsTab();
         initApiHistoryTab();
+        initChangelogTab();
         selectActiveTab();
     }
 
@@ -186,6 +189,12 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     private void initApiHistoryTab() {
         apiHistoryController = uiService.loadFxml("ui/main_window/apiHistoryTab.fxml");
         apiHistoryTab.setContent(apiHistoryController.getRoot());
+    }
+
+    private void initChangelogTab() {
+        changelogController = uiService.loadFxml("ui/main_window/changelogTab.fxml");
+        changelogTab.setContent(changelogController.getRoot());
+        initLoading(changelogTab, changelogController::loadIfNeeded);
     }
 
     private void initReplayAnalysisControllerTab() {
@@ -260,6 +269,18 @@ public class MainController implements Controller<TabPane>, DisposableBean {
             moderationReportController = uiService.loadFxml("ui/main_window/report.fxml");
             reportTab.setContent(moderationReportController.getRoot());
             initLoading(reportTab);
+        }
+    }
+
+    public void refreshManualReplayLookupVisibility() {
+        if (moderationReportController != null) {
+            moderationReportController.refreshManualReplayLookupVisibility();
+        }
+    }
+
+    public void refreshReportPlayerRoleLabelsVisibility() {
+        if (moderationReportController != null) {
+            moderationReportController.refreshReportPlayerRoleButtonText();
         }
     }
 
@@ -424,11 +445,15 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         } else {
             log.warn("Local preferences were not saved successfully.");
         }
-        try {
-            log.info("Backing up configuration folder on application exit.");
-            applicationUpdateService.createConfigurationBackupArchive();
-        } catch (Exception e) {
-            log.warn("Failed to back up configuration folder on application exit.", e);
+        if (localPreferences.getTabSettings().isAutomaticConfigurationBackupsOnExitCheckBox()) {
+            try {
+                log.info("Backing up configuration folder on application exit.");
+                applicationUpdateService.createConfigurationBackupArchive();
+            } catch (Exception e) {
+                log.warn("Failed to back up configuration folder on application exit.", e);
+            }
+        } else {
+            log.info("Automatic configuration backup on exit is disabled.");
         }
     }
 
@@ -456,6 +481,11 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     }
 
     private void checkForNewVersion() {
+        if (!applicationUpdateService.isPackagedReleaseInstall()) {
+            log.debug("Skipping update check because this run is not a packaged release install.");
+            return;
+        }
+
         Thread versionCheckThread = new Thread(() -> {
             try {
                 applicationUpdateService.fetchLatestRelease().ifPresent(release -> {
