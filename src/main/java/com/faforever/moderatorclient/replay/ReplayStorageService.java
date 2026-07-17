@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -88,6 +89,13 @@ public class ReplayStorageService {
             output.write('\n');
             input.skipNBytes(probe.headerEnd() + 1L);
             input.transferTo(output);
+        } catch (IOException e) {
+            try {
+                Files.deleteIfExists(normalizedReplay);
+            } catch (IOException deleteFailure) {
+                e.addSuppressed(deleteFailure);
+            }
+            throw e;
         }
         return new PreparedReplay(normalizedReplay, true);
     }
@@ -160,12 +168,17 @@ public class ReplayStorageService {
         long deletedBytes = 0L;
 
         try (var paths = Files.walk(scanRoot)) {
-            for (Path path : paths.filter(file -> isReplayFile(file, cutoff)).toList()) {
+            for (Path path : paths.filter(file -> isReplayCleanupCandidate(file, cutoff)).toList()) {
                 long size = Files.size(path);
                 Files.deleteIfExists(path);
                 deletedFiles++;
                 deletedBytes += size;
             }
+        } catch (RuntimeException e) {
+            if (e.getCause() instanceof IOException ioException) {
+                throw ioException;
+            }
+            throw e;
         }
 
         return new ReplayCleanupResult(replayDir, maxAge, deletedFiles, deletedBytes);
@@ -214,6 +227,13 @@ public class ReplayStorageService {
         }
     }
 
+    private boolean isReplayCleanupCandidate(Path path, Instant cutoff) {
+        if (cutoff == null) {
+            return Files.isRegularFile(path.toAbsolutePath().normalize(), LinkOption.NOFOLLOW_LINKS);
+        }
+        return isReplayFile(path, cutoff);
+    }
+
     private boolean hasReplayHeader(Path path) throws IOException {
         byte[] headerBytes = new byte[MAX_REPLAY_HEADER_BYTES];
         int bytesRead;
@@ -241,13 +261,13 @@ public class ReplayStorageService {
                 && (header.contains("\"compression\"") || header.contains("\"game_type\""));
     }
 
-    private int findReplayHeaderEnd(byte[] replayBytes, int length) {
+    private int findReplayHeaderEnd(byte[] replayBytes, int length) throws IOException {
         for (int i = 0; i < length; i++) {
             if (replayBytes[i] == '\n') {
                 return i;
             }
         }
-        throw new IllegalArgumentException("Missing separator between replay header and body");
+        throw new EOFException("Missing separator between replay header and body");
     }
 
     private String normalizeReplayHeader(String header) {

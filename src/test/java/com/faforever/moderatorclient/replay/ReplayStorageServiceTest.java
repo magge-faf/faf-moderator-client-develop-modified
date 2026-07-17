@@ -4,6 +4,7 @@ import com.faforever.moderatorclient.config.local.LocalPreferences;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -14,6 +15,7 @@ import java.time.temporal.ChronoUnit;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ReplayStorageServiceTest {
 
@@ -100,7 +102,7 @@ class ReplayStorageServiceTest {
     }
 
     @Test
-    void purgeAllReplayFilesDeletesReplayFilesRegardlessOfAge(@TempDir Path tempDir) throws Exception {
+    void purgeAllReplayFilesDeletesEveryRegularFileRegardlessOfReplayValidity(@TempDir Path tempDir) throws Exception {
         String originalUserDir = System.getProperty("user.dir");
         try {
             System.setProperty("user.dir", tempDir.toString());
@@ -114,9 +116,9 @@ class ReplayStorageServiceTest {
 
             ReplayStorageService.ReplayCleanupResult result = service.purgeAllReplayFiles();
 
-            assertThat(result.deletedFileCount(), is(1L));
+            assertThat(result.deletedFileCount(), is(2L));
             assertThat(Files.exists(replay), is(false));
-            assertThat(Files.exists(invalidReplay), is(true));
+            assertThat(Files.exists(invalidReplay), is(false));
         } finally {
             System.setProperty("user.dir", originalUserDir);
         }
@@ -176,6 +178,21 @@ class ReplayStorageServiceTest {
                 assertThat(preparedReplay.temporary(), is(false));
                 assertThat(preparedReplay.path(), is(replay));
             }
+        } finally {
+            System.setProperty("user.dir", originalUserDir);
+        }
+    }
+
+    @Test
+    void prepareReplayForParsingThrowsCheckedExceptionWhenHeaderSeparatorIsMissing(@TempDir Path tempDir) throws Exception {
+        String originalUserDir = System.getProperty("user.dir");
+        try {
+            System.setProperty("user.dir", tempDir.toString());
+            ReplayStorageService service = new ReplayStorageService(new LocalPreferences());
+            Path replay = service.resolveReplayFile(557);
+            Files.writeString(replay, "{\"game_type\":\"DEMORALIZATION\",\"compression\":\"zstd\"}");
+
+            assertThrows(IOException.class, () -> service.prepareReplayForParsing(replay));
         } finally {
             System.setProperty("user.dir", originalUserDir);
         }
