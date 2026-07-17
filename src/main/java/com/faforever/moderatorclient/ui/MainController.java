@@ -191,14 +191,18 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     }
 
     private void initApiHistoryTab() {
-        apiHistoryController = uiService.loadFxml("ui/main_window/apiHistoryTab.fxml");
-        apiHistoryTab.setContent(apiHistoryController.getRoot());
+        if (checkPermissionForTab(apiHistoryTab, GroupPermission.ROLE_ADMIN_MODERATION_REPORT)) {
+            apiHistoryController = uiService.loadFxml("ui/main_window/apiHistoryTab.fxml");
+            apiHistoryTab.setContent(apiHistoryController.getRoot());
+        }
     }
 
     private void initChangelogTab() {
-        changelogController = uiService.loadFxml("ui/main_window/changelogTab.fxml");
-        changelogTab.setContent(changelogController.getRoot());
-        initLoading(changelogTab, changelogController::loadIfNeeded);
+        if (checkPermissionForTab(changelogTab, GroupPermission.ROLE_ADMIN_MODERATION_REPORT)) {
+            changelogController = uiService.loadFxml("ui/main_window/changelogTab.fxml");
+            changelogTab.setContent(changelogController.getRoot());
+            initLoading(changelogTab, changelogController::loadIfNeeded);
+        }
     }
 
     private void initReplayAnalysisControllerTab() {
@@ -208,8 +212,10 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     }
 
     private void initSettingsTab() {
-        settingsController = uiService.loadFxml("ui/main_window/settingsTab.fxml");
-        settingsTab.setContent(settingsController.getRoot());
+        if (checkPermissionForTab(settingsTab, GroupPermission.ROLE_ADMIN_MODERATION_REPORT)) {
+            settingsController = uiService.loadFxml("ui/main_window/settingsTab.fxml");
+            settingsTab.setContent(settingsController.getRoot());
+        }
     }
 
     private void initReportStatisticsTab() {
@@ -348,8 +354,10 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     }
 
     private void initIrcChatTab() {
-        ircChatController = uiService.loadFxml("ui/main_window/ircChatTab.fxml");
-        ircChatTab.setContent(ircChatController.getRoot());
+        if (checkPermissionForTab(ircChatTab, GroupPermission.ROLE_ADMIN_MODERATION_REPORT)) {
+            ircChatController = uiService.loadFxml("ui/main_window/ircChatTab.fxml");
+            ircChatTab.setContent(ircChatController.getRoot());
+        }
     }
 
     private void initVotingTab() {
