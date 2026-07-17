@@ -975,25 +975,26 @@ public class UserManagementController implements Controller<SplitPane> {
 
     public void saveOnExitContent() {
         try {
-            Files.write(ApplicationPaths.resolveConfigurationFile(SEARCH_HISTORY_FILE_NAME), searchHistoryTextArea.getText().getBytes());
-            Files.write(ApplicationPaths.resolveConfigurationFile(USER_NOTES_FILE_NAME), userNotesTextArea.getText().getBytes());
+            Files.createDirectories(ApplicationPaths.resolveConfigurationDirectory());
+            Files.writeString(ApplicationPaths.resolveConfigurationFile(SEARCH_HISTORY_FILE_NAME), searchHistoryTextArea.getText());
+            Files.writeString(ApplicationPaths.resolveConfigurationFile(USER_NOTES_FILE_NAME), userNotesTextArea.getText());
         } catch (IOException e) {
-            log.debug(String.valueOf(e));
+            log.warn("Failed to save search history/user notes", e);
         }
     }
 
     private void loadContent() {
         try {
             if (Files.exists(ApplicationPaths.resolveConfigurationFile(SEARCH_HISTORY_FILE_NAME))) {
-                String searchHistory = new String(Files.readAllBytes(ApplicationPaths.resolveConfigurationFile(SEARCH_HISTORY_FILE_NAME)));
+                String searchHistory = Files.readString(ApplicationPaths.resolveConfigurationFile(SEARCH_HISTORY_FILE_NAME));
                 searchHistoryTextArea.setText(searchHistory);
             }
             if (Files.exists(ApplicationPaths.resolveConfigurationFile(USER_NOTES_FILE_NAME))) {
-                String userNotes = new String(Files.readAllBytes(ApplicationPaths.resolveConfigurationFile(USER_NOTES_FILE_NAME)));
+                String userNotes = Files.readString(ApplicationPaths.resolveConfigurationFile(USER_NOTES_FILE_NAME));
                 userNotesTextArea.setText(userNotes);
             }
         } catch (IOException e) {
-            log.debug(String.valueOf(e));
+            log.warn("Failed to load search history/user notes", e);
         }
     }
 
