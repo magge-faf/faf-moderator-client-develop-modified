@@ -18,6 +18,7 @@ Git / commit style
 - When Codex creates a commit, include `Co-Authored-By: Codex <codex@openai.com>` as the final line of the commit message.
 - Keep commits grouped by real topic, not by accidental micro-steps.
 - Before creating a new commit, inspect roughly the last seven commits (for example `git log -7 --oneline --stat`) and decide whether the current change belongs in one of them. If it does, amend/fold into that commit instead of adding another same-topic commit.
+- When inspecting recent commits, also check whether the visible commit subjects/scopes would look repetitive or misleading in the history. Avoid broad repeated scopes like `fix(settings): ...` for different behavioral topics; prefer narrower scopes such as `fix(config): ...`, `fix(replays): ...`, or `feat(reports): ...` so related commits look related and unrelated commits do not look same-ish.
 - Before committing, inspect the staged file list and ask: "Would these changes still belong together if reviewed separately?" If the answer is no, split the commit by behavioral topic.
 - Do not use broad catch-all scopes or subjects like `fix(maintenance)` to combine unrelated areas. For example, updater UI/runtime checks, replay cleanup safety, and bans JSON sync fixes must be separate commits even if they were implemented in the same work session.
 - In a dirty worktree, stage only the intended hunks/files. Do not sweep unrelated changes into a commit.
