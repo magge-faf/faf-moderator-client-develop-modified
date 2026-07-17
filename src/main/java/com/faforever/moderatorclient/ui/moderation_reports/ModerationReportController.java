@@ -83,6 +83,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -278,34 +279,36 @@ public class ModerationReportController implements Controller<Region> {
     public void onStartReplay() {
         String replayId = startReplayButton.getId();
         String replayUrl = String.format(replayDownLoadFormat, replayId);
-        Path tempFilePath = null;
+        Path stagingFilePath = null;
         try {
-            tempFilePath = replayStorageService.resolveReplayFile(Integer.parseInt(replayId));
+            Path resolvedReplayPath = replayStorageService.resolveReplayFile(Integer.parseInt(replayId));
+            stagingFilePath = replayStorageService.createTemporaryReplayFile("download_" + replayId + "_");
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(replayUrl))
                     .build();
 
-            HttpResponse<Path> response = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(tempFilePath));
+            HttpResponse<Path> response = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(stagingFilePath));
 
             if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                Files.move(stagingFilePath, resolvedReplayPath, StandardCopyOption.REPLACE_EXISTING);
                 if (!GraphicsEnvironment.isHeadless() && Desktop.isDesktopSupported()
                         && Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
-                    Desktop.getDesktop().open(tempFilePath.toFile());
+                    Desktop.getDesktop().open(resolvedReplayPath.toFile());
                 } else {
-                    new ProcessBuilder("cmd", "/c", "start", "", tempFilePath.toAbsolutePath().toString()).start();
+                    new ProcessBuilder("cmd", "/c", "start", "", resolvedReplayPath.toAbsolutePath().toString()).start();
                 }
             } else {
                 log.error("Failed to download replay {}: HTTP {}", replayId, response.statusCode());
-                Files.deleteIfExists(tempFilePath);
+                Files.deleteIfExists(stagingFilePath);
             }
         } catch (IOException | InterruptedException e) {
             log.error("Failed to start replay {} from {}", replayId, replayUrl, e);
-            if (tempFilePath != null) {
+            if (stagingFilePath != null) {
                 try {
-                    Files.deleteIfExists(tempFilePath);
+                    Files.deleteIfExists(stagingFilePath);
                 } catch (IOException cleanupException) {
-                    log.warn("Failed to delete temp file {}", tempFilePath, cleanupException);
+                    log.warn("Failed to delete temp file {}", stagingFilePath, cleanupException);
                 }
             }
             if (e instanceof InterruptedException) {
@@ -480,6 +483,7 @@ public class ModerationReportController implements Controller<Region> {
         if (selectedGameIds.isEmpty()) {
             result = result.replace("ReplayID", "");
             result = result.replace(" -  {gameIds}", "");
+            result = result.replace("{gameIds}", "");
         } else {
             result = result.replace("{gameIds}", selectedGameIds);
         }
@@ -2676,7 +2680,19 @@ public class ModerationReportController implements Controller<Region> {
             return;
         }
 
-        updateReportDetails(currentlySelectedItemNotNull);
+        String reporterRepresentation = currentlySelectedItemNotNull.getReporter() == null
+                ? "Reporter n/a"
+                : currentlySelectedItemNotNull.getReporter().getRepresentation();
+        copyReporterIdButton.setText(formatPlayerRoleButtonText("Reporter", reporterRepresentation));
+
+        Collection<PlayerFX> reportedUsers = currentlySelectedItemNotNull.getReportedUsers();
+        if (reportedUsers == null || reportedUsers.isEmpty()) {
+            copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", "Reported User n/a"));
+        } else {
+            for (PlayerFX offender : reportedUsers) {
+                copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", offender.getRepresentation()));
+            }
+        }
     }
 
     private String formatPlayerRoleButtonText(String role, String playerText) {
