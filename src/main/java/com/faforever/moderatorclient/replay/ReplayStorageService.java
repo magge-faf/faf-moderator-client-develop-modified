@@ -52,35 +52,58 @@ public class ReplayStorageService {
         return resolveReplayDirectory().resolve(replayId + ".fafreplay");
     }
 
+    /**
+     * Scratch files (temp downloads, header-normalized copies) live under a dedicated subdirectory so
+     * age-based cleanup never touches replays a moderator deliberately downloaded and kept.
+     */
+    public Path resolveTemporaryReplayDirectory() {
+        return resolveReplayDirectory().resolve("tmp");
+    }
+
+    private void ensureTemporaryReplayDirectoryExists() throws IOException {
+        Files.createDirectories(resolveTemporaryReplayDirectory());
+    }
+
     public Path createTemporaryReplayFile(String prefix) throws IOException {
-        ensureReplayDirectoryExists();
+        ensureTemporaryReplayDirectoryExists();
         String sanitizedPrefix = prefix == null ? "faf_replay_" : prefix.replaceAll("[^A-Za-z0-9._-]", "_");
         if (sanitizedPrefix.length() < 3) {
             sanitizedPrefix = "faf_replay_";
         }
-        return Files.createTempFile(resolveReplayDirectory(), sanitizedPrefix, ".fafreplay");
+        return Files.createTempFile(resolveTemporaryReplayDirectory(), sanitizedPrefix, ".fafreplay");
     }
 
     public PreparedReplay prepareReplayForParsing(Path replayFile) throws IOException {
-        byte[] replayBytes = Files.readAllBytes(replayFile);
-        int headerEnd = findReplayHeaderEnd(replayBytes);
-        String header = new String(replayBytes, 0, headerEnd, StandardCharsets.UTF_8);
-        String normalizedHeader = normalizeReplayHeader(header);
+        HeaderProbe probe = readReplayHeader(replayFile);
+        String normalizedHeader = normalizeReplayHeader(probe.header());
 
-        if (header.equals(normalizedHeader)) {
+        if (probe.header().equals(normalizedHeader)) {
             return new PreparedReplay(replayFile, false);
         }
 
         Path normalizedReplay = createTemporaryReplayFile("normalized_replay_");
-        byte[] normalizedHeaderBytes = normalizedHeader.getBytes(StandardCharsets.UTF_8);
-        byte[] normalizedReplayBytes = new byte[normalizedHeaderBytes.length + 1 + (replayBytes.length - headerEnd - 1)];
-
-        System.arraycopy(normalizedHeaderBytes, 0, normalizedReplayBytes, 0, normalizedHeaderBytes.length);
-        normalizedReplayBytes[normalizedHeaderBytes.length] = '\n';
-        System.arraycopy(replayBytes, headerEnd + 1, normalizedReplayBytes, normalizedHeaderBytes.length + 1, replayBytes.length - headerEnd - 1);
-
-        Files.write(normalizedReplay, normalizedReplayBytes);
+        try (var input = Files.newInputStream(replayFile);
+             var output = Files.newOutputStream(normalizedReplay)) {
+            output.write(normalizedHeader.getBytes(StandardCharsets.UTF_8));
+            output.write('\n');
+            input.skipNBytes(probe.headerEnd() + 1L);
+            input.transferTo(output);
+        }
         return new PreparedReplay(normalizedReplay, true);
+    }
+
+    private HeaderProbe readReplayHeader(Path replayFile) throws IOException {
+        byte[] buffer = new byte[MAX_REPLAY_HEADER_BYTES];
+        int bytesRead;
+        try (var inputStream = Files.newInputStream(replayFile)) {
+            bytesRead = inputStream.readNBytes(buffer, 0, buffer.length);
+        }
+        int headerEnd = findReplayHeaderEnd(buffer, bytesRead);
+        String header = new String(buffer, 0, headerEnd, StandardCharsets.UTF_8);
+        return new HeaderProbe(header, headerEnd);
+    }
+
+    private record HeaderProbe(String header, int headerEnd) {
     }
 
     public ReplayFolderStats describeReplayFolder() throws IOException {
@@ -123,7 +146,12 @@ public class ReplayStorageService {
 
     private ReplayCleanupResult purgeReplayFiles(Duration maxAge) throws IOException {
         Path replayDir = resolveReplayDirectory().toAbsolutePath().normalize();
-        if (!Files.isDirectory(replayDir)) {
+
+        // Age-based cleanup only ever touches scratch files in the temp subdirectory, never replays a
+        // moderator deliberately downloaded and kept. A full purge (maxAge == null) is an explicit,
+        // user-confirmed action and clears the whole replay directory, temp files included.
+        Path scanRoot = maxAge == null ? replayDir : resolveTemporaryReplayDirectory().toAbsolutePath().normalize();
+        if (!Files.isDirectory(scanRoot)) {
             return new ReplayCleanupResult(replayDir, maxAge, 0L, 0L);
         }
 
@@ -131,8 +159,8 @@ public class ReplayStorageService {
         long deletedFiles = 0L;
         long deletedBytes = 0L;
 
-        try (var paths = Files.walk(replayDir)) {
-            for (Path path : paths.filter(file -> isReplayFile(file, replayDir, cutoff)).toList()) {
+        try (var paths = Files.walk(scanRoot)) {
+            for (Path path : paths.filter(file -> isReplayFile(file, cutoff)).toList()) {
                 long size = Files.size(path);
                 Files.deleteIfExists(path);
                 deletedFiles++;
@@ -162,11 +190,8 @@ public class ReplayStorageService {
         }
     }
 
-    private boolean isReplayFile(Path path, Path replayDir, Instant cutoff) {
+    private boolean isReplayFile(Path path, Instant cutoff) {
         Path normalizedPath = path.toAbsolutePath().normalize();
-        if (!normalizedPath.startsWith(replayDir) || !replayDir.equals(normalizedPath.getParent())) {
-            return false;
-        }
         if (!Files.isRegularFile(normalizedPath, LinkOption.NOFOLLOW_LINKS)) {
             return false;
         }
@@ -216,8 +241,8 @@ public class ReplayStorageService {
                 && (header.contains("\"compression\"") || header.contains("\"game_type\""));
     }
 
-    private int findReplayHeaderEnd(byte[] replayBytes) {
-        for (int i = 0; i < replayBytes.length; i++) {
+    private int findReplayHeaderEnd(byte[] replayBytes, int length) {
+        for (int i = 0; i < length; i++) {
             if (replayBytes[i] == '\n') {
                 return i;
             }

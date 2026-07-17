@@ -268,18 +268,22 @@ public class ReplayAnalysisController implements Controller<VBox> {
         try (Stream<Path> paths = Files.walk(replayDirectory)) {
             long detectedReplays = paths
                 .filter(Files::isRegularFile)
-                .filter(path -> path.toString().toLowerCase().endsWith(".fafreplay"))
+                .filter(ReplayAnalysisController::isRetainedReplayFile)
                 .count();
             log.info("Total replays in folder: {}", detectedReplays);
             try (Stream<Path> newPaths = Files.walk(replayDirectory)) {
                 newPaths
                     .filter(Files::isRegularFile)
-                    .filter(path -> path.toString().toLowerCase().endsWith(".fafreplay"))
+                    .filter(ReplayAnalysisController::isRetainedReplayFile)
                     .forEach(path -> processReplayFile(path, checkedReplays));
             }
         } catch (IOException e) {
             log.error("Error accessing replay directory: {}", e.getMessage());
         }
+    }
+
+    private static boolean isRetainedReplayFile(Path path) {
+        return path.getFileName().toString().matches("\\d+\\.fafreplay");
     }
 
     private void processReplayFile(Path replayPath, Map<Integer, ReplayStatus> checkedReplays) {
