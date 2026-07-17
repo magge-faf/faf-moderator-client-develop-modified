@@ -19,7 +19,7 @@
     <SplitPane orientation="VERTICAL" VBox.vgrow="ALWAYS" dividerPositions="0.45">
 
         <!-- Input form -->
-        <ScrollPane fitToWidth="true" hbarPolicy="NEVER">
+        <ScrollPane fitToWidth="false" hbarPolicy="AS_NEEDED">
             <VBox spacing="12" style="-fx-padding: 5 5 5 0;">
 
                 <TitledPane text="Annotation" expanded="true">
