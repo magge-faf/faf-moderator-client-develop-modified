@@ -34,7 +34,9 @@ public class LocalPreferencesReaderWriter {
         }
 
         try (BufferedReader reader = Files.newBufferedReader(readPath)) {
-            return objectMapper.readValue(reader, LocalPreferences.class);
+            LocalPreferences localPreferences = objectMapper.readValue(reader, LocalPreferences.class);
+            localPreferences.applyDefaultLayoutPreferences();
+            return localPreferences;
         } catch (IOException e) {
             log.error("Failed to read preferences, using defaults", e);
             return new LocalPreferences();

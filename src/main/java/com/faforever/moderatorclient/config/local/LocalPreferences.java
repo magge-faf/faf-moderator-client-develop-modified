@@ -41,9 +41,14 @@ public class LocalPreferences {
         applyDefaultLayoutPreferences();
     }
 
-    private void applyDefaultLayoutPreferences() {
+    /**
+     * Backfills default layout values (table column widths/order, divider positions) into the nested
+     * preference sections. Safe to call again after Jackson deserialization has replaced those nested
+     * objects: only keys/lists that are still missing are filled in, existing saved values are untouched.
+     */
+    void applyDefaultLayoutPreferences() {
         // tabUserManagement
-        tabUserManagement.userSearchTableTableColumnWidthsTabUserManagement = new HashMap<>(Map.ofEntries(
+        backfillMap(tabUserManagement.userSearchTableTableColumnWidthsTabUserManagement, Map.ofEntries(
                 Map.entry("AccountLink", 174.58984375),
                 Map.entry("Email", 175.541015625),
                 Map.entry("RegistrationDate", 124.650390625),
@@ -64,9 +69,9 @@ public class LocalPreferences {
                 Map.entry("UUID", 252.220703125),
                 Map.entry("IPAddress", 94.9609375)
         ));
-        tabUserManagement.userSearchTableColumnOrderTabUserManagement = new ArrayList<>(List.of("ID", "Name", "Email", "RegistrationDate", "LastLogin", "Hash", "UUID", "UIDCreated", "UIDLastUsed", "MemoryS/N", "IPAddress", "DeviceID", "AccountLink", "UserAgent", "Manufacturer", "CPUName", "ProcessorId", "S/N", "VolumeS/N"));
-        tabUserManagement.rootSplitPaneDividerPositionsTabUserManagement = new ArrayList<>(List.of(0.39481268011527376));
-        tabUserManagement.userBansTableColumnWidths = new HashMap<>(Map.ofEntries(
+        backfillList(tabUserManagement.userSearchTableColumnOrderTabUserManagement, List.of("ID", "Name", "Email", "RegistrationDate", "LastLogin", "Hash", "UUID", "UIDCreated", "UIDLastUsed", "MemoryS/N", "IPAddress", "DeviceID", "AccountLink", "UserAgent", "Manufacturer", "CPUName", "ProcessorId", "S/N", "VolumeS/N"));
+        backfillList(tabUserManagement.rootSplitPaneDividerPositionsTabUserManagement, List.of(0.39481268011527376));
+        backfillMap(tabUserManagement.userBansTableColumnWidths, Map.ofEntries(
                 Map.entry("ID", 80.0),
                 Map.entry("Level", 80.0),
                 Map.entry("Status", 80.0),
@@ -80,8 +85,8 @@ public class LocalPreferences {
                 Map.entry("CreatedTime", 180.0),
                 Map.entry("UpdateTime", 180.0)
         ));
-        tabUserManagement.userBansTableColumnOrder = new ArrayList<>(List.of("ID", "Level", "Status", "Duration", "Expiresat", "Reason", "Author", "RevocationReason", "RevocationAuthor", "Revocationat", "CreatedTime", "UpdateTime"));
-        tabUserManagement.userNoteTableColumnWidths = new HashMap<>(Map.ofEntries(
+        backfillList(tabUserManagement.userBansTableColumnOrder, List.of("ID", "Level", "Status", "Duration", "Expiresat", "Reason", "Author", "RevocationReason", "RevocationAuthor", "Revocationat", "CreatedTime", "UpdateTime"));
+        backfillMap(tabUserManagement.userNoteTableColumnWidths, Map.ofEntries(
                 Map.entry("ID", 80.0),
                 Map.entry("Watched", 80.0),
                 Map.entry("Note", 600.0),
@@ -89,14 +94,14 @@ public class LocalPreferences {
                 Map.entry("Created", 160.0),
                 Map.entry("Lastupdate", 160.0)
         ));
-        tabUserManagement.userNoteTableColumnOrder = new ArrayList<>(List.of("ID", "Watched", "Note", "Author", "Created", "Lastupdate"));
-        tabUserManagement.userNameHistoryTableColumnWidths = new HashMap<>(Map.ofEntries(
+        backfillList(tabUserManagement.userNoteTableColumnOrder, List.of("ID", "Watched", "Note", "Author", "Created", "Lastupdate"));
+        backfillMap(tabUserManagement.userNameHistoryTableColumnWidths, Map.ofEntries(
                 Map.entry("ID", 80.0),
                 Map.entry("ChangeTime", 180.0),
                 Map.entry("PreviousName", 200.0)
         ));
-        tabUserManagement.userNameHistoryTableColumnOrder = new ArrayList<>(List.of("ID", "ChangeTime", "PreviousName"));
-        tabUserManagement.userLastGamesTableColumnWidths = new HashMap<>(Map.ofEntries(
+        backfillList(tabUserManagement.userNameHistoryTableColumnOrder, List.of("ID", "ChangeTime", "PreviousName"));
+        backfillMap(tabUserManagement.userLastGamesTableColumnWidths, Map.ofEntries(
                 Map.entry("GameID", 100.0),
                 Map.entry("GameName", 845.7109375),
                 Map.entry("GameValidity", 206.0),
@@ -105,8 +110,8 @@ public class LocalPreferences {
                 Map.entry("ScoreTime", 150.0),
                 Map.entry("Replay", 150.0)
         ));
-        tabUserManagement.userLastGamesTableColumnOrder = new ArrayList<>(List.of("GameID", "GameName", "GameValidity", "RatingBeforeGame", "RatingChange", "ScoreTime", "Replay"));
-        tabUserManagement.userAvatarsTableColumnWidths = new HashMap<>(Map.ofEntries(
+        backfillList(tabUserManagement.userLastGamesTableColumnOrder, List.of("GameID", "GameName", "GameValidity", "RatingBeforeGame", "RatingChange", "ScoreTime", "Replay"));
+        backfillMap(tabUserManagement.userAvatarsTableColumnWidths, Map.ofEntries(
                 Map.entry("AssignmentID", 140.0),
                 Map.entry("AvatarID", 80.0),
                 Map.entry("Preview", 80.0),
@@ -114,20 +119,20 @@ public class LocalPreferences {
                 Map.entry("Selected", 80.0),
                 Map.entry("ExpiresAt", 180.0)
         ));
-        tabUserManagement.userAvatarsTableColumnOrder = new ArrayList<>(List.of("AssignmentID", "AvatarID", "Preview", "Tooltip", "Selected", "ExpiresAt"));
-        tabUserManagement.userGroupsTableColumnWidths = new HashMap<>(Map.ofEntries(
+        backfillList(tabUserManagement.userAvatarsTableColumnOrder, List.of("AssignmentID", "AvatarID", "Preview", "Tooltip", "Selected", "ExpiresAt"));
+        backfillMap(tabUserManagement.userGroupsTableColumnWidths, Map.ofEntries(
                 Map.entry("ID", 80.0),
                 Map.entry("GroupName", 150.0),
                 Map.entry("Public", 80.0)
         ));
-        tabUserManagement.userGroupsTableColumnOrder = new ArrayList<>(List.of("ID", "GroupName", "Public"));
-        tabUserManagement.permissionsTableColumnWidths = new HashMap<>(Map.ofEntries(
+        backfillList(tabUserManagement.userGroupsTableColumnOrder, List.of("ID", "GroupName", "Public"));
+        backfillMap(tabUserManagement.permissionsTableColumnWidths, Map.ofEntries(
                 Map.entry("ID", 80.0),
                 Map.entry("PermissionName", 150.0)
         ));
-        tabUserManagement.permissionsTableColumnOrder = new ArrayList<>(List.of("ID", "PermissionName"));
+        backfillList(tabUserManagement.permissionsTableColumnOrder, List.of("ID", "PermissionName"));
         // tabReports
-        tabReports.reportTableColumnWidthsTabReports = new HashMap<>(Map.ofEntries(
+        backfillMap(tabReports.reportTableColumnWidthsTabReports, Map.ofEntries(
                 Map.entry("lastModeratorColumn", 108.982421875),
                 Map.entry("reportDescriptionColumn", 946.251953125),
                 Map.entry("statusColumn", 15.0),
@@ -140,10 +145,10 @@ public class LocalPreferences {
                 Map.entry("createTimeColumn", 133.0),
                 Map.entry("idColumn", 48.34375)
         ));
-        tabReports.reportTableColumnOrderTabReports = new ArrayList<>(List.of("idColumn", "reporterColumn", "statusColumn", "reportedUsersColumn", "reportDescriptionColumn", "gameColumn", "incidentTimeCodeColumn", "privateNoteColumn", "moderatorPrivateNoticeColumn", "lastModeratorColumn", "createTimeColumn"));
-        tabReports.rootSplitPaneDividerPositionsTabReports = new ArrayList<>(List.of(0.5295389048991355));
+        backfillList(tabReports.reportTableColumnOrderTabReports, List.of("idColumn", "reporterColumn", "statusColumn", "reportedUsersColumn", "reportDescriptionColumn", "gameColumn", "incidentTimeCodeColumn", "privateNoteColumn", "moderatorPrivateNoticeColumn", "lastModeratorColumn", "createTimeColumn"));
+        backfillList(tabReports.rootSplitPaneDividerPositionsTabReports, List.of(0.5295389048991355));
         // tabRecentNotes
-        tabRecentNotes.columnWidthsTabRecentNotes = new HashMap<>(Map.ofEntries(
+        backfillMap(tabRecentNotes.columnWidthsTabRecentNotes, Map.ofEntries(
                 Map.entry("playerIdColumn", 191.46484375),
                 Map.entry("authorIdColumn", 92.9453125),
                 Map.entry("noteColumn", 805.0),
@@ -151,9 +156,9 @@ public class LocalPreferences {
                 Map.entry("noteUpdatedColumn", 124.650390625),
                 Map.entry("noteIdColumn", 65.244140625)
         ));
-        tabRecentNotes.columnOrderTabRecentNotes = new ArrayList<>(List.of("noteCreatedColumn", "noteUpdatedColumn", "noteIdColumn", "authorIdColumn", "playerIdColumn", "noteColumn"));
+        backfillList(tabRecentNotes.columnOrderTabRecentNotes, List.of("noteCreatedColumn", "noteUpdatedColumn", "noteIdColumn", "authorIdColumn", "playerIdColumn", "noteColumn"));
         // tabBans
-        tabBans.columnWidthsTabBans = new HashMap<>(Map.ofEntries(
+        backfillMap(tabBans.columnWidthsTabBans, Map.ofEntries(
                 Map.entry("Status", 17.0),
                 Map.entry("RevocationReason", 250.0),
                 Map.entry("CreatedTime", 180.0),
@@ -168,9 +173,9 @@ public class LocalPreferences {
                 Map.entry("ID", 64.0),
                 Map.entry("Expiresat", 134.494140625)
         ));
-        tabBans.columnOrderTabBans = new ArrayList<>(List.of("Level", "ID", "Status", "Duration", "AffectedPlayer", "Expiresat", "Reason", "Author", "CreatedTime", "UpdateTime", "RevocationReason", "RevocationAuthor", "Revocationat"));
+        backfillList(tabBans.columnOrderTabBans, List.of("Level", "ID", "Status", "Duration", "AffectedPlayer", "Expiresat", "Reason", "Author", "CreatedTime", "UpdateTime", "RevocationReason", "RevocationAuthor", "Revocationat"));
         // tabAvatars
-        tabAvatars.avatarTableColumnWidths = new HashMap<>(Map.ofEntries(
+        backfillMap(tabAvatars.avatarTableColumnWidths, Map.ofEntries(
                 Map.entry("#", 35.40625),
                 Map.entry("AvatarID", 72.83203125),
                 Map.entry("Preview", 64.76953125),
@@ -181,8 +186,8 @@ public class LocalPreferences {
                 Map.entry("Inuse", 80.0),
                 Map.entry("Age", 90.0)
         ));
-        tabAvatars.avatarTableColumnOrder = new ArrayList<>(List.of("#", "AvatarID", "Preview", "Tooltip", "Created", "URL", "Assignments", "Inuse", "Age"));
-        tabAvatars.avatarAssignmentTableColumnWidths = new HashMap<>(Map.ofEntries(
+        backfillList(tabAvatars.avatarTableColumnOrder, List.of("#", "AvatarID", "Preview", "Tooltip", "Created", "URL", "Assignments", "Inuse", "Age"));
+        backfillMap(tabAvatars.avatarAssignmentTableColumnWidths, Map.ofEntries(
                 Map.entry("ID", 80.0),
                 Map.entry("UserID", 80.0),
                 Map.entry("Username", 150.0),
@@ -191,9 +196,9 @@ public class LocalPreferences {
                 Map.entry("Assignedat", 180.0),
                 Map.entry("Remove", 90.0)
         ));
-        tabAvatars.avatarAssignmentTableColumnOrder = new ArrayList<>(List.of("ID", "UserID", "Username", "Selected", "Expiresat", "Assignedat", "Remove"));
+        backfillList(tabAvatars.avatarAssignmentTableColumnOrder, List.of("ID", "UserID", "Username", "Selected", "Expiresat", "Assignedat", "Remove"));
         // tabMapVault
-        tabMapVault.mapSearchTableColumnWidths = new HashMap<>(Map.ofEntries(
+        backfillMap(tabMapVault.mapSearchTableColumnWidths, Map.ofEntries(
                 Map.entry("MapID", 100.0),
                 Map.entry("Name", 200.0),
                 Map.entry("Author", 200.0),
@@ -201,8 +206,8 @@ public class LocalPreferences {
                 Map.entry("Firstupload", 160.0),
                 Map.entry("Lastupdate", 160.0)
         ));
-        tabMapVault.mapSearchTableColumnOrder = new ArrayList<>(List.of("MapID", "Name", "Author", "Recommended", "Firstupload", "Lastupdate"));
-        tabMapVault.mapVersionTableColumnWidths = new HashMap<>(Map.ofEntries(
+        backfillList(tabMapVault.mapSearchTableColumnOrder, List.of("MapID", "Name", "Author", "Recommended", "Firstupload", "Lastupdate"));
+        backfillMap(tabMapVault.mapVersionTableColumnWidths, Map.ofEntries(
                 Map.entry("VersionID", 100.0),
                 Map.entry("VersionNo.", 100.0),
                 Map.entry("Ranked", 80.0),
@@ -214,9 +219,9 @@ public class LocalPreferences {
                 Map.entry("Uploaded", 160.0),
                 Map.entry("Lastupdate", 160.0)
         ));
-        tabMapVault.mapVersionTableColumnOrder = new ArrayList<>(List.of("VersionID", "VersionNo.", "Ranked", "Hidden", "MaxPlayers", "Width", "Height", "Description", "Uploaded", "Lastupdate"));
+        backfillList(tabMapVault.mapVersionTableColumnOrder, List.of("VersionID", "VersionNo.", "Ranked", "Hidden", "MaxPlayers", "Width", "Height", "Description", "Uploaded", "Lastupdate"));
         // tabModVault
-        tabModVault.modSearchTableColumnWidths = new HashMap<>(Map.ofEntries(
+        backfillMap(tabModVault.modSearchTableColumnWidths, Map.ofEntries(
                 Map.entry("ModID", 100.0),
                 Map.entry("Name", 200.0),
                 Map.entry("Uploader", 200.0),
@@ -225,8 +230,8 @@ public class LocalPreferences {
                 Map.entry("Firstupload", 160.0),
                 Map.entry("Lastupdate", 160.0)
         ));
-        tabModVault.modSearchTableColumnOrder = new ArrayList<>(List.of("ModID", "Name", "Uploader", "Author", "Recommended", "Firstupload", "Lastupdate"));
-        tabModVault.modVersionTableColumnWidths = new HashMap<>(Map.ofEntries(
+        backfillList(tabModVault.modSearchTableColumnOrder, List.of("ModID", "Name", "Uploader", "Author", "Recommended", "Firstupload", "Lastupdate"));
+        backfillMap(tabModVault.modVersionTableColumnWidths, Map.ofEntries(
                 Map.entry("VersionID", 100.0),
                 Map.entry("VersionNo.", 100.0),
                 Map.entry("UID", 280.0),
@@ -236,9 +241,9 @@ public class LocalPreferences {
                 Map.entry("Uploaded", 160.0),
                 Map.entry("Lastupdate", 160.0)
         ));
-        tabModVault.modVersionTableColumnOrder = new ArrayList<>(List.of("VersionID", "VersionNo.", "UID", "Ranked", "Hidden", "Description", "Uploaded", "Lastupdate"));
+        backfillList(tabModVault.modVersionTableColumnOrder, List.of("VersionID", "VersionNo.", "UID", "Ranked", "Hidden", "Description", "Uploaded", "Lastupdate"));
         // tabRecentActivity
-        tabRecentActivity.userRegistrationFeedTableColumnWidths = new HashMap<>(Map.ofEntries(
+        backfillMap(tabRecentActivity.userRegistrationFeedTableColumnWidths, Map.ofEntries(
                 Map.entry("ID", 48.8125),
                 Map.entry("Name", 127.697265625),
                 Map.entry("Email", 260.201171875),
@@ -260,8 +265,8 @@ public class LocalPreferences {
                 Map.entry("UIDCreated", 80.0),
                 Map.entry("UIDLastUsed", 80.0)
         ));
-        tabRecentActivity.userRegistrationFeedTableColumnOrder = new ArrayList<>(List.of("ID", "Name", "Email", "RegistrationDate", "LastLogin", "AccountLink", "IPAddress", "UserAgent", "Hash", "UUID", "MemoryS/N", "DeviceID", "Manufacturer", "CPUName", "ProcessorId", "S/N", "VolumeS/N", "Ban", "UIDCreated", "UIDLastUsed"));
-        tabRecentActivity.teamkillFeedTableColumnWidths = new HashMap<>(Map.ofEntries(
+        backfillList(tabRecentActivity.userRegistrationFeedTableColumnOrder, List.of("ID", "Name", "Email", "RegistrationDate", "LastLogin", "AccountLink", "IPAddress", "UserAgent", "Hash", "UUID", "MemoryS/N", "DeviceID", "Manufacturer", "CPUName", "ProcessorId", "S/N", "VolumeS/N", "Ban", "UIDCreated", "UIDLastUsed"));
+        backfillMap(tabRecentActivity.teamkillFeedTableColumnWidths, Map.ofEntries(
                 Map.entry("ID", 80.0),
                 Map.entry("Killer", 180.0),
                 Map.entry("Victim", 180.0),
@@ -269,8 +274,8 @@ public class LocalPreferences {
                 Map.entry("GameTime", 100.0),
                 Map.entry("ReportedAt", 180.0)
         ));
-        tabRecentActivity.teamkillFeedTableColumnOrder = new ArrayList<>(List.of("ID", "Killer", "Victim", "GameID", "GameTime", "ReportedAt"));
-        tabRecentActivity.mapUploadFeedTableColumnWidths = new HashMap<>(Map.ofEntries(
+        backfillList(tabRecentActivity.teamkillFeedTableColumnOrder, List.of("ID", "Killer", "Victim", "GameID", "GameTime", "ReportedAt"));
+        backfillMap(tabRecentActivity.mapUploadFeedTableColumnWidths, Map.ofEntries(
                 Map.entry("MapVersionID", 100.0),
                 Map.entry("MapID", 80.0),
                 Map.entry("MapName", 150.0),
@@ -285,16 +290,26 @@ public class LocalPreferences {
                 Map.entry("DownloadURL", 400.0),
                 Map.entry("Action", 80.0)
         ));
-        tabRecentActivity.mapUploadFeedTableColumnOrder = new ArrayList<>(List.of("MapVersionID", "MapID", "MapName", "Uploader", "Version", "Ranked", "Hidden", "Width", "Height", "Maxplayers", "Versiondescription", "DownloadURL", "Action"));
+        backfillList(tabRecentActivity.mapUploadFeedTableColumnOrder, List.of("MapVersionID", "MapID", "MapName", "Uploader", "Version", "Ranked", "Hidden", "Width", "Height", "Maxplayers", "Versiondescription", "DownloadURL", "Action"));
         // tabApiHistory
-        tabApiHistory.historyTableColumnWidths = new HashMap<>(Map.ofEntries(
+        backfillMap(tabApiHistory.historyTableColumnWidths, Map.ofEntries(
                 Map.entry("timeColumn", 60.015625),
                 Map.entry("methodColumn", 70.0),
                 Map.entry("urlColumn", 1353.0),
                 Map.entry("statusColumn", 70.0),
                 Map.entry("durationColumn", 90.0)
         ));
-        tabApiHistory.historyTableColumnOrder = new ArrayList<>(List.of("timeColumn", "methodColumn", "urlColumn", "statusColumn", "durationColumn"));
+        backfillList(tabApiHistory.historyTableColumnOrder, List.of("timeColumn", "methodColumn", "urlColumn", "statusColumn", "durationColumn"));
+    }
+
+    private static void backfillMap(Map<String, Double> target, Map<String, Double> defaults) {
+        defaults.forEach(target::putIfAbsent);
+    }
+
+    private static <T> void backfillList(List<T> target, List<T> defaults) {
+        if (target.isEmpty()) {
+            target.addAll(defaults);
+        }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -336,7 +351,11 @@ public class LocalPreferences {
             }
 
             // Fallback to legacy plaintext Preferences (for migration)
-            return CREDENTIAL_PREFERENCES.get(REFRESH_TOKEN_KEY, null);
+            String legacyPlaintextToken = CREDENTIAL_PREFERENCES.get(REFRESH_TOKEN_KEY, null);
+            if (legacyPlaintextToken != null) {
+                setRefreshToken(legacyPlaintextToken);
+            }
+            return legacyPlaintextToken;
         }
 
         public void setRefreshToken(String refreshToken) {
@@ -382,7 +401,11 @@ public class LocalPreferences {
                 }
             }
 
-            return CREDENTIAL_PREFERENCES.get(LOBBY_REFRESH_TOKEN_KEY, null);
+            String legacyPlaintextToken = CREDENTIAL_PREFERENCES.get(LOBBY_REFRESH_TOKEN_KEY, null);
+            if (legacyPlaintextToken != null) {
+                setLobbyRefreshToken(legacyPlaintextToken);
+            }
+            return legacyPlaintextToken;
         }
 
         public void setLobbyRefreshToken(String refreshToken) {
