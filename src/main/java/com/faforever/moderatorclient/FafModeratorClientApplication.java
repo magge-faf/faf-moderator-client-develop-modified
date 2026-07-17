@@ -7,8 +7,6 @@ import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.config.local.LocalPreferencesReaderWriter;
 import com.faforever.moderatorclient.logging.LogMaintenanceService;
 import com.faforever.moderatorclient.ui.MainController;
-import com.faforever.moderatorclient.ui.PlatformService;
-import com.faforever.moderatorclient.ui.PlatformServiceImpl;
 import com.faforever.moderatorclient.ui.StageHolder;
 import com.faforever.moderatorclient.ui.UiService;
 import com.faforever.moderatorclient.ui.main_window.UserManagementController;
@@ -27,7 +25,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import java.io.ByteArrayInputStream;
@@ -45,11 +42,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 @ComponentScan
 @Slf4j
 public class FafModeratorClientApplication extends Application {
-
-    @Bean
-    public PlatformService platformService() {
-        return new PlatformServiceImpl(getHostServices());
-    }
 
     private ConfigurableApplicationContext applicationContext;
     @Autowired
