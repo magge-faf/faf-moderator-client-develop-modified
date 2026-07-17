@@ -64,8 +64,10 @@
 
                 <Separator minHeight="5"/>
 
-                <Button fx:id="createReportForumButton" mnemonicParsing="false" minWidth="150" onAction="#onCreateReportForumButton"
-                        text="Search Forum"/>
+                <Button fx:id="createReportForumReporterButton" mnemonicParsing="false" minWidth="150" onAction="#onCreateReportForumReporterButton"
+                        text="Search Forum Reporter"/>
+                <Button fx:id="createReportForumOffenderButton" mnemonicParsing="false" minWidth="150" onAction="#onCreateReportForumOffenderButton"
+                        text="Search Forum Offender"/>
             </VBox>
         </ScrollPane>
         <TableView fx:id="reportTableView" maxHeight="Infinity" maxWidth="Infinity" HBox.hgrow="ALWAYS"/>

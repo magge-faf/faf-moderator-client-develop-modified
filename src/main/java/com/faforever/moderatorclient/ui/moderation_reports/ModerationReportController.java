@@ -37,6 +37,7 @@ import com.google.common.base.Strings;
 import javafx.application.Platform;
 import javafx.beans.property.LongProperty;
 import javafx.beans.property.SimpleLongProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.transformation.FilteredList;
@@ -103,6 +104,8 @@ import static java.text.MessageFormat.format;
 @Slf4j
 @RequiredArgsConstructor
 public class ModerationReportController implements Controller<Region> {
+    static final String WARNING_TEMPLATE_NAME = "Warning";
+    static final String WARNING_TEMPLATE_FORMAT = "{reportIds}\n\nWarning - ReplayID {gameIds} - {reason}";
     private static final String CHEATS_ENABLED_KEY = "CheatsEnabled";
     private static final String VICTORY_KEY = "Victory";
     private static final String SHARE_KEY = "Share";
@@ -121,6 +124,7 @@ public class ModerationReportController implements Controller<Region> {
     private final UiService uiService;
     private final FafApiCommunicationService fafApiCommunicationService;
     private final PlatformService platformService;
+    private final ObservableList<PlayerFX> accountPlayersOfCurrentlySelectedReport = FXCollections.observableArrayList();
     private final ObservableList<PlayerFX> reportedPlayersOfCurrentlySelectedReport = FXCollections.observableArrayList();
     private final HttpClient httpClient = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.ALWAYS)
@@ -128,7 +132,8 @@ public class ModerationReportController implements Controller<Region> {
     private final BanService banService;
     private final UserService userService;
     private final ReplayStorageService replayStorageService;
-    public Button createReportForumButton;
+    public Button createReportForumReporterButton;
+    public Button createReportForumOffenderButton;
     public TableColumn lastActivity;
     @FXML
     public Button copyModeratorEventsButton;
@@ -439,15 +444,7 @@ public class ModerationReportController implements Controller<Region> {
                 });
 
                 warningOkButton.setOnAction(event -> {
-                    TemplateAndReasonConfig warningTemplate = templates.stream()
-                            .filter(template -> "Warning".equalsIgnoreCase(template.getName()))
-                            .findFirst()
-                            .orElse(null);
-                    if (warningTemplate == null) {
-                        log.warn("Warning template not found in templatesAndReasons.json");
-                        return;
-                    }
-
+                    TemplateAndReasonConfig warningTemplate = findWarningTemplate(templates);
                     copyTemplateToClipboard(warningTemplate, reasonCheckBoxes, selectedIds, selectedGameIds);
                     closeTemplateStageAfterCopy(templateStage);
                 });
@@ -525,6 +522,22 @@ public class ModerationReportController implements Controller<Region> {
             log.warn("Failed to load templates and reasons config", e);
         }
         return null;
+    }
+
+    static TemplateAndReasonConfig findWarningTemplate(List<TemplateAndReasonConfig> templates) {
+        if (templates != null) {
+            Optional<TemplateAndReasonConfig> warningTemplate = templates.stream()
+                    .filter(template -> WARNING_TEMPLATE_NAME.equalsIgnoreCase(template.getName()))
+                    .findFirst();
+            if (warningTemplate.isPresent()) {
+                return warningTemplate.get();
+            }
+        }
+
+        TemplateAndReasonConfig warningTemplate = new TemplateAndReasonConfig();
+        warningTemplate.setName(WARNING_TEMPLATE_NAME);
+        warningTemplate.setFormat(WARNING_TEMPLATE_FORMAT);
+        return warningTemplate;
     }
 
     private void showInTableRepeatedOffenders(List<ModerationReportFX> reps) {
@@ -949,16 +962,26 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private void resetButtonsToInvalidState() {
+        resetGameButtonsToInvalidState();
+        copyReporterIdButton.setText(formatPlayerRoleButtonText("Reporter", "Reporter n/a"));
+        copyReporterIdButton.setId("");
+        copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", "Reported User n/a"));
+        copyReportedUserIdButton.setId("");
+        createReportForumReporterButton.setId("");
+        createReportForumReporterButton.setText("Search Forum Reporter:\nn/a");
+        createReportForumOffenderButton.setId("");
+        createReportForumOffenderButton.setText("Search Forum Offender:\nn/a");
+        accountPlayersOfCurrentlySelectedReport.clear();
+        reportedPlayersOfCurrentlySelectedReport.clear();
+    }
+
+    private void resetGameButtonsToInvalidState() {
         copyChatLogButton.setText("Chat Log n/a");
         copyChatLogButton.setId("");
         copyChatLogButtonOffenderOnly.setText("Chat Offender n/a");
         copyChatLogButtonOffenderOnly.setId("");
         copyModeratorEventsButton.setText("Moderator Events n/a");
         copyModeratorEventsButton.setId("");
-        copyReporterIdButton.setText(formatPlayerRoleButtonText("Reporter", "Reporter n/a"));
-        copyReporterIdButton.setId("");
-        copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", "Reported User n/a"));
-        copyReportedUserIdButton.setId("");
         copyGameIdButton.setText("Game ID n/a");
         copyGameIdButton.setId("");
         startReplayButton.setText("Replay n/a");
@@ -971,12 +994,39 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private void initializeUserTableView() {
-        ViewHelper.buildUserTableView(platformService, reportedPlayerTableView, reportedPlayersOfCurrentlySelectedReport, this::addBan,
+        ViewHelper.buildUserTableView(platformService, reportedPlayerTableView, accountPlayersOfCurrentlySelectedReport, null,
                 playerFX -> ViewHelper.loadForceRenameDialog(uiService, playerFX), false, fafApiCommunicationService, userService, uiService, null);
+        TableColumn<PlayerFX, String> roleColumn = new TableColumn<>("Role");
+        roleColumn.setId("Role");
+        roleColumn.setCellValueFactory(param -> new SimpleStringProperty(getReportAccountRole(param.getValue())));
+        roleColumn.setPrefWidth(90);
+        reportedPlayerTableView.getColumns().addFirst(roleColumn);
+        reportedPlayerTableView.getColumns().add(createReportAccountBanColumn());
         Platform.runLater(() -> {
             loadColumnLayout(reportTableView, localPreferences);
             loadSplitPanePositions(root, localPreferences);
         });
+    }
+
+    private TableColumn<PlayerFX, PlayerFX> createReportAccountBanColumn() {
+        TableColumn<PlayerFX, PlayerFX> banColumn = new TableColumn<>("Ban");
+        banColumn.setId("Ban");
+        banColumn.setCellValueFactory(param -> new SimpleObjectProperty<>(param.getValue()));
+        banColumn.setCellFactory(param -> new TableCell<>() {
+            @Override
+            protected void updateItem(PlayerFX item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setGraphic(null);
+                    return;
+                }
+
+                Button button = new Button("Add ban");
+                button.setOnAction(event -> addBan(item));
+                setGraphic(button);
+            }
+        });
+        return banColumn;
     }
 
     public void onSave() {
@@ -1081,6 +1131,7 @@ public class ModerationReportController implements Controller<Region> {
                 ? Collections.emptySet()
                 : newValue.getReportedUsers();
         reportedPlayersOfCurrentlySelectedReport.setAll(reportedUsers);
+        accountPlayersOfCurrentlySelectedReport.setAll(getReportAccountRows(newValue));
         currentlySelectedItemNotNull = newValue;
 
         copyReportIdButton.setText("Report ID: " + newValue.getId());
@@ -1091,19 +1142,21 @@ public class ModerationReportController implements Controller<Region> {
                 : newValue.getReporter().getRepresentation();
         copyReporterIdButton.setText(formatPlayerRoleButtonText("Reporter", reporterRepresentation));
         copyReporterIdButton.setId(newValue.getReporter() == null ? "" : reporterRepresentation);
+        createReportForumReporterButton.setId(newValue.getReporter() == null ? "" : newValue.getReporter().getId());
+        createReportForumReporterButton.setText("Search Forum Reporter:\n" + reporterRepresentation);
 
         // Since ~2023, reports have only one offender; legacy reports may have several.
         for (PlayerFX offender : reportedPlayersOfCurrentlySelectedReport) {
             copyReportedUserIdButton.setId(offender.getRepresentation());
             copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", offender.getRepresentation()));
-            createReportForumButton.setId(offender.getId());
-            createReportForumButton.setText("Search Forum:\n" + offender.getRepresentation());
+            createReportForumOffenderButton.setId(offender.getId());
+            createReportForumOffenderButton.setText("Search Forum Offender:\n" + offender.getRepresentation());
         }
         if (reportedPlayersOfCurrentlySelectedReport.isEmpty()) {
             copyReportedUserIdButton.setId("");
             copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", "Reported User n/a"));
-            createReportForumButton.setId("");
-            createReportForumButton.setText("Search Forum:\nn/a");
+            createReportForumOffenderButton.setId("");
+            createReportForumOffenderButton.setText("Search Forum Offender:\nn/a");
         }
 
         if (newValue.getGame() != null) {
@@ -1117,8 +1170,32 @@ public class ModerationReportController implements Controller<Region> {
                 showChatLog(currentlySelectedItemNotNull);
             }
         } else {
-            resetButtonsToInvalidState();
+            resetGameButtonsToInvalidState();
         }
+    }
+
+    private static List<PlayerFX> getReportAccountRows(ModerationReportFX report) {
+        List<PlayerFX> accountRows = new ArrayList<>();
+        if (report.getReporter() != null) {
+            accountRows.add(report.getReporter());
+        }
+        if (report.getReportedUsers() != null) {
+            accountRows.addAll(report.getReportedUsers());
+        }
+        return accountRows;
+    }
+
+    private String getReportAccountRole(PlayerFX player) {
+        if (player == null || currentlySelectedItemNotNull == null) {
+            return "";
+        }
+
+        PlayerFX reporter = currentlySelectedItemNotNull.getReporter();
+        if (reporter != null && Objects.equals(reporter.getId(), player.getId())) {
+            return "Reporter";
+        }
+
+        return "Offender";
     }
 
     public void loadCheckboxStates() {
@@ -2356,9 +2433,20 @@ public class ModerationReportController implements Controller<Region> {
         return filteredChatLog.toString();
     }
 
-    public void onCreateReportForumButton() throws IOException {
-        String reportedUserId = createReportForumButton.getId();
-        String url = "https://forum.faforever.com/search?term=" + reportedUserId +
+    public void onCreateReportForumReporterButton() throws IOException {
+        openForumSearch(createReportForumReporterButton.getId());
+    }
+
+    public void onCreateReportForumOffenderButton() throws IOException {
+        openForumSearch(createReportForumOffenderButton.getId());
+    }
+
+    private void openForumSearch(String userId) throws IOException {
+        if (userId == null || userId.isBlank()) {
+            return;
+        }
+
+        String url = "https://forum.faforever.com/search?term=" + userId +
                 "&in=titlesposts&matchWords=all&sortBy=relevance&sortDirection=desc&showAs=posts";
 
         String browser = String.valueOf(localPreferences.getUi().getBrowserComboBox());

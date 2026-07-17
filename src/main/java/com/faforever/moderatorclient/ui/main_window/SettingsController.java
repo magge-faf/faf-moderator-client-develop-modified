@@ -253,6 +253,10 @@ public class SettingsController implements Controller<Pane> {
                 {
                   "name": "Another Ban Template",
                   "format": "{reportIds}\\n\\nDAY_NUMBER Day Ban - ReplayID {gameIds} - {reason}"
+                },
+                {
+                  "name": "Warning",
+                  "format": "{reportIds}\\n\\nWarning - ReplayID {gameIds} - {reason}"
                 }
               ],
               "reasons": [
