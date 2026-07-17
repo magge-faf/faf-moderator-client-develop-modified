@@ -7,6 +7,7 @@ import com.faforever.moderatorclient.replay.ReplayStorageService;
 import com.faforever.moderatorclient.update.ApplicationUpdateService;
 import com.faforever.moderatorclient.ui.Controller;
 import com.faforever.moderatorclient.ui.MainController;
+import com.faforever.moderatorclient.ui.ViewHelper;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
@@ -22,6 +23,7 @@ import javafx.util.StringConverter;
 import java.io.*;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Locale;
@@ -463,20 +465,25 @@ public class SettingsController implements Controller<Pane> {
     }
 
     public void onPurgeUpdaterDataFolder() {
-        try {
-            ApplicationUpdateService.UpdaterFolderCleanupResult result = applicationUpdateService.purgeUpdaterFolder();
-            updaterDataFolderStatusLabel.setText(String.format(
-                    Locale.ROOT,
-                    "Purged updater folder: removed %.2f MB across %d files from %s",
-                    bytesToMegabytes(result.deletedBytes()),
-                    result.deletedFileCount(),
-                    result.directory()
-            ));
-            refreshUpdaterFolderInfo();
-        } catch (IOException e) {
-            updaterDataFolderStatusLabel.setText("Failed to purge updater folder: " + e.getMessage());
-            log.error("Failed to purge updater folder", e);
-        }
+        runInBackground(() -> {
+            try {
+                ApplicationUpdateService.UpdaterFolderCleanupResult result = applicationUpdateService.purgeUpdaterFolder();
+                String statusText = String.format(
+                        Locale.ROOT,
+                        "Purged updater folder: removed %.2f MB across %d files from %s",
+                        bytesToMegabytes(result.deletedBytes()),
+                        result.deletedFileCount(),
+                        result.directory()
+                );
+                Platform.runLater(() -> {
+                    updaterDataFolderStatusLabel.setText(statusText);
+                    refreshUpdaterFolderInfo();
+                });
+            } catch (IOException e) {
+                log.error("Failed to purge updater folder", e);
+                Platform.runLater(() -> updaterDataFolderStatusLabel.setText("Failed to purge updater folder: " + e.getMessage()));
+            }
+        });
     }
 
     public void onDebugUpdateWindow() {
@@ -514,19 +521,32 @@ public class SettingsController implements Controller<Pane> {
     }
 
     public void onPurgeOldReplayFiles() {
-        try {
-            ReplayStorageService.ReplayCleanupResult result = replayStorageService.purgeAllReplayFiles();
-            replayFolderStatusLabel.setText(String.format(
-                    Locale.ROOT,
-                    "Purged %d replay files and freed %.2f MB.",
-                    result.deletedFileCount(),
-                    bytesToMegabytes(result.deletedBytes())
-            ));
-            refreshReplayFolderInfo();
-        } catch (IOException e) {
-            replayFolderStatusLabel.setText("Failed to purge replay files: " + e.getMessage());
-            log.error("Failed to purge replay folder", e);
+        boolean confirmed = ViewHelper.confirmDialog(
+                "Purge all replay files",
+                "This will permanently delete all stored replay downloads and temp replay files. Continue?"
+        );
+        if (!confirmed) {
+            return;
         }
+
+        runInBackground(() -> {
+            try {
+                ReplayStorageService.ReplayCleanupResult result = replayStorageService.purgeAllReplayFiles();
+                String statusText = String.format(
+                        Locale.ROOT,
+                        "Purged %d replay files and freed %.2f MB.",
+                        result.deletedFileCount(),
+                        bytesToMegabytes(result.deletedBytes())
+                );
+                Platform.runLater(() -> {
+                    replayFolderStatusLabel.setText(statusText);
+                    refreshReplayFolderInfo();
+                });
+            } catch (IOException e) {
+                log.error("Failed to purge replay folder", e);
+                Platform.runLater(() -> replayFolderStatusLabel.setText("Failed to purge replay files: " + e.getMessage()));
+            }
+        });
     }
 
     private static void openPath(File path) throws IOException {
@@ -605,52 +625,80 @@ public class SettingsController implements Controller<Pane> {
         if (backupFolder.isBlank() || backupFolder.equals(defaultUpdateBackupFolder)) {
             localPreferences.getTabSettings().setUpdateBackupFolder("");
         } else {
-            localPreferences.getTabSettings().setUpdateBackupFolder(Path.of(backupFolder).toAbsolutePath().normalize().toString());
+            Path normalizedBackupFolder;
+            try {
+                normalizedBackupFolder = Path.of(backupFolder).toAbsolutePath().normalize();
+            } catch (InvalidPathException e) {
+                updateBackupFolderStatusLabel.setText("Invalid backup folder path: " + e.getMessage());
+                log.warn("Ignoring invalid backup folder path: {}", backupFolder, e);
+                return;
+            }
+            localPreferences.getTabSettings().setUpdateBackupFolder(normalizedBackupFolder.toString());
         }
         if (refreshInfo) {
             refreshUpdateBackupFolderInfo();
         }
     }
 
+    private void runInBackground(Runnable task) {
+        Thread thread = new Thread(task, "settings-background-task");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
     private void refreshUpdateBackupFolderInfo() {
-        try {
-            persistBackupFolderPreference(false);
-            ApplicationUpdateService.BackupFolderStats stats = applicationUpdateService.describeBackupFolder();
-            updateBackupFolderInfoLabel.setText(String.format(
-                    Locale.ROOT,
-                    "Stored backups: %.2f MB across %d files in %s",
-                    bytesToMegabytes(stats.totalBytes()),
-                    stats.fileCount(),
-                    stats.directory()
-            ));
-            if (updateBackupFolderStatusLabel.getText() == null) {
-                updateBackupFolderStatusLabel.setText("");
+        persistBackupFolderPreference(false);
+        runInBackground(() -> {
+            try {
+                ApplicationUpdateService.BackupFolderStats stats = applicationUpdateService.describeBackupFolder();
+                String infoText = String.format(
+                        Locale.ROOT,
+                        "Stored backups: %.2f MB across %d files in %s",
+                        bytesToMegabytes(stats.totalBytes()),
+                        stats.fileCount(),
+                        stats.directory()
+                );
+                Platform.runLater(() -> {
+                    updateBackupFolderInfoLabel.setText(infoText);
+                    if (updateBackupFolderStatusLabel.getText() == null) {
+                        updateBackupFolderStatusLabel.setText("");
+                    }
+                });
+            } catch (Exception e) {
+                log.error("Failed to refresh update backup folder info", e);
+                Platform.runLater(() -> {
+                    updateBackupFolderInfoLabel.setText("Stored backups: unavailable");
+                    updateBackupFolderStatusLabel.setText("Unable to inspect backup folder: " + e.getMessage());
+                });
             }
-        } catch (Exception e) {
-            updateBackupFolderInfoLabel.setText("Stored backups: unavailable");
-            updateBackupFolderStatusLabel.setText("Unable to inspect backup folder: " + e.getMessage());
-            log.error("Failed to refresh update backup folder info", e);
-        }
+        });
     }
 
     private void refreshUpdaterFolderInfo() {
-        try {
-            ApplicationUpdateService.UpdaterFolderStats stats = applicationUpdateService.describeUpdaterFolder();
-            updaterDataFolderInfoLabel.setText(String.format(
-                    Locale.ROOT,
-                    "Updater sessions, downloaded release archives, installer scripts, and apply-update.log files are stored in %s. Stored updater data: %.2f MB across %d files.",
-                    stats.directory(),
-                    bytesToMegabytes(stats.totalBytes()),
-                    stats.fileCount()
-            ));
-            if (updaterDataFolderStatusLabel.getText() == null) {
-                updaterDataFolderStatusLabel.setText("");
+        runInBackground(() -> {
+            try {
+                ApplicationUpdateService.UpdaterFolderStats stats = applicationUpdateService.describeUpdaterFolder();
+                String infoText = String.format(
+                        Locale.ROOT,
+                        "Updater sessions, downloaded release archives, installer scripts, and apply-update.log files are stored in %s. Stored updater data: %.2f MB across %d files.",
+                        stats.directory(),
+                        bytesToMegabytes(stats.totalBytes()),
+                        stats.fileCount()
+                );
+                Platform.runLater(() -> {
+                    updaterDataFolderInfoLabel.setText(infoText);
+                    if (updaterDataFolderStatusLabel.getText() == null) {
+                        updaterDataFolderStatusLabel.setText("");
+                    }
+                });
+            } catch (IOException e) {
+                log.error("Failed to refresh updater folder info", e);
+                Platform.runLater(() -> {
+                    updaterDataFolderInfoLabel.setText("Updater folder: unavailable");
+                    updaterDataFolderStatusLabel.setText("Unable to inspect updater folder: " + e.getMessage());
+                });
             }
-        } catch (IOException e) {
-            updaterDataFolderInfoLabel.setText("Updater folder: unavailable");
-            updaterDataFolderStatusLabel.setText("Unable to inspect updater folder: " + e.getMessage());
-            log.error("Failed to refresh updater folder info", e);
-        }
+        });
     }
 
     private double bytesToMegabytes(long bytes) {
@@ -658,22 +706,29 @@ public class SettingsController implements Controller<Pane> {
     }
 
     private void refreshReplayFolderInfo() {
-        try {
-            ReplayStorageService.ReplayFolderStats stats = replayStorageService.describeReplayFolder();
-            replayFolderInfoLabel.setText(String.format(
-                    Locale.ROOT,
-                    "Replay folder: %s. Stored replays: %.2f MB across %d files.",
-                    stats.directory(),
-                    bytesToMegabytes(stats.totalBytes()),
-                    stats.fileCount()
-            ));
-            if (replayFolderStatusLabel.getText() == null) {
-                replayFolderStatusLabel.setText("");
+        runInBackground(() -> {
+            try {
+                ReplayStorageService.ReplayFolderStats stats = replayStorageService.describeReplayFolder();
+                String infoText = String.format(
+                        Locale.ROOT,
+                        "Replay folder: %s. Stored replays: %.2f MB across %d files.",
+                        stats.directory(),
+                        bytesToMegabytes(stats.totalBytes()),
+                        stats.fileCount()
+                );
+                Platform.runLater(() -> {
+                    replayFolderInfoLabel.setText(infoText);
+                    if (replayFolderStatusLabel.getText() == null) {
+                        replayFolderStatusLabel.setText("");
+                    }
+                });
+            } catch (IOException e) {
+                log.error("Failed to refresh replay folder info", e);
+                Platform.runLater(() -> {
+                    replayFolderInfoLabel.setText("Replay folder: unavailable");
+                    replayFolderStatusLabel.setText("Unable to inspect replay folder: " + e.getMessage());
+                });
             }
-        } catch (IOException e) {
-            replayFolderInfoLabel.setText("Replay folder: unavailable");
-            replayFolderStatusLabel.setText("Unable to inspect replay folder: " + e.getMessage());
-            log.error("Failed to refresh replay folder info", e);
-        }
+        });
     }
 }
