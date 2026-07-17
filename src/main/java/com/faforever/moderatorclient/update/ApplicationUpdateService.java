@@ -11,6 +11,7 @@ import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -43,6 +44,8 @@ public class ApplicationUpdateService {
             URI.create("https://api.github.com/repos/magge-faf/faf-moderator-client-develop-modified/releases/latest");
     private static final DateTimeFormatter BACKUP_TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
     private static final int CONFIGURATION_BACKUP_SLOT_COUNT = 10;
+    private static final int DOWNLOAD_BUFFER_SIZE = 64 * 1024;
+    private static final long DOWNLOAD_PROGRESS_INTERVAL_NANOS = Duration.ofMillis(750).toNanos();
 
     private final ObjectMapper objectMapper;
     private final LocalPreferences localPreferences;
@@ -261,7 +264,7 @@ public class ApplicationUpdateService {
         Path stagedInstall = sessionDir.resolve("staged");
 
         reportStatus(statusCallback, "Downloading " + asset.name() + "...");
-        downloadAsset(asset.browserDownloadUrl(), downloadedZip);
+        downloadAsset(asset.browserDownloadUrl(), downloadedZip, statusCallback);
 
         reportStatus(statusCallback, "Extracting release files...");
         extractZip(downloadedZip, stagedInstall);
@@ -273,7 +276,7 @@ public class ApplicationUpdateService {
         zipDirectory(installLocation.installRoot(), backupArchive);
         reportStatus(statusCallback, "Backup saved to " + backupArchive);
 
-        reportStatus(statusCallback, "Ready to restart the FAF Moderator Client and apply the update. Your PC will not restart.");
+        reportStatus(statusCallback, "Ready to apply the update to the FAF Moderator Client. Your PC will not restart.");
         if (restartConfirmation != null && !restartConfirmation.getAsBoolean()) {
             reportStatus(statusCallback, "Update prepared. Client restart canceled by user.");
             return false;
@@ -287,7 +290,7 @@ public class ApplicationUpdateService {
                 ApplicationPaths.resolveWorkingDirectory(),
                 ApplicationPaths.resolveConfigurationDirectory()
         );
-        reportStatus(statusCallback, "Installer helper launched. The client will close and restart after files are replaced. Your PC will not restart.");
+        reportStatus(statusCallback, "Installer helper launched. The FAF Moderator Client will close and open again after files are replaced. Your PC will not restart.");
         log.info("Prepared update {}. Backup saved to {}", release.tagName(), backupArchive);
         return true;
     }
@@ -305,7 +308,8 @@ public class ApplicationUpdateService {
         return normalized.isBlank() ? "0" : normalized;
     }
 
-    private void downloadAsset(String downloadUrl, Path target) throws IOException, InterruptedException {
+    private void downloadAsset(String downloadUrl, Path target, Consumer<String> statusCallback)
+            throws IOException, InterruptedException {
         Files.createDirectories(target.getParent());
 
         HttpRequest request = HttpRequest.newBuilder(URI.create(downloadUrl))
@@ -313,10 +317,69 @@ public class ApplicationUpdateService {
                 .GET()
                 .build();
 
-        HttpResponse<Path> response = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(target));
+        HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             throw new IOException("Release asset download failed with HTTP " + response.statusCode());
         }
+
+        long totalBytes = response.headers().firstValueAsLong("Content-Length").orElse(-1L);
+        long downloadedBytes = 0L;
+        long startedAt = System.nanoTime();
+        long lastReportedAt = startedAt;
+        byte[] buffer = new byte[DOWNLOAD_BUFFER_SIZE];
+
+        try (InputStream inputStream = response.body();
+             var outputStream = Files.newOutputStream(target)) {
+            int read;
+            while ((read = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, read);
+                downloadedBytes += read;
+
+                long now = System.nanoTime();
+                if (now - lastReportedAt >= DOWNLOAD_PROGRESS_INTERVAL_NANOS) {
+                    reportStatus(statusCallback, formatDownloadProgress(downloadedBytes, totalBytes, startedAt, now));
+                    lastReportedAt = now;
+                }
+            }
+        } catch (IOException e) {
+            Files.deleteIfExists(target);
+            throw e;
+        }
+
+        long finishedAt = System.nanoTime();
+        reportStatus(statusCallback, "Download complete: " + formatBytes(downloadedBytes)
+                + " at " + formatBytesPerSecond(downloadedBytes, startedAt, finishedAt));
+    }
+
+    static String formatDownloadProgress(long downloadedBytes, long totalBytes, long startedAtNanos, long nowNanos) {
+        String speed = formatBytesPerSecond(downloadedBytes, startedAtNanos, nowNanos);
+        if (totalBytes > 0) {
+            double percent = downloadedBytes * 100d / totalBytes;
+            return String.format(
+                    Locale.ROOT,
+                    "Downloading: %.0f%% (%s / %s, %s)",
+                    Math.min(100d, percent),
+                    formatBytes(downloadedBytes),
+                    formatBytes(totalBytes),
+                    speed
+            );
+        }
+
+        return "Downloading: " + formatBytes(downloadedBytes) + " (" + speed + ")";
+    }
+
+    private static String formatBytesPerSecond(long downloadedBytes, long startedAtNanos, long nowNanos) {
+        long elapsedNanos = Math.max(1L, nowNanos - startedAtNanos);
+        double bytesPerSecond = downloadedBytes / (elapsedNanos / 1_000_000_000d);
+        return formatBytes(bytesPerSecond) + "/s";
+    }
+
+    private static String formatBytes(double bytes) {
+        double megabytes = bytes / (1024d * 1024d);
+        if (megabytes >= 1d) {
+            return String.format(Locale.ROOT, "%.1f MB", megabytes);
+        }
+        return String.format(Locale.ROOT, "%.0f KB", bytes / 1024d);
     }
 
     private void extractZip(Path zipFile, Path targetDirectory) throws IOException {
@@ -619,7 +682,7 @@ public class ApplicationUpdateService {
 
         return Optional.of("The Java runtime used to start this client could not be found at "
                 + javaExecutable + ".\n\n"
-                + "Restart the client from a valid Java runtime and try the automatic update again. "
+                + "Start the FAF Moderator Client from a valid Java runtime and try the automatic update again. "
                 + "You can still use Manual Download.");
     }
 

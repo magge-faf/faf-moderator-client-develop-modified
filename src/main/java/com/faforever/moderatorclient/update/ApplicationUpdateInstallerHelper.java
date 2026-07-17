@@ -41,16 +41,10 @@ public final class ApplicationUpdateInstallerHelper {
             snapshotExistingConfig(snapshotDir, configSourceDirs(installDir, workingDir, currentConfigDir), legacyPrefsFiles(installDir, workingDir), logPath);
 
             log(logPath, "Applying update from '" + stageDir + "' to '" + installDir + "'.");
-            deleteIfExists(installDir.resolve("bin"), logPath);
-            deleteIfExists(installDir.resolve("lib"), logPath);
-            copyDirectoryContents(stageDir, installDir, logPath);
+            replaceInstallDirectories(installDir, stageDir, sessionDir.resolve("previous-install"), logPath);
 
-            if (!Files.isDirectory(installDir.resolve("bin")) || !Files.isDirectory(installDir.resolve("lib"))) {
-                throw new IOException("Updated install is missing bin or lib after copy.");
-            }
-
-            restoreExistingConfig(snapshotDir, configTargetDirs(installDir, workingDir, currentConfigDir), legacyPrefsFiles(installDir, workingDir), logPath);
-            startUpdatedClient(launcherPath, workingDir, logPath);
+            restoreExistingConfig(snapshotDir, configTargetDirs(installDir, workingDir, currentConfigDir), logPath);
+            startUpdatedClient(launcherPath, installDir, logPath);
             log(logPath, "Update finished.");
         } catch (Exception e) {
             log(logPath, "Update failed: " + e.getMessage());
@@ -63,15 +57,18 @@ public final class ApplicationUpdateInstallerHelper {
                 currentConfigDir,
                 workingDir.resolve(ApplicationPaths.CONFIGURATION_DIRECTORY_NAME),
                 installDir.resolve(ApplicationPaths.CONFIGURATION_DIRECTORY_NAME),
+                workingDir.resolve("bin").resolve(ApplicationPaths.CONFIGURATION_DIRECTORY_NAME),
+                installDir.resolve("bin").resolve(ApplicationPaths.CONFIGURATION_DIRECTORY_NAME),
                 workingDir.resolve(ApplicationPaths.LEGACY_CONFIGURATION_DIRECTORY_NAME),
-                installDir.resolve(ApplicationPaths.LEGACY_CONFIGURATION_DIRECTORY_NAME)
+                installDir.resolve(ApplicationPaths.LEGACY_CONFIGURATION_DIRECTORY_NAME),
+                workingDir.resolve("bin").resolve(ApplicationPaths.LEGACY_CONFIGURATION_DIRECTORY_NAME),
+                installDir.resolve("bin").resolve(ApplicationPaths.LEGACY_CONFIGURATION_DIRECTORY_NAME)
         ));
     }
 
     static List<Path> configTargetDirs(Path installDir, Path workingDir, Path currentConfigDir) {
         return List.copyOf(uniquePaths(
                 currentConfigDir,
-                workingDir.resolve(ApplicationPaths.CONFIGURATION_DIRECTORY_NAME),
                 installDir.resolve(ApplicationPaths.CONFIGURATION_DIRECTORY_NAME)
         ));
     }
@@ -79,7 +76,9 @@ public final class ApplicationUpdateInstallerHelper {
     static List<Path> legacyPrefsFiles(Path installDir, Path workingDir) {
         return List.copyOf(uniquePaths(
                 workingDir.resolve(ApplicationPaths.PREFERENCES_FILE_NAME),
-                installDir.resolve(ApplicationPaths.PREFERENCES_FILE_NAME)
+                installDir.resolve(ApplicationPaths.PREFERENCES_FILE_NAME),
+                workingDir.resolve("bin").resolve(ApplicationPaths.PREFERENCES_FILE_NAME),
+                installDir.resolve("bin").resolve(ApplicationPaths.PREFERENCES_FILE_NAME)
         ));
     }
 
@@ -94,31 +93,46 @@ public final class ApplicationUpdateInstallerHelper {
     }
 
     private static void snapshotExistingConfig(Path snapshotDir, List<Path> sourceDirs, List<Path> legacyPrefsFiles, Path logPath) throws IOException {
-        for (Path sourceDir : sourceDirs) {
+        boolean foundConfig = false;
+        for (int index = sourceDirs.size() - 1; index >= 0; index--) {
+            Path sourceDir = sourceDirs.get(index);
             if (Files.isDirectory(sourceDir)) {
-                log(logPath, "Snapshotting existing config from '" + sourceDir + "' to '" + snapshotDir + "'.");
-                deleteIfExists(snapshotDir, logPath);
+                log(logPath, "Merging existing config from '" + sourceDir + "' into '" + snapshotDir + "'.");
                 Files.createDirectories(snapshotDir);
                 copyDirectoryContents(sourceDir, snapshotDir, logPath);
-                break;
+                foundConfig = true;
             }
         }
 
-        for (Path prefsFile : legacyPrefsFiles) {
-            if (Files.isRegularFile(prefsFile)) {
+        Path snapshotPreferences = snapshotDir.resolve(ApplicationPaths.PREFERENCES_FILE_NAME);
+        if (Files.notExists(snapshotPreferences)) {
+            Path prefsFile = newestRegularFile(legacyPrefsFiles);
+            if (prefsFile != null) {
                 log(logPath, "Snapshotting legacy preferences file '" + prefsFile + "'.");
                 Files.createDirectories(snapshotDir);
-                Files.copy(prefsFile, snapshotDir.resolve(ApplicationPaths.PREFERENCES_FILE_NAME), StandardCopyOption.REPLACE_EXISTING);
-                break;
+                Files.copy(prefsFile, snapshotPreferences, StandardCopyOption.REPLACE_EXISTING);
             }
         }
 
-        if (Files.notExists(snapshotDir)) {
+        if (!foundConfig && Files.notExists(snapshotDir)) {
             log(logPath, "No existing config folder or legacy preferences file found to restore.");
         }
     }
 
-    private static void restoreExistingConfig(Path snapshotDir, List<Path> targetDirs, List<Path> legacyPrefsFiles, Path logPath) throws IOException {
+    private static Path newestRegularFile(List<Path> files) throws IOException {
+        Path newest = null;
+        for (Path file : files) {
+            if (!Files.isRegularFile(file)) {
+                continue;
+            }
+            if (newest == null || Files.getLastModifiedTime(file).compareTo(Files.getLastModifiedTime(newest)) > 0) {
+                newest = file;
+            }
+        }
+        return newest;
+    }
+
+    private static void restoreExistingConfig(Path snapshotDir, List<Path> targetDirs, Path logPath) throws IOException {
         if (Files.notExists(snapshotDir)) {
             return;
         }
@@ -128,12 +142,72 @@ public final class ApplicationUpdateInstallerHelper {
             Files.createDirectories(targetDir);
             copyDirectoryContents(snapshotDir, targetDir, logPath);
         }
+    }
 
-        Path snapshotPrefsFile = snapshotDir.resolve(ApplicationPaths.PREFERENCES_FILE_NAME);
-        if (Files.isRegularFile(snapshotPrefsFile)) {
-            for (Path prefsTarget : legacyPrefsFiles) {
-                log(logPath, "Restoring legacy preferences file to '" + prefsTarget + "'.");
-                Files.copy(snapshotPrefsFile, prefsTarget, StandardCopyOption.REPLACE_EXISTING);
+    private static void replaceInstallDirectories(Path installDir, Path stageDir, Path previousInstallDir, Path logPath) throws IOException {
+        Path installBin = installDir.resolve("bin");
+        Path installLib = installDir.resolve("lib");
+        Path stagedBin = stageDir.resolve("bin");
+        Path stagedLib = stageDir.resolve("lib");
+        if (!Files.isDirectory(stagedBin) || !Files.isDirectory(stagedLib)) {
+            throw new IOException("Staged update is missing bin or lib.");
+        }
+
+        deleteIfExists(previousInstallDir, logPath);
+        Files.createDirectories(previousInstallDir);
+
+        try {
+            replaceDirectoryContents(installBin, stagedBin, previousInstallDir.resolve("bin"), logPath);
+            replaceDirectoryContents(installLib, stagedLib, previousInstallDir.resolve("lib"), logPath);
+
+            if (!Files.isRegularFile(installBin.resolve("faf-moderator-client.bat")) && isWindows()) {
+                throw new IOException("Updated install is missing the Windows launcher after copy.");
+            }
+            if (!Files.isDirectory(installBin) || !Files.isDirectory(installLib)) {
+                throw new IOException("Updated install is missing bin or lib after copy.");
+            }
+        } catch (IOException | RuntimeException e) {
+            log(logPath, "Restoring previous install directory contents after update failure.");
+            restoreDirectoryContents(previousInstallDir.resolve("bin"), installBin, logPath);
+            restoreDirectoryContents(previousInstallDir.resolve("lib"), installLib, logPath);
+            throw e;
+        }
+    }
+
+    private static void replaceDirectoryContents(Path targetDir, Path stagedDir, Path previousDir, Path logPath) throws IOException {
+        if (Files.isDirectory(targetDir)) {
+            log(logPath, "Snapshotting current contents of '" + targetDir + "' to '" + previousDir + "'.");
+            copyDirectory(targetDir, previousDir, logPath);
+        }
+
+        Files.createDirectories(targetDir);
+        deleteDirectoryContents(targetDir, logPath);
+        copyDirectory(stagedDir, targetDir, logPath);
+    }
+
+    private static void restoreDirectoryContents(Path previousDir, Path targetDir, Path logPath) throws IOException {
+        if (Files.notExists(previousDir)) {
+            return;
+        }
+
+        Files.createDirectories(targetDir);
+        deleteDirectoryContents(targetDir, logPath);
+        log(logPath, "Restoring previous contents of '" + targetDir + "' from '" + previousDir + "'.");
+        copyDirectory(previousDir, targetDir, logPath);
+    }
+
+    private static void deleteDirectoryContents(Path directory, Path logPath) throws IOException {
+        if (!Files.isDirectory(directory)) {
+            return;
+        }
+
+        log(logPath, "Removing contents of '" + directory + "'.");
+        try (var paths = Files.walk(directory)) {
+            for (Path current : paths
+                    .filter(path -> !path.equals(directory))
+                    .sorted((left, right) -> right.compareTo(left))
+                    .toList()) {
+                Files.deleteIfExists(current);
             }
         }
     }
@@ -191,6 +265,10 @@ public final class ApplicationUpdateInstallerHelper {
         }
         processBuilder.directory(workingDir.toFile());
         processBuilder.start();
+    }
+
+    private static boolean isWindows() {
+        return System.getProperty("os.name", "").toLowerCase().contains("win");
     }
 
     private static void log(Path logPath, String message) throws IOException {

@@ -29,7 +29,7 @@ class ApplicationUpdateServiceTest {
         reminder.setReminderVersionTag("v2026-07-01");
         reminder.setNextReminderEpoch(System.currentTimeMillis() + TimeUnit.DAYS.toMillis(14));
 
-        GithubRelease release = new GithubRelease("v2026-07-08", "v2026-07-08", "https://example.invalid", "", null, List.of());
+        GithubRelease release = new GithubRelease("v9999-01-01", "v9999-01-01", "https://example.invalid", "", null, List.of());
 
         assertThat(service.shouldShowUpdate(release, reminder), is(true));
     }
@@ -42,6 +42,20 @@ class ApplicationUpdateServiceTest {
         GithubRelease release = new GithubRelease("v9999-01-01", "v9999-01-01", "https://example.invalid", "", null, List.of());
 
         assertThat(service.shouldShowUpdate(release, reminder), is(false));
+    }
+
+    @Test
+    void olderDateReleaseDoesNotShowUpdateForCurrentBuild() {
+        LocalPreferences.VersionReminder reminder = new LocalPreferences.VersionReminder();
+        GithubRelease release = new GithubRelease("v2026-07-08", "v2026-07-08", "https://example.invalid", "", null, List.of());
+
+        assertThat(service.shouldShowUpdate(release, reminder), is(false));
+    }
+
+    @Test
+    void dateReleaseVersionsCompareChronologically() {
+        assertThat(ApplicationUpdateService.compareVersions("v2026-07-08", "v2026-07-17") < 0, is(true));
+        assertThat(ApplicationUpdateService.compareVersions("v2026-07-17", "v2026-07-08") > 0, is(true));
     }
 
     @Test
@@ -58,6 +72,30 @@ class ApplicationUpdateServiceTest {
 
         assertThat(selected.isPresent(), is(true));
         assertThat(selected.get(), is(asset));
+    }
+
+    @Test
+    void downloadProgressIncludesPercentSizeAndSpeedWhenContentLengthIsKnown() {
+        String progress = ApplicationUpdateService.formatDownloadProgress(
+                5L * 1024L * 1024L,
+                10L * 1024L * 1024L,
+                0L,
+                2_000_000_000L
+        );
+
+        assertThat(progress, is("Downloading: 50% (5.0 MB / 10.0 MB, 2.5 MB/s)"));
+    }
+
+    @Test
+    void downloadProgressOmitsPercentWhenContentLengthIsUnknown() {
+        String progress = ApplicationUpdateService.formatDownloadProgress(
+                512L * 1024L,
+                -1L,
+                0L,
+                1_000_000_000L
+        );
+
+        assertThat(progress, is("Downloading: 512 KB (512 KB/s)"));
     }
 
     @Test
@@ -218,8 +256,10 @@ class ApplicationUpdateServiceTest {
         assertThat(sources.get(0), is(currentConfig.toAbsolutePath().normalize()));
         assertThat(sources.get(1), is(currentWorkingDir.resolve("config").toAbsolutePath().normalize()));
         assertThat(sources.get(2), is(installRoot.resolve("config").toAbsolutePath().normalize()));
-        assertThat(sources.get(3), is(currentWorkingDir.resolve("data").toAbsolutePath().normalize()));
-        assertThat(sources.get(4), is(installRoot.resolve("data").toAbsolutePath().normalize()));
+        assertThat(sources.contains(installRoot.resolve("bin").resolve("config").toAbsolutePath().normalize()), is(true));
+        assertThat(sources.contains(currentWorkingDir.resolve("data").toAbsolutePath().normalize()), is(true));
+        assertThat(sources.contains(installRoot.resolve("data").toAbsolutePath().normalize()), is(true));
+        assertThat(sources.contains(installRoot.resolve("bin").resolve("data").toAbsolutePath().normalize()), is(true));
     }
 
     @Test
@@ -231,8 +271,177 @@ class ApplicationUpdateServiceTest {
         List<Path> targets = ApplicationUpdateInstallerHelper.configTargetDirs(installRoot, currentWorkingDir, currentConfig);
 
         assertThat(targets.contains(currentConfig.toAbsolutePath().normalize()), is(true));
-        assertThat(targets.contains(currentWorkingDir.resolve("config").toAbsolutePath().normalize()), is(true));
+        assertThat(targets.contains(currentWorkingDir.resolve("config").toAbsolutePath().normalize()), is(false));
         assertThat(targets.contains(installRoot.resolve("config").toAbsolutePath().normalize()), is(true));
+    }
+
+    @Test
+    void installerHelperRestoresSnapshotOnlyToConfigTargets(@TempDir Path tempDir) throws Exception {
+        Path installRoot = tempDir.resolve("install");
+        Path currentWorkingDir = installRoot.resolve("bin");
+        Path currentConfig = installRoot.resolve("config");
+        Path snapshotDir = tempDir.resolve("snapshot");
+        Path logPath = tempDir.resolve("apply-update.log");
+        Files.createDirectories(snapshotDir);
+        Files.writeString(snapshotDir.resolve("client-prefs.json"), "prefs");
+        Files.writeString(snapshotDir.resolve("templatesAndReasons.json"), "templates");
+
+        ReflectionTestUtils.invokeMethod(
+                ApplicationUpdateInstallerHelper.class,
+                "restoreExistingConfig",
+                snapshotDir,
+                ApplicationUpdateInstallerHelper.configTargetDirs(installRoot, currentWorkingDir, currentConfig),
+                logPath
+        );
+
+        assertThat(Files.exists(installRoot.resolve("config").resolve("client-prefs.json")), is(true));
+        assertThat(Files.exists(installRoot.resolve("client-prefs.json")), is(false));
+        assertThat(Files.exists(installRoot.resolve("data")), is(false));
+        assertThat(Files.exists(currentWorkingDir.resolve("config")), is(false));
+    }
+
+    @Test
+    void installerHelperMergesConfigSourcesWithHigherPrioritySourcesWinning(@TempDir Path tempDir) throws Exception {
+        Path installRoot = tempDir.resolve("install");
+        Path currentWorkingDir = installRoot.resolve("bin");
+        Path currentConfig = installRoot.resolve("config");
+        Path binConfig = currentWorkingDir.resolve("config");
+        Path legacyData = currentWorkingDir.resolve("data");
+        Path snapshotDir = tempDir.resolve("snapshot");
+        Path logPath = tempDir.resolve("apply-update.log");
+
+        Files.createDirectories(currentConfig);
+        Files.createDirectories(binConfig);
+        Files.createDirectories(legacyData);
+        Files.writeString(currentConfig.resolve("client-prefs.json"), "top prefs");
+        Files.writeString(binConfig.resolve("templatesAndReasons.json"), "bin templates");
+        Files.writeString(binConfig.resolve("client-prefs.json"), "bin prefs");
+        Files.writeString(legacyData.resolve("userNotes.txt"), "legacy notes");
+
+        ReflectionTestUtils.invokeMethod(
+                ApplicationUpdateInstallerHelper.class,
+                "snapshotExistingConfig",
+                snapshotDir,
+                ApplicationUpdateInstallerHelper.configSourceDirs(installRoot, currentWorkingDir, currentConfig),
+                List.of(),
+                logPath
+        );
+
+        assertThat(Files.readString(snapshotDir.resolve("client-prefs.json")), is("top prefs"));
+        assertThat(Files.readString(snapshotDir.resolve("templatesAndReasons.json")), is("bin templates"));
+        assertThat(Files.readString(snapshotDir.resolve("userNotes.txt")), is("legacy notes"));
+    }
+
+    @Test
+    void installerHelperMigratesBinDataWhenWorkingDirectoryIsInstallRoot(@TempDir Path tempDir) throws Exception {
+        Path installRoot = tempDir.resolve("install");
+        Path currentWorkingDir = installRoot;
+        Path currentConfig = installRoot.resolve("config");
+        Path binData = installRoot.resolve("bin").resolve("data");
+        Path snapshotDir = tempDir.resolve("snapshot");
+        Path logPath = tempDir.resolve("apply-update.log");
+
+        Files.createDirectories(binData);
+        Files.writeString(binData.resolve("templatesAndReasons.json"), "legacy bin data templates");
+
+        ReflectionTestUtils.invokeMethod(
+                ApplicationUpdateInstallerHelper.class,
+                "snapshotExistingConfig",
+                snapshotDir,
+                ApplicationUpdateInstallerHelper.configSourceDirs(installRoot, currentWorkingDir, currentConfig),
+                List.of(),
+                logPath
+        );
+
+        assertThat(Files.readString(snapshotDir.resolve("templatesAndReasons.json")), is("legacy bin data templates"));
+    }
+
+    @Test
+    void installerHelperDoesNotLetLegacyPrefsOverwriteConfigPrefs(@TempDir Path tempDir) throws Exception {
+        Path installRoot = tempDir.resolve("install");
+        Path currentWorkingDir = installRoot;
+        Path currentConfig = installRoot.resolve("config");
+        Path snapshotDir = tempDir.resolve("snapshot");
+        Path logPath = tempDir.resolve("apply-update.log");
+
+        Files.createDirectories(currentConfig);
+        Files.writeString(currentConfig.resolve("client-prefs.json"), "config prefs");
+        Files.writeString(installRoot.resolve("client-prefs.json"), "root legacy prefs");
+        Files.createDirectories(installRoot.resolve("bin"));
+        Files.writeString(installRoot.resolve("bin").resolve("client-prefs.json"), "bin legacy prefs");
+
+        ReflectionTestUtils.invokeMethod(
+                ApplicationUpdateInstallerHelper.class,
+                "snapshotExistingConfig",
+                snapshotDir,
+                ApplicationUpdateInstallerHelper.configSourceDirs(installRoot, currentWorkingDir, currentConfig),
+                ApplicationUpdateInstallerHelper.legacyPrefsFiles(installRoot, currentWorkingDir),
+                logPath
+        );
+
+        assertThat(Files.readString(snapshotDir.resolve("client-prefs.json")), is("config prefs"));
+    }
+
+    @Test
+    void installerHelperUsesNewestLegacyPrefsWhenConfigPrefsAreMissing(@TempDir Path tempDir) throws Exception {
+        Path installRoot = tempDir.resolve("install");
+        Path currentWorkingDir = installRoot;
+        Path currentConfig = installRoot.resolve("config");
+        Path snapshotDir = tempDir.resolve("snapshot");
+        Path logPath = tempDir.resolve("apply-update.log");
+        Path rootPrefs = installRoot.resolve("client-prefs.json");
+        Path binPrefs = installRoot.resolve("bin").resolve("client-prefs.json");
+
+        Files.createDirectories(installRoot);
+        Files.writeString(rootPrefs, "root legacy prefs");
+        Thread.sleep(5);
+        Files.createDirectories(binPrefs.getParent());
+        Files.writeString(binPrefs, "bin legacy prefs");
+
+        ReflectionTestUtils.invokeMethod(
+                ApplicationUpdateInstallerHelper.class,
+                "snapshotExistingConfig",
+                snapshotDir,
+                ApplicationUpdateInstallerHelper.configSourceDirs(installRoot, currentWorkingDir, currentConfig),
+                ApplicationUpdateInstallerHelper.legacyPrefsFiles(installRoot, currentWorkingDir),
+                logPath
+        );
+
+        assertThat(Files.readString(snapshotDir.resolve("client-prefs.json")), is("bin legacy prefs"));
+    }
+
+    @Test
+    void installerHelperReplacesBinAndLibContentsWithoutMovingDirectories(@TempDir Path tempDir) throws Exception {
+        Path installRoot = tempDir.resolve("install");
+        Path stageDir = tempDir.resolve("staged");
+        Path previousInstall = tempDir.resolve("previous-install");
+        Path logPath = tempDir.resolve("apply-update.log");
+
+        Files.createDirectories(installRoot.resolve("bin"));
+        Files.createDirectories(installRoot.resolve("lib"));
+        Path originalBin = installRoot.resolve("bin").toRealPath();
+        Files.writeString(installRoot.resolve("bin").resolve("faf-moderator-client.bat"), "old launcher");
+        Files.writeString(installRoot.resolve("lib").resolve("old.jar"), "old jar");
+
+        Files.createDirectories(stageDir.resolve("bin"));
+        Files.createDirectories(stageDir.resolve("lib"));
+        Files.writeString(stageDir.resolve("bin").resolve("faf-moderator-client.bat"), "new launcher");
+        Files.writeString(stageDir.resolve("lib").resolve("new.jar"), "new jar");
+
+        ReflectionTestUtils.invokeMethod(
+                ApplicationUpdateInstallerHelper.class,
+                "replaceInstallDirectories",
+                installRoot,
+                stageDir,
+                previousInstall,
+                logPath
+        );
+
+        assertThat(Files.readString(installRoot.resolve("bin").resolve("faf-moderator-client.bat")), is("new launcher"));
+        assertThat(installRoot.resolve("bin").toRealPath(), is(originalBin));
+        assertThat(Files.exists(installRoot.resolve("lib").resolve("new.jar")), is(true));
+        assertThat(Files.exists(previousInstall.resolve("bin").resolve("faf-moderator-client.bat")), is(true));
+        assertThat(Files.exists(previousInstall.resolve("lib").resolve("old.jar")), is(true));
     }
 
     @Test
@@ -244,5 +453,6 @@ class ApplicationUpdateServiceTest {
 
         assertThat(prefsFiles.get(0), is(currentWorkingDir.resolve("client-prefs.json").toAbsolutePath().normalize()));
         assertThat(prefsFiles.get(1), is(installRoot.resolve("client-prefs.json").toAbsolutePath().normalize()));
+        assertThat(prefsFiles.contains(installRoot.resolve("bin").resolve("client-prefs.json").toAbsolutePath().normalize()), is(true));
     }
 }

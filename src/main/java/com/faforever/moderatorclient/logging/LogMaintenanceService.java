@@ -1,5 +1,6 @@
 package com.faforever.moderatorclient.logging;
 
+import com.faforever.moderatorclient.config.ApplicationPaths;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -15,7 +16,7 @@ public class LogMaintenanceService {
     private final Path logsDirectory;
 
     public LogMaintenanceService() {
-        this(Path.of("logs"));
+        this(ApplicationPaths.resolveLogDirectory());
     }
 
     LogMaintenanceService(Path logsDirectory) {

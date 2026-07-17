@@ -125,8 +125,6 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     private final Map<Tab, Boolean> dataLoadingState = new HashMap<>();
 
     private final FafApiCommunicationService communicationService;
-    public static final String CONFIGURATION_FOLDER = ApplicationPaths.CONFIGURATION_DIRECTORY_NAME;
-
     @Override
     public TabPane getRoot() {
         return root;
@@ -502,7 +500,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
             try {
                 applicationUpdateService.fetchLatestRelease().ifPresent(release -> {
                     if (applicationUpdateService.shouldShowUpdate(release, localPreferences.getVersionReminder())) {
-                        Platform.runLater(() -> showUpdatePopup(release));
+                        Platform.runLater(() -> showUpdatePopup(release, true));
                     }
                 });
             } catch (Exception e) {
@@ -517,14 +515,18 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         return applicationUpdateService.isNewerVersion(latest);
     }
 
-    private void showUpdatePopup(GithubRelease release) {
+    public void showUpdatePopupForDebug(GithubRelease release) {
+        showUpdatePopup(release, false);
+    }
+
+    private void showUpdatePopup(GithubRelease release, boolean scheduleReminderOnDismiss) {
         Optional<String> autoUpdateUnavailableReason = applicationUpdateService.describeAutomaticUpdateUnavailableReason(release);
 
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.setTitle("Update Available");
         dialog.setHeaderText("Version " + release.displayName() + " is available");
 
-        ButtonType updateButtonType = new ButtonType("Backup + Update + Restart", ButtonBar.ButtonData.OK_DONE);
+        ButtonType updateButtonType = new ButtonType("Backup + Update FAF Moderator Client", ButtonBar.ButtonData.OK_DONE);
         ButtonType closeButtonType = new ButtonType("Not Now", ButtonBar.ButtonData.CANCEL_CLOSE);
 
         dialog.getDialogPane().getButtonTypes().addAll(updateButtonType, closeButtonType);
@@ -567,17 +569,19 @@ public class MainController implements Controller<TabPane>, DisposableBean {
             return;
         }
 
-        localPreferences.getVersionReminder().scheduleForNextStart(
-                release.tagName(),
-                localPreferences.getVersionReminder().getReminderDelayDays()
-        );
-        localPreferencesReaderWriter.write(localPreferences);
+        if (scheduleReminderOnDismiss) {
+            localPreferences.getVersionReminder().scheduleForNextStart(
+                    release.tagName(),
+                    localPreferences.getVersionReminder().getReminderDelayDays()
+            );
+            localPreferencesReaderWriter.write(localPreferences);
+        }
     }
 
     private void showAutomaticUpdateUnavailable(String detail) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle("Self-Update Unavailable");
-        alert.setHeaderText("Backup + Update + Restart is not available here");
+        alert.setHeaderText("Backup + Update FAF Moderator Client is not available here");
         alert.setContentText(detail);
         applyDialogStyles(alert.getDialogPane());
         alert.showAndWait();
@@ -618,7 +622,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
                 boolean launchedInstaller = applicationUpdateService.prepareUpdateAndLaunchInstaller(
                         release,
                         status -> Platform.runLater(() -> appendUpdateProgress(updateLogArea, statusLabel, status)),
-                        () -> confirmAutomaticUpdateRestart(release, updateLogArea, statusLabel)
+                        () -> confirmAutomaticUpdateApply(release, updateLogArea, statusLabel)
                 );
                 if (!launchedInstaller) {
                     Platform.runLater(() -> {
@@ -660,7 +664,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         progressAlert.show();
     }
 
-    private boolean confirmAutomaticUpdateRestart(GithubRelease release, TextArea updateLogArea, Label statusLabel) {
+    private boolean confirmAutomaticUpdateApply(GithubRelease release, TextArea updateLogArea, Label statusLabel) {
         if (localPreferences.getVersionReminder().isSkipAutomaticUpdateRestartConfirmation()) {
             return true;
         }
@@ -669,11 +673,11 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         AtomicBoolean confirmed = new AtomicBoolean(false);
 
         Platform.runLater(() -> {
-            appendUpdateProgress(updateLogArea, statusLabel, "Waiting for client restart confirmation...");
+            appendUpdateProgress(updateLogArea, statusLabel, "Waiting for FAF Moderator Client update confirmation...");
 
             Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-            alert.setTitle("Client Restart Required");
-            alert.setHeaderText("Ready to restart the FAF Moderator Client and apply " + release.displayName());
+            alert.setTitle("FAF Moderator Client Update");
+            alert.setHeaderText("Ready to apply " + release.displayName() + " to the FAF Moderator Client");
 
             Label message = new Label("""
                     The update is downloaded, extracted, validated, and backed up.
@@ -684,11 +688,11 @@ public class MainController implements Controller<TabPane>, DisposableBean {
                     """);
             message.setWrapText(true);
 
-            CheckBox rememberChoice = new CheckBox("Do not ask again for automatic client restarts");
+            CheckBox rememberChoice = new CheckBox("Do not ask again before applying automatic FAF Moderator Client updates");
             VBox content = new VBox(10, message, rememberChoice);
             alert.getDialogPane().setContent(content);
             alert.getButtonTypes().setAll(
-                    new ButtonType("Restart Client Now", ButtonBar.ButtonData.OK_DONE),
+                    new ButtonType("Apply Update to FAF Moderator Client", ButtonBar.ButtonData.OK_DONE),
                     new ButtonType("Cancel", ButtonBar.ButtonData.CANCEL_CLOSE)
             );
             applyDialogStyles(alert.getDialogPane());

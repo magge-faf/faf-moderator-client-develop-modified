@@ -2,10 +2,12 @@ package com.faforever.moderatorclient.ui.main_window;
 
 import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.config.local.LocalPreferencesReaderWriter;
+import com.faforever.moderatorclient.config.ApplicationPaths;
 import com.faforever.moderatorclient.replay.ReplayStorageService;
 import com.faforever.moderatorclient.update.ApplicationUpdateService;
 import com.faforever.moderatorclient.ui.Controller;
 import com.faforever.moderatorclient.ui.MainController;
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
@@ -25,8 +27,6 @@ import java.nio.file.Paths;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
-
-import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
 
 @Component
 @Slf4j
@@ -242,7 +242,7 @@ public class SettingsController implements Controller<Pane> {
     }
 
 
-    private static final String jsonFileTemplatesAndReasons = CONFIGURATION_FOLDER + File.separator + "templatesAndReasons.json";
+    private static final String TEMPLATES_AND_REASONS_FILE_NAME = "templatesAndReasons.json";
     private static final String JSON_CONTENT_templatesAndReasons = """
             {
               "templates": [
@@ -278,21 +278,21 @@ public class SettingsController implements Controller<Pane> {
             }""";
 
     private void initTemplatesAndReasons(){
-        File file = new File(jsonFileTemplatesAndReasons);
+        File file = ApplicationPaths.resolveConfigurationFile(TEMPLATES_AND_REASONS_FILE_NAME).toFile();
         if (!file.exists()) {
             try {
-                Files.createDirectories(Paths.get(CONFIGURATION_FOLDER));
+                Files.createDirectories(ApplicationPaths.resolveConfigurationDirectory());
                 try (FileWriter writer = new FileWriter(file)) {
                     writer.write(JSON_CONTENT_templatesAndReasons);
-                    log.info("Created {}", jsonFileTemplatesAndReasons);
+                    log.info("Created {}", file);
                 }
             } catch (IOException e) {
-                log.warn("Failed to create {}", jsonFileTemplatesAndReasons, e);
+                log.warn("Failed to create {}", file, e);
             }
         }
     }
 
-    private static final String jsonFileTemplatesFinishReports = CONFIGURATION_FOLDER + File.separator + "templatesFinishReports.json";
+    private static final String TEMPLATES_FINISH_REPORTS_FILE_NAME = "templatesFinishReports.json";
     private static final String JSON_CONTENT_templatesFinishReports = """
             {
               "templatesEditReports": [
@@ -360,22 +360,22 @@ public class SettingsController implements Controller<Pane> {
             }""";
 
     private void initTemplatesFinishReports(){
-        File file = new File(jsonFileTemplatesFinishReports);
+        File file = ApplicationPaths.resolveConfigurationFile(TEMPLATES_FINISH_REPORTS_FILE_NAME).toFile();
         if (!file.exists()) {
             try {
-                Files.createDirectories(Paths.get(CONFIGURATION_FOLDER));
+                Files.createDirectories(ApplicationPaths.resolveConfigurationDirectory());
                 try (FileWriter writer = new FileWriter(file)) {
                     writer.write(JSON_CONTENT_templatesFinishReports);
-                    log.info("Created {}", jsonFileTemplatesFinishReports);
+                    log.info("Created {}", file);
                 }
             } catch (IOException e) {
-                log.warn("Failed to create {}", jsonFileTemplatesFinishReports, e);
+                log.warn("Failed to create {}", file, e);
             }
         }
     }
 
     public void createTemplateGamingModeratorTask() {
-        File fileCompleted = new File(CONFIGURATION_FOLDER + File.separator + "templateGamingModeratorTask.txt");
+        File fileCompleted = ApplicationPaths.resolveConfigurationFile("templateGamingModeratorTask.txt").toFile();
         if (!fileCompleted.exists()) {
             String contentCompleted = """
                     Gaming Moderator Task for FAForever.com
@@ -395,7 +395,7 @@ public class SettingsController implements Controller<Pane> {
     }
 
     public void onOpenAiPromptButton() throws IOException {
-        openFile(CONFIGURATION_FOLDER + File.separator + "templateGamingModeratorTask.txt");
+        openFile(ApplicationPaths.resolveConfigurationFile("templateGamingModeratorTask.txt").toString());
     }
 
     public void onChooseUpdateBackupFolder() {
@@ -430,12 +430,12 @@ public class SettingsController implements Controller<Pane> {
     }
 
     public void templatesAndReasonsReportButton() throws IOException {
-        openFile(CONFIGURATION_FOLDER + File.separator +  "templatesAndReasons.json");
+        openFile(ApplicationPaths.resolveConfigurationFile(TEMPLATES_AND_REASONS_FILE_NAME).toString());
 
     }
 
     public void templatesFinishReportsButton() throws IOException {
-        openFile(CONFIGURATION_FOLDER + File.separator +  "templatesFinishReports.json");
+        openFile(ApplicationPaths.resolveConfigurationFile(TEMPLATES_FINISH_REPORTS_FILE_NAME).toString());
 
     }
 
@@ -477,6 +477,26 @@ public class SettingsController implements Controller<Pane> {
             updaterDataFolderStatusLabel.setText("Failed to purge updater folder: " + e.getMessage());
             log.error("Failed to purge updater folder", e);
         }
+    }
+
+    public void onDebugUpdateWindow() {
+        updaterDataFolderStatusLabel.setText("Loading latest GitHub release...");
+        Thread updateDebugThread = new Thread(() -> {
+            try {
+                applicationUpdateService.fetchLatestRelease().ifPresentOrElse(
+                        release -> Platform.runLater(() -> {
+                            updaterDataFolderStatusLabel.setText("Loaded " + release.displayName() + " from GitHub.");
+                            mainController.showUpdatePopupForDebug(release);
+                        }),
+                        () -> Platform.runLater(() -> updaterDataFolderStatusLabel.setText("No GitHub release found."))
+                );
+            } catch (Exception e) {
+                Platform.runLater(() -> updaterDataFolderStatusLabel.setText("Failed to load latest release: " + e.getMessage()));
+                log.warn("Failed to load latest release for updater debug window", e);
+            }
+        }, "update-debug-window");
+        updateDebugThread.setDaemon(true);
+        updateDebugThread.start();
     }
 
     public void onOpenReplayFolder() {

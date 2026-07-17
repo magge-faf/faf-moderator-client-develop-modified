@@ -66,7 +66,6 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -81,8 +80,6 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.ButtonType;
 import org.springframework.web.client.HttpClientErrorException;
-
-import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
 
 @Slf4j
 @Component
@@ -183,8 +180,8 @@ public class UserManagementController implements Controller<SplitPane> {
     @FXML
     public TextArea userNotesTextArea;
 
-    private static final String SEARCH_HISTORY_FILE = CONFIGURATION_FOLDER + File.separator +  "searchHistory.txt";
-    private static final String USER_NOTES_FILE = CONFIGURATION_FOLDER + File.separator + "userNotes.txt";
+    private static final String SEARCH_HISTORY_FILE_NAME = "searchHistory.txt";
+    private static final String USER_NOTES_FILE_NAME = "userNotes.txt";
     @FXML
     public TextField smurfVillageLookupTextField;
     public CheckBox includeUUIDCheckBox;
@@ -978,8 +975,8 @@ public class UserManagementController implements Controller<SplitPane> {
 
     public void saveOnExitContent() {
         try {
-            Files.write(Paths.get(SEARCH_HISTORY_FILE), searchHistoryTextArea.getText().getBytes());
-            Files.write(Paths.get(USER_NOTES_FILE), userNotesTextArea.getText().getBytes());
+            Files.write(ApplicationPaths.resolveConfigurationFile(SEARCH_HISTORY_FILE_NAME), searchHistoryTextArea.getText().getBytes());
+            Files.write(ApplicationPaths.resolveConfigurationFile(USER_NOTES_FILE_NAME), userNotesTextArea.getText().getBytes());
         } catch (IOException e) {
             log.debug(String.valueOf(e));
         }
@@ -987,12 +984,12 @@ public class UserManagementController implements Controller<SplitPane> {
 
     private void loadContent() {
         try {
-            if (Files.exists(Paths.get(SEARCH_HISTORY_FILE))) {
-                String searchHistory = new String(Files.readAllBytes(Paths.get(SEARCH_HISTORY_FILE)));
+            if (Files.exists(ApplicationPaths.resolveConfigurationFile(SEARCH_HISTORY_FILE_NAME))) {
+                String searchHistory = new String(Files.readAllBytes(ApplicationPaths.resolveConfigurationFile(SEARCH_HISTORY_FILE_NAME)));
                 searchHistoryTextArea.setText(searchHistory);
             }
-            if (Files.exists(Paths.get(USER_NOTES_FILE))) {
-                String userNotes = new String(Files.readAllBytes(Paths.get(USER_NOTES_FILE)));
+            if (Files.exists(ApplicationPaths.resolveConfigurationFile(USER_NOTES_FILE_NAME))) {
+                String userNotes = new String(Files.readAllBytes(ApplicationPaths.resolveConfigurationFile(USER_NOTES_FILE_NAME)));
                 userNotesTextArea.setText(userNotes);
             }
         } catch (IOException e) {

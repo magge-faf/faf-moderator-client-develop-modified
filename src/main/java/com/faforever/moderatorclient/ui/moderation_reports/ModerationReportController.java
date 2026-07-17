@@ -14,6 +14,7 @@ import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.BanService;
 import com.faforever.moderatorclient.api.domain.ModerationReportService;
 import com.faforever.moderatorclient.api.domain.UserService;
+import com.faforever.moderatorclient.config.ApplicationPaths;
 import com.faforever.moderatorclient.config.TemplateAndReasonConfig;
 import com.faforever.moderatorclient.replay.ReplayStorageService;
 import com.faforever.moderatorclient.ui.*;
@@ -95,7 +96,6 @@ import java.util.stream.Collectors;
 
 import javafx.scene.paint.Color;
 
-import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
 import static java.text.MessageFormat.format;
 
 
@@ -515,7 +515,7 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private TemplateAndReasonConfig loadTemplateAndReasonConfig() {
-        File templatesAndReasonsFile = new File(CONFIGURATION_FOLDER + File.separator + "templatesAndReasons.json");
+        File templatesAndReasonsFile = ApplicationPaths.resolveConfigurationFile("templatesAndReasons.json").toFile();
         try {
             return objectMapper.readValue(templatesAndReasonsFile, TemplateAndReasonConfig.class);
         } catch (IOException e) {
@@ -1569,7 +1569,7 @@ public class ModerationReportController implements Controller<Region> {
                                 .map(PlayerFX::getRepresentation)
                                 .collect(Collectors.joining(", "));
                         String reporter = String.valueOf(report.getReporter().getRepresentation());
-                        String filePathGamingModeratorTask = CONFIGURATION_FOLDER + File.separator + "templateGamingModeratorTask.txt";
+                        String filePathGamingModeratorTask = ApplicationPaths.resolveConfigurationFile("templateGamingModeratorTask.txt").toString();
                         StringBuilder contentGamingModeratorTask = new StringBuilder();
                         try (BufferedReader br = new BufferedReader(new FileReader(filePathGamingModeratorTask))) {
                             String line;

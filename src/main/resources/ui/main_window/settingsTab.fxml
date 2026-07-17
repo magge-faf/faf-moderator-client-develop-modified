@@ -113,6 +113,7 @@
                     <HBox spacing="8" styleClass="settings-action-row">
                         <Button mnemonicParsing="false" onAction="#onOpenUpdaterDataFolder" text="Open Updater Folder"/>
                         <Button mnemonicParsing="false" onAction="#onPurgeUpdaterDataFolder" text="Purge Updater Folder"/>
+                        <Button mnemonicParsing="false" onAction="#onDebugUpdateWindow" text="Debug Update Window"/>
                     </HBox>
                     <Label fx:id="updaterDataFolderStatusLabel" styleClass="settings-status" text="" wrapText="true"/>
                 </VBox>
