@@ -1857,11 +1857,21 @@ public class ModerationReportController implements Controller<Region> {
         }
     }
 
-    private String extractName(String fullNameWithId) {
-        if (fullNameWithId.contains("[")) {
-            return fullNameWithId.split("\\[")[0].trim();
+    static String extractName(String fullNameWithId) {
+        if (fullNameWithId == null) {
+            return "";
         }
-        return fullNameWithId.trim();
+
+        String name = fullNameWithId.trim();
+        int rolePrefixEnd = name.lastIndexOf('\n');
+        if (rolePrefixEnd >= 0) {
+            name = name.substring(rolePrefixEnd + 1).trim();
+        }
+
+        if (name.contains("[")) {
+            return name.split("\\[")[0].trim();
+        }
+        return name;
     }
 
     private static final Font MONO = Font.font("Courier New", 12);
