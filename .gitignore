@@ -20,11 +20,13 @@ build_verify/
 *.gz
 
 # Runtime / local data files
-data/
-logs/
-client-prefs.json
-client.log
-ConfigurationModerationToolFAF/
+/data/
+/config/
+/replay/
+/logs/
+/client-prefs.json
+/client.log
+/ConfigurationModerationToolFAF/
 
 # Editor / tool config
 .vscode/

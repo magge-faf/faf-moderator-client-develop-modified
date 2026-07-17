@@ -3,7 +3,7 @@ import java.text.SimpleDateFormat
 
 plugins {
     id 'application'
-    id 'com.gradleup.shadow' version '9.4.2'
+    id 'com.gradleup.shadow' version '9.6.0'
 }
 
 repositories {
@@ -103,7 +103,13 @@ tasks.withType(CreateStartScripts).each { task ->
         String text = task.windowsScript.text
         // Replaces the per file classpath (which are all jars in "lib") with a wildcard on lib
         text = text.replaceFirst(/(set CLASSPATH=%APP_HOME%\\lib\\).*/, { "${it[1]}*" })
+        text = text.replaceFirst(/(?m)^set DEFAULT_JVM_OPTS=.*/, 'set DEFAULT_JVM_OPTS="-Dfaf.app.home=%APP_HOME%"')
         task.windowsScript.write text
+
+        text = task.unixScript.text
+        // Inner \" quoting keeps "-Dfaf.app.home=$APP_HOME" a single xargs token even if APP_HOME has spaces
+        text = text.replace('DEFAULT_JVM_OPTS=""', 'DEFAULT_JVM_OPTS="\\"-Dfaf.app.home=$APP_HOME\\""')
+        task.unixScript.write text
     }
 }
 
@@ -111,12 +117,42 @@ distZip {
     archiveClassifier.set(javafxPlatform)
 }
 
+def buildDistributionsDir = layout.buildDirectory.dir("distributions")
+def buildInstallDir = layout.buildDirectory.dir("install/${project.name}")
+
+tasks.register("printBuildOutputPaths") {
+    doLast {
+        println ""
+        println "Build outputs:"
+
+        def distributionDir = buildDistributionsDir.get().asFile
+        def distributionFiles = distributionDir.exists()
+                ? distributionDir.listFiles().findAll { it.isFile() && (it.name.endsWith(".zip") || it.name.endsWith(".tar")) }.sort { it.name }
+                : []
+        if (distributionFiles) {
+            distributionFiles.each { println "  Distribution archive: ${it.absolutePath}" }
+        } else {
+            println "  Distribution archive: not found in ${distributionDir.absolutePath}"
+        }
+
+        def installDir = buildInstallDir.get().asFile
+        if (installDir.exists()) {
+            println "  Runnable install folder: ${installDir.absolutePath}"
+            println "  Start scripts: ${new File(installDir, 'bin').absolutePath}"
+        } else {
+            println "  Runnable install folder: not built by this task"
+        }
+    }
+}
+
+build.finalizedBy(tasks.named("printBuildOutputPaths"))
+
 static def dateVersion() {
     def now = new Date()
     return now.format('yyyy-MM-dd')
 }
 
-version = project.hasProperty('version') ? project.property('version') : dateVersion()
+version = providers.gradleProperty('version').orElse(dateVersion()).get()
 
 processResources {
     def resolvedVersion = version
@@ -157,4 +193,7 @@ compileJava.dependsOn(tasks.named("generateVersionClass"))
 
 test {
     useJUnitPlatform()
+    // Isolates java.util.prefs.Preferences from the real OS-backed store (Windows registry / ~/.java) so
+    // credential tests never read or clear the packaged app's saved login token.
+    systemProperty 'java.util.prefs.PreferencesFactory', 'com.faforever.moderatorclient.config.local.InMemoryPreferencesFactory'
 }

@@ -3,6 +3,7 @@ package com.faforever.moderatorclient.ui.moderation_reports;
 import com.faforever.commons.api.dto.ModerationReport;
 import com.faforever.commons.api.dto.ModerationReportStatus;
 import com.faforever.moderatorclient.api.domain.ModerationReportService;
+import com.faforever.moderatorclient.config.ApplicationPaths;
 import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.ui.Controller;
 import com.faforever.moderatorclient.ui.domain.ModerationReportFX;
@@ -27,8 +28,6 @@ import java.util.List;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import static com.faforever.moderatorclient.ui.MainController.CONFIGURATION_FOLDER;
-
 @Component
 @RequiredArgsConstructor
 public class EditModerationReportController implements Controller<Pane> {
@@ -51,7 +50,7 @@ public class EditModerationReportController implements Controller<Pane> {
     @FXML
 	public void initialize() throws IOException {
 		try {
-			loadButtonsFromJson(CONFIGURATION_FOLDER + File.separator + "templatesFinishReports.json");
+			loadButtonsFromJson(ApplicationPaths.resolveConfigurationFile("templatesFinishReports.json").toString());
 		} catch (IOException e) {
 			throw new IOException("Failed to initialize Buttons" + e);
 		}

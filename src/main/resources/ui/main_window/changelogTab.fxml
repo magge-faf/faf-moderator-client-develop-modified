@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.web.WebView?>
+
+<VBox fx:id="root" spacing="8" xmlns="http://javafx.com/javafx/20.0.1"
+      xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.faforever.moderatorclient.ui.main_window.ChangelogController">
+    <HBox spacing="8">
+        <ComboBox fx:id="buildComboBox" prefWidth="360"/>
+        <Button mnemonicParsing="false" onAction="#onRefresh" text="Refresh"/>
+        <Button mnemonicParsing="false" onAction="#onOpenProjectIssues" text="Report Bug / Request Feature"/>
+    </HBox>
+    <Label fx:id="releaseInfoLabel" wrapText="true"/>
+    <WebView fx:id="changelogWebView" VBox.vgrow="ALWAYS"/>
+</VBox>

@@ -19,23 +19,23 @@
     <SplitPane orientation="VERTICAL" VBox.vgrow="ALWAYS" dividerPositions="0.45">
 
         <!-- Input form -->
-        <ScrollPane fitToWidth="true" hbarPolicy="NEVER">
+        <ScrollPane fitToWidth="false" hbarPolicy="AS_NEEDED">
             <VBox spacing="12" style="-fx-padding: 5 5 5 0;">
 
                 <TitledPane text="Annotation" expanded="true">
                     <GridPane hgap="10" vgap="8" style="-fx-padding: 10;">
                         <columnConstraints>
-                            <ColumnConstraints minWidth="170" maxWidth="170"/>
-                            <ColumnConstraints hgrow="ALWAYS"/>
+                            <ColumnConstraints minWidth="105" maxWidth="105"/>
+                            <ColumnConstraints minWidth="460" maxWidth="460"/>
                         </columnConstraints>
                         <Label text="Comment:" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
                         <HBox spacing="8" alignment="CENTER_LEFT" GridPane.rowIndex="0" GridPane.columnIndex="1">
-                            <TextField fx:id="commentField" promptText="Enter Comment" HBox.hgrow="ALWAYS"/>
+                            <TextField fx:id="commentField" maxWidth="360" prefWidth="360" promptText="Enter Comment"/>
                             <CheckBox fx:id="keepCommentFieldCheckBox" text="Keep"/>
                         </HBox>
                         <Label text="Reason:" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
                         <HBox spacing="8" alignment="CENTER_LEFT" GridPane.rowIndex="1" GridPane.columnIndex="1">
-                            <TextField fx:id="reasonField" promptText="Enter Reason" HBox.hgrow="ALWAYS"/>
+                            <TextField fx:id="reasonField" maxWidth="360" prefWidth="360" promptText="Enter Reason"/>
                             <CheckBox fx:id="keepReasonFieldCheckBox" text="Keep"/>
                         </HBox>
                     </GridPane>
@@ -43,31 +43,33 @@
 
                 <TitledPane text="Hardware Information" expanded="true">
                     <VBox spacing="10" style="-fx-padding: 10;">
-                        <GridPane hgap="10" vgap="8">
+                        <GridPane hgap="18" vgap="8">
                             <columnConstraints>
-                                <ColumnConstraints minWidth="190" maxWidth="190"/>
-                                <ColumnConstraints hgrow="ALWAYS"/>
+                                <ColumnConstraints minWidth="155" maxWidth="155"/>
+                                <ColumnConstraints minWidth="330" maxWidth="330"/>
+                                <ColumnConstraints minWidth="155" maxWidth="155"/>
+                                <ColumnConstraints minWidth="330" maxWidth="330"/>
                             </columnConstraints>
                             <Label text="IP Address:"            GridPane.rowIndex="0" GridPane.columnIndex="0"/>
-                            <TextField fx:id="ipAddressField"    GridPane.rowIndex="0" GridPane.columnIndex="1" promptText="Enter IP Address"/>
+                            <TextField fx:id="ipAddressField" maxWidth="320" prefWidth="320" GridPane.rowIndex="0" GridPane.columnIndex="1" promptText="Enter IP Address"/>
                             <Label text="UUID:"                  GridPane.rowIndex="1" GridPane.columnIndex="0"/>
-                            <TextField fx:id="uuidField"         GridPane.rowIndex="1" GridPane.columnIndex="1" promptText="Enter UUID"/>
+                            <TextField fx:id="uuidField" maxWidth="320" prefWidth="320" GridPane.rowIndex="1" GridPane.columnIndex="1" promptText="Enter UUID"/>
                             <Label text="Device ID:"             GridPane.rowIndex="2" GridPane.columnIndex="0"/>
-                            <TextField fx:id="deviceIdField"     GridPane.rowIndex="2" GridPane.columnIndex="1" promptText="Enter Device ID"/>
+                            <TextField fx:id="deviceIdField" maxWidth="320" prefWidth="320" GridPane.rowIndex="2" GridPane.columnIndex="1" promptText="Enter Device ID"/>
                             <Label text="Manufacturer:"          GridPane.rowIndex="3" GridPane.columnIndex="0"/>
-                            <TextField fx:id="manufacturerField" GridPane.rowIndex="3" GridPane.columnIndex="1" promptText="Enter Manufacturer"/>
+                            <TextField fx:id="manufacturerField" maxWidth="320" prefWidth="320" GridPane.rowIndex="3" GridPane.columnIndex="1" promptText="Enter Manufacturer"/>
                             <Label text="CPU Name:"              GridPane.rowIndex="4" GridPane.columnIndex="0"/>
-                            <TextField fx:id="cpuNameField"      GridPane.rowIndex="4" GridPane.columnIndex="1" promptText="Enter CPU Name"/>
-                            <Label text="Processor ID:"          GridPane.rowIndex="5" GridPane.columnIndex="0"/>
-                            <TextField fx:id="processorIdField"  GridPane.rowIndex="5" GridPane.columnIndex="1" promptText="Enter Processor ID"/>
-                            <Label text="Serial Number:"         GridPane.rowIndex="6" GridPane.columnIndex="0"/>
-                            <TextField fx:id="serialNumberField" GridPane.rowIndex="6" GridPane.columnIndex="1" promptText="Enter Serial Number"/>
-                            <Label text="Volume Serial Number:"  GridPane.rowIndex="7" GridPane.columnIndex="0"/>
-                            <TextField fx:id="volumeSerialNumberField" GridPane.rowIndex="7" GridPane.columnIndex="1" promptText="Enter Volume Serial Number"/>
-                            <Label text="Hash:"                  GridPane.rowIndex="8" GridPane.columnIndex="0"/>
-                            <TextField fx:id="hashField"         GridPane.rowIndex="8" GridPane.columnIndex="1" promptText="Enter Hash"/>
-                            <Label text="Memory Serial Number:"  GridPane.rowIndex="9" GridPane.columnIndex="0"/>
-                            <TextField fx:id="memorySerialNumberField" GridPane.rowIndex="9" GridPane.columnIndex="1" promptText="Enter Memory Serial Number"/>
+                            <TextField fx:id="cpuNameField" maxWidth="320" prefWidth="320" GridPane.rowIndex="4" GridPane.columnIndex="1" promptText="Enter CPU Name"/>
+                            <Label text="Processor ID:"          GridPane.rowIndex="0" GridPane.columnIndex="2"/>
+                            <TextField fx:id="processorIdField" maxWidth="320" prefWidth="320" GridPane.rowIndex="0" GridPane.columnIndex="3" promptText="Enter Processor ID"/>
+                            <Label text="Serial Number:"         GridPane.rowIndex="1" GridPane.columnIndex="2"/>
+                            <TextField fx:id="serialNumberField" maxWidth="320" prefWidth="320" GridPane.rowIndex="1" GridPane.columnIndex="3" promptText="Enter Serial Number"/>
+                            <Label text="Volume Serial Number:"  GridPane.rowIndex="2" GridPane.columnIndex="2"/>
+                            <TextField fx:id="volumeSerialNumberField" maxWidth="320" prefWidth="320" GridPane.rowIndex="2" GridPane.columnIndex="3" promptText="Enter Volume Serial Number"/>
+                            <Label text="Hash:"                  GridPane.rowIndex="3" GridPane.columnIndex="2"/>
+                            <TextField fx:id="hashField" maxWidth="320" prefWidth="320" GridPane.rowIndex="3" GridPane.columnIndex="3" promptText="Enter Hash"/>
+                            <Label text="Memory Serial Number:"  GridPane.rowIndex="4" GridPane.columnIndex="2"/>
+                            <TextField fx:id="memorySerialNumberField" maxWidth="320" prefWidth="320" GridPane.rowIndex="4" GridPane.columnIndex="3" promptText="Enter Memory Serial Number"/>
                         </GridPane>
                         <Button fx:id="addItemButton" text="Add Excluded Item" onAction="#handleAddItem"/>
                     </VBox>

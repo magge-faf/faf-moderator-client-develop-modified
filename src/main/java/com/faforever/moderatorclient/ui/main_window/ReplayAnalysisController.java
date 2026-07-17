@@ -6,6 +6,7 @@ import com.faforever.commons.replay.ReplayDataParser;
 import com.faforever.commons.replay.body.Event;
 import com.faforever.moderatorclient.api.TokenService;
 import com.faforever.moderatorclient.config.ApplicationVersion;
+import com.faforever.moderatorclient.replay.ReplayStorageService;
 import com.faforever.moderatorclient.ui.Controller;
 import com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -18,7 +19,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.stream.Stream;
@@ -60,10 +60,9 @@ public class ReplayAnalysisController implements Controller<VBox> {
 
     private final ObjectMapper objectMapper;
     private final TokenService tokenService;
+    private final ReplayStorageService replayStorageService;
     private final RestTemplate restTemplate = new RestTemplate();
     private static String REPLAY_API_URL;
-    private static final String REPLAY_SAVE_DIR = "data/replays/";
-    private static final String CHECKED_REPLAYS_FILE = "data/checked_replays.json";
 
     @Override
     public VBox getRoot() {
@@ -160,20 +159,23 @@ public class ReplayAnalysisController implements Controller<VBox> {
     }
 
     public void ensureReplayDirectoryExists() {
-        Path replayDir = Path.of(REPLAY_SAVE_DIR);
-        if (!Files.exists(replayDir)) {
-            try {
-                Files.createDirectories(replayDir);
-                log.info("Created directory: {}", REPLAY_SAVE_DIR);
-            } catch (IOException e) {
-                log.error("Failed to create replay directory: {}", e.getMessage());
-            }
+        try {
+            replayStorageService.ensureReplayDirectoryExists();
+        } catch (IOException e) {
+            log.error("Failed to create replay directory: {}", e.getMessage());
         }
     }
 
     public void downloadReplay(int replayId, Map<Integer, ReplayStatus> checkedReplays) {
         String replayUrl = "https://replay.faforever.com/" + replayId;
-        Path savePath = Path.of(REPLAY_SAVE_DIR, replayId + ".fafreplay");
+        Path savePath;
+        try {
+            savePath = replayStorageService.resolveReplayFile(replayId);
+        } catch (IOException e) {
+            log.error("Failed to resolve replay path for {}", replayId, e);
+            checkedReplays.put(replayId, ReplayStatus.DOWNLOAD_FAILED);
+            return;
+        }
         int retryCount = 0;
         boolean success = false;
 
@@ -257,16 +259,22 @@ public class ReplayAnalysisController implements Controller<VBox> {
     }
 
     public void checkReplaysForFocusArmySwitch(Map<Integer, ReplayStatus> checkedReplays) {
-        try (Stream<Path> paths = Files.walk(Paths.get(REPLAY_SAVE_DIR))) {
+        Path replayDirectory = replayStorageService.resolveReplayDirectory();
+        if (!Files.isDirectory(replayDirectory)) {
+            log.info("Replay directory does not exist yet: {}", replayDirectory);
+            return;
+        }
+
+        try (Stream<Path> paths = Files.walk(replayDirectory)) {
             long detectedReplays = paths
                 .filter(Files::isRegularFile)
-                .filter(path -> path.toString().toLowerCase().endsWith(".fafreplay"))
+                .filter(ReplayAnalysisController::isRetainedReplayFile)
                 .count();
             log.info("Total replays in folder: {}", detectedReplays);
-            try (Stream<Path> newPaths = Files.walk(Paths.get(REPLAY_SAVE_DIR))) {
+            try (Stream<Path> newPaths = Files.walk(replayDirectory)) {
                 newPaths
                     .filter(Files::isRegularFile)
-                    .filter(path -> path.toString().toLowerCase().endsWith(".fafreplay"))
+                    .filter(ReplayAnalysisController::isRetainedReplayFile)
                     .forEach(path -> processReplayFile(path, checkedReplays));
             }
         } catch (IOException e) {
@@ -274,52 +282,58 @@ public class ReplayAnalysisController implements Controller<VBox> {
         }
     }
 
+    private static boolean isRetainedReplayFile(Path path) {
+        return path.getFileName().toString().matches("\\d+\\.fafreplay");
+    }
+
     private void processReplayFile(Path replayPath, Map<Integer, ReplayStatus> checkedReplays) {
         try {
             int replayId = Integer.parseInt(
                 replayPath.getFileName().toString().replace(".fafreplay", "")
             );
-            ReplayDataParser replayDataParser = new ReplayDataParser(replayPath, objectMapper);
-            List<GameOption> gameOptions = replayDataParser.getGameOptions();
-            String commonArmy = getValueForKey(gameOptions);
-            if ("Union".equals(commonArmy)) {
-                checkedReplays.put(replayId, ReplayStatus.UNION);
-                return;
+            try (ReplayStorageService.PreparedReplay preparedReplay = replayStorageService.prepareReplayForParsing(replayPath)) {
+                ReplayDataParser replayDataParser = new ReplayDataParser(preparedReplay.path(), objectMapper);
+                List<GameOption> gameOptions = replayDataParser.getGameOptions();
+                String commonArmy = getValueForKey(gameOptions);
+                if ("Union".equals(commonArmy)) {
+                    checkedReplays.put(replayId, ReplayStatus.UNION);
+                    return;
+                }
+                List<Event> events = replayDataParser.getEvents();
+                ModerationReportController.DesyncResult desyncResult = checkReplayEventsForDesync(
+                    events
+                );
+                if (desyncResult.desync()) {
+                    checkedReplays.put(replayId, ReplayStatus.DESYNCED);
+                    return;
+                }
+                List<ModeratorEvent> moderatorEvents = replayDataParser.getModeratorEvents();
+                List<PlayerInfo> playerInfoList = replayDataParser
+                    .getArmies()
+                    .entrySet()
+                    .stream()
+                    .filter(entry -> entry.getValue().containsKey("PlayerName"))
+                    .map(
+                        entry ->
+                            new PlayerInfo(
+                                entry.getKey() + 1,
+                                (String) entry.getValue().get("PlayerName")
+                            )
+                    )
+                    .toList();
+                if (
+                    checkModeratorEventsForFocusSwitch(
+                        moderatorEvents,
+                        replayPath.getFileName().toString(),
+                        playerInfoList
+                    )
+                ) {
+                    checkedReplays.put(replayId, ReplayStatus.DETECTED);
+                    log.debug("Detected: {}", replayId);
+                    return;
+                }
+                checkedReplays.put(replayId, ReplayStatus.CHECKED);
             }
-            List<Event> events = replayDataParser.getEvents();
-            ModerationReportController.DesyncResult desyncResult = checkReplayEventsForDesync(
-                events
-            );
-            if (desyncResult.desync()) {
-                checkedReplays.put(replayId, ReplayStatus.DESYNCED);
-                return;
-            }
-            List<ModeratorEvent> moderatorEvents = replayDataParser.getModeratorEvents();
-            List<PlayerInfo> playerInfoList = replayDataParser
-                .getArmies()
-                .entrySet()
-                .stream()
-                .filter(entry -> entry.getValue().containsKey("PlayerName"))
-                .map(
-                    entry ->
-                        new PlayerInfo(
-                            entry.getKey() + 1,
-                            (String) entry.getValue().get("PlayerName")
-                        )
-                )
-                .toList();
-            if (
-                checkModeratorEventsForFocusSwitch(
-                    moderatorEvents,
-                    replayPath.getFileName().toString(),
-                    playerInfoList
-                )
-            ) {
-                checkedReplays.put(replayId, ReplayStatus.DETECTED);
-                log.debug("Detected: {}", replayId);
-                return;
-            }
-            checkedReplays.put(replayId, ReplayStatus.CHECKED);
         } catch (Exception e) {
             int replayId = 0;
             try {
@@ -459,7 +473,7 @@ public class ReplayAnalysisController implements Controller<VBox> {
     }
 
     private Map<Integer, ReplayStatus> loadCheckedReplays() {
-        Path checkedReplaysPath = Paths.get(CHECKED_REPLAYS_FILE);
+        Path checkedReplaysPath = replayStorageService.resolveCheckedReplaysFile();
         if (Files.exists(checkedReplaysPath)) {
             try {
                 return objectMapper.readValue(
@@ -474,8 +488,9 @@ public class ReplayAnalysisController implements Controller<VBox> {
     }
 
     private void saveCheckedReplays(Map<Integer, ReplayStatus> checkedReplays) {
-        Path checkedReplaysPath = Paths.get(CHECKED_REPLAYS_FILE);
+        Path checkedReplaysPath = replayStorageService.resolveCheckedReplaysFile();
         try {
+            Files.createDirectories(checkedReplaysPath.getParent());
             objectMapper
                 .writerWithDefaultPrettyPrinter()
                 .writeValue(checkedReplaysPath.toFile(), checkedReplays);

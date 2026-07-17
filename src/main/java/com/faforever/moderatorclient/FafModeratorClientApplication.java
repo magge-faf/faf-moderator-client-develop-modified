@@ -5,9 +5,8 @@ import com.faforever.moderatorclient.config.ApplicationProperties;
 import com.faforever.moderatorclient.config.ApplicationVersion;
 import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.config.local.LocalPreferencesReaderWriter;
+import com.faforever.moderatorclient.logging.LogMaintenanceService;
 import com.faforever.moderatorclient.ui.MainController;
-import com.faforever.moderatorclient.ui.PlatformService;
-import com.faforever.moderatorclient.ui.PlatformServiceImpl;
 import com.faforever.moderatorclient.ui.StageHolder;
 import com.faforever.moderatorclient.ui.UiService;
 import com.faforever.moderatorclient.ui.main_window.UserManagementController;
@@ -26,9 +25,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Timer;
@@ -41,11 +43,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Slf4j
 public class FafModeratorClientApplication extends Application {
 
-    @Bean
-    public PlatformService platformService() {
-        return new PlatformServiceImpl(getHostServices());
-    }
-
     private ConfigurableApplicationContext applicationContext;
     @Autowired
     private UserManagementController userManagementController;
@@ -55,6 +52,8 @@ public class FafModeratorClientApplication extends Application {
     private LocalPreferences localPreferences;
     @Autowired
     private LocalPreferencesReaderWriter localPreferencesReaderWriter;
+    @Autowired
+    private LogMaintenanceService logMaintenanceService;
 
     private Stage primaryStage;
 
@@ -72,6 +71,7 @@ public class FafModeratorClientApplication extends Application {
         SpringApplication app = new SpringApplication(FafModeratorClientApplication.class);
         applicationContext = app.run();
         applicationContext.getAutowireCapableBeanFactory().autowireBean(this);
+        logMaintenanceService.archiveLegacyClientLogs();
     }
 
     @Override
@@ -82,7 +82,7 @@ public class FafModeratorClientApplication extends Application {
         UiService uiService = applicationContext.getBean(UiService.class);
         MainController mainController = uiService.loadFxml("ui/mainWindow.fxml");
         mainController.display();
-        primaryStage.getIcons().add(new Image(Objects.requireNonNull(this.getClass().getResourceAsStream("/media/favicon.png"))));
+        primaryStage.getIcons().add(loadImage("/media/favicon.png"));
         Scene scene = new Scene(mainController.getRoot());
 
         String stylesheet = "/style/main-light.css";
@@ -126,6 +126,14 @@ public class FafModeratorClientApplication extends Application {
             }
         };
         timer.scheduleAtFixedRate(task, 0, 1000);
+    }
+
+    private Image loadImage(String resourcePath) {
+        try (InputStream inputStream = Objects.requireNonNull(getClass().getResourceAsStream(resourcePath))) {
+            return new Image(new ByteArrayInputStream(inputStream.readAllBytes()));
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to load image resource: " + resourcePath, e);
+        }
     }
 
     public void updateWindowTitle(Stage primaryStage, long startTime, int requestsInLastMinute,

@@ -17,11 +17,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 
-@Component
 @Slf4j
 @RequiredArgsConstructor
 public class ListViewMapCell extends ListCell<MapPoolAssignmentFX> {

@@ -44,6 +44,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
 import java.time.Duration;
+import java.time.LocalDate;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
 import javafx.util.Callback;
@@ -64,6 +65,8 @@ import java.nio.file.Path;
 import java.text.MessageFormat;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.Period;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import javafx.application.Platform;
@@ -84,7 +87,6 @@ import static com.faforever.commons.api.dto.GroupPermission.ROLE_ADMIN_ACCOUNT_N
 @Slf4j
 public class ViewHelper {
 
-    @Autowired
     private static LargeThumbnailCache largeThumbnailCache;
 
     private static SmurfManagementController smurfManagementController;
@@ -96,9 +98,9 @@ public class ViewHelper {
     private static final DateTimeFormatter DT_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter DT_UID = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
-    @Autowired
-    public ViewHelper(SmurfManagementController smurfManagementController) {
+    public ViewHelper(SmurfManagementController smurfManagementController, LargeThumbnailCache largeThumbnailCache) {
         ViewHelper.smurfManagementController = smurfManagementController;
+        ViewHelper.largeThumbnailCache = largeThumbnailCache;
     }
 
     /**
@@ -184,8 +186,23 @@ public class ViewHelper {
 
         TableColumn<AvatarFX, OffsetDateTime> changeTimeColumn = new TableColumn<>("Created");
         changeTimeColumn.setCellValueFactory(o -> o.getValue().createTimeProperty());
+        changeTimeColumn.setCellFactory(offsetDateTimeCellFactory(DT_DATETIME));
         changeTimeColumn.setMinWidth(180);
         tableView.getColumns().add(changeTimeColumn);
+
+        TableColumn<AvatarFX, OffsetDateTime> ageColumn = new TableColumn<>("Age");
+        ageColumn.setCellValueFactory(o -> o.getValue().createTimeProperty());
+        ageColumn.setCellFactory(column -> new TableCell<>() {
+            @Override
+            protected void updateItem(OffsetDateTime item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty ? null : formatAge(item));
+            }
+        });
+        ageColumn.setComparator(Comparator.nullsLast(Comparator.reverseOrder()));
+        ageColumn.setMinWidth(90);
+        tableView.getColumns().add(ageColumn);
+        extractors.put(ageColumn, avatarFX -> formatAge(avatarFX.getCreateTime()));
 
         TableColumn<AvatarFX, String> urlColumn = new TableColumn<>("URL");
         urlColumn.setCellValueFactory(o -> o.getValue().urlProperty());
@@ -361,8 +378,9 @@ public class ViewHelper {
             extractors.put(affectedPlayerColumn, banInfoFX -> banInfoFX.getPlayer().getLogin());
         }
 
-        TableColumn<BanInfoFX, OffsetDateTime> expiresAtColumn = new TableColumn<>("Expires at");
-        expiresAtColumn.setCellValueFactory(o -> o.getValue().expiresAtProperty());
+        TableColumn<BanInfoFX, String> expiresAtColumn = new TableColumn<>("Expires at");
+        expiresAtColumn.setCellValueFactory(o -> Bindings.createStringBinding(() -> formatBanExpiresAt(o.getValue().getExpiresAt()),
+                o.getValue().expiresAtProperty()));
         tableView.getColumns().add(expiresAtColumn);
         extractors.put(expiresAtColumn, BanInfoFX::getExpiresAt);
 
@@ -1313,6 +1331,60 @@ public class ViewHelper {
                 setText(empty || item == null ? null : fmt.format(item));
             }
         };
+    }
+
+    static String formatBanExpiresAt(OffsetDateTime expiresAt) {
+        if (expiresAt == null) {
+            return "Permanent";
+        }
+
+        OffsetDateTime now = OffsetDateTime.now(expiresAt.getOffset());
+        Duration delta = Duration.between(now, expiresAt);
+        boolean expired = delta.isNegative();
+        Duration absoluteDelta = delta.abs();
+
+        String relativeTime = formatCompactDuration(absoluteDelta);
+        String relativeText = expired ? "expired " + relativeTime + " ago" : "in " + relativeTime;
+        return "%s (%s)".formatted(DT_DATETIME.format(expiresAt.atZoneSameInstant(ZoneId.systemDefault())), relativeText);
+    }
+
+    private static String formatCompactDuration(Duration duration) {
+        long days = duration.toDays();
+        int hours = duration.toHoursPart();
+        int minutes = duration.toMinutesPart();
+
+        if (days > 0) {
+            return hours > 0 ? "%sd %sh".formatted(days, hours) : "%sd".formatted(days);
+        }
+        if (hours > 0) {
+            return minutes > 0 ? "%sh %sm".formatted(hours, minutes) : "%sh".formatted(hours);
+        }
+        return "%sm".formatted(Math.max(1, minutes));
+    }
+
+    private static String formatAge(OffsetDateTime createdAt) {
+        if (createdAt == null) {
+            return "";
+        }
+
+        LocalDate createdDate = createdAt.atZoneSameInstant(ZoneId.systemDefault()).toLocalDate();
+        LocalDate today = LocalDate.now();
+        if (createdDate.isAfter(today)) {
+            return "0d";
+        }
+
+        Period period = Period.between(createdDate, today);
+        List<String> parts = new ArrayList<>(3);
+        if (period.getYears() > 0) {
+            parts.add(period.getYears() + "y");
+        }
+        if (period.getMonths() > 0) {
+            parts.add(period.getMonths() + "mo");
+        }
+        if (period.getDays() > 0 || parts.isEmpty()) {
+            parts.add(period.getDays() + "d");
+        }
+        return String.join(" ", parts);
     }
 
     private static TableColumn<PlayerFX, String> addUidStringColumn(
