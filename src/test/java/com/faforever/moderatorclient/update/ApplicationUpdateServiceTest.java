@@ -4,13 +4,16 @@ import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+import java.util.zip.ZipOutputStream;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.greaterThan;
@@ -147,5 +150,99 @@ class ApplicationUpdateServiceTest {
         } finally {
             System.setProperty("user.dir", originalUserDir);
         }
+    }
+
+    @Test
+    void extractZipTrimsSharedRootDirectoryEntry(@TempDir Path tempDir) throws Exception {
+        Path zip = tempDir.resolve("release.zip");
+        try (ZipOutputStream zipOutputStream = new ZipOutputStream(Files.newOutputStream(zip))) {
+            zipOutputStream.putNextEntry(new ZipEntry("faf-moderator-client-win/"));
+            zipOutputStream.closeEntry();
+            zipOutputStream.putNextEntry(new ZipEntry("faf-moderator-client-win/bin/"));
+            zipOutputStream.closeEntry();
+            zipOutputStream.putNextEntry(new ZipEntry("faf-moderator-client-win/bin/faf-moderator-client.bat"));
+            zipOutputStream.write("@echo off".getBytes());
+            zipOutputStream.closeEntry();
+            zipOutputStream.putNextEntry(new ZipEntry("faf-moderator-client-win/lib/"));
+            zipOutputStream.closeEntry();
+            zipOutputStream.putNextEntry(new ZipEntry("faf-moderator-client-win/lib/faf-moderator-client.jar"));
+            zipOutputStream.write("jar".getBytes());
+            zipOutputStream.closeEntry();
+        }
+
+        Path stagedInstall = tempDir.resolve("staged");
+        ReflectionTestUtils.invokeMethod(service, "extractZip", zip, stagedInstall);
+
+        assertThat(Files.isRegularFile(stagedInstall.resolve("bin/faf-moderator-client.bat")), is(true));
+        assertThat(Files.isRegularFile(stagedInstall.resolve("lib/faf-moderator-client.jar")), is(true));
+        assertThat(Files.exists(stagedInstall.resolve("faf-moderator-client-win")), is(false));
+    }
+
+    @Test
+    void purgeUpdaterFolderDeletesSessionFilesAndReportsDeletedSize(@TempDir Path tempDir) throws Exception {
+        Path updaterDir = tempDir.resolve("updater");
+        Path sessionDir = updaterDir.resolve("update-test");
+        Files.createDirectories(sessionDir);
+        Files.writeString(sessionDir.resolve("apply-update.log"), "log");
+        Files.writeString(sessionDir.resolve("release.zip"), "archive");
+
+        ApplicationUpdateService localService = new ApplicationUpdateService(new ObjectMapper(), new LocalPreferences()) {
+            @Override
+            public Path resolveUpdaterBaseDirectory() {
+                return updaterDir;
+            }
+        };
+
+        ApplicationUpdateService.UpdaterFolderStats before = localService.describeUpdaterFolder();
+        ApplicationUpdateService.UpdaterFolderCleanupResult result = localService.purgeUpdaterFolder();
+        ApplicationUpdateService.UpdaterFolderStats after = localService.describeUpdaterFolder();
+
+        assertThat(before.fileCount(), is(2L));
+        assertThat(before.totalBytes(), is(10L));
+        assertThat(result.deletedFileCount(), is(2L));
+        assertThat(result.deletedBytes(), is(10L));
+        assertThat(Files.isDirectory(updaterDir), is(true));
+        assertThat(Files.exists(sessionDir), is(false));
+        assertThat(after.fileCount(), is(0L));
+        assertThat(after.totalBytes(), is(0L));
+    }
+
+    @Test
+    void installerHelperChecksAllConfigLocationsInPriorityOrder(@TempDir Path tempDir) {
+        Path installRoot = tempDir.resolve("install");
+        Path currentWorkingDir = installRoot.resolve("bin");
+        Path currentConfig = tempDir.resolve("current-config");
+
+        List<Path> sources = ApplicationUpdateInstallerHelper.configSourceDirs(installRoot, currentWorkingDir, currentConfig);
+
+        assertThat(sources.get(0), is(currentConfig.toAbsolutePath().normalize()));
+        assertThat(sources.get(1), is(currentWorkingDir.resolve("config").toAbsolutePath().normalize()));
+        assertThat(sources.get(2), is(installRoot.resolve("config").toAbsolutePath().normalize()));
+        assertThat(sources.get(3), is(currentWorkingDir.resolve("data").toAbsolutePath().normalize()));
+        assertThat(sources.get(4), is(installRoot.resolve("data").toAbsolutePath().normalize()));
+    }
+
+    @Test
+    void installerHelperRestoresCurrentAndInstallRootConfigTargets(@TempDir Path tempDir) {
+        Path installRoot = tempDir.resolve("install");
+        Path currentWorkingDir = installRoot.resolve("bin");
+        Path currentConfig = tempDir.resolve("current-config");
+
+        List<Path> targets = ApplicationUpdateInstallerHelper.configTargetDirs(installRoot, currentWorkingDir, currentConfig);
+
+        assertThat(targets.contains(currentConfig.toAbsolutePath().normalize()), is(true));
+        assertThat(targets.contains(currentWorkingDir.resolve("config").toAbsolutePath().normalize()), is(true));
+        assertThat(targets.contains(installRoot.resolve("config").toAbsolutePath().normalize()), is(true));
+    }
+
+    @Test
+    void installerHelperPreservesLegacyPreferenceFiles(@TempDir Path tempDir) {
+        Path installRoot = tempDir.resolve("install");
+        Path currentWorkingDir = installRoot.resolve("bin");
+
+        List<Path> prefsFiles = ApplicationUpdateInstallerHelper.legacyPrefsFiles(installRoot, currentWorkingDir);
+
+        assertThat(prefsFiles.get(0), is(currentWorkingDir.resolve("client-prefs.json").toAbsolutePath().normalize()));
+        assertThat(prefsFiles.get(1), is(installRoot.resolve("client-prefs.json").toAbsolutePath().normalize()));
     }
 }

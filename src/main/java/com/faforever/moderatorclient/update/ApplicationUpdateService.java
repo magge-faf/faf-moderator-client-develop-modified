@@ -18,6 +18,8 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.Comparator;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -27,6 +29,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -156,11 +159,55 @@ public class ApplicationUpdateService {
 
     public BackupFolderStats describeBackupFolder() throws IOException {
         Path backupDir = resolveConfiguredBackupDirectory();
-        if (!Files.isDirectory(backupDir)) {
-            return new BackupFolderStats(backupDir, 0L, 0L);
+        FolderStats stats = describeFolder(backupDir);
+        return new BackupFolderStats(stats.directory(), stats.fileCount(), stats.totalBytes());
+    }
+
+    public UpdaterFolderStats describeUpdaterFolder() throws IOException {
+        FolderStats stats = describeFolder(resolveUpdaterBaseDirectory());
+        return new UpdaterFolderStats(stats.directory(), stats.fileCount(), stats.totalBytes());
+    }
+
+    public UpdaterFolderCleanupResult purgeUpdaterFolder() throws IOException {
+        Path updaterDir = resolveUpdaterBaseDirectory();
+        if (!Files.isDirectory(updaterDir)) {
+            Files.createDirectories(updaterDir);
+            return new UpdaterFolderCleanupResult(updaterDir, 0L, 0L);
         }
 
-        try (var paths = Files.walk(backupDir)) {
+        long[] totals = new long[]{0L, 0L};
+        try (var paths = Files.walk(updaterDir)) {
+            paths
+                    .filter(path -> !path.equals(updaterDir))
+                    .sorted(Comparator.reverseOrder())
+                    .forEach(path -> {
+                        try {
+                            if (Files.isRegularFile(path)) {
+                                totals[0]++;
+                                totals[1] += Files.size(path);
+                            }
+                            Files.deleteIfExists(path);
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
+        } catch (RuntimeException e) {
+            if (e.getCause() instanceof IOException ioException) {
+                throw ioException;
+            }
+            throw e;
+        }
+
+        Files.createDirectories(updaterDir);
+        return new UpdaterFolderCleanupResult(updaterDir, totals[0], totals[1]);
+    }
+
+    private FolderStats describeFolder(Path directory) throws IOException {
+        if (!Files.isDirectory(directory)) {
+            return new FolderStats(directory, 0L, 0L);
+        }
+
+        try (var paths = Files.walk(directory)) {
             long[] totals = paths
                     .filter(Files::isRegularFile)
                     .map(path -> {
@@ -171,7 +218,7 @@ public class ApplicationUpdateService {
                         }
                     })
                     .reduce(new long[]{0L, 0L}, (left, right) -> new long[]{left[0] + right[0], left[1] + right[1]});
-            return new BackupFolderStats(backupDir, totals[0], totals[1]);
+            return new FolderStats(directory, totals[0], totals[1]);
         } catch (RuntimeException e) {
             if (e.getCause() instanceof IOException ioException) {
                 throw ioException;
@@ -202,7 +249,7 @@ public class ApplicationUpdateService {
         return backupArchive;
     }
 
-    public void prepareUpdateAndLaunchInstaller(GithubRelease release, Consumer<String> statusCallback)
+    public boolean prepareUpdateAndLaunchInstaller(GithubRelease release, Consumer<String> statusCallback, BooleanSupplier restartConfirmation)
             throws IOException, InterruptedException {
         InstallLocation installLocation = resolveInstallLocation()
                 .orElseThrow(() -> new IllegalStateException("Automatic update is only available from an unpacked release folder."));
@@ -218,15 +265,31 @@ public class ApplicationUpdateService {
 
         reportStatus(statusCallback, "Extracting release files...");
         extractZip(downloadedZip, stagedInstall);
+        reportStatus(statusCallback, "Validating extracted release layout...");
         validateStagedInstall(stagedInstall);
 
         reportStatus(statusCallback, "Creating backup zip of the current installation...");
         Path backupArchive = createBackupArchivePath(installLocation.installRoot());
         zipDirectory(installLocation.installRoot(), backupArchive);
+        reportStatus(statusCallback, "Backup saved to " + backupArchive);
 
-        reportStatus(statusCallback, "Scheduling restart...");
-        launchInstallerHelper(installLocation, stagedInstall, sessionDir);
+        reportStatus(statusCallback, "Ready to restart the FAF Moderator Client and apply the update. Your PC will not restart.");
+        if (restartConfirmation != null && !restartConfirmation.getAsBoolean()) {
+            reportStatus(statusCallback, "Update prepared. Client restart canceled by user.");
+            return false;
+        }
+
+        reportStatus(statusCallback, "Writing installer helper in " + sessionDir);
+        launchInstallerHelper(
+                installLocation,
+                stagedInstall,
+                sessionDir,
+                ApplicationPaths.resolveWorkingDirectory(),
+                ApplicationPaths.resolveConfigurationDirectory()
+        );
+        reportStatus(statusCallback, "Installer helper launched. The client will close and restart after files are replaced. Your PC will not restart.");
         log.info("Prepared update {}. Backup saved to {}", release.tagName(), backupArchive);
+        return true;
     }
 
     static int compareVersions(String left, String right) {
@@ -299,7 +362,13 @@ public class ApplicationUpdateService {
                 }
 
                 String normalized = name.endsWith("/") ? name.substring(0, name.length() - 1) : name;
-                if (normalized.isBlank() || !normalized.contains("/")) {
+                if (normalized.isBlank()) {
+                    continue;
+                }
+                if (!normalized.contains("/")) {
+                    if (entry.isDirectory()) {
+                        continue;
+                    }
                     return null;
                 }
 
@@ -338,7 +407,7 @@ public class ApplicationUpdateService {
         return sessionDir;
     }
 
-    private Path resolveUpdaterBaseDirectory() {
+    public Path resolveUpdaterBaseDirectory() {
         if (isWindows()) {
             String localAppData = System.getenv("LOCALAPPDATA");
             if (localAppData != null && !localAppData.isBlank()) {
@@ -414,88 +483,51 @@ public class ApplicationUpdateService {
         }
     }
 
-    private void launchInstallerHelper(InstallLocation installLocation, Path stagedInstall, Path sessionDirectory) throws IOException {
-        Path scriptPath = sessionDirectory.resolve(isWindows() ? "apply-update.ps1" : "apply-update.sh");
-        Files.writeString(scriptPath, buildInstallerScript(installLocation, stagedInstall), StandardCharsets.UTF_8);
-        if (!isWindows()) {
-            scriptPath.toFile().setExecutable(true, false);
-        }
+    private void launchInstallerHelper(
+            InstallLocation installLocation,
+            Path stagedInstall,
+            Path sessionDirectory,
+            Path currentWorkingDirectory,
+            Path currentConfigurationDirectory
+    ) throws IOException {
+        Path helperClasspath = copyInstallerHelperClasspath(sessionDirectory);
+        List<String> command = new ArrayList<>();
+        command.add(resolveJavaExecutable().toString());
+        command.add("-cp");
+        command.add(helperClasspath.toString());
+        command.add(ApplicationUpdateInstallerHelper.class.getName());
+        command.add(String.valueOf(ProcessHandle.current().pid()));
+        command.add(installLocation.installRoot().toString());
+        command.add(stagedInstall.toString());
+        command.add(installLocation.launcherScript().toString());
+        command.add(currentWorkingDirectory.toString());
+        command.add(currentConfigurationDirectory.toString());
 
-        ProcessBuilder processBuilder;
-        if (isWindows()) {
-            processBuilder = new ProcessBuilder(
-                    "powershell.exe",
-                    "-NoProfile",
-                    "-ExecutionPolicy",
-                    "Bypass",
-                    "-WindowStyle",
-                    "Hidden",
-                    "-File",
-                    scriptPath.toString()
-            );
-        } else {
-            processBuilder = new ProcessBuilder("sh", scriptPath.toString());
-        }
-
+        ProcessBuilder processBuilder = new ProcessBuilder(command);
+        processBuilder.directory(sessionDirectory.toFile());
         processBuilder.start();
     }
 
-    private String buildInstallerScript(InstallLocation installLocation, Path stagedInstall) {
-        if (isWindows()) {
-            return """
-                    $ErrorActionPreference = 'Stop'
-                    $ProgressPreference = 'SilentlyContinue'
-                    $pidToWait = %d
-                    $installDir = '%s'
-                    $stageDir = '%s'
-                    $launcherPath = '%s'
-                    $workingDir = '%s'
-
-                    while (Get-Process -Id $pidToWait -ErrorAction SilentlyContinue) {
-                        Start-Sleep -Milliseconds 500
-                    }
-
-                    $binDir = Join-Path $installDir 'bin'
-                    $libDir = Join-Path $installDir 'lib'
-                    if (Test-Path -LiteralPath $binDir) { Remove-Item -LiteralPath $binDir -Recurse -Force }
-                    if (Test-Path -LiteralPath $libDir) { Remove-Item -LiteralPath $libDir -Recurse -Force }
-
-                    Get-ChildItem -LiteralPath $stageDir -Force | ForEach-Object {
-                        Copy-Item -LiteralPath $_.FullName -Destination $installDir -Recurse -Force
-                    }
-
-                    Start-Process -FilePath $launcherPath -WorkingDirectory $workingDir
-                    """.formatted(
-                    ProcessHandle.current().pid(),
-                    escapeForPowerShell(installLocation.installRoot()),
-                    escapeForPowerShell(stagedInstall),
-                    escapeForPowerShell(installLocation.launcherScript()),
-                    escapeForPowerShell(installLocation.installRoot())
-            );
+    private Path copyInstallerHelperClasspath(Path sessionDirectory) throws IOException {
+        Path codeSource;
+        try {
+            codeSource = Path.of(ApplicationUpdateInstallerHelper.class.getProtectionDomain().getCodeSource().getLocation().toURI())
+                    .toAbsolutePath()
+                    .normalize();
+        } catch (Exception e) {
+            throw new IOException("Failed to locate update helper classpath", e);
         }
+        if (Files.isRegularFile(codeSource)) {
+            Path helperJar = sessionDirectory.resolve("update-helper.jar");
+            Files.copy(codeSource, helperJar, StandardCopyOption.REPLACE_EXISTING);
+            return helperJar;
+        }
+        return codeSource;
+    }
 
-        return """
-                #!/usr/bin/env sh
-                set -eu
-                PID=%d
-                INSTALL_DIR='%s'
-                STAGE_DIR='%s'
-                LAUNCHER_PATH='%s'
-
-                while kill -0 "$PID" 2>/dev/null; do
-                  sleep 1
-                done
-
-                rm -rf "$INSTALL_DIR/bin" "$INSTALL_DIR/lib"
-                cp -R "$STAGE_DIR/." "$INSTALL_DIR/"
-                chmod +x "$LAUNCHER_PATH" || true
-                nohup "$LAUNCHER_PATH" >/dev/null 2>&1 &
-                """.formatted(
-                ProcessHandle.current().pid(),
-                escapeForShell(installLocation.installRoot()),
-                escapeForShell(stagedInstall),
-                escapeForShell(installLocation.launcherScript())
-        );
+    private Path resolveJavaExecutable() {
+        String executable = isWindows() ? "java.exe" : "java";
+        return Path.of(System.getProperty("java.home"), "bin", executable);
     }
 
     private Optional<InstallLocation> resolveInstallLocation() {
@@ -580,41 +612,15 @@ public class ApplicationUpdateService {
     }
 
     private Optional<String> describeInstallerRuntimeUnavailableReason() {
-        if (isWindows()) {
-            String systemRoot = System.getenv("SystemRoot") == null ? "C:\\Windows" : System.getenv("SystemRoot");
-            Path bundledPowerShell = Path.of(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
-            if (isExecutableAvailable("powershell.exe") || Files.isRegularFile(bundledPowerShell)) {
-                return Optional.empty();
-            }
-            return Optional.of("PowerShell is required for automatic updates on Windows.\n\n"
-                    + "Install or enable Windows PowerShell, then restart the client and try the automatic update again. "
-                    + "You can still use Manual Download.");
-        }
-
-        if (isExecutableAvailable("sh")) {
+        Path javaExecutable = resolveJavaExecutable();
+        if (Files.isRegularFile(javaExecutable)) {
             return Optional.empty();
         }
-        return Optional.of("A POSIX sh runtime is required for automatic updates on this system.\n\n"
-                + "Install a compatible shell, then restart the client and try the automatic update again. "
+
+        return Optional.of("The Java runtime used to start this client could not be found at "
+                + javaExecutable + ".\n\n"
+                + "Restart the client from a valid Java runtime and try the automatic update again. "
                 + "You can still use Manual Download.");
-    }
-
-    private boolean isExecutableAvailable(String executableName) {
-        String pathValue = System.getenv("PATH");
-        if (pathValue == null || pathValue.isBlank()) {
-            return false;
-        }
-
-        for (String directory : pathValue.split(java.io.File.pathSeparator)) {
-            if (directory == null || directory.isBlank()) {
-                continue;
-            }
-            Path executablePath = Path.of(directory, executableName);
-            if (Files.isRegularFile(executablePath)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private String blankToNull(String value) {
@@ -627,18 +633,19 @@ public class ApplicationUpdateService {
         }
     }
 
-    private String escapeForPowerShell(Path path) {
-        return path.toAbsolutePath().toString().replace("'", "''");
-    }
-
-    private String escapeForShell(Path path) {
-        return path.toAbsolutePath().toString().replace("'", "'\"'\"'");
-    }
-
     private record InstallLocation(Path installRoot, Path launcherScript) {
     }
 
     public record BackupFolderStats(Path directory, long fileCount, long totalBytes) {
+    }
+
+    public record UpdaterFolderStats(Path directory, long fileCount, long totalBytes) {
+    }
+
+    public record UpdaterFolderCleanupResult(Path directory, long deletedFileCount, long deletedBytes) {
+    }
+
+    private record FolderStats(Path directory, long fileCount, long totalBytes) {
     }
 
 }

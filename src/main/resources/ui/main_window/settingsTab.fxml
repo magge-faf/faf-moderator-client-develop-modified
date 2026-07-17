@@ -107,6 +107,14 @@
                     <Label fx:id="updateBackupFolderDefaultLabel" styleClass="settings-help" text="" wrapText="true"/>
                     <Label fx:id="updateBackupFolderInfoLabel" styleClass="settings-status" text="Stored backups: 0.00 MB across 0 files." wrapText="true"/>
                     <Label fx:id="updateBackupFolderStatusLabel" styleClass="settings-status" text="" wrapText="true"/>
+                    <Separator/>
+                    <Label styleClass="settings-section-title" text="Updater Data"/>
+                    <Label fx:id="updaterDataFolderInfoLabel" styleClass="settings-help" text="" wrapText="true"/>
+                    <HBox spacing="8" styleClass="settings-action-row">
+                        <Button mnemonicParsing="false" onAction="#onOpenUpdaterDataFolder" text="Open Updater Folder"/>
+                        <Button mnemonicParsing="false" onAction="#onPurgeUpdaterDataFolder" text="Purge Updater Folder"/>
+                    </HBox>
+                    <Label fx:id="updaterDataFolderStatusLabel" styleClass="settings-status" text="" wrapText="true"/>
                 </VBox>
 
                 <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="0" GridPane.rowIndex="4" GridPane.columnSpan="2">

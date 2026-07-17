@@ -111,6 +111,36 @@ distZip {
     archiveClassifier.set(javafxPlatform)
 }
 
+def buildDistributionsDir = layout.buildDirectory.dir("distributions")
+def buildInstallDir = layout.buildDirectory.dir("install/${project.name}")
+
+tasks.register("printBuildOutputPaths") {
+    doLast {
+        println ""
+        println "Build outputs:"
+
+        def distributionDir = buildDistributionsDir.get().asFile
+        def distributionFiles = distributionDir.exists()
+                ? distributionDir.listFiles().findAll { it.isFile() && (it.name.endsWith(".zip") || it.name.endsWith(".tar")) }.sort { it.name }
+                : []
+        if (distributionFiles) {
+            distributionFiles.each { println "  Distribution archive: ${it.absolutePath}" }
+        } else {
+            println "  Distribution archive: not found in ${distributionDir.absolutePath}"
+        }
+
+        def installDir = buildInstallDir.get().asFile
+        if (installDir.exists()) {
+            println "  Runnable install folder: ${installDir.absolutePath}"
+            println "  Start scripts: ${new File(installDir, 'bin').absolutePath}"
+        } else {
+            println "  Runnable install folder: not built by this task"
+        }
+    }
+}
+
+build.finalizedBy(tasks.named("printBuildOutputPaths"))
+
 static def dateVersion() {
     def now = new Date()
     return now.format('yyyy-MM-dd')

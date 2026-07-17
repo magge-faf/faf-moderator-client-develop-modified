@@ -73,6 +73,10 @@ public class SettingsController implements Controller<Pane> {
     public Label updateBackupFolderStatusLabel;
     @FXML
     public Label updateBackupFolderDefaultLabel;
+    @FXML
+    public Label updaterDataFolderInfoLabel;
+    @FXML
+    public Label updaterDataFolderStatusLabel;
 
     private String defaultUpdateBackupFolder;
 
@@ -151,7 +155,9 @@ public class SettingsController implements Controller<Pane> {
                 defaultUpdateBackupFolder
         ));
         replayFolderStatusLabel.setText("");
+        updaterDataFolderStatusLabel.setText("");
         refreshUpdateBackupFolderInfo();
+        refreshUpdaterFolderInfo();
         refreshReplayFolderInfo();
 
         if (browserComboBox.getValue() == null) {
@@ -435,6 +441,35 @@ public class SettingsController implements Controller<Pane> {
         }
     }
 
+    public void onOpenUpdaterDataFolder() {
+        try {
+            Path updaterDataFolder = applicationUpdateService.resolveUpdaterBaseDirectory();
+            Files.createDirectories(updaterDataFolder);
+            openPath(updaterDataFolder.toFile());
+            updaterDataFolderStatusLabel.setText("Opened updater folder: " + updaterDataFolder);
+        } catch (IOException e) {
+            updaterDataFolderStatusLabel.setText("Failed to open updater folder: " + e.getMessage());
+            log.error("Failed to open updater folder", e);
+        }
+    }
+
+    public void onPurgeUpdaterDataFolder() {
+        try {
+            ApplicationUpdateService.UpdaterFolderCleanupResult result = applicationUpdateService.purgeUpdaterFolder();
+            updaterDataFolderStatusLabel.setText(String.format(
+                    Locale.ROOT,
+                    "Purged updater folder: removed %.2f MB across %d files from %s",
+                    bytesToMegabytes(result.deletedBytes()),
+                    result.deletedFileCount(),
+                    result.directory()
+            ));
+            refreshUpdaterFolderInfo();
+        } catch (IOException e) {
+            updaterDataFolderStatusLabel.setText("Failed to purge updater folder: " + e.getMessage());
+            log.error("Failed to purge updater folder", e);
+        }
+    }
+
     public void onOpenReplayFolder() {
         try {
             replayStorageService.ensureReplayDirectoryExists();
@@ -566,6 +601,26 @@ public class SettingsController implements Controller<Pane> {
             updateBackupFolderInfoLabel.setText("Stored backups: unavailable");
             updateBackupFolderStatusLabel.setText("Unable to inspect backup folder: " + e.getMessage());
             log.error("Failed to refresh update backup folder info", e);
+        }
+    }
+
+    private void refreshUpdaterFolderInfo() {
+        try {
+            ApplicationUpdateService.UpdaterFolderStats stats = applicationUpdateService.describeUpdaterFolder();
+            updaterDataFolderInfoLabel.setText(String.format(
+                    Locale.ROOT,
+                    "Updater sessions, downloaded release archives, installer scripts, and apply-update.log files are stored in %s. Stored updater data: %.2f MB across %d files.",
+                    stats.directory(),
+                    bytesToMegabytes(stats.totalBytes()),
+                    stats.fileCount()
+            ));
+            if (updaterDataFolderStatusLabel.getText() == null) {
+                updaterDataFolderStatusLabel.setText("");
+            }
+        } catch (IOException e) {
+            updaterDataFolderInfoLabel.setText("Updater folder: unavailable");
+            updaterDataFolderStatusLabel.setText("Unable to inspect updater folder: " + e.getMessage());
+            log.error("Failed to refresh updater folder info", e);
         }
     }
 
