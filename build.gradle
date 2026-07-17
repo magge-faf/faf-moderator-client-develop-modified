@@ -193,4 +193,7 @@ compileJava.dependsOn(tasks.named("generateVersionClass"))
 
 test {
     useJUnitPlatform()
+    // Isolates java.util.prefs.Preferences from the real OS-backed store (Windows registry / ~/.java) so
+    // credential tests never read or clear the packaged app's saved login token.
+    systemProperty 'java.util.prefs.PreferencesFactory', 'com.faforever.moderatorclient.config.local.InMemoryPreferencesFactory'
 }
