@@ -519,4 +519,28 @@ class ApplicationUpdateServiceTest {
         assertThat(prefsFiles.get(1), is(installRoot.resolve("client-prefs.json").toAbsolutePath().normalize()));
         assertThat(prefsFiles.contains(installRoot.resolve("bin").resolve("client-prefs.json").toAbsolutePath().normalize()), is(true));
     }
+
+    @Test
+    void installerHelperStartsWindowsClientFromInstallRoot(@TempDir Path tempDir) {
+        String originalOsName = System.getProperty("os.name");
+        try {
+            System.setProperty("os.name", "Windows 11");
+            Path installRoot = tempDir.resolve("install");
+            Path launcher = installRoot.resolve("bin").resolve("faf-moderator-client.bat");
+
+            List<String> command = ApplicationUpdateInstallerHelper.startUpdatedClientCommand(launcher, installRoot);
+
+            assertThat(command, is(List.of(
+                    "cmd",
+                    "/c",
+                    "start",
+                    "",
+                    "/d",
+                    installRoot.toString(),
+                    launcher.toString()
+            )));
+        } finally {
+            System.setProperty("os.name", originalOsName);
+        }
+    }
 }

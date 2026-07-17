@@ -315,14 +315,16 @@ public final class ApplicationUpdateInstallerHelper {
 
     private static void startUpdatedClient(Path launcherPath, Path workingDir, Path logPath) throws IOException {
         log(logPath, "Starting '" + launcherPath + "'.");
-        ProcessBuilder processBuilder;
-        if (System.getProperty("os.name", "").toLowerCase().contains("win")) {
-            processBuilder = new ProcessBuilder("cmd", "/c", "start", "", launcherPath.toString());
-        } else {
-            processBuilder = new ProcessBuilder("sh", launcherPath.toString());
-        }
+        ProcessBuilder processBuilder = new ProcessBuilder(startUpdatedClientCommand(launcherPath, workingDir));
         processBuilder.directory(workingDir.toFile());
         processBuilder.start();
+    }
+
+    static List<String> startUpdatedClientCommand(Path launcherPath, Path workingDir) {
+        if (System.getProperty("os.name", "").toLowerCase().contains("win")) {
+            return List.of("cmd", "/c", "start", "", "/d", workingDir.toString(), launcherPath.toString());
+        }
+        return List.of("sh", launcherPath.toString());
     }
 
     private static boolean isWindows() {

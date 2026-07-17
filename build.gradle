@@ -103,7 +103,7 @@ tasks.withType(CreateStartScripts).each { task ->
         String text = task.windowsScript.text
         // Replaces the per file classpath (which are all jars in "lib") with a wildcard on lib
         text = text.replaceFirst(/(set CLASSPATH=%APP_HOME%\\lib\\).*/, { "${it[1]}*" })
-        text = text.replace("set DEFAULT_JVM_OPTS=", "set DEFAULT_JVM_OPTS=\"-Dfaf.app.home=%APP_HOME%\"")
+        text = text.replaceFirst(/(?m)^set DEFAULT_JVM_OPTS=.*/, 'set DEFAULT_JVM_OPTS="-Dfaf.app.home=%APP_HOME%"')
         task.windowsScript.write text
 
         text = task.unixScript.text
