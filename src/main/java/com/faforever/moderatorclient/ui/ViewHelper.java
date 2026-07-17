@@ -378,8 +378,9 @@ public class ViewHelper {
             extractors.put(affectedPlayerColumn, banInfoFX -> banInfoFX.getPlayer().getLogin());
         }
 
-        TableColumn<BanInfoFX, OffsetDateTime> expiresAtColumn = new TableColumn<>("Expires at");
-        expiresAtColumn.setCellValueFactory(o -> o.getValue().expiresAtProperty());
+        TableColumn<BanInfoFX, String> expiresAtColumn = new TableColumn<>("Expires at");
+        expiresAtColumn.setCellValueFactory(o -> Bindings.createStringBinding(() -> formatBanExpiresAt(o.getValue().getExpiresAt()),
+                o.getValue().expiresAtProperty()));
         tableView.getColumns().add(expiresAtColumn);
         extractors.put(expiresAtColumn, BanInfoFX::getExpiresAt);
 
@@ -1330,6 +1331,35 @@ public class ViewHelper {
                 setText(empty || item == null ? null : fmt.format(item));
             }
         };
+    }
+
+    static String formatBanExpiresAt(OffsetDateTime expiresAt) {
+        if (expiresAt == null) {
+            return "Permanent";
+        }
+
+        OffsetDateTime now = OffsetDateTime.now(expiresAt.getOffset());
+        Duration delta = Duration.between(now, expiresAt);
+        boolean expired = delta.isNegative();
+        Duration absoluteDelta = delta.abs();
+
+        String relativeTime = formatCompactDuration(absoluteDelta);
+        String relativeText = expired ? "expired " + relativeTime + " ago" : "in " + relativeTime;
+        return "%s (%s)".formatted(DT_DATETIME.format(expiresAt.atZoneSameInstant(ZoneId.systemDefault())), relativeText);
+    }
+
+    private static String formatCompactDuration(Duration duration) {
+        long days = duration.toDays();
+        int hours = duration.toHoursPart();
+        int minutes = duration.toMinutesPart();
+
+        if (days > 0) {
+            return hours > 0 ? "%sd %sh".formatted(days, hours) : "%sd".formatted(days);
+        }
+        if (hours > 0) {
+            return minutes > 0 ? "%sh %sm".formatted(hours, minutes) : "%sh".formatted(hours);
+        }
+        return "%sm".formatted(Math.max(1, minutes));
     }
 
     private static String formatAge(OffsetDateTime createdAt) {
