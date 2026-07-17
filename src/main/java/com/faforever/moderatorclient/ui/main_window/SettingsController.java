@@ -84,7 +84,7 @@ public class SettingsController implements Controller<Pane> {
     public Label updaterDataFolderStatusLabel;
 
     private String defaultUpdateBackupFolder;
-    private final PauseTransition updateBackupFolderRefreshDelay = new PauseTransition(Duration.millis(250));
+    private PauseTransition updateBackupFolderRefreshDelay;
     private final AtomicLong updateBackupFolderInfoGeneration = new AtomicLong();
 
     @Override
@@ -150,6 +150,7 @@ public class SettingsController implements Controller<Pane> {
                         : configuredBackupFolder
         );
         updateBackupFolderTextField.setPromptText(defaultUpdateBackupFolder);
+        updateBackupFolderRefreshDelay = new PauseTransition(Duration.millis(250));
         updateBackupFolderRefreshDelay.setOnFinished(event -> refreshUpdateBackupFolderInfo());
         updateBackupFolderTextField.textProperty().addListener((obs, oldVal, newVal) -> scheduleUpdateBackupFolderInfoRefresh());
         replayFolderInfoLabel.setText(String.format(
@@ -722,6 +723,10 @@ public class SettingsController implements Controller<Pane> {
     }
 
     private void scheduleUpdateBackupFolderInfoRefresh() {
+        if (updateBackupFolderRefreshDelay == null) {
+            refreshUpdateBackupFolderInfo();
+            return;
+        }
         updateBackupFolderRefreshDelay.playFromStart();
     }
 

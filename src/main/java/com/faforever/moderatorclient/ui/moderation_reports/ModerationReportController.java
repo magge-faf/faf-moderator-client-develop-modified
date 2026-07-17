@@ -1874,8 +1874,6 @@ public class ModerationReportController implements Controller<Region> {
         return name;
     }
 
-    private static final Font MONO = Font.font("Courier New", 12);
-
     private void addColoredTextForPointOfInterest(String line, TextFlow textFlow) {
         textFlow.getChildren().add(styledText(line, Color.ORANGE));
     }
@@ -2012,14 +2010,18 @@ public class ModerationReportController implements Controller<Region> {
     private static Text styledText(String content, Color color) {
         Text t = new Text(content);
         t.setFill(color);
-        t.setFont(MONO);
+        t.setFont(monospaceFont());
         return t;
     }
 
     private static Text newline() {
         Text t = new Text("\n");
-        t.setFont(MONO);
+        t.setFont(monospaceFont());
         return t;
+    }
+
+    private static Font monospaceFont() {
+        return Font.font("Courier New", 12);
     }
 
     private void deleteTempFile(Path tempFilePath) {
