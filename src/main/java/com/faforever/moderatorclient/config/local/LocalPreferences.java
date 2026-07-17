@@ -1,5 +1,6 @@
 package com.faforever.moderatorclient.config.local;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
@@ -12,6 +13,7 @@ import java.util.Map;
 import java.util.prefs.Preferences;
 import java.util.prefs.BackingStoreException;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Data
@@ -320,6 +322,8 @@ public class LocalPreferences {
         private static final String ENCRYPTED_TOKEN_KEY = "encryptedRefreshToken";
         private static final String LOBBY_REFRESH_TOKEN_KEY = "lobbyRefreshToken";
         private static final String ENCRYPTED_LOBBY_TOKEN_KEY = "encryptedLobbyRefreshToken";
+        private static final Pattern PLAUSIBLE_REFRESH_TOKEN_PATTERN =
+                Pattern.compile("[A-Za-z0-9._~+/=-]{20,}");
 
         boolean enabled = true;
         String environment;
@@ -488,10 +492,14 @@ public class LocalPreferences {
                 }
 
                 String decryptedToken = new String(decrypted, java.nio.charset.StandardCharsets.UTF_8);
-                return decryptedToken.isBlank() ? null : decryptedToken;
+                return isPlausibleRefreshToken(decryptedToken) ? decryptedToken : null;
             } catch (Exception e) {
                 return null;
             }
+        }
+
+        private boolean isPlausibleRefreshToken(String token) {
+            return token != null && PLAUSIBLE_REFRESH_TOKEN_PATTERN.matcher(token).matches();
         }
 
         private javax.crypto.SecretKey getOrGenerateSecretKey() {
@@ -672,6 +680,8 @@ public class LocalPreferences {
         private int reminderDelayDays = 3;
         private String reminderVersionTag = "";
         private boolean skipAutomaticUpdateRestartConfirmation = false;
+        @JsonIgnore
+        private transient boolean suppressCurrentSession = false;
 
         public long getEffectiveNextReminderEpoch() {
             if (nextReminderEpoch > 0) {
@@ -693,8 +703,16 @@ public class LocalPreferences {
         public void scheduleForNextStart(String versionTag, int preferredDelayDays) {
             reminderDelayDays = Math.max(1, preferredDelayDays);
             reminderVersionTag = versionTag == null ? "" : versionTag;
-            nextReminderEpoch = 0;
-            lastReminderEpoch = 0;
+            suppressCurrentSession = true;
+        }
+
+        public boolean shouldSuppressForCurrentSession(String versionTag) {
+            if (!suppressCurrentSession) {
+                return false;
+            }
+            String normalizedReminderVersion = reminderVersionTag == null ? "" : reminderVersionTag;
+            String normalizedVersion = versionTag == null ? "" : versionTag;
+            return normalizedReminderVersion.equals(normalizedVersion);
         }
     }
 

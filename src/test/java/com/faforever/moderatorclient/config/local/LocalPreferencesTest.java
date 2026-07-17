@@ -12,6 +12,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.nullValue;
 
 class LocalPreferencesTest {
     private static final Preferences CREDENTIAL_PREFERENCES =
@@ -67,6 +68,23 @@ class LocalPreferencesTest {
             assertThat(localPreferences.getAutoLogin().getRefreshToken(), is(legacyRefreshToken));
             assertThat(CREDENTIAL_PREFERENCES.get(ENCRYPTED_TOKEN_KEY, null), not(is(legacyEncryptedToken)));
             assertThat(CREDENTIAL_PREFERENCES.get(AES_KEY, null) != null, is(true));
+        } finally {
+            clearCredentialPreferences();
+        }
+    }
+
+    @Test
+    void corruptEncryptedRefreshTokenIsNotMigratedAsLegacyToken() {
+        clearCredentialPreferences();
+
+        String corruptEncryptedToken = Base64.getEncoder().encodeToString(new byte[]{1, 2, 3, 4, 5, 6});
+        CREDENTIAL_PREFERENCES.put(ENCRYPTED_TOKEN_KEY, corruptEncryptedToken);
+
+        try {
+            LocalPreferences localPreferences = new LocalPreferences();
+
+            assertThat(localPreferences.getAutoLogin().getRefreshToken(), is(nullValue()));
+            assertThat(CREDENTIAL_PREFERENCES.get(ENCRYPTED_TOKEN_KEY, null), is(corruptEncryptedToken));
         } finally {
             clearCredentialPreferences();
         }

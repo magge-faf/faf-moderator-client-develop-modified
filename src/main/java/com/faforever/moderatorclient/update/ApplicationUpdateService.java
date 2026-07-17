@@ -101,6 +101,9 @@ public class ApplicationUpdateService {
         if (reminderVersion != null && compareVersions(release.tagName(), reminderVersion) > 0) {
             return true;
         }
+        if (reminder.shouldSuppressForCurrentSession(release.tagName())) {
+            return false;
+        }
 
         long nextReminderEpoch = reminder.getEffectiveNextReminderEpoch();
         return nextReminderEpoch == 0 || System.currentTimeMillis() >= nextReminderEpoch;

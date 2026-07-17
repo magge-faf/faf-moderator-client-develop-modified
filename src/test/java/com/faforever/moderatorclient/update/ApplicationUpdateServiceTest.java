@@ -52,6 +52,21 @@ class ApplicationUpdateServiceTest {
     }
 
     @Test
+    void nextStartReminderSuppressesOnlyCurrentSession() {
+        LocalPreferences.VersionReminder reminder = new LocalPreferences.VersionReminder();
+        reminder.scheduleForNextStart("v9999-01-01", 3);
+        GithubRelease release = new GithubRelease("v9999-01-01", "v9999-01-01", "https://example.invalid", "", null, List.of());
+
+        assertThat(service.shouldShowUpdate(release, reminder), is(false));
+
+        LocalPreferences.VersionReminder reloadedReminder = new LocalPreferences.VersionReminder();
+        reloadedReminder.setReminderVersionTag(reminder.getReminderVersionTag());
+        reloadedReminder.setReminderDelayDays(reminder.getReminderDelayDays());
+
+        assertThat(service.shouldShowUpdate(release, reloadedReminder), is(true));
+    }
+
+    @Test
     void olderDateReleaseDoesNotShowUpdateForCurrentBuild() {
         LocalPreferences.VersionReminder reminder = new LocalPreferences.VersionReminder();
         GithubRelease release = new GithubRelease("v2026-07-08", "v2026-07-08", "https://example.invalid", "", null, List.of());
