@@ -12,6 +12,7 @@
       fx:controller="com.faforever.moderatorclient.ui.main_window.ChangelogController">
     <HBox spacing="8">
         <ComboBox fx:id="buildComboBox" prefWidth="360"/>
+        <Button mnemonicParsing="false" onAction="#onRefresh" text="Refresh"/>
         <Button mnemonicParsing="false" onAction="#onOpenProjectIssues" text="Report Bug / Request Feature"/>
     </HBox>
     <Label fx:id="releaseInfoLabel" wrapText="true"/>
