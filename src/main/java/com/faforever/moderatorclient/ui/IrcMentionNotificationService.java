@@ -26,9 +26,6 @@ import java.awt.TrayIcon.MessageType;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
-import java.util.Locale;
 
 @Service
 @Slf4j
@@ -49,10 +46,6 @@ public class IrcMentionNotificationService {
     }
 
     public void showMentionToast(String sender, String channel, String message) {
-        if (isWindows() && showSystemNotification(sender, channel, message)) {
-            return;
-        }
-
         Platform.runLater(() -> {
             boolean desktopNotificationPreferred = shouldPreferDesktopNotification();
             if (desktopNotificationPreferred && showSystemNotification(sender, channel, message)) {
@@ -64,12 +57,9 @@ public class IrcMentionNotificationService {
                 return;
             }
 
-            if (isWindows()) {
-                runWindowsNotificationAsync(sender, channel, message);
-                return;
+            if (!showSystemNotification(sender, channel, message)) {
+                log.debug("Unable to show a mention notification: no system tray available and no visible window.");
             }
-
-            showSystemNotification(sender, channel, message);
         });
     }
 
@@ -98,32 +88,6 @@ public class IrcMentionNotificationService {
         String body = abbreviate(sender + " in " + channel + System.lineSeparator() + message, 220);
         systemTrayIcon.displayMessage(title, body, MessageType.INFO);
         return true;
-    }
-
-    private void runWindowsNotificationAsync(String sender, String channel, String message) {
-        String title = abbreviate("IRC mention", 60);
-        String body = abbreviate(sender + " in " + channel + System.lineSeparator() + message, 220);
-        String script = """
-                Add-Type -AssemblyName System.Windows.Forms
-                Add-Type -AssemblyName System.Drawing
-                $notification = New-Object System.Windows.Forms.NotifyIcon
-                $notification.Icon = [System.Drawing.SystemIcons]::Information
-                $notification.Visible = $true
-                $notification.BalloonTipTitle = '%s'
-                $notification.BalloonTipText = '%s'
-                $notification.ShowBalloonTip(5000)
-                Start-Sleep -Milliseconds 5500
-                $notification.Dispose()
-                """.formatted(toPowerShellLiteral(title), toPowerShellLiteral(body));
-
-        // Runs on a bounded worker that waits for the script to finish, instead of leaving an
-        // unobserved PowerShell process detached from the caller for the full balloon lifetime.
-        Thread.ofVirtual().name("irc-mention-toast").start(() -> {
-            if (!runWindowsNotificationCommand(script)) {
-                log.warn("Windows balloon notification failed; falling back to system tray notification.");
-                Platform.runLater(() -> showSystemNotification(sender, channel, message));
-            }
-        });
     }
 
     private synchronized TrayIcon getOrCreateTrayIcon() {
@@ -263,49 +227,11 @@ public class IrcMentionNotificationService {
         }
     }
 
-    private boolean runWindowsNotificationCommand(String script) {
-        try {
-            String encodedCommand = Base64.getEncoder()
-                    .encodeToString(script.getBytes(StandardCharsets.UTF_16LE));
-            Process process = new ProcessBuilder(
-                    "powershell.exe",
-                    "-NoProfile",
-                    "-NonInteractive",
-                    "-WindowStyle", "Hidden",
-                    "-EncodedCommand", encodedCommand
-            ).start();
-            int exitCode = process.waitFor();
-            if (exitCode != 0) {
-                log.warn("Windows notification command failed with exit code {}", exitCode);
-                return false;
-            }
-            return true;
-        } catch (IOException e) {
-            log.warn("Failed to start Windows notification command", e);
-            return false;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.warn("Interrupted while waiting for Windows notification command", e);
-            return false;
-        }
-    }
-
-    private boolean isWindows() {
-        return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
-    }
-
     private String abbreviate(String value, int maxLength) {
         if (value == null || value.length() <= maxLength) {
             return value;
         }
         return value.substring(0, Math.max(0, maxLength - 3)) + "...";
-    }
-
-    private String toPowerShellLiteral(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.replace("'", "''");
     }
 
     private void playBundledMentionSound() {
