@@ -343,6 +343,11 @@ public class SettingsController implements Controller<Pane> {
                   "descriptionPublicNote": "Please resubmit the report with clear details about the violation, including what happened, when it happened, and where it occurred."
                 },
               {
+                "setReportStatusTo": "DISCARDED",
+                  "buttonName": "Discarded - Smurf - Insufficient Information",
+                  "descriptionPublicNote": "Please resubmit the report with clear details explaining why you believe this user is a smurf, including any relevant evidence."
+                },
+              {
                 "setReportStatusTo": "PROCESSING",
                   "buttonName": "Processing - Review",
                   "descriptionPublicNote": "Thank you for your report. The moderation team will review the report and update its status once the review is complete."
