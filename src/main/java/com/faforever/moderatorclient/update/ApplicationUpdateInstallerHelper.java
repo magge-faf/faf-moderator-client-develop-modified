@@ -176,8 +176,11 @@ public final class ApplicationUpdateInstallerHelper {
 
     private static void replaceDirectoryContents(Path targetDir, Path stagedDir, Path previousDir, Path logPath) throws IOException {
         if (Files.isDirectory(targetDir)) {
+            Path previousDirStaging = previousDir.resolveSibling(previousDir.getFileName() + ".snapshot-tmp");
+            deleteIfExists(previousDirStaging, logPath);
             log(logPath, "Snapshotting current contents of '" + targetDir + "' to '" + previousDir + "'.");
-            copyDirectory(targetDir, previousDir, logPath);
+            copyDirectory(targetDir, previousDirStaging, logPath);
+            Files.move(previousDirStaging, previousDir);
         }
 
         Files.createDirectories(targetDir);
@@ -261,7 +264,7 @@ public final class ApplicationUpdateInstallerHelper {
         if (System.getProperty("os.name", "").toLowerCase().contains("win")) {
             processBuilder = new ProcessBuilder("cmd", "/c", "start", "", launcherPath.toString());
         } else {
-            processBuilder = new ProcessBuilder(launcherPath.toString());
+            processBuilder = new ProcessBuilder("sh", launcherPath.toString());
         }
         processBuilder.directory(workingDir.toFile());
         processBuilder.start();

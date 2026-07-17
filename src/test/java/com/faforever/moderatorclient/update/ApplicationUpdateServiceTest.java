@@ -6,8 +6,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -18,6 +21,7 @@ import java.util.zip.ZipOutputStream;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
 
 class ApplicationUpdateServiceTest {
 
@@ -125,7 +129,6 @@ class ApplicationUpdateServiceTest {
             }
 
             Path firstArchive = backupDir.resolve("config-backup-01.zip");
-            long firstArchiveSize = Files.size(firstArchive);
             Files.writeString(configDir.resolve("templatesAndReasons.json"), "second");
 
             Path overwrittenArchive = localService.createConfigurationBackupArchive();
@@ -134,7 +137,14 @@ class ApplicationUpdateServiceTest {
             try (var backupFiles = Files.list(backupDir)) {
                 assertThat(backupFiles.filter(Files::isRegularFile).count(), is(10L));
             }
-            assertThat(Files.size(firstArchive) >= firstArchiveSize, is(true));
+            try (ZipFile zipFile = new ZipFile(firstArchive.toFile())) {
+                ZipEntry entry = zipFile.getEntry("templatesAndReasons.json");
+                assertThat(entry, is(notNullValue()));
+                try (var inputStream = zipFile.getInputStream(entry)) {
+                    String content = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+                    assertThat(content, is("second"));
+                }
+            }
         } finally {
             System.setProperty("user.dir", originalUserDir);
         }
@@ -394,9 +404,11 @@ class ApplicationUpdateServiceTest {
 
         Files.createDirectories(installRoot);
         Files.writeString(rootPrefs, "root legacy prefs");
-        Thread.sleep(5);
         Files.createDirectories(binPrefs.getParent());
         Files.writeString(binPrefs, "bin legacy prefs");
+        Instant baseTime = Instant.now();
+        Files.setLastModifiedTime(rootPrefs, FileTime.from(baseTime));
+        Files.setLastModifiedTime(binPrefs, FileTime.from(baseTime.plusSeconds(1)));
 
         ReflectionTestUtils.invokeMethod(
                 ApplicationUpdateInstallerHelper.class,

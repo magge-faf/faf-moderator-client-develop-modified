@@ -17,6 +17,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -29,7 +30,9 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.zip.ZipEntry;
@@ -248,8 +251,23 @@ public class ApplicationUpdateService {
         Path backupArchive = useRotatingSlot
                 ? createConfigurationBackupArchivePath(backupDir)
                 : createManualConfigurationBackupArchivePath(backupDir);
-        zipDirectory(configurationDirectory, backupArchive);
+        Path stagingArchive = backupDir.resolve(backupArchive.getFileName() + ".tmp-" + UUID.randomUUID());
+        try {
+            zipDirectory(configurationDirectory, stagingArchive);
+            moveArchiveAtomically(stagingArchive, backupArchive);
+        } catch (IOException e) {
+            Files.deleteIfExists(stagingArchive);
+            throw e;
+        }
         return backupArchive;
+    }
+
+    private void moveArchiveAtomically(Path source, Path target) throws IOException {
+        try {
+            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException e) {
+            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 
     public boolean prepareUpdateAndLaunchInstaller(GithubRelease release, Consumer<String> statusCallback, BooleanSupplier restartConfirmation)
@@ -273,7 +291,7 @@ public class ApplicationUpdateService {
 
         reportStatus(statusCallback, "Creating backup zip of the current installation...");
         Path backupArchive = createBackupArchivePath(installLocation.installRoot());
-        zipDirectory(installLocation.installRoot(), backupArchive);
+        zipDirectory(installLocation.installRoot(), backupArchive, Set.of(resolveDefaultBackupDirectory()));
         reportStatus(statusCallback, "Backup saved to " + backupArchive);
 
         reportStatus(statusCallback, "Ready to apply the update to the FAF Moderator Client. Your PC will not restart.");
@@ -523,10 +541,18 @@ public class ApplicationUpdateService {
     }
 
     private void zipDirectory(Path sourceDirectory, Path zipPath) throws IOException {
+        zipDirectory(sourceDirectory, zipPath, Set.of());
+    }
+
+    private void zipDirectory(Path sourceDirectory, Path zipPath, Set<Path> excludedDirectories) throws IOException {
+        Set<Path> normalizedExclusions = excludedDirectories.stream()
+                .map(path -> path.toAbsolutePath().normalize())
+                .collect(Collectors.toSet());
         try (ZipOutputStream zipOutputStream = new ZipOutputStream(Files.newOutputStream(zipPath))) {
             Files.walk(sourceDirectory)
                     .filter(Files::isRegularFile)
                     .filter(path -> !path.toAbsolutePath().normalize().equals(zipPath.toAbsolutePath().normalize()))
+                    .filter(path -> normalizedExclusions.stream().noneMatch(excluded -> path.toAbsolutePath().normalize().startsWith(excluded)))
                     .forEach(path -> {
                         Path relativePath = sourceDirectory.relativize(path);
                         ZipEntry entry = new ZipEntry(relativePath.toString().replace('\\', '/'));
