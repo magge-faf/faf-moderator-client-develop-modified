@@ -167,8 +167,11 @@ public class ApplicationUpdateService {
     }
 
     public BackupFolderStats describeBackupFolder() throws IOException {
-        Path backupDir = resolveConfiguredBackupDirectory();
-        FolderStats stats = describeFolder(backupDir);
+        return describeBackupFolder(resolveConfiguredBackupDirectory());
+    }
+
+    public BackupFolderStats describeBackupFolder(Path backupDir) throws IOException {
+        FolderStats stats = describeFolder(backupDir.toAbsolutePath().normalize());
         return new BackupFolderStats(stats.directory(), stats.fileCount(), stats.totalBytes());
     }
 

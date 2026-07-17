@@ -8,11 +8,13 @@ import com.faforever.moderatorclient.update.ApplicationUpdateService;
 import com.faforever.moderatorclient.ui.Controller;
 import com.faforever.moderatorclient.ui.MainController;
 import com.faforever.moderatorclient.ui.ViewHelper;
+import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
+import javafx.util.Duration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +31,7 @@ import java.nio.file.Paths;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Component
 @Slf4j
@@ -81,6 +84,8 @@ public class SettingsController implements Controller<Pane> {
     public Label updaterDataFolderStatusLabel;
 
     private String defaultUpdateBackupFolder;
+    private final PauseTransition updateBackupFolderRefreshDelay = new PauseTransition(Duration.millis(250));
+    private final AtomicLong updateBackupFolderInfoGeneration = new AtomicLong();
 
     @Override
     public VBox getRoot() {return root;}
@@ -145,7 +150,8 @@ public class SettingsController implements Controller<Pane> {
                         : configuredBackupFolder
         );
         updateBackupFolderTextField.setPromptText(defaultUpdateBackupFolder);
-        updateBackupFolderTextField.textProperty().addListener((obs, oldVal, newVal) -> refreshUpdateBackupFolderInfo());
+        updateBackupFolderRefreshDelay.setOnFinished(event -> refreshUpdateBackupFolderInfo());
+        updateBackupFolderTextField.textProperty().addListener((obs, oldVal, newVal) -> scheduleUpdateBackupFolderInfoRefresh());
         replayFolderInfoLabel.setText(String.format(
                 Locale.ROOT,
                 "Replay folder: %s. All replay downloads and temp replay files are stored here.",
@@ -404,7 +410,7 @@ public class SettingsController implements Controller<Pane> {
         DirectoryChooser directoryChooser = new DirectoryChooser();
         directoryChooser.setTitle("Select Update Backup Folder");
 
-        Path initialDirectory = resolveBackupFolderFieldPath();
+        Path initialDirectory = resolveBackupFolderFieldPathIfValid();
         if (initialDirectory != null && Files.isDirectory(initialDirectory)) {
             directoryChooser.setInitialDirectory(initialDirectory.toFile());
         } else {
@@ -422,10 +428,11 @@ public class SettingsController implements Controller<Pane> {
 
     public void onOpenUpdateBackupFolder() {
         try {
-            Path folder = Optional.ofNullable(resolveBackupFolderFieldPath())
-                    .orElse(Path.of(defaultUpdateBackupFolder));
+            Path folder = resolveBackupFolderFieldPathOrDefault();
             Files.createDirectories(folder);
             openPath(folder.toFile());
+        } catch (InvalidPathException e) {
+            showInvalidBackupFolderPath(e);
         } catch (IOException e) {
             log.error("Failed to open update backup folder", e);
         }
@@ -443,7 +450,9 @@ public class SettingsController implements Controller<Pane> {
 
     public void onBackupConfigurationFolderNow() {
         try {
-            persistBackupFolderPreference(false);
+            if (!persistBackupFolderPreference(false)) {
+                return;
+            }
             Path backupArchive = applicationUpdateService.createManualConfigurationBackupArchive();
             updateBackupFolderStatusLabel.setText("Backed up config folder to " + backupArchive);
         } catch (IOException e) {
@@ -587,7 +596,9 @@ public class SettingsController implements Controller<Pane> {
         localPreferences.getTabIrcChat().setDebugTraffic(ircDebugTrafficCheckBox.isSelected());
         localPreferences.getTabReports().setEnableManualReplayLookupCheckBox(enableManualReplayLookupCheckBox.isSelected());
         localPreferences.getTabReports().setShowReportPlayerRoleLabelsCheckBox(showReportPlayerRoleLabelsCheckBox.isSelected());
-        persistBackupFolderPreference(true);
+        if (!persistBackupFolderPreference(true)) {
+            return false;
+        }
 
         Tab selectedTab = defaultActiveTabComboBox.getSelectionModel().getSelectedItem();
         if (selectedTab != null) {
@@ -612,32 +623,49 @@ public class SettingsController implements Controller<Pane> {
         if (value == null || value.isBlank()) {
             return null;
         }
+        return Path.of(value).toAbsolutePath().normalize();
+    }
+
+    private Path resolveBackupFolderFieldPathIfValid() {
         try {
-            return Path.of(value).toAbsolutePath().normalize();
-        } catch (Exception e) {
-            log.debug("Ignoring invalid backup folder path: {}", value, e);
+            return resolveBackupFolderFieldPath();
+        } catch (InvalidPathException e) {
+            log.debug("Ignoring invalid backup folder path: {}", updateBackupFolderTextField.getText(), e);
             return null;
         }
     }
 
-    private void persistBackupFolderPreference(boolean refreshInfo) {
+    private Path resolveBackupFolderFieldPathOrDefault() {
+        return Optional.ofNullable(resolveBackupFolderFieldPath())
+                .orElseGet(() -> Path.of(defaultUpdateBackupFolder).toAbsolutePath().normalize());
+    }
+
+    private boolean persistBackupFolderPreference(boolean refreshInfo) {
         String backupFolder = updateBackupFolderTextField.getText() == null ? "" : updateBackupFolderTextField.getText().trim();
-        if (backupFolder.isBlank() || backupFolder.equals(defaultUpdateBackupFolder)) {
+        if (backupFolder.isBlank()) {
             localPreferences.getTabSettings().setUpdateBackupFolder("");
-        } else {
-            Path normalizedBackupFolder;
-            try {
-                normalizedBackupFolder = Path.of(backupFolder).toAbsolutePath().normalize();
-            } catch (InvalidPathException e) {
-                updateBackupFolderStatusLabel.setText("Invalid backup folder path: " + e.getMessage());
-                log.warn("Ignoring invalid backup folder path: {}", backupFolder, e);
-                return;
+            if (refreshInfo) {
+                refreshUpdateBackupFolderInfo();
             }
-            localPreferences.getTabSettings().setUpdateBackupFolder(normalizedBackupFolder.toString());
+            return true;
+        }
+        try {
+            Path normalizedBackupFolder = resolveBackupFolderFieldPath();
+            Path defaultBackupFolder = Path.of(defaultUpdateBackupFolder).toAbsolutePath().normalize();
+            if (Objects.equals(normalizedBackupFolder, defaultBackupFolder)) {
+                localPreferences.getTabSettings().setUpdateBackupFolder("");
+            } else {
+                localPreferences.getTabSettings().setUpdateBackupFolder(normalizedBackupFolder.toString());
+            }
+        } catch (InvalidPathException e) {
+            showInvalidBackupFolderPath(e);
+            log.warn("Ignoring invalid backup folder path: {}", backupFolder, e);
+            return false;
         }
         if (refreshInfo) {
             refreshUpdateBackupFolderInfo();
         }
+        return true;
     }
 
     private void runInBackground(Runnable task) {
@@ -647,10 +675,20 @@ public class SettingsController implements Controller<Pane> {
     }
 
     private void refreshUpdateBackupFolderInfo() {
-        persistBackupFolderPreference(false);
+        long generation = updateBackupFolderInfoGeneration.incrementAndGet();
+        String requestedText = updateBackupFolderTextField.getText();
+        Path backupFolder;
+        try {
+            backupFolder = resolveBackupFolderFieldPathOrDefault();
+        } catch (InvalidPathException e) {
+            showInvalidBackupFolderPath(e);
+            updateBackupFolderInfoLabel.setText("Stored backups: unavailable");
+            return;
+        }
+
         runInBackground(() -> {
             try {
-                ApplicationUpdateService.BackupFolderStats stats = applicationUpdateService.describeBackupFolder();
+                ApplicationUpdateService.BackupFolderStats stats = applicationUpdateService.describeBackupFolder(backupFolder);
                 String infoText = String.format(
                         Locale.ROOT,
                         "Stored backups: %.2f MB across %d files in %s",
@@ -659,19 +697,43 @@ public class SettingsController implements Controller<Pane> {
                         stats.directory()
                 );
                 Platform.runLater(() -> {
+                    if (!isCurrentBackupFolderInfoRequest(generation, requestedText)) {
+                        return;
+                    }
                     updateBackupFolderInfoLabel.setText(infoText);
-                    if (updateBackupFolderStatusLabel.getText() == null) {
+                    String statusText = updateBackupFolderStatusLabel.getText();
+                    if (statusText == null
+                            || statusText.startsWith("Invalid backup folder path")
+                            || statusText.startsWith("Unable to inspect backup folder")) {
                         updateBackupFolderStatusLabel.setText("");
                     }
                 });
             } catch (Exception e) {
                 log.error("Failed to refresh update backup folder info", e);
                 Platform.runLater(() -> {
+                    if (!isCurrentBackupFolderInfoRequest(generation, requestedText)) {
+                        return;
+                    }
                     updateBackupFolderInfoLabel.setText("Stored backups: unavailable");
                     updateBackupFolderStatusLabel.setText("Unable to inspect backup folder: " + e.getMessage());
                 });
             }
         });
+    }
+
+    private void scheduleUpdateBackupFolderInfoRefresh() {
+        updateBackupFolderRefreshDelay.playFromStart();
+    }
+
+    private boolean isCurrentBackupFolderInfoRequest(long generation, String requestedText) {
+        return root != null
+                && generation == updateBackupFolderInfoGeneration.get()
+                && Objects.equals(requestedText, updateBackupFolderTextField.getText());
+    }
+
+    private void showInvalidBackupFolderPath(InvalidPathException e) {
+        updateBackupFolderInfoGeneration.incrementAndGet();
+        updateBackupFolderStatusLabel.setText("Invalid backup folder path: " + e.getMessage());
     }
 
     private void refreshUpdaterFolderInfo() {
