@@ -600,9 +600,7 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     public void onUserSearch() {
-        users.clear();
-        userSearchTableView.getSortOrder().clear();
-        searchHighlightTerm.set(null);
+        clearUserSearchResults();
 
         String searchParameter = searchUserPropertyMapping.get(searchUserProperties.getValue());
         String searchPattern = userSearchTextField.getText();
@@ -1008,6 +1006,13 @@ public class UserManagementController implements Controller<SplitPane> {
         }
     }
 
+    private void clearUserSearchResults() {
+        users.clear();
+        userSearchTableView.getSortOrder().clear();
+        userSearchTableView.getSelectionModel().clearSelection();
+        searchHighlightTerm.set(null);
+    }
+
     private boolean isValidPlayerId(String playerId) {
         if (playerId == null || playerId.isEmpty()) {
             return false;
@@ -1191,6 +1196,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
     private void processBannedUsers(Path filePath, Label progressLabel, String taskName) {
         captureSmurfCheckSettings(false);
+        clearUserSearchResults();
         resetPreviousStateSmurfVillageLookup();
         Set<String> userIds = bansController.loadExistingBannedUserIds(filePath);
 
@@ -1983,8 +1989,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
     private void startSmurfVillageLookup(boolean forceEnableAllSettings) {
         captureSmurfCheckSettings(forceEnableAllSettings);
-        users.clear();
-        userSearchTableView.getSortOrder().clear();
+        clearUserSearchResults();
 
         setStatusWorking();
 
@@ -2114,8 +2119,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
         captureSmurfCheckSettings(false);
         smurfLookupSettings = smurfLookupSettings.withSuppressCleanOutput(true);
-        users.clear();
-        userSearchTableView.getSortOrder().clear();
+        clearUserSearchResults();
         resetPreviousStateSmurfVillageLookup();
         smurfOutputTextArea.setText("");
         stopLoadingAnimation();
