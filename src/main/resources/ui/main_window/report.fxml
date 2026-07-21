@@ -79,12 +79,16 @@
             </ScrollPane>
         </Tab>
         <Tab text="Reported Accounts">
-            <TableView fx:id="reportedPlayerTableView" maxHeight="Infinity"
-                       maxWidth="Infinity"/>
+            <VBox spacing="6" style="-fx-padding: 6 6 0 6;">
+                <CheckBox fx:id="autoSearchReportedAccountInUserManagementCheckBox" mnemonicParsing="false"
+                          text="Auto-search in User Management when selecting a user from the table below"/>
+                <TableView fx:id="reportedPlayerTableView" maxHeight="Infinity"
+                           maxWidth="Infinity" VBox.vgrow="ALWAYS"/>
+            </VBox>
         </Tab>
         <Tab text="Moderator Events">
             <ScrollPane prefHeight="200.0" prefWidth="200.0">
-                <TextFlow fx:id="moderatorEventTextFlow" prefHeight="200.0" prefWidth="200.0"/>
+                <TextFlow fx:id="moderatorEventTextFlow" />
             </ScrollPane>
         </Tab>
         <Tab text="Map Drawings">
