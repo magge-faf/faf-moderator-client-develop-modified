@@ -2,6 +2,7 @@ package com.faforever.moderatorclient.ui.moderation_reports;
 
 import com.faforever.moderatorclient.ui.moderation_reports.ModeratorStatisticsFormatter.ModeratorActivity;
 import com.faforever.moderatorclient.ui.main_window.ReportStatisticsController;
+import com.faforever.moderatorclient.ui.main_window.UserManagementController;
 import com.faforever.commons.api.dto.ModerationReportStatus;
 import com.faforever.commons.replay.ChatMessage;
 import com.faforever.commons.replay.ModeratorEvent;
@@ -59,10 +60,13 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.StrokeLineCap;
 import javafx.scene.shape.StrokeLineJoin;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -114,6 +118,8 @@ public class ModerationReportController implements Controller<Region> {
     private static final String DEMORALIZATION = "demoralization";
     private static final String ASSASSINATION = "Assassination (default)";
     private static final String OFF_STRING = "Off";
+    private static final String REPORTER_TEXT_STYLE = "-fx-text-fill: lightblue;";
+    private static final String OFFENDER_TEXT_STYLE = "-fx-text-fill: lightcoral;";
     private static final ExecutorService BACKGROUND_EXECUTOR = Executors.newCachedThreadPool(r -> {
         Thread t = new Thread(r);
         t.setDaemon(true);
@@ -228,6 +234,8 @@ public class ModerationReportController implements Controller<Region> {
     @FXML
     public TableView<PlayerFX> reportedPlayerTableView;
     @FXML
+    public CheckBox autoSearchReportedAccountInUserManagementCheckBox;
+    @FXML
     public TextFlow chatLogTextFlow;
     public Button copyReportedUserIdButton;
     public Button copyChatLogButton;
@@ -239,6 +247,9 @@ public class ModerationReportController implements Controller<Region> {
 
     @Autowired
     public ReportStatisticsController reportStatisticsController;
+
+    @Autowired
+    public UserManagementController userManagementController;
 
     @Value("${faforever.vault.replay-download-url-format}")
     private String replayDownLoadFormat;
@@ -937,11 +948,14 @@ public class ModerationReportController implements Controller<Region> {
     @Getter
     @Setter
     public static class Offender {
+        private static final DateTimeFormatter LAST_REPORTED_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
         private final StringProperty player;
         private final Integer currentOffenseCount;
         private final Integer totalOffenseCountCompleted;
         private final Integer totalOffenseCountDiscarded;
         private final Integer totalOffenseCountProcessing;
+        @Getter(AccessLevel.NONE)
         private LocalDateTime lastReported;
 
         public Offender(String player,
@@ -963,18 +977,29 @@ public class ModerationReportController implements Controller<Region> {
             return player.get();
         }
 
+        public String getLastReported() {
+            if (lastReported == null) {
+                return "";
+            }
+            return lastReported.format(LAST_REPORTED_FORMATTER);
+        }
+
     }
 
     private void resetButtonsToInvalidState() {
         resetGameButtonsToInvalidState();
         copyReporterIdButton.setText(formatPlayerRoleButtonText("Reporter", "Reporter n/a"));
+        styleReportAccountButton(copyReporterIdButton, "Reporter");
         copyReporterIdButton.setId("");
         copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", "Reported User n/a"));
+        styleReportAccountButton(copyReportedUserIdButton, "Offender");
         copyReportedUserIdButton.setId("");
         createReportForumReporterButton.setId("");
         createReportForumReporterButton.setText("Search Forum Reporter:\nn/a");
+        styleReportAccountButton(createReportForumReporterButton, "Reporter");
         createReportForumOffenderButton.setId("");
         createReportForumOffenderButton.setText("Search Forum Offender:\nn/a");
+        styleReportAccountButton(createReportForumOffenderButton, "Offender");
         accountPlayersOfCurrentlySelectedReport.clear();
         reportedPlayersOfCurrentlySelectedReport.clear();
     }
@@ -1003,9 +1028,26 @@ public class ModerationReportController implements Controller<Region> {
         TableColumn<PlayerFX, String> roleColumn = new TableColumn<>("Role");
         roleColumn.setId("Role");
         roleColumn.setCellValueFactory(param -> new SimpleStringProperty(getReportAccountRole(param.getValue())));
+        roleColumn.setCellFactory(param -> new TableCell<>() {
+            @Override
+            protected void updateItem(String role, boolean empty) {
+                super.updateItem(role, empty);
+                if (empty || role == null) {
+                    setText(null);
+                    setStyle("");
+                    return;
+                }
+
+                setText(role);
+                setStyle(getReportAccountRoleTextStyle(role));
+            }
+        });
         roleColumn.setPrefWidth(90);
         reportedPlayerTableView.getColumns().addFirst(roleColumn);
         reportedPlayerTableView.getColumns().add(createReportAccountBanColumn());
+        reportedPlayerTableView.getColumns().add(createReportAccountRecentBansColumn());
+        reportedPlayerTableView.getSelectionModel().selectedItemProperty().addListener(
+                (observable, oldValue, newValue) -> autoSearchReportedAccountInUserManagement(newValue));
         Platform.runLater(() -> {
             loadColumnLayout(reportTableView, localPreferences);
             loadSplitPanePositions(root, localPreferences);
@@ -1026,11 +1068,55 @@ public class ModerationReportController implements Controller<Region> {
                 }
 
                 Button button = new Button("Add ban");
+                button.setStyle(getReportAccountRoleTextStyle(getReportAccountRole(item)));
                 button.setOnAction(event -> addBan(item));
                 setGraphic(button);
             }
         });
         return banColumn;
+    }
+
+    private TableColumn<PlayerFX, PlayerFX> createReportAccountRecentBansColumn() {
+        TableColumn<PlayerFX, PlayerFX> bansColumn = new TableColumn<>("Recent Bans");
+        bansColumn.setId("RecentBans");
+        bansColumn.setCellValueFactory(param -> new SimpleObjectProperty<>(param.getValue()));
+        bansColumn.setCellFactory(param -> new TableCell<>() {
+            @Override
+            protected void updateItem(PlayerFX item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setGraphic(null);
+                    return;
+                }
+
+                Button button = new Button("Show");
+                button.setDisable(item.getBans().isEmpty());
+                button.setOnAction(event -> showRecentBans(item));
+                setGraphic(button);
+            }
+        });
+        return bansColumn;
+    }
+
+    private void showRecentBans(PlayerFX player) {
+        ObservableList<BanInfoFX> recentBans = FXCollections.observableArrayList(player.getBans().stream()
+                .sorted(Comparator.comparing(BanInfoFX::getCreateTime,
+                        Comparator.nullsLast(Comparator.naturalOrder())).reversed())
+                .toList());
+
+        TableView<BanInfoFX> tableView = new TableView<>();
+        ViewHelper.buildBanTableView(tableView, recentBans, false, localPreferences, userService, uiService);
+        tableView.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+
+        VBox content = new VBox(8);
+        content.setPadding(new Insets(8));
+        content.getChildren().add(tableView);
+
+        Stage dialog = new Stage();
+        dialog.initModality(Modality.NONE);
+        dialog.setTitle("Recent bans - " + player.getRepresentation());
+        dialog.setScene(new Scene(content, 900, 360));
+        dialog.show();
     }
 
     public void onSave() {
@@ -1145,22 +1231,28 @@ public class ModerationReportController implements Controller<Region> {
                 ? "Reporter n/a"
                 : newValue.getReporter().getRepresentation();
         copyReporterIdButton.setText(formatPlayerRoleButtonText("Reporter", reporterRepresentation));
+        styleReportAccountButton(copyReporterIdButton, "Reporter");
         copyReporterIdButton.setId(newValue.getReporter() == null ? "" : reporterRepresentation);
         createReportForumReporterButton.setId(newValue.getReporter() == null ? "" : newValue.getReporter().getId());
         createReportForumReporterButton.setText("Search Forum Reporter:\n" + reporterRepresentation);
+        styleReportAccountButton(createReportForumReporterButton, "Reporter");
 
         // Since ~2023, reports have only one offender; legacy reports may have several.
         for (PlayerFX offender : reportedPlayersOfCurrentlySelectedReport) {
             copyReportedUserIdButton.setId(offender.getRepresentation());
             copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", offender.getRepresentation()));
+            styleReportAccountButton(copyReportedUserIdButton, "Offender");
             createReportForumOffenderButton.setId(offender.getId());
             createReportForumOffenderButton.setText("Search Forum Offender:\n" + offender.getRepresentation());
+            styleReportAccountButton(createReportForumOffenderButton, "Offender");
         }
         if (reportedPlayersOfCurrentlySelectedReport.isEmpty()) {
             copyReportedUserIdButton.setId("");
             copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", "Reported User n/a"));
+            styleReportAccountButton(copyReportedUserIdButton, "Offender");
             createReportForumOffenderButton.setId("");
             createReportForumOffenderButton.setText("Search Forum Offender:\nn/a");
+            styleReportAccountButton(createReportForumOffenderButton, "Offender");
         }
 
         if (newValue.getGame() != null) {
@@ -1202,6 +1294,22 @@ public class ModerationReportController implements Controller<Region> {
         return "Offender";
     }
 
+    private String getReportAccountRoleTextStyle(String role) {
+        return switch (role) {
+            case "Reporter" -> REPORTER_TEXT_STYLE;
+            case "Offender" -> OFFENDER_TEXT_STYLE;
+            default -> "";
+        };
+    }
+
+    private void autoSearchReportedAccountInUserManagement(PlayerFX player) {
+        if (!autoSearchReportedAccountInUserManagementCheckBox.isSelected() || player == null) {
+            return;
+        }
+
+        userManagementController.searchUserByLogin(player.getLogin());
+    }
+
     public void loadCheckboxStates() {
         LocalPreferences.TabReports tabReports = localPreferences.getTabReports();
 
@@ -1219,6 +1327,8 @@ public class ModerationReportController implements Controller<Region> {
         showTextMarkersCheckBox.setSelected(tabReports.isTextMarkerTypeFilterCheckBox());
         thresholdToShowSelfDestructionUnitsEventTextField.setText(tabReports.getThresholdToShowSelfDestructionUnitsEventTextField());
         fetchReportsOnStartupCheckBox.setSelected(tabReports.isFetchReportsOnStartupCheckBox());
+        autoSearchReportedAccountInUserManagementCheckBox.setSelected(
+                tabReports.isAutoSearchReportedAccountInUserManagementCheckBox());
     }
 
     @FXML
@@ -1888,6 +1998,8 @@ public class ModerationReportController implements Controller<Region> {
     // Matches: #N [mm:ss] or [HH:mm:ss] sender → receiver: message
     private static final Pattern CHAT_LINE_PATTERN =
             Pattern.compile("^(#\\d+) (\\[[^\\]]+\\]) (.+?) → (.+?): (.*)$");
+    private static final Pattern MODERATOR_EVENT_LINE_PATTERN =
+            Pattern.compile("^(\\S+) from (.+?)\\s*:\\s*(.*)$");
 
     public void updateChatLogToColorTextFlow(TextFlow textFlow, String filteredLog, String reporterName, String offenderName) {
         if (textFlow == null) {
@@ -2042,42 +2154,65 @@ public class ModerationReportController implements Controller<Region> {
         textFlow.getChildren().clear();
         String[] events = moderatorEvents.split("\n");
 
+        int visibleEventCount = (int) Arrays.stream(events)
+                .filter(event -> event != null && !event.trim().isEmpty())
+                .count();
+        int rowNumberW = Math.max(2, ("#" + visibleEventCount).length());
+        int maxTimeLen = 10;
+        int maxNameLen = 1;
         for (String event : events) {
-            TextFlow eventFlow = new TextFlow();
-            String[] parts = event.split("from ", 2);
+            Matcher matcher = MODERATOR_EVENT_LINE_PATTERN.matcher(event);
+            if (matcher.matches()) {
+                maxTimeLen = Math.max(maxTimeLen, bracketedTime(matcher.group(1)).length());
+                maxNameLen = Math.max(maxNameLen, matcher.group(2).trim().length());
+            }
+        }
+        final int rowW = rowNumberW;
+        final int timeW = maxTimeLen;
+        final int nameW = maxNameLen;
 
-            if (parts.length > 1) {
-                String timestamp = parts[0].trim() + " from ";
-                String rest = parts[1].trim();
-                int colonIndex = rest.indexOf(':');
-
-                if (colonIndex > 0) {
-                    String namePart = rest.substring(0, colonIndex).trim();
-                    String eventMessage = rest.substring(colonIndex + 1).trim();
-
-                    Color nameColor;
-                    if (namePart.equalsIgnoreCase(reporterName)) {
-                        nameColor = Color.LIGHTBLUE;
-                    } else if (namePart.equalsIgnoreCase(offenderName)) {
-                        nameColor = Color.LIGHTCORAL;
-                    } else {
-                        nameColor = Color.WHITE;
-                    }
-
-                    eventFlow.getChildren().addAll(
-                            styledText(timestamp, Color.GRAY),
-                            styledText(namePart + ": ", nameColor),
-                            styledText(eventMessage, Color.WHITE)
-                    );
-                } else {
-                    eventFlow.getChildren().add(styledText(event, Color.WHITE));
-                }
-            } else {
-                eventFlow.getChildren().add(styledText(event, Color.WHITE));
+        int rowNumber = 1;
+        for (String event : events) {
+            if (event == null || event.trim().isEmpty()) {
+                textFlow.getChildren().add(newline());
+                continue;
             }
 
-            textFlow.getChildren().add(eventFlow);
+            String rowNumberPad = String.format("%-" + rowW + "s", "#" + rowNumber++);
+
+            Matcher matcher = MODERATOR_EVENT_LINE_PATTERN.matcher(event);
+            if (matcher.matches()) {
+                String timestamp = String.format("%-" + timeW + "s", bracketedTime(matcher.group(1)));
+                String name = matcher.group(2).trim();
+                String paddedName = String.format("%-" + nameW + "s", name);
+                String eventMessage = matcher.group(3).trim();
+
+                Color nameColor;
+                if (name.equalsIgnoreCase(reporterName)) {
+                    nameColor = Color.LIGHTBLUE;
+                } else if (name.equalsIgnoreCase(offenderName)) {
+                    nameColor = Color.LIGHTCORAL;
+                } else {
+                    nameColor = Color.LIGHTYELLOW;
+                }
+
+                textFlow.getChildren().addAll(
+                        styledText(rowNumberPad + " ", Color.DIMGRAY),
+                        styledText(timestamp + "  ", Color.GRAY),
+                        styledText(paddedName + "  ", nameColor),
+                        styledText(eventMessage, Color.WHITE),
+                        newline()
+                );
+            } else {
+                textFlow.getChildren().add(styledText(rowNumberPad + " ", Color.DIMGRAY));
+                appendHighlightedLine(textFlow, event, offenderName, reporterName);
+                textFlow.getChildren().add(newline());
+            }
         }
+    }
+
+    private static String bracketedTime(String timestamp) {
+        return "[" + timestamp + "]";
     }
 
     // -------------------------------------------------------------------------
@@ -2688,7 +2823,9 @@ public class ModerationReportController implements Controller<Region> {
     public void refreshReportPlayerRoleButtonText() {
         if (currentlySelectedItemNotNull == null) {
             copyReporterIdButton.setText(formatPlayerRoleButtonText("Reporter", "Reporter n/a"));
+            styleReportAccountButton(copyReporterIdButton, "Reporter");
             copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", "Reported User n/a"));
+            styleReportAccountButton(copyReportedUserIdButton, "Offender");
             return;
         }
 
@@ -2696,15 +2833,22 @@ public class ModerationReportController implements Controller<Region> {
                 ? "Reporter n/a"
                 : currentlySelectedItemNotNull.getReporter().getRepresentation();
         copyReporterIdButton.setText(formatPlayerRoleButtonText("Reporter", reporterRepresentation));
+        styleReportAccountButton(copyReporterIdButton, "Reporter");
 
         Collection<PlayerFX> reportedUsers = currentlySelectedItemNotNull.getReportedUsers();
         if (reportedUsers == null || reportedUsers.isEmpty()) {
             copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", "Reported User n/a"));
+            styleReportAccountButton(copyReportedUserIdButton, "Offender");
         } else {
             for (PlayerFX offender : reportedUsers) {
                 copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", offender.getRepresentation()));
+                styleReportAccountButton(copyReportedUserIdButton, "Offender");
             }
         }
+    }
+
+    private void styleReportAccountButton(Button button, String role) {
+        button.setStyle(getReportAccountRoleTextStyle(role));
     }
 
     private String formatPlayerRoleButtonText(String role, String playerText) {

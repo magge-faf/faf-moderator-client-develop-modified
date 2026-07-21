@@ -653,6 +653,7 @@ public class LocalPreferences {
         boolean fetchReportsOnStartupCheckBox = true;
         boolean enableManualReplayLookupCheckBox = false;
         boolean showReportPlayerRoleLabelsCheckBox = true;
+        boolean autoSearchReportedAccountInUserManagementCheckBox = false;
 
         // TextFields
         String thresholdToShowSelfDestructionUnitsEventTextField = "0";

@@ -658,6 +658,16 @@ public class UserManagementController implements Controller<SplitPane> {
         new Thread(searchTask).start();
     }
 
+    public void searchUserByLogin(String login) {
+        if (login == null || login.isBlank()) {
+            return;
+        }
+
+        searchUserProperties.getSelectionModel().select("Name");
+        userSearchTextField.setText(login);
+        onUserSearch();
+    }
+
     private String determineSearchParameter(String searchPattern) {
         if (isDeviceId(searchPattern)) {
             return "uniqueIdAssignments.uniqueId.deviceId";
