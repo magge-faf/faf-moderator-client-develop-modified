@@ -81,31 +81,46 @@ public class UserService {
     }
 
     public List<PlayerFX> findUsersByAttributeIn(@NotNull String attribute, @NotNull Collection<String> values) {
+        return findUsersByAttributeIn(attribute, values, Integer.MAX_VALUE);
+    }
+
+    public List<PlayerFX> findUsersByAttributeIn(@NotNull String attribute, @NotNull Collection<String> values, int maxResults) {
         if (values.isEmpty()) return Collections.emptyList();
-        if (values.size() == 1) return findUsersByAttribute(attribute, values.iterator().next());
+        if (maxResults <= 0) return Collections.emptyList();
+        if (values.size() == 1) return findUsersByAttribute(attribute, values.iterator().next(), maxResults);
         log.debug("Batch-searching for players by attribute '{}' with {} values", attribute, values.size());
         ElideNavigatorOnCollection<Player> navigator = ElideNavigator.of(Player.class)
                 .collection()
                 .setFilter(ElideNavigator.qBuilder().string(attribute).in(new ArrayList<>(values)));
         addModeratorIncludes(navigator);
-        List<Player> allPlayers = fafApi.getAll(Player.class, navigator);
+        List<Player> allPlayers = maxResults == Integer.MAX_VALUE
+                ? fafApi.getAll(Player.class, navigator)
+                : fafApi.getMany(Player.class, navigator, maxResults, Collections.emptyMap());
         return playerMapper.mapToFx(allPlayers);
     }
 
     public List<PlayerFX> findUsersByAttribute(@NotNull String attribute, @NotNull String pattern) {
+        return findUsersByAttribute(attribute, pattern, Integer.MAX_VALUE);
+    }
+
+    public List<PlayerFX> findUsersByAttribute(@NotNull String attribute, @NotNull String pattern, int maxResults) {
+        if (maxResults <= 0) return Collections.emptyList();
         log.debug("Searching for player by attribute '{}' with pattern: {}", attribute, pattern);
         ElideNavigatorOnCollection<Player> navigator = ElideNavigator.of(Player.class)
                 .collection()
                 .setFilter(ElideNavigator.qBuilder().string(attribute).eq(pattern));
         addModeratorIncludes(navigator);
-        List<Player> firstPage = fafApi.getFirstPageOnlyForFindUsersByAttribute(Player.class, navigator, environmentProperties.getMaxPageSizeSmurfVillageLookup());
+        int firstPageSize = Math.min(environmentProperties.getMaxPageSizeSmurfVillageLookup(), maxResults);
+        List<Player> firstPage = fafApi.getFirstPageOnlyForFindUsersByAttribute(Player.class, navigator, firstPageSize);
 
-        if (firstPage.size() < environmentProperties.getMaxPageSizeSmurfVillageLookup()) {
+        if (firstPage.size() < firstPageSize || firstPage.size() >= maxResults) {
             return playerMapper.mapToFx(firstPage);
         }
 
         // Otherwise, fetch all pages
-        List<Player> allPlayers = fafApi.getAll(Player.class, navigator);
+        List<Player> allPlayers = maxResults == Integer.MAX_VALUE
+                ? fafApi.getAll(Player.class, navigator)
+                : fafApi.getMany(Player.class, navigator, maxResults, Collections.emptyMap());
         return playerMapper.mapToFx(allPlayers);
     }
 

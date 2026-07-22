@@ -77,6 +77,7 @@ import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -1425,7 +1426,9 @@ public class UserManagementController implements Controller<SplitPane> {
 
         List<PlayerFX> users;
         try {
-            users = userService.findUsersByAttributeIn(property, toProcess);
+            users = smurfLookupSettings.promptOnThreshold()
+                    ? userService.findUsersByAttributeIn(property, toProcess, thresholdProbeLimit())
+                    : userService.findUsersByAttributeIn(property, toProcess);
         } catch (HttpClientErrorException e) {
             updateSmurfVillageLogTextArea(String.format(
                     "\t\t ERROR fetching users for [%s] batch: %s\n", displayAttr, e.getMessage()));
@@ -1436,8 +1439,8 @@ public class UserManagementController implements Controller<SplitPane> {
             // Batch exceeded threshold — fall back to per-value so each hot value
             // can be individually excluded, continued, or used to cancel.
             updateSmurfVillageLogTextArea(String.format(
-                    "\n  [%s] batch returned %d results (threshold: %d) — switching to per-value for exclusion control",
-                    displayAttr, users.size(), smurfLookupSettings.threshold()));
+                    "\n  [%s] batch exceeded threshold (%d) — switching to per-value for exclusion control",
+                    displayAttr, smurfLookupSettings.threshold()));
             for (String value : toProcess) {
                 if (cancelRequestedByUser) return;
                 processSingleValue(value, property, displayAttr, cumulativeAccounts, currentPlayer, excludedItems);
@@ -1528,23 +1531,16 @@ public class UserManagementController implements Controller<SplitPane> {
 
         List<PlayerFX> foundUsers;
         try {
-            foundUsers = userService.findUsersByAttribute(property, value);
+            foundUsers = smurfLookupSettings.promptOnThreshold()
+                    ? userService.findUsersByAttribute(property, value, thresholdProbeLimit())
+                    : userService.findUsersByAttribute(property, value);
         } catch (HttpClientErrorException e) {
             updateSmurfVillageLogTextArea(String.format(
                     "\t\t ERROR fetching users for [%s] = [%s]: %s\n", displayAttr, value, e.getMessage()));
             return;
         }
 
-        String currentPlayerId = currentPlayer != null ? currentPlayer.getId() : null;
-
-        Map<String, PlayerFX> deduplicated = new LinkedHashMap<>();
-        for (PlayerFX p : foundUsers) {
-            if (p.getId() != null) deduplicated.putIfAbsent(p.getId(), p);
-        }
-
-        List<PlayerFX> otherAccounts = deduplicated.values().stream()
-                .filter(p -> !p.getId().equals(currentPlayerId))
-                .toList();
+        List<PlayerFX> otherAccounts = findOtherAccounts(foundUsers, currentPlayer);
 
         if (smurfLookupSettings.promptOnThreshold() && otherAccounts.size() > smurfLookupSettings.threshold()) {
             boolean decided = false;
@@ -1556,8 +1552,8 @@ public class UserManagementController implements Controller<SplitPane> {
                 Platform.runLater(() -> {
                     Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
                     alert.setTitle("Threshold Exceeded");
-                    alert.setHeaderText(String.format("[%s] = [%s]%nReturned %d results (threshold: %d)",
-                            displayAttr, value, snapshot.size(), smurfLookupSettings.threshold()));
+                    alert.setHeaderText(String.format("[%s] = [%s]%nReturned more than %d results",
+                            displayAttr, value, smurfLookupSettings.threshold()));
                     alert.setContentText("How do you want to handle this value?");
 
                     ButtonType addToExclude = new ButtonType("Add to exclusion list and skip");
@@ -1588,8 +1584,8 @@ public class UserManagementController implements Controller<SplitPane> {
                         newExcluded.put(
                                 "comment",
                                 String.format(
-                                        "Excluded by user prompt: %d related accounts found for [%s = %s]",
-                                        snapshot.size(),
+                                        "Excluded by user prompt: more than %d related accounts found for [%s = %s]",
+                                        smurfLookupSettings.threshold(),
                                         property,
                                         value));
                         excludedItems.add(newExcluded);
@@ -1600,12 +1596,19 @@ public class UserManagementController implements Controller<SplitPane> {
                     }
                     case "show" -> {
                         CountDownLatch showLatch = new CountDownLatch(1);
-                        List<PlayerFX> showSnapshot = snapshot;
-                        Platform.runLater(() -> { showUserDetailsWindow(showSnapshot); showLatch.countDown(); });
+                        Platform.runLater(() -> {
+                            showUserDetailsWindow(
+                                    () -> findOtherAccounts(userService.findUsersByAttribute(property, value), currentPlayer),
+                                    showLatch);
+                        });
                         try { showLatch.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
                         // loop back — dialog re-shows
                     }
-                    default -> decided = true; // "continue"
+                    default -> {
+                        foundUsers = userService.findUsersByAttribute(property, value);
+                        otherAccounts = findOtherAccounts(foundUsers, currentPlayer);
+                        decided = true;
+                    }
                 }
             }
             if (cancelRequestedByUser) return;
@@ -1653,6 +1656,26 @@ public class UserManagementController implements Controller<SplitPane> {
         }
 
         if (localLog.length() > 0) updateSmurfVillageLogTextArea(localLog.toString());
+    }
+
+    private int thresholdProbeLimit() {
+        if (smurfLookupSettings.threshold() >= Integer.MAX_VALUE - 1) {
+            return Integer.MAX_VALUE;
+        }
+        return Math.max(1, smurfLookupSettings.threshold() + 1);
+    }
+
+    private List<PlayerFX> findOtherAccounts(List<PlayerFX> users, PlayerFX currentPlayer) {
+        String currentPlayerId = currentPlayer != null ? currentPlayer.getId() : null;
+
+        Map<String, PlayerFX> deduplicated = new LinkedHashMap<>();
+        for (PlayerFX p : users) {
+            if (p.getId() != null) deduplicated.putIfAbsent(p.getId(), p);
+        }
+
+        return deduplicated.values().stream()
+                .filter(p -> !p.getId().equals(currentPlayerId))
+                .toList();
     }
 
     private String formatLookupHeader(String displayAttr, Collection<String> values) {
@@ -1713,9 +1736,60 @@ public class UserManagementController implements Controller<SplitPane> {
         return values;
     }
 
-    @SuppressWarnings("unchecked")
     private void showUserDetailsWindow(List<PlayerFX> users) {
+        showUserDetailsWindowContent(users, null);
+    }
+
+    private void showUserDetailsWindow(Supplier<List<PlayerFX>> usersLoader, CountDownLatch closedLatch) {
         Stage detailsStage = new Stage();
+        detailsStage.setTitle("Related Accounts");
+
+        ProgressIndicator progressIndicator = new ProgressIndicator();
+        progressIndicator.setMaxSize(48, 48);
+        Label loadingLabel = new Label("Fetching related accounts...");
+        loadingLabel.setStyle("-fx-font-weight: bold;");
+
+        VBox loadingLayout = new VBox(12, progressIndicator, loadingLabel);
+        loadingLayout.setAlignment(Pos.CENTER);
+        loadingLayout.setPadding(new Insets(20));
+
+        Scene scene = new Scene(loadingLayout, 700, 400);
+        detailsStage.setScene(scene);
+        detailsStage.initModality(Modality.APPLICATION_MODAL);
+
+        Task<List<PlayerFX>> loadTask = new Task<>() {
+            @Override
+            protected List<PlayerFX> call() {
+                return usersLoader.get();
+            }
+        };
+
+        loadTask.setOnSucceeded(event -> showUserDetailsWindowContent(loadTask.getValue(), detailsStage));
+        loadTask.setOnFailed(event -> {
+            Throwable failure = loadTask.getException();
+            log.warn("Failed to fetch related accounts", failure);
+            Label errorLabel = new Label("Failed to fetch related accounts.");
+            errorLabel.setStyle("-fx-font-weight: bold;");
+            Label detailsLabel = new Label(failure == null ? "Unknown error" : failure.getMessage());
+            detailsLabel.setWrapText(true);
+            Button closeButton = new Button("Close");
+            closeButton.setOnAction(e -> detailsStage.close());
+            VBox errorLayout = new VBox(10, errorLabel, detailsLabel, closeButton);
+            errorLayout.setAlignment(Pos.CENTER);
+            errorLayout.setPadding(new Insets(20));
+            detailsStage.getScene().setRoot(errorLayout);
+        });
+
+        detailsStage.setOnHidden(event -> closedLatch.countDown());
+        Thread loaderThread = new Thread(loadTask, "related-accounts-loader");
+        loaderThread.setDaemon(true);
+        loaderThread.start();
+        detailsStage.show();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void showUserDetailsWindowContent(List<PlayerFX> users, Stage existingStage) {
+        Stage detailsStage = existingStage == null ? new Stage() : existingStage;
         detailsStage.setTitle("Related Accounts");
 
         TableView<PlayerFX> table = new TableView<>();
@@ -1774,10 +1848,14 @@ public class UserManagementController implements Controller<SplitPane> {
         VBox layout = new VBox(10, label, table, buttonBox);
         layout.setPadding(new Insets(10));
 
-        Scene scene = new Scene(layout, 700, 400);
-        detailsStage.setScene(scene);
-        detailsStage.initModality(Modality.APPLICATION_MODAL);
-        detailsStage.showAndWait();
+        if (detailsStage.getScene() == null) {
+            Scene scene = new Scene(layout, 700, 400);
+            detailsStage.setScene(scene);
+            detailsStage.initModality(Modality.APPLICATION_MODAL);
+            detailsStage.showAndWait();
+        } else {
+            detailsStage.getScene().setRoot(layout);
+        }
     }
 
     private Set<String> alreadyCheckedUsers = new HashSet<>();
