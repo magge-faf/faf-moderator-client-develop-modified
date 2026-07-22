@@ -333,15 +333,7 @@ public class ViewHelper {
             BanInfoFX banInfo = o.getValue();
             return switch (banInfo.getDuration()) {
                 case PERMANENT -> "PERMANENT";
-                case TEMPORARY -> {
-                    Instant now = Instant.now();
-                    Duration totalDuration = Duration.between(banInfo.getCreateTime(), banInfo.getExpiresAt());
-                    Duration remainingDuration = Duration.between(now, banInfo.getExpiresAt());
-                    long totalDays = totalDuration.toDays();
-                    long remainingDays = remainingDuration.toDays();
-                    long remainingHours = remainingDuration.toHoursPart();
-                    yield "%s days (%s days, %s hours)".formatted(totalDays, remainingDays, remainingHours);
-                }
+                case TEMPORARY -> formatCompactBanDuration(banInfo);
             };
         }, o.getValue().durationProperty()));
         tableView.getColumns().add(banDurationColumn);
@@ -431,6 +423,40 @@ public class ViewHelper {
         tableView.getColumns().add(updateTimeColumn);
 
         applyCopyContextMenus(tableView, extractors);
+    }
+
+    private static String formatCompactBanDuration(BanInfoFX banInfo) {
+        if (banInfo.getCreateTime() == null || banInfo.getExpiresAt() == null) {
+            return "";
+        }
+
+        Duration duration = Duration.between(banInfo.getCreateTime(), banInfo.getExpiresAt());
+        if (duration.isNegative() || duration.isZero()) {
+            return "0d";
+        }
+
+        long totalHours = duration.toHours();
+        long totalDays = Math.max(1, (long) Math.ceil(totalHours / 24.0));
+        long years = totalDays / 365;
+        long remainingDays = totalDays % 365;
+        long months = remainingDays / 30;
+        long days = remainingDays % 30;
+
+        List<String> parts = new ArrayList<>();
+        if (years > 0) {
+            parts.add(years + "y");
+        }
+        if (months > 0) {
+            parts.add(months + "m");
+        }
+        if (years == 0 && days > 0) {
+            parts.add(days + "d");
+        }
+        if (parts.isEmpty()) {
+            parts.add(totalHours + "h");
+        }
+
+        return String.join(" ", parts);
     }
 
     public static void buildNameHistoryTableView(TableView<NameRecordFX> tableView, ObservableList<NameRecordFX> data) {
@@ -1353,6 +1379,16 @@ public class ViewHelper {
         int hours = duration.toHoursPart();
         int minutes = duration.toMinutesPart();
 
+        if (days >= 365) {
+            long years = days / 365;
+            long months = days % 365 / 30;
+            return months > 0 ? "%sy %sm".formatted(years, months) : "%sy".formatted(years);
+        }
+        if (days >= 30) {
+            long months = days / 30;
+            long remainingDays = days % 30;
+            return remainingDays > 0 ? "%sm %sd".formatted(months, remainingDays) : "%sm".formatted(months);
+        }
         if (days > 0) {
             return hours > 0 ? "%sd %sh".formatted(days, hours) : "%sd".formatted(days);
         }

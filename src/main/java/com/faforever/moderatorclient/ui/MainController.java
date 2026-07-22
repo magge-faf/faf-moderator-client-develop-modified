@@ -292,6 +292,13 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         }
     }
 
+    public void openReportSettings() {
+        root.getSelectionModel().select(reportTab);
+        if (moderationReportController != null) {
+            moderationReportController.selectReportSettingsTab();
+        }
+    }
+
     private void initMapVaultTab() {
         mapVaultController = uiService.loadFxml("ui/main_window/mapVault.fxml");
         mapVaultTab.setContent(mapVaultController.getRoot());
@@ -435,9 +442,6 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     @Override
     public void destroy() {
         log.info("Application exit received: saving local preferences to disk.");
-        boolean preferencesSaved = settingsController != null
-                ? settingsController.saveOnExit()
-                : localPreferencesReaderWriter.write(localPreferences);
         if (moderationReportController != null) moderationReportController.onSave();
         if (userManagementController != null) userManagementController.onSave();
         if (bansController != null) bansController.onSave();
@@ -452,6 +456,9 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         if (userGroupsController != null) userGroupsController.onSave();
         if (recentActivityController != null) recentActivityController.onSave();
         if (apiHistoryController != null) apiHistoryController.onSave();
+        boolean preferencesSaved = settingsController != null
+                ? settingsController.saveOnExit()
+                : localPreferencesReaderWriter.write(localPreferences);
         if (preferencesSaved) {
             log.info("Local preferences saved successfully.");
         } else {

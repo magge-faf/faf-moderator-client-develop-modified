@@ -97,6 +97,10 @@ public class UserManagementController implements Controller<SplitPane> {
     public Button checkSmurfManagementAccountsButton;
     @FXML
     public Button copyAccountsReferenceTextAndImageButton;
+    @FXML
+    public CheckBox showForumAccountsReferenceButtonCheckBox;
+    @FXML
+    public CheckBox redoLastUserSearchOnStartupCheckBox;
     public Label userNotesLabel;
     @FXML
     public TextField maxMatchesBeforePromptSmurfVillageLookupTextField;
@@ -286,6 +290,8 @@ public class UserManagementController implements Controller<SplitPane> {
         userSearchTableView.getSelectionModel().getSelectedItems().addListener((ListChangeListener<PlayerFX>) change -> onSelectedUser());
         initializeSearchProperties();
         bindUIElementsToPreferences();
+        bindForumAccountsReferenceButtonVisibility();
+        redoLastUserSearchOnStartup();
 
         Tooltip tooltip = catchFirstLayerSmurfsOnlyCheckBox.getTooltip();
 
@@ -406,6 +412,23 @@ public class UserManagementController implements Controller<SplitPane> {
         }
     }
 
+    private void bindForumAccountsReferenceButtonVisibility() {
+        copyAccountsReferenceTextAndImageButton.visibleProperty()
+                .bind(showForumAccountsReferenceButtonCheckBox.selectedProperty());
+        copyAccountsReferenceTextAndImageButton.managedProperty()
+                .bind(showForumAccountsReferenceButtonCheckBox.selectedProperty());
+    }
+
+    private void redoLastUserSearchOnStartup() {
+        if (!redoLastUserSearchOnStartupCheckBox.isSelected()) {
+            return;
+        }
+        if (userSearchTextField.getText() == null || userSearchTextField.getText().isBlank()) {
+            return;
+        }
+
+        Platform.runLater(this::onUserSearch);
+    }
 
     private void configureSearchHistoryVisibility() {
         LocalPreferences.TabUserManagement tabUserManagement = localPreferences.getTabUserManagement();
@@ -2222,19 +2245,201 @@ public class UserManagementController implements Controller<SplitPane> {
         if (strippedOutput.startsWith("Accounts Reference:")) {
             strippedOutput = strippedOutput.substring("Accounts Reference:".length()).strip();
         }
-        return "```\n" + strippedOutput + "\n```";
+        return "\n\n```\n" + strippedOutput + "\n```";
     }
 
     private WritableImage snapshotForumAccountsReferenceImage(int rowCount) {
         Label heading = new Label("Accounts Reference:");
         heading.setStyle("-fx-font-weight: bold; -fx-text-fill: white; -fx-padding: 0 0 6 0;");
 
+        VBox summary = createAccountsReferenceSummary();
         ImageView tableImageView = new ImageView(snapshotFullUserSearchTable(rowCount));
-        VBox imageLayout = new VBox(0, heading, tableImageView);
+        VBox imageLayout = new VBox(6, heading, summary, tableImageView);
         imageLayout.setStyle("-fx-background-color: #202020; -fx-padding: 0;");
         imageLayout.applyCss();
         imageLayout.layout();
-        return imageLayout.snapshot(null, null);
+        return trimTopWhiteMargin(imageLayout.snapshot(null, null));
+    }
+
+    private WritableImage trimTopWhiteMargin(WritableImage image) {
+        int width = (int) image.getWidth();
+        int height = (int) image.getHeight();
+        int firstContentRow = 0;
+
+        for (int y = 0; y < height; y++) {
+            boolean rowIsWhite = true;
+            for (int x = 0; x < width; x++) {
+                Color color = image.getPixelReader().getColor(x, y);
+                if (color.getOpacity() > 0.01
+                        && (color.getRed() < 0.96 || color.getGreen() < 0.96 || color.getBlue() < 0.96)) {
+                    rowIsWhite = false;
+                    break;
+                }
+            }
+            if (!rowIsWhite) {
+                firstContentRow = y;
+                break;
+            }
+        }
+
+        if (firstContentRow <= 0) {
+            return image;
+        }
+
+        return new WritableImage(
+                image.getPixelReader(),
+                0,
+                firstContentRow,
+                width,
+                height - firstContentRow);
+    }
+
+    private VBox createAccountsReferenceSummary() {
+        List<PlayerFX> referenceUsers = new ArrayList<>(userSearchTableView.getItems());
+        int activeCount = 0;
+        int bannedCount = 0;
+        for (PlayerFX user : referenceUsers) {
+            if (activeBan(user) == null) {
+                activeCount++;
+            } else {
+                bannedCount++;
+            }
+        }
+
+        Set<String> sharedUuids = findSharedValues(referenceUsers, this::uuidValues);
+        Set<String> sharedHashes = findSharedValues(referenceUsers, this::hashValues);
+
+        Label verdict = new Label(String.format(
+                "%d related accounts: %d active, %d banned. Shared by %s.",
+                referenceUsers.size(),
+                activeCount,
+                bannedCount,
+                formatSharedTypes(sharedUuids, sharedHashes)));
+        verdict.setStyle("-fx-text-fill: white; -fx-font-weight: bold;");
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(3);
+        grid.setStyle("-fx-background-color: #2b2f31; -fx-padding: 6;");
+
+        addSummaryHeader(grid);
+        int row = 1;
+        for (PlayerFX user : referenceUsers) {
+            addSummaryRow(grid, row++, user, sharedUuids, sharedHashes);
+        }
+
+        return new VBox(4, verdict, grid);
+    }
+
+    private void addSummaryHeader(GridPane grid) {
+        addSummaryCell(grid, "Status", 0, 0, "-fx-text-fill: #b8c7d1; -fx-font-weight: bold;");
+        addSummaryCell(grid, "Player", 1, 0, "-fx-text-fill: #b8c7d1; -fx-font-weight: bold;");
+        addSummaryCell(grid, "ID", 2, 0, "-fx-text-fill: #b8c7d1; -fx-font-weight: bold;");
+        addSummaryCell(grid, "Shared", 3, 0, "-fx-text-fill: #b8c7d1; -fx-font-weight: bold;");
+        addSummaryCell(grid, "UUID", 4, 0, "-fx-text-fill: #b8c7d1; -fx-font-weight: bold;");
+        addSummaryCell(grid, "Hash", 5, 0, "-fx-text-fill: #b8c7d1; -fx-font-weight: bold;");
+    }
+
+    private void addSummaryRow(GridPane grid, int row, PlayerFX user, Set<String> sharedUuids, Set<String> sharedHashes) {
+        BanInfoFX ban = activeBan(user);
+        String status = banStatusText(ban);
+        String statusStyle = switch (status) {
+            case "ACTIVE" -> "-fx-text-fill: #7ee787; -fx-font-weight: bold;";
+            case "PERM-BANNED" -> "-fx-text-fill: #ff7b72; -fx-font-weight: bold;";
+            default -> "-fx-text-fill: #f2cc60; -fx-font-weight: bold;";
+        };
+
+        List<String> userSharedUuids = uuidValues(user).stream().filter(sharedUuids::contains).toList();
+        List<String> userSharedHashes = hashValues(user).stream().filter(sharedHashes::contains).toList();
+
+        addSummaryCell(grid, status, 0, row, statusStyle);
+        addSummaryCell(grid, user.getLogin(), 1, row, "-fx-text-fill: white;");
+        addSummaryCell(grid, user.getId(), 2, row, "-fx-text-fill: white;");
+        addSummaryCell(grid, formatBadges(userSharedUuids, userSharedHashes), 3, row, "-fx-text-fill: #d2a8ff; -fx-font-weight: bold;");
+        addSummaryCell(grid, userSharedUuids.stream().map(this::shortIdentifier).collect(Collectors.joining(" | ")), 4, row, "-fx-text-fill: #79c0ff;");
+        addSummaryCell(grid, userSharedHashes.stream().map(this::shortIdentifier).collect(Collectors.joining(" | ")), 5, row, "-fx-text-fill: #ffa657;");
+    }
+
+    private void addSummaryCell(GridPane grid, String text, int column, int row, String style) {
+        Label label = new Label(text == null ? "" : text);
+        label.setStyle(style);
+        label.setWrapText(false);
+        grid.add(label, column, row);
+    }
+
+    private Set<String> findSharedValues(List<PlayerFX> users, java.util.function.Function<PlayerFX, List<String>> extractor) {
+        Map<String, Long> valueCounts = users.stream()
+                .flatMap(user -> extractor.apply(user).stream().distinct())
+                .collect(Collectors.groupingBy(value -> value, LinkedHashMap::new, Collectors.counting()));
+        return valueCounts.entrySet().stream()
+                .filter(entry -> entry.getValue() > 1)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private String formatSharedTypes(Set<String> sharedUuids, Set<String> sharedHashes) {
+        if (!sharedUuids.isEmpty() && !sharedHashes.isEmpty()) {
+            return "UUID and hash";
+        }
+        if (!sharedUuids.isEmpty()) {
+            return "UUID";
+        }
+        if (!sharedHashes.isEmpty()) {
+            return "hash";
+        }
+        return "no repeated UUID/hash";
+    }
+
+    private String formatBadges(List<String> sharedUuids, List<String> sharedHashes) {
+        List<String> badges = new ArrayList<>();
+        if (!sharedUuids.isEmpty()) {
+            badges.add("UUID");
+        }
+        if (!sharedHashes.isEmpty()) {
+            badges.add("HASH");
+        }
+        return String.join("  ", badges);
+    }
+
+    private String shortIdentifier(String value) {
+        if (value == null || value.length() <= 18) {
+            return value;
+        }
+        return value.substring(0, 8) + "..." + value.substring(value.length() - 8);
+    }
+
+    private List<String> uuidValues(PlayerFX user) {
+        return user.getUniqueIdAssignments().stream()
+                .map(UniqueIdAssignmentFx::getUniqueId)
+                .filter(Objects::nonNull)
+                .map(UniqueIdFx::getUuid)
+                .filter(value -> value != null && !value.isBlank())
+                .distinct()
+                .toList();
+    }
+
+    private List<String> hashValues(PlayerFX user) {
+        return user.getUniqueIdAssignments().stream()
+                .map(UniqueIdAssignmentFx::getUniqueId)
+                .filter(Objects::nonNull)
+                .map(UniqueIdFx::getHash)
+                .filter(value -> value != null && !value.isBlank())
+                .distinct()
+                .toList();
+    }
+
+    private BanInfoFX activeBan(PlayerFX user) {
+        return user.getBans().stream()
+                .filter(ban -> ban.getBanStatus() == BanStatus.BANNED)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String banStatusText(BanInfoFX ban) {
+        if (ban == null) {
+            return "ACTIVE";
+        }
+        return ban.getExpiresAt() == null ? "PERM-BANNED" : "TEMP-BANNED";
     }
 
     private WritableImage snapshotFullUserSearchTable(int rowCount) {

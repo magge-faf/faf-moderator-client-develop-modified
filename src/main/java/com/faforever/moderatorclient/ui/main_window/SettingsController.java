@@ -63,10 +63,6 @@ public class SettingsController implements Controller<Pane> {
     @FXML
     public CheckBox autoPurgeTempReplaysOlderThanOneDayCheckBox;
     @FXML
-    public CheckBox enableManualReplayLookupCheckBox;
-    @FXML
-    public CheckBox showReportPlayerRoleLabelsCheckBox;
-    @FXML
     public Label replayFolderInfoLabel;
     @FXML
     public Label replayFolderStatusLabel;
@@ -89,6 +85,11 @@ public class SettingsController implements Controller<Pane> {
 
     @Override
     public VBox getRoot() {return root;}
+
+    @FXML
+    public void onOpenReportSettings() {
+        mainController.openReportSettings();
+    }
 
     @FXML
     public void initialize() throws IOException {
@@ -127,21 +128,6 @@ public class SettingsController implements Controller<Pane> {
         automaticConfigurationBackupsOnExitCheckBox.setSelected(
                 localPreferences.getTabSettings().isAutomaticConfigurationBackupsOnExitCheckBox()
         );
-        enableManualReplayLookupCheckBox.setSelected(
-                localPreferences.getTabReports().isEnableManualReplayLookupCheckBox()
-        );
-        enableManualReplayLookupCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
-            localPreferences.getTabReports().setEnableManualReplayLookupCheckBox(newVal);
-            mainController.refreshManualReplayLookupVisibility();
-        });
-        showReportPlayerRoleLabelsCheckBox.setSelected(
-                localPreferences.getTabReports().isShowReportPlayerRoleLabelsCheckBox()
-        );
-        showReportPlayerRoleLabelsCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
-            localPreferences.getTabReports().setShowReportPlayerRoleLabelsCheckBox(newVal);
-            mainController.refreshReportPlayerRoleLabelsVisibility();
-        });
-
         defaultUpdateBackupFolder = applicationUpdateService.resolveDefaultBackupDirectory().toString();
         String configuredBackupFolder = localPreferences.getTabSettings().getUpdateBackupFolder();
         updateBackupFolderTextField.setText(
@@ -222,7 +208,6 @@ public class SettingsController implements Controller<Pane> {
                     checkBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
                         try {
                             prefField.set(tabReports, newVal);
-                            refreshManualReplayLookupVisibility(fieldName);
                         } catch (IllegalAccessException ignored) {
                         }
                     });
@@ -243,13 +228,6 @@ public class SettingsController implements Controller<Pane> {
             }
         }
     }
-
-    private void refreshManualReplayLookupVisibility(String fieldName) {
-        if ("enableManualReplayLookupCheckBox".equals(fieldName)) {
-            mainController.refreshManualReplayLookupVisibility();
-        }
-    }
-
 
     private static final String TEMPLATES_AND_REASONS_FILE_NAME = "templatesAndReasons.json";
     private static final String JSON_CONTENT_templatesAndReasons = """
@@ -595,8 +573,6 @@ public class SettingsController implements Controller<Pane> {
                 automaticConfigurationBackupsOnExitCheckBox.isSelected()
         );
         localPreferences.getTabIrcChat().setDebugTraffic(ircDebugTrafficCheckBox.isSelected());
-        localPreferences.getTabReports().setEnableManualReplayLookupCheckBox(enableManualReplayLookupCheckBox.isSelected());
-        localPreferences.getTabReports().setShowReportPlayerRoleLabelsCheckBox(showReportPlayerRoleLabelsCheckBox.isSelected());
         if (!persistBackupFolderPreference(true)) {
             return false;
         }

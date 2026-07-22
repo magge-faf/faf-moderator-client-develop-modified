@@ -578,6 +578,8 @@ public class LocalPreferences {
         boolean includeProcessorIdCheckBox = false;
         boolean includeProcessorNameCheckBox = false;
         boolean includeManufacturerCheckBox = false;
+        boolean redoLastUserSearchOnStartupCheckBox = false;
+        boolean showForumAccountsReferenceButtonCheckBox = true;
 
         boolean searchHistoryTexAreaVisibilityState = false;
         boolean userNotesTextAreaVisibilityState = false;
@@ -652,7 +654,12 @@ public class LocalPreferences {
 
         boolean fetchReportsOnStartupCheckBox = true;
         boolean enableManualReplayLookupCheckBox = false;
+        boolean showOpenLogsInNotepadPlusPlusButtonCheckBox = false;
         boolean showReportPlayerRoleLabelsCheckBox = true;
+        boolean colorReportTableRoleHeadersCheckBox = true;
+        boolean colorReportedAccountsRoleColumnCheckBox = true;
+        boolean colorReportClipboardRoleButtonsCheckBox = true;
+        boolean colorReportForumSearchRoleButtonsCheckBox = true;
         boolean autoSearchReportedAccountInUserManagementCheckBox = false;
 
         // TextFields
@@ -663,6 +670,10 @@ public class LocalPreferences {
         Map<String, Double> reportTableColumnWidthsTabReports = new HashMap<>();
         List<String> reportTableColumnOrderTabReports = new ArrayList<>();
         List<Double> rootSplitPaneDividerPositionsTabReports = new ArrayList<>();
+        double recentBansDialogX = -1;
+        double recentBansDialogY = -1;
+        double recentBansDialogWidth = 1400;
+        double recentBansDialogHeight = 640;
 
     }
 

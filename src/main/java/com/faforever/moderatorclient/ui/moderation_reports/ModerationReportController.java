@@ -3,6 +3,8 @@ package com.faforever.moderatorclient.ui.moderation_reports;
 import com.faforever.moderatorclient.ui.moderation_reports.ModeratorStatisticsFormatter.ModeratorActivity;
 import com.faforever.moderatorclient.ui.main_window.ReportStatisticsController;
 import com.faforever.moderatorclient.ui.main_window.UserManagementController;
+import com.faforever.commons.api.dto.BanDurationType;
+import com.faforever.commons.api.dto.BanStatus;
 import com.faforever.commons.api.dto.ModerationReportStatus;
 import com.faforever.commons.replay.ChatMessage;
 import com.faforever.commons.replay.ModeratorEvent;
@@ -59,6 +61,7 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -85,6 +88,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -120,6 +124,10 @@ public class ModerationReportController implements Controller<Region> {
     private static final String OFF_STRING = "Off";
     private static final String REPORTER_TEXT_STYLE = "-fx-text-fill: lightblue;";
     private static final String OFFENDER_TEXT_STYLE = "-fx-text-fill: lightcoral;";
+    private static final double RECENT_BANS_DIALOG_DEFAULT_WIDTH = 1400;
+    private static final double RECENT_BANS_DIALOG_DEFAULT_HEIGHT = 640;
+    private static final double RECENT_BANS_DIALOG_MIN_WIDTH = 800;
+    private static final double RECENT_BANS_DIALOG_MIN_HEIGHT = 300;
     private static final ExecutorService BACKGROUND_EXECUTOR = Executors.newCachedThreadPool(r -> {
         Thread t = new Thread(r);
         t.setDaemon(true);
@@ -236,9 +244,20 @@ public class ModerationReportController implements Controller<Region> {
     @FXML
     public CheckBox autoSearchReportedAccountInUserManagementCheckBox;
     @FXML
+    public CheckBox enableManualReplayLookupCheckBox;
+    @FXML
+    public CheckBox showOpenLogsInNotepadPlusPlusButtonCheckBox;
+    @FXML
+    public CheckBox showReportPlayerRoleLabelsCheckBox;
+    @FXML
+    public TabPane reportDetailsTabPane;
+    @FXML
+    public Tab reportSettingsTab;
+    @FXML
     public TextFlow chatLogTextFlow;
     public Button copyReportedUserIdButton;
     public Button copyChatLogButton;
+    public Button openLogsInNotepadPlusPlusButton;
     public Button copyReportIdButton;
     public Button copyGameIdButton;
     public Button startReplayButton;
@@ -265,6 +284,60 @@ public class ModerationReportController implements Controller<Region> {
 
     public void onCopyChatLog() {
         setSysClipboardText(copyChatLogButton.getId());
+    }
+
+    public void onOpenLogsInNotepadPlusPlus() {
+        String chatLog = copyChatLogButton.getId();
+        String moderatorEvents = copyModeratorEventsButton.getId();
+        if (chatLog == null || chatLog.isBlank()) {
+            ViewHelper.errorDialog("Logs unavailable", "Load a report chat log before opening logs in Notepad++.");
+            return;
+        }
+        if (moderatorEvents == null || moderatorEvents.isBlank()) {
+            ViewHelper.errorDialog("Logs unavailable", "Load moderator events before opening logs in Notepad++.");
+            return;
+        }
+
+        try {
+            Path chatLogFile = Files.createTempFile("faf-chat-log-", ".txt");
+            Path moderatorEventsFile = Files.createTempFile("faf-moderator-events-", ".txt");
+            Files.writeString(chatLogFile, chatLog, StandardCharsets.UTF_8);
+            Files.writeString(moderatorEventsFile, moderatorEvents, StandardCharsets.UTF_8);
+            new ProcessBuilder(resolveNotepadPlusPlusExecutable(),
+                    chatLogFile.toAbsolutePath().toString(),
+                    moderatorEventsFile.toAbsolutePath().toString()).start();
+        } catch (IOException e) {
+            log.error("Failed to open logs in Notepad++", e);
+            ViewHelper.errorDialog("Notepad++ required",
+                    "Install Notepad++ in the standard location or make sure notepad++ is available on PATH, then try again.");
+        }
+    }
+
+    private String resolveNotepadPlusPlusExecutable() throws IOException {
+        List<String> candidates = new ArrayList<>();
+
+        String programFiles = System.getenv("ProgramFiles");
+        if (programFiles != null && !programFiles.isBlank()) {
+            candidates.add(Path.of(programFiles, "Notepad++", "notepad++.exe").toString());
+        }
+
+        String programFilesX86 = System.getenv("ProgramFiles(x86)");
+        if (programFilesX86 != null && !programFilesX86.isBlank()) {
+            candidates.add(Path.of(programFilesX86, "Notepad++", "notepad++.exe").toString());
+        }
+
+        String localAppData = System.getenv("LOCALAPPDATA");
+        if (localAppData != null && !localAppData.isBlank()) {
+            candidates.add(Path.of(localAppData, "Programs", "Notepad++", "notepad++.exe").toString());
+        }
+
+        for (String candidate : candidates) {
+            if (Files.isRegularFile(Path.of(candidate))) {
+                return candidate;
+            }
+        }
+
+        return "notepad++";
     }
 
     public void onCopyChatLogButtonOffenderOnly() {
@@ -770,6 +843,13 @@ public class ModerationReportController implements Controller<Region> {
         })*/;
     }
 
+    public void handleCopyBanStatsButtonAction() {
+        String stats = moderatorStatisticsTextArea == null ? "" : moderatorStatisticsTextArea.getText();
+        ClipboardContent clipboardContent = new ClipboardContent();
+        clipboardContent.putString(stats == null ? "" : stats);
+        Clipboard.getSystemClipboard().setContent(clipboardContent);
+    }
+
     public static class ModeratorStatistics {
         private final StringProperty moderator;
         private final LongProperty completedReports;
@@ -989,17 +1069,17 @@ public class ModerationReportController implements Controller<Region> {
     private void resetButtonsToInvalidState() {
         resetGameButtonsToInvalidState();
         copyReporterIdButton.setText(formatPlayerRoleButtonText("Reporter", "Reporter n/a"));
-        styleReportAccountButton(copyReporterIdButton, "Reporter");
+        styleReportClipboardRoleButton(copyReporterIdButton, "Reporter");
         copyReporterIdButton.setId("");
         copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", "Reported User n/a"));
-        styleReportAccountButton(copyReportedUserIdButton, "Offender");
+        styleReportClipboardRoleButton(copyReportedUserIdButton, "Offender");
         copyReportedUserIdButton.setId("");
         createReportForumReporterButton.setId("");
         createReportForumReporterButton.setText("Search Forum Reporter:\nn/a");
-        styleReportAccountButton(createReportForumReporterButton, "Reporter");
+        styleReportForumSearchRoleButton(createReportForumReporterButton, "Reporter");
         createReportForumOffenderButton.setId("");
         createReportForumOffenderButton.setText("Search Forum Offender:\nn/a");
-        styleReportAccountButton(createReportForumOffenderButton, "Offender");
+        styleReportForumSearchRoleButton(createReportForumOffenderButton, "Offender");
         accountPlayersOfCurrentlySelectedReport.clear();
         reportedPlayersOfCurrentlySelectedReport.clear();
     }
@@ -1007,6 +1087,7 @@ public class ModerationReportController implements Controller<Region> {
     private void resetGameButtonsToInvalidState() {
         copyChatLogButton.setText("Chat Log n/a");
         copyChatLogButton.setId("");
+        openLogsInNotepadPlusPlusButton.setDisable(true);
         copyChatLogButtonOffenderOnly.setText("Chat Offender n/a");
         copyChatLogButtonOffenderOnly.setId("");
         copyModeratorEventsButton.setText("Moderator Events n/a");
@@ -1079,6 +1160,7 @@ public class ModerationReportController implements Controller<Region> {
     private TableColumn<PlayerFX, PlayerFX> createReportAccountRecentBansColumn() {
         TableColumn<PlayerFX, PlayerFX> bansColumn = new TableColumn<>("Recent Bans");
         bansColumn.setId("RecentBans");
+        bansColumn.setMinWidth(130);
         bansColumn.setCellValueFactory(param -> new SimpleObjectProperty<>(param.getValue()));
         bansColumn.setCellFactory(param -> new TableCell<>() {
             @Override
@@ -1089,34 +1171,239 @@ public class ModerationReportController implements Controller<Region> {
                     return;
                 }
 
-                Button button = new Button("Show");
-                button.setDisable(item.getBans().isEmpty());
-                button.setOnAction(event -> showRecentBans(item));
+                int banEventCount = item.getBans().size();
+                Button button = new Button("Show (" + banEventCount + " events)");
+                button.setMaxWidth(Double.MAX_VALUE);
+                button.setDisable(countRecentBanEventsForSelectedReport() == 0);
+                button.setOnAction(event -> showRecentBansForSelectedReport());
                 setGraphic(button);
             }
         });
         return bansColumn;
     }
 
-    private void showRecentBans(PlayerFX player) {
-        ObservableList<BanInfoFX> recentBans = FXCollections.observableArrayList(player.getBans().stream()
-                .sorted(Comparator.comparing(BanInfoFX::getCreateTime,
-                        Comparator.nullsLast(Comparator.naturalOrder())).reversed())
+    private int countRecentBanEventsForSelectedReport() {
+        return accountPlayersOfCurrentlySelectedReport.stream()
+                .map(PlayerFX::getBans)
+                .filter(Objects::nonNull)
+                .mapToInt(List::size)
+                .sum();
+    }
+
+    private void showRecentBansForSelectedReport() {
+        PlayerFX reporter = currentlySelectedItemNotNull == null ? null : currentlySelectedItemNotNull.getReporter();
+        ObservableList<BanInfoFX> reporterBans = createSortedRecentBans(reporter == null ? List.of() : reporter.getBans());
+        ObservableList<BanInfoFX> offenderBans = createSortedRecentBans(reportedPlayersOfCurrentlySelectedReport.stream()
+                .map(PlayerFX::getBans)
+                .filter(Objects::nonNull)
+                .flatMap(Collection::stream)
                 .toList());
 
-        TableView<BanInfoFX> tableView = new TableView<>();
-        ViewHelper.buildBanTableView(tableView, recentBans, false, localPreferences, userService, uiService);
-        tableView.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
-
-        VBox content = new VBox(8);
+        HBox content = new HBox(8,
+                createRecentBansPane("Reporter - " + getPlayerRepresentationOrNA(reporter), reporterBans),
+                createRecentBansPane("Offender - " + getOffenderRecentBansTitle(), offenderBans));
         content.setPadding(new Insets(8));
-        content.getChildren().add(tableView);
 
         Stage dialog = new Stage();
         dialog.initModality(Modality.NONE);
-        dialog.setTitle("Recent bans - " + player.getRepresentation());
-        dialog.setScene(new Scene(content, 900, 360));
+        dialog.setTitle("Recent bans - selected report");
+        LocalPreferences.TabReports tabReports = localPreferences.getTabReports();
+        Scene scene = new Scene(content,
+                validSavedDialogSize(tabReports.getRecentBansDialogWidth(), RECENT_BANS_DIALOG_MIN_WIDTH)
+                        ? tabReports.getRecentBansDialogWidth()
+                        : RECENT_BANS_DIALOG_DEFAULT_WIDTH,
+                validSavedDialogSize(tabReports.getRecentBansDialogHeight(), RECENT_BANS_DIALOG_MIN_HEIGHT)
+                        ? tabReports.getRecentBansDialogHeight()
+                        : RECENT_BANS_DIALOG_DEFAULT_HEIGHT);
+        applyCurrentTheme(scene);
+        scene.setOnKeyPressed(event -> {
+            if (event.getCode() == KeyCode.ESCAPE) {
+                dialog.close();
+            }
+        });
+        dialog.setScene(scene);
+        dialog.setMinWidth(RECENT_BANS_DIALOG_MIN_WIDTH);
+        dialog.setMinHeight(RECENT_BANS_DIALOG_MIN_HEIGHT);
+        restoreRecentBansDialogPosition(dialog, tabReports);
+        dialog.setOnHidden(event -> saveRecentBansDialogBounds(dialog));
         dialog.show();
+    }
+
+    private static boolean validSavedDialogSize(double size, double minimum) {
+        return Double.isFinite(size) && size >= minimum;
+    }
+
+    private static void restoreRecentBansDialogPosition(Stage dialog, LocalPreferences.TabReports tabReports) {
+        if (Double.isFinite(tabReports.getRecentBansDialogX()) && tabReports.getRecentBansDialogX() >= 0) {
+            dialog.setX(tabReports.getRecentBansDialogX());
+        }
+        if (Double.isFinite(tabReports.getRecentBansDialogY()) && tabReports.getRecentBansDialogY() >= 0) {
+            dialog.setY(tabReports.getRecentBansDialogY());
+        }
+    }
+
+    private void saveRecentBansDialogBounds(Stage dialog) {
+        LocalPreferences.TabReports tabReports = localPreferences.getTabReports();
+        tabReports.setRecentBansDialogX(dialog.getX());
+        tabReports.setRecentBansDialogY(dialog.getY());
+        tabReports.setRecentBansDialogWidth(dialog.getWidth());
+        tabReports.setRecentBansDialogHeight(dialog.getHeight());
+    }
+
+    private void applyCurrentTheme(Scene scene) {
+        String stylesheet = localPreferences.getTabSettings().isDarkModeCheckBox()
+                ? "/style/main-dark.css"
+                : "/style/main-light.css";
+        Optional.ofNullable(getClass().getResource(stylesheet))
+                .ifPresent(resource -> scene.getStylesheets().add(resource.toExternalForm()));
+    }
+
+    private ObservableList<BanInfoFX> createSortedRecentBans(Collection<BanInfoFX> bans) {
+        return FXCollections.observableArrayList(bans.stream()
+                .sorted(Comparator.comparing(BanInfoFX::getCreateTime,
+                        Comparator.nullsFirst(Comparator.naturalOrder())))
+                .toList());
+    }
+
+    private VBox createRecentBansPane(String title, ObservableList<BanInfoFX> bans) {
+        TableView<BanInfoFX> tableView = new TableView<>();
+        ViewHelper.buildBanTableView(tableView, bans, true, localPreferences, userService, uiService);
+        tableView.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        configureRecentBansTableColumns(tableView);
+
+        VBox pane = new VBox(6, new Label(title + " (" + bans.size() + " events)"), tableView);
+        pane.setPrefWidth(730);
+        pane.setMinWidth(520);
+        pane.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(pane, Priority.ALWAYS);
+        VBox.setVgrow(tableView, Priority.ALWAYS);
+        return pane;
+    }
+
+    private void configureRecentBansTableColumns(TableView<BanInfoFX> tableView) {
+        tableView.getColumns().removeIf(column ->
+                !List.of("ID", "Duration", "Reason").contains(column.getText()));
+        TableColumn<BanInfoFX, String> expiredColumn = new TableColumn<>("Expired");
+        expiredColumn.setCellValueFactory(cellData -> new SimpleStringProperty(
+                formatRecentBanExpiredAgo(cellData.getValue())));
+        tableView.getColumns().add(2, expiredColumn);
+
+        setFixedRecentBansColumnWidth(tableView, "ID", 70);
+        setFixedRecentBansColumnWidth(tableView, "Duration", 90);
+        setFixedRecentBansColumnWidth(tableView, "Expired", 170);
+        bindRecentBansReasonColumnWidth(tableView);
+    }
+
+    private void setRecentBansColumnWidth(TableView<BanInfoFX> tableView, String columnText, double width) {
+        tableView.getColumns().stream()
+                .filter(column -> Objects.equals(column.getText(), columnText))
+                .findFirst()
+                .ifPresent(column -> {
+                    column.setMinWidth(Math.min(width, 90));
+                    column.setPrefWidth(width);
+                });
+    }
+
+    private void setFixedRecentBansColumnWidth(TableView<BanInfoFX> tableView, String columnText, double width) {
+        tableView.getColumns().stream()
+                .filter(column -> Objects.equals(column.getText(), columnText))
+                .findFirst()
+                .ifPresent(column -> {
+                    column.setMinWidth(width);
+                    column.setPrefWidth(width);
+                    column.setMaxWidth(width);
+                    column.setResizable(false);
+                });
+    }
+
+    private void bindRecentBansReasonColumnWidth(TableView<BanInfoFX> tableView) {
+        tableView.getColumns().stream()
+                .filter(column -> Objects.equals(column.getText(), "Reason"))
+                .findFirst()
+                .ifPresent(column -> {
+                    column.setMinWidth(260);
+                    column.prefWidthProperty().bind(tableView.widthProperty()
+                            .subtract(70)
+                            .subtract(90)
+                            .subtract(170)
+                            .subtract(24));
+                });
+    }
+
+    private String formatRecentBanExpiredAgo(BanInfoFX banInfo) {
+        if (banInfo.getBanStatus() == BanStatus.DISABLED) {
+            if (banInfo.getRevokeTime() == null) {
+                return "disabled/revoked";
+            }
+
+            java.time.Duration revokedAgo = java.time.Duration.between(banInfo.getRevokeTime(), java.time.OffsetDateTime.now());
+            return revokedAgo.isNegative()
+                    ? "disabled/revoked"
+                    : "disabled/revoked " + formatRecentBanRelativeDuration(revokedAgo) + " ago";
+        }
+
+        if (banInfo.getBanStatus() == BanStatus.BANNED) {
+            if (banInfo.getDuration() == BanDurationType.PERMANENT) {
+                return "active, permanent";
+            }
+            if (banInfo.getExpiresAt() == null) {
+                return "active";
+            }
+
+            java.time.Duration remaining = java.time.Duration.between(java.time.OffsetDateTime.now(), banInfo.getExpiresAt());
+            return remaining.isNegative()
+                    ? "active"
+                    : "active, " + formatRecentBanRelativeDuration(remaining) + " left";
+        }
+
+        if (banInfo.getExpiresAt() == null) {
+            return "";
+        }
+
+        java.time.Duration delta = java.time.Duration.between(banInfo.getExpiresAt(), java.time.OffsetDateTime.now());
+        if (delta.isNegative()) {
+            return "";
+        }
+
+        return formatRecentBanRelativeDuration(delta) + " ago";
+    }
+
+    private String formatRecentBanRelativeDuration(java.time.Duration duration) {
+        long days = duration.toDays();
+        long hours = duration.toHoursPart();
+        long minutes = duration.toMinutesPart();
+
+        if (days >= 365) {
+            long years = days / 365;
+            long months = days % 365 / 30;
+            return months > 0 ? years + "y " + months + "m" : years + "y";
+        }
+        if (days >= 30) {
+            long months = days / 30;
+            long remainingDays = days % 30;
+            return remainingDays > 0 ? months + "m " + remainingDays + "d" : months + "m";
+        }
+        if (days > 0) {
+            return hours > 0 ? days + "d " + hours + "h" : days + "d";
+        }
+        if (hours > 0) {
+            return minutes > 0 ? hours + "h " + minutes + "m" : hours + "h";
+        }
+        return minutes > 0 ? minutes + "m" : "now";
+    }
+
+    private String getPlayerRepresentationOrNA(PlayerFX player) {
+        return player == null ? "n/a" : player.getRepresentation();
+    }
+
+    private String getOffenderRecentBansTitle() {
+        if (reportedPlayersOfCurrentlySelectedReport.isEmpty()) {
+            return "n/a";
+        }
+        if (reportedPlayersOfCurrentlySelectedReport.size() == 1) {
+            return reportedPlayersOfCurrentlySelectedReport.getFirst().getRepresentation();
+        }
+        return reportedPlayersOfCurrentlySelectedReport.size() + " offenders";
     }
 
     public void onSave() {
@@ -1231,28 +1518,28 @@ public class ModerationReportController implements Controller<Region> {
                 ? "Reporter n/a"
                 : newValue.getReporter().getRepresentation();
         copyReporterIdButton.setText(formatPlayerRoleButtonText("Reporter", reporterRepresentation));
-        styleReportAccountButton(copyReporterIdButton, "Reporter");
+        styleReportClipboardRoleButton(copyReporterIdButton, "Reporter");
         copyReporterIdButton.setId(newValue.getReporter() == null ? "" : reporterRepresentation);
         createReportForumReporterButton.setId(newValue.getReporter() == null ? "" : newValue.getReporter().getId());
         createReportForumReporterButton.setText("Search Forum Reporter:\n" + reporterRepresentation);
-        styleReportAccountButton(createReportForumReporterButton, "Reporter");
+        styleReportForumSearchRoleButton(createReportForumReporterButton, "Reporter");
 
         // Since ~2023, reports have only one offender; legacy reports may have several.
         for (PlayerFX offender : reportedPlayersOfCurrentlySelectedReport) {
             copyReportedUserIdButton.setId(offender.getRepresentation());
             copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", offender.getRepresentation()));
-            styleReportAccountButton(copyReportedUserIdButton, "Offender");
+            styleReportClipboardRoleButton(copyReportedUserIdButton, "Offender");
             createReportForumOffenderButton.setId(offender.getId());
             createReportForumOffenderButton.setText("Search Forum Offender:\n" + offender.getRepresentation());
-            styleReportAccountButton(createReportForumOffenderButton, "Offender");
+            styleReportForumSearchRoleButton(createReportForumOffenderButton, "Offender");
         }
         if (reportedPlayersOfCurrentlySelectedReport.isEmpty()) {
             copyReportedUserIdButton.setId("");
             copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", "Reported User n/a"));
-            styleReportAccountButton(copyReportedUserIdButton, "Offender");
+            styleReportClipboardRoleButton(copyReportedUserIdButton, "Offender");
             createReportForumOffenderButton.setId("");
             createReportForumOffenderButton.setText("Search Forum Offender:\nn/a");
-            styleReportAccountButton(createReportForumOffenderButton, "Offender");
+            styleReportForumSearchRoleButton(createReportForumOffenderButton, "Offender");
         }
 
         if (newValue.getGame() != null) {
@@ -1327,6 +1614,10 @@ public class ModerationReportController implements Controller<Region> {
         showTextMarkersCheckBox.setSelected(tabReports.isTextMarkerTypeFilterCheckBox());
         thresholdToShowSelfDestructionUnitsEventTextField.setText(tabReports.getThresholdToShowSelfDestructionUnitsEventTextField());
         fetchReportsOnStartupCheckBox.setSelected(tabReports.isFetchReportsOnStartupCheckBox());
+        enableManualReplayLookupCheckBox.setSelected(tabReports.isEnableManualReplayLookupCheckBox());
+        showOpenLogsInNotepadPlusPlusButtonCheckBox.setSelected(
+                tabReports.isShowOpenLogsInNotepadPlusPlusButtonCheckBox());
+        showReportPlayerRoleLabelsCheckBox.setSelected(tabReports.isShowReportPlayerRoleLabelsCheckBox());
         autoSearchReportedAccountInUserManagementCheckBox.setSelected(
                 tabReports.isAutoSearchReportedAccountInUserManagementCheckBox());
     }
@@ -1345,7 +1636,9 @@ public class ModerationReportController implements Controller<Region> {
         chatLogTextFlow.getChildren().clear();
         chatLogTextFlow.getChildren().add(messageTextNoSelection);
         bindUIElementsToPreferences();
+        addReportToolPreferenceListeners();
         refreshManualReplayLookupVisibility();
+        refreshOpenLogsInNotepadPlusPlusVisibility();
         refreshReportPlayerRoleButtonText();
 
         if (fetchReportsOnStartupCheckBox.isSelected()) {
@@ -1369,6 +1662,15 @@ public class ModerationReportController implements Controller<Region> {
         });
     }
 
+    private void addReportToolPreferenceListeners() {
+        enableManualReplayLookupCheckBox.selectedProperty().addListener((obs, oldValue, newValue) ->
+                refreshManualReplayLookupVisibility());
+        showOpenLogsInNotepadPlusPlusButtonCheckBox.selectedProperty().addListener((obs, oldValue, newValue) ->
+                refreshOpenLogsInNotepadPlusPlusVisibility());
+        showReportPlayerRoleLabelsCheckBox.selectedProperty().addListener((obs, oldValue, newValue) ->
+                refreshReportPlayerRoleButtonText());
+    }
+
     private void initializeItemMapAndListeners() {
         itemMap = FXCollections.observableHashMap();
         itemList = FXCollections.observableArrayList();
@@ -1389,8 +1691,26 @@ public class ModerationReportController implements Controller<Region> {
         SortedList<ModerationReportFX> sortedItemList = new SortedList<>(filteredItemList);
         sortedItemList.comparatorProperty().bind(reportTableView.comparatorProperty());
         ViewHelper.buildModerationReportTableView(reportTableView, sortedItemList, this::showChatLog, userService, uiService);
+        refreshReportTableRoleHeaderColors();
         statusChoiceBox.getSelectionModel().selectedItemProperty().addListener(observable -> renewFilter());
         playerNameFilterTextField.textProperty().addListener(observable -> renewFilter());
+    }
+
+    private void refreshReportTableRoleHeaderColors() {
+        colorReportTableColumnHeader("reporterColumn", "Reporter");
+        colorReportTableColumnHeader("reportedUsersColumn", "Offender");
+    }
+
+    private void colorReportTableColumnHeader(String columnId, String role) {
+        reportTableView.getColumns().stream()
+                .filter(column -> Objects.equals(column.getId(), columnId))
+                .findFirst()
+                .ifPresent(column -> {
+                    Label label = new Label(role);
+                    label.setStyle(getReportAccountRoleTextStyle(role));
+                    column.setText("");
+                    column.setGraphic(label);
+                });
     }
 
     public static void setSysClipboardText(String writeMe) {
@@ -1822,6 +2142,7 @@ public class ModerationReportController implements Controller<Region> {
         Platform.runLater(() -> {
             copyModeratorEventsButton.setId(moderatorEventsLog);
             copyModeratorEventsButton.setText("Copy Moderator Events");
+            refreshOpenLogsInNotepadPlusPlusVisibility();
             moderatorEventTextFlow.getChildren().clear();
             updateModeratorEventToColorTextFlow(moderatorEventTextFlow, moderatorEventsLog,
                     extractName(copyReporterIdButton.getText()),
@@ -1953,6 +2274,7 @@ public class ModerationReportController implements Controller<Region> {
                 Platform.runLater(() -> {
                     copyChatLogButton.setId(chatLogFiltered.toString());
                     copyChatLogButton.setText("Copy Chat Log");
+                    refreshOpenLogsInNotepadPlusPlusVisibility();
 
                     copyChatLogButtonOffenderOnly.setText("Copy Chat Offender");
                     copyChatLogButtonOffenderOnly.setId(chatLogFilteredOffenderOnly.toString());
@@ -2820,12 +3142,22 @@ public class ModerationReportController implements Controller<Region> {
         getModeratorEventsReplayIdButton.setManaged(visible);
     }
 
+    private void refreshOpenLogsInNotepadPlusPlusVisibility() {
+        boolean visible = localPreferences.getTabReports().isShowOpenLogsInNotepadPlusPlusButtonCheckBox();
+        openLogsInNotepadPlusPlusButton.setVisible(visible);
+        openLogsInNotepadPlusPlusButton.setManaged(visible);
+        openLogsInNotepadPlusPlusButton.setDisable(
+                copyChatLogButton.getId() == null || copyChatLogButton.getId().isBlank()
+                        || copyModeratorEventsButton.getId() == null || copyModeratorEventsButton.getId().isBlank());
+    }
+
     public void refreshReportPlayerRoleButtonText() {
         if (currentlySelectedItemNotNull == null) {
             copyReporterIdButton.setText(formatPlayerRoleButtonText("Reporter", "Reporter n/a"));
-            styleReportAccountButton(copyReporterIdButton, "Reporter");
+            styleReportClipboardRoleButton(copyReporterIdButton, "Reporter");
             copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", "Reported User n/a"));
-            styleReportAccountButton(copyReportedUserIdButton, "Offender");
+            styleReportClipboardRoleButton(copyReportedUserIdButton, "Offender");
+            refreshReportForumSearchRoleButtonStyles();
             return;
         }
 
@@ -2833,21 +3165,41 @@ public class ModerationReportController implements Controller<Region> {
                 ? "Reporter n/a"
                 : currentlySelectedItemNotNull.getReporter().getRepresentation();
         copyReporterIdButton.setText(formatPlayerRoleButtonText("Reporter", reporterRepresentation));
-        styleReportAccountButton(copyReporterIdButton, "Reporter");
+        styleReportClipboardRoleButton(copyReporterIdButton, "Reporter");
 
         Collection<PlayerFX> reportedUsers = currentlySelectedItemNotNull.getReportedUsers();
         if (reportedUsers == null || reportedUsers.isEmpty()) {
             copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", "Reported User n/a"));
-            styleReportAccountButton(copyReportedUserIdButton, "Offender");
+            styleReportClipboardRoleButton(copyReportedUserIdButton, "Offender");
         } else {
             for (PlayerFX offender : reportedUsers) {
                 copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", offender.getRepresentation()));
-                styleReportAccountButton(copyReportedUserIdButton, "Offender");
+                styleReportClipboardRoleButton(copyReportedUserIdButton, "Offender");
             }
         }
+        refreshReportForumSearchRoleButtonStyles();
+    }
+
+    public void selectReportSettingsTab() {
+        reportDetailsTabPane.getSelectionModel().select(reportSettingsTab);
+    }
+
+    private void refreshReportForumSearchRoleButtonStyles() {
+        styleReportForumSearchRoleButton(createReportForumReporterButton, "Reporter");
+        styleReportForumSearchRoleButton(createReportForumOffenderButton, "Offender");
+    }
+
+    private void styleReportClipboardRoleButton(Button button, String role) {
+        styleReportAccountButton(button, role);
+    }
+
+    private void styleReportForumSearchRoleButton(Button button, String role) {
+        styleReportAccountButton(button, role);
     }
 
     private void styleReportAccountButton(Button button, String role) {
+        button.setGraphic(null);
+        button.setContentDisplay(ContentDisplay.TEXT_ONLY);
         button.setStyle(getReportAccountRoleTextStyle(role));
     }
 

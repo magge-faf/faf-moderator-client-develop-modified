@@ -76,12 +76,11 @@
                 </VBox>
 
                 <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="0" GridPane.rowIndex="2" GridPane.columnSpan="2">
-                    <Label styleClass="settings-section-title" text="Advanced Report Tools"/>
-                    <Label styleClass="settings-help" text="Enable manual replay ID lookup to enter a replay ID without selecting a report and fetch its chat log and moderator events." wrapText="true"/>
-                    <CheckBox fx:id="enableManualReplayLookupCheckBox" mnemonicParsing="false"
-                              text="Show manual replay ID field and Get Chat/Events button"/>
-                    <CheckBox fx:id="showReportPlayerRoleLabelsCheckBox" mnemonicParsing="false"
-                              text="Show Reporter and Offender prefix in report buttons"/>
+                    <Label styleClass="settings-section-title" text="Report Settings"/>
+                    <Label styleClass="settings-help" text="Open the local Reports settings for manual replay lookup, report role labels, chat log, replay, and moderator event options." wrapText="true"/>
+                    <Button fx:id="openReportSettingsButton" mnemonicParsing="false"
+                            onAction="#onOpenReportSettings"
+                            text="GoTo Report Settings"/>
                 </VBox>
 
                 <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="0" GridPane.rowIndex="3" GridPane.columnSpan="2">

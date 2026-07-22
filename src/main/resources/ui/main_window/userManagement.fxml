@@ -312,5 +312,16 @@
                           style="-fx-font-family: 'Consolas', 'Courier New', monospace; -fx-font-size: 12px;"/>
             </VBox>
         </Tab>
+        <Tab text="Settings">
+            <VBox spacing="8" style="-fx-padding: 8;">
+                <Label text="User Search" style="-fx-font-weight: bold;"/>
+                <CheckBox fx:id="redoLastUserSearchOnStartupCheckBox"
+                          text="Redo last user search on startup"/>
+                <Separator/>
+                <Label text="Smurf Village" style="-fx-font-weight: bold;"/>
+                <CheckBox fx:id="showForumAccountsReferenceButtonCheckBox"
+                          text="Show Copy Forum Accounts Reference button"/>
+            </VBox>
+        </Tab>
     </TabPane>
 </SplitPane>

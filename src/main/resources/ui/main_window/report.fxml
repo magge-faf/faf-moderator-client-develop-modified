@@ -45,6 +45,8 @@
 
                 <Button fx:id="copyChatLogButton" text="Chat Log" onAction="#onCopyChatLog" minWidth="150"/>
                 <Button fx:id="copyChatLogButtonOffenderOnly" text="Chat Log Offender" onAction="#onCopyChatLogButtonOffenderOnly" minWidth="150"/>
+                <Button fx:id="openLogsInNotepadPlusPlusButton" text="Open Logs in N++"
+                        onAction="#onOpenLogsInNotepadPlusPlus" minWidth="150"/>
                 <Button fx:id="copyModeratorEventsButton" text="Moderator Events" onAction="#onCopyModeratorEvents" minWidth="150"/>
 
                 <Separator minHeight="5"/>
@@ -72,7 +74,7 @@
         </ScrollPane>
         <TableView fx:id="reportTableView" maxHeight="Infinity" maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
     </SplitPane>
-    <TabPane tabClosingPolicy="UNAVAILABLE">
+    <TabPane fx:id="reportDetailsTabPane" tabClosingPolicy="UNAVAILABLE">
         <Tab text="Chat Log">
             <ScrollPane prefHeight="200.0" prefWidth="200.0">
                 <TextFlow fx:id="chatLogTextFlow" />
@@ -209,13 +211,24 @@
                         </TitledPane>
                         <HBox alignment="CENTER">
                             <Button text="Copy All Stats Data to Clipboard (takes a few seconds)" onAction="#handleCopyAllStatsButtonAction"/>
+                            <Button text="Copy Ban Stats" onAction="#handleCopyBanStatsButtonAction"/>
                         </HBox>
                     </VBox>
                 </content>
             </ScrollPane>
         </Tab>
-        <Tab text="Settings Moderator Events, Replay and Chat Log">
+        <Tab fx:id="reportSettingsTab" text="Settings">
             <VBox spacing="10">
+                <Label text="Report Tools:"/>
+                <Label text="Enable local Reports workflow options." wrapText="true"/>
+                <CheckBox fx:id="enableManualReplayLookupCheckBox" mnemonicParsing="false"
+                          text="Show manual replay ID field and Get Chat/Events button"/>
+                <CheckBox fx:id="showOpenLogsInNotepadPlusPlusButtonCheckBox" mnemonicParsing="false"
+                          text="Show button to open Chat Log and Moderator Events in Notepad++"/>
+                <Label text="Notepad++ is required for the logs open button." wrapText="true"/>
+                <CheckBox fx:id="showReportPlayerRoleLabelsCheckBox" mnemonicParsing="false"
+                          text="Show Reporter and Offender prefix in report buttons"/>
+                <Separator minHeight="5"/>
 
                 <!-- Game Data -->
                 <Label text="Show Game Data Events:"/>
