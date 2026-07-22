@@ -34,8 +34,13 @@ import javafx.event.Event;
 import javafx.fxml.FXML;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.image.ImageView;
+import javafx.scene.image.WritableImage;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
@@ -89,6 +94,8 @@ public class UserManagementController implements Controller<SplitPane> {
     public Button checkTemporaryBansButton;
     @FXML
     public Button checkSmurfManagementAccountsButton;
+    @FXML
+    public Button copyAccountsReferenceTextAndImageButton;
     public Label userNotesLabel;
     @FXML
     public TextField maxMatchesBeforePromptSmurfVillageLookupTextField;
@@ -2112,6 +2119,102 @@ public class UserManagementController implements Controller<SplitPane> {
                 log.error("RuntimeException in updateSmurfVillageLogTextArea: {}", e.getMessage(), e);
             }
         });
+    }
+
+    @FXML
+    private void copyAccountsReferenceTextAndImage() {
+        String referenceText = buildForumReferenceText();
+        int rowCount = userSearchTableView.getItems().size();
+        if (referenceText == null || rowCount == 0) {
+            return;
+        }
+
+        ClipboardContent content = new ClipboardContent();
+        content.putString(referenceText);
+        content.putImage(snapshotForumAccountsReferenceImage(rowCount));
+        Clipboard.getSystemClipboard().setContent(content);
+    }
+
+    private String buildForumReferenceText() {
+        String output = smurfOutputTextArea.getText();
+        if (output == null || output.isBlank()) {
+            return null;
+        }
+        String strippedOutput = output.strip();
+        if (strippedOutput.startsWith("Accounts Reference:")) {
+            strippedOutput = strippedOutput.substring("Accounts Reference:".length()).strip();
+        }
+        return "```\n" + strippedOutput + "\n```";
+    }
+
+    private WritableImage snapshotForumAccountsReferenceImage(int rowCount) {
+        Label heading = new Label("Accounts Reference:");
+        heading.setStyle("-fx-font-weight: bold; -fx-text-fill: white; -fx-padding: 0 0 6 0;");
+
+        ImageView tableImageView = new ImageView(snapshotFullUserSearchTable(rowCount));
+        VBox imageLayout = new VBox(0, heading, tableImageView);
+        imageLayout.setStyle("-fx-background-color: #202020; -fx-padding: 0;");
+        imageLayout.applyCss();
+        imageLayout.layout();
+        return imageLayout.snapshot(null, null);
+    }
+
+    private WritableImage snapshotFullUserSearchTable(int rowCount) {
+        double originalMinHeight = userSearchTableView.getMinHeight();
+        double originalPrefHeight = userSearchTableView.getPrefHeight();
+        double originalMaxHeight = userSearchTableView.getMaxHeight();
+        boolean originalManaged = userSearchTableView.isManaged();
+
+        double rowHeight = userSearchTableView.getFixedCellSize() > 0 ? userSearchTableView.getFixedCellSize() : 56;
+        double firstPassHeight = 40 + rowHeight * rowCount + 24;
+
+        try {
+            userSearchTableView.setManaged(false);
+            resizeUserSearchTableForSnapshot(firstPassHeight);
+            userSearchTableView.applyCss();
+            userSearchTableView.layout();
+
+            double fullHeight = measureUserSearchTableContentHeight(rowCount);
+            resizeUserSearchTableForSnapshot(fullHeight);
+            userSearchTableView.applyCss();
+            userSearchTableView.layout();
+
+            WritableImage snapshot = userSearchTableView.snapshot(null, null);
+            int croppedHeight = Math.max(1, Math.min((int) Math.ceil(fullHeight), (int) snapshot.getHeight()));
+            return new WritableImage(snapshot.getPixelReader(), 0, 0, (int) snapshot.getWidth(), croppedHeight);
+        } finally {
+            userSearchTableView.setMinHeight(originalMinHeight);
+            userSearchTableView.setPrefHeight(originalPrefHeight);
+            userSearchTableView.setMaxHeight(originalMaxHeight);
+            userSearchTableView.setManaged(originalManaged);
+            userSearchTableView.applyCss();
+            userSearchTableView.layout();
+        }
+    }
+
+    private void resizeUserSearchTableForSnapshot(double height) {
+        userSearchTableView.setMinHeight(height);
+        userSearchTableView.setPrefHeight(height);
+        userSearchTableView.setMaxHeight(height);
+    }
+
+    private double measureUserSearchTableContentHeight(int rowCount) {
+        double headerHeight = Optional.ofNullable(userSearchTableView.lookup(".column-header-background"))
+                .map(node -> node.getBoundsInParent().getHeight())
+                .orElse(28.0);
+        double rowsHeight = userSearchTableView.lookupAll(".table-row-cell").stream()
+                .filter(TableRow.class::isInstance)
+                .map(TableRow.class::cast)
+                .filter(row -> !row.isEmpty() && row.getIndex() >= 0 && row.getIndex() < rowCount)
+                .mapToDouble(row -> row.getBoundsInParent().getHeight())
+                .sum();
+        double horizontalScrollHeight = userSearchTableView.lookupAll(".scroll-bar").stream()
+                .filter(Node::isVisible)
+                .filter(node -> "horizontal".equals(node.getProperties().get("orientation")) || node.getStyleClass().contains("horizontal"))
+                .mapToDouble(node -> node.getBoundsInParent().getHeight())
+                .max()
+                .orElse(0.0);
+        return Math.ceil(headerHeight + rowsHeight + horizontalScrollHeight + 2);
     }
 
     private Timeline loadingAnimation;

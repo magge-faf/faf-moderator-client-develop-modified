@@ -299,7 +299,15 @@
         </Tab>
 
         <Tab fx:id="smurfOutputTab" text="Smurf Village">
-            <VBox>
+            <VBox spacing="5">
+                <HBox spacing="5" alignment="CENTER_LEFT">
+                    <Button fx:id="copyAccountsReferenceTextAndImageButton" text="Copy Forum Accounts Reference"
+                            onAction="#copyAccountsReferenceTextAndImage" mnemonicParsing="false">
+                        <tooltip>
+                            <Tooltip text="Copies the forum heading, code-block output, and full account table image"/>
+                        </tooltip>
+                    </Button>
+                </HBox>
                 <TextArea fx:id="smurfOutputTextArea" VBox.vgrow="ALWAYS"
                           style="-fx-font-family: 'Consolas', 'Courier New', monospace; -fx-font-size: 12px;"/>
             </VBox>
