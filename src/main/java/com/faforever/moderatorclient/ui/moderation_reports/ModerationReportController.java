@@ -1409,6 +1409,10 @@ public class ModerationReportController implements Controller<Region> {
     public void onSave() {
         saveColumnLayout(reportTableView, localPreferences);
         saveSplitPanePositions(root, localPreferences);
+        Tab selectedSubTab = reportDetailsTabPane.getSelectionModel().getSelectedItem();
+        if (selectedSubTab != null && selectedSubTab.getId() != null) {
+            localPreferences.getTabReports().setSelectedSubTabId(selectedSubTab.getId());
+        }
     }
 
     private static void saveColumnRecursive(TableColumn<?, ?> column, Map<String, Double> widths, List<String> order) {
@@ -1625,6 +1629,7 @@ public class ModerationReportController implements Controller<Region> {
     @FXML
     public void initialize() {
         loadCheckboxStates();
+        restoreAndTrackSelectedSubTab();
         setupReportSelectionListener();
         statusChoiceBox.setItems(FXCollections.observableArrayList(ChooseableStatus.values()));
         statusChoiceBox.getSelectionModel().select(ChooseableStatus.AWAITING_PROCESSING); // Set Default Selection
@@ -1690,7 +1695,7 @@ public class ModerationReportController implements Controller<Region> {
         renewFilter();
         SortedList<ModerationReportFX> sortedItemList = new SortedList<>(filteredItemList);
         sortedItemList.comparatorProperty().bind(reportTableView.comparatorProperty());
-        ViewHelper.buildModerationReportTableView(reportTableView, sortedItemList, this::showChatLog, userService, uiService);
+        ViewHelper.buildModerationReportTableView(reportTableView, sortedItemList, this::showChatLog, userService, uiService, localPreferences);
         refreshReportTableRoleHeaderColors();
         statusChoiceBox.getSelectionModel().selectedItemProperty().addListener(observable -> renewFilter());
         playerNameFilterTextField.textProperty().addListener(observable -> renewFilter());
@@ -1935,6 +1940,19 @@ public class ModerationReportController implements Controller<Region> {
         } catch (Exception e) {
             log.error("Error while editing reports", e);
         }
+    }
+
+    private void restoreAndTrackSelectedSubTab() {
+        String savedTabId = localPreferences.getTabReports().getSelectedSubTabId();
+        reportDetailsTabPane.getTabs().stream()
+                .filter(tab -> Objects.equals(tab.getId(), savedTabId))
+                .findFirst()
+                .ifPresent(tab -> reportDetailsTabPane.getSelectionModel().select(tab));
+        reportDetailsTabPane.getSelectionModel().selectedItemProperty().addListener((observable, oldTab, newTab) -> {
+            if (newTab != null && newTab.getId() != null) {
+                localPreferences.getTabReports().setSelectedSubTabId(newTab.getId());
+            }
+        });
     }
 
     @Getter

@@ -46,6 +46,7 @@ import javafx.scene.text.Text;
 import java.time.Duration;
 import java.time.LocalDate;
 import javafx.scene.text.TextAlignment;
+import javafx.scene.text.TextFlow;
 import javafx.stage.Stage;
 import javafx.util.Callback;
 import javafx.util.StringConverter;
@@ -58,7 +59,10 @@ import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.awt.Desktop;
+import java.awt.GraphicsEnvironment;
 import java.io.*;
+import java.net.URI;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -78,6 +82,8 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -2819,12 +2825,89 @@ public class ViewHelper {
         };
     }
 
+    private static final Pattern URL_PATTERN = Pattern.compile("https?://\\S+");
+
+    private static List<Node> buildLinkifiedTextNodes(String content, LocalPreferences localPreferences) {
+        List<Node> nodes = new ArrayList<>();
+        Matcher matcher = URL_PATTERN.matcher(content);
+        int lastEnd = 0;
+        while (matcher.find()) {
+            if (matcher.start() > lastEnd) {
+                nodes.add(plainDescriptionText(content.substring(lastEnd, matcher.start())));
+            }
+            String url = matcher.group();
+            Hyperlink link = new Hyperlink(url);
+            link.setFocusTraversable(false);
+            link.setStyle("-fx-text-fill: #4ea3ff; -fx-underline: true; -fx-padding: 0; -fx-border-width: 0;");
+            link.setOnAction(event -> openUrlInConfiguredBrowser(url, localPreferences));
+            nodes.add(link);
+            lastEnd = matcher.end();
+        }
+        if (lastEnd < content.length()) {
+            nodes.add(plainDescriptionText(content.substring(lastEnd)));
+        }
+        return nodes;
+    }
+
+    private static double measureWrappedTextHeight(String content, double wrappingWidth) {
+        Text measuringText = new Text(content);
+        measuringText.setWrappingWidth(Math.max(1.0, wrappingWidth));
+        return measuringText.getLayoutBounds().getHeight();
+    }
+
+    private static Text plainDescriptionText(String value) {
+        Text text = new Text(value);
+        text.setFill(Color.WHITE);
+        return text;
+    }
+
+    private static void openUrlInConfiguredBrowser(String url, LocalPreferences localPreferences) {
+        String browser = localPreferences == null ? null : String.valueOf(localPreferences.getUi().getBrowserComboBox());
+
+        if (browser == null || "selectBrowser".equalsIgnoreCase(browser)) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Browser Selection Required");
+            alert.setHeaderText("No Browser Selected");
+            alert.setContentText("Please go to the Settings tab (top right) and select a browser.");
+            alert.showAndWait();
+            return;
+        }
+
+        try {
+            if (!GraphicsEnvironment.isHeadless() && Desktop.isDesktopSupported()
+                    && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+                Desktop.getDesktop().browse(URI.create(url));
+            } else {
+                List<String> allowedBrowsers = Arrays.asList("chrome", "firefox", "Microsoft Edge", "edge", "msedge", "iexplore");
+                String lowerBrowser = browser.toLowerCase();
+
+                boolean isAllowed = allowedBrowsers.stream().anyMatch(allowed -> lowerBrowser.contains(allowed.toLowerCase()));
+
+                if (!isAllowed) {
+                    log.warn("Browser not in allow-list: {}", browser);
+                    throw new SecurityException("Browser not permitted: " + browser);
+                }
+
+                ProcessBuilder pb;
+                if ("Microsoft Edge".equalsIgnoreCase(browser)) {
+                    pb = new ProcessBuilder("cmd", "/c", "start", "microsoft-edge:" + url);
+                } else {
+                    pb = new ProcessBuilder("cmd", "/c", "start", browser, url);
+                }
+                pb.start();
+            }
+        } catch (Exception e) {
+            log.warn("Failed to open URL: {}", url, e);
+        }
+    }
+
     public static void buildModerationReportTableView(
             TableView<ModerationReportFX> tableView,
             ObservableList<ModerationReportFX> items,
             Consumer<ModerationReportFX> onChatLog,
             @Nullable UserService userService,
-            @Nullable UiService uiService
+            @Nullable UiService uiService,
+            @Nullable LocalPreferences localPreferences
     ) {
         tableView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         tableView.setItems(items);
@@ -2967,14 +3050,40 @@ public class ViewHelper {
 
         reportDescriptionColumn.setCellValueFactory(param -> param.getValue().reportDescriptionProperty());
         reportDescriptionColumn.setCellFactory(column -> {
-            TableCell<ModerationReportFX, String> cell = new TableCell<>();
-            Text text = new Text();
-            text.setFill(Color.WHITE);
-            cell.setGraphic(text);
-            cell.setPrefHeight(Control.USE_COMPUTED_SIZE);
-            cell.setWrapText(true);
-            text.wrappingWidthProperty().bind(Bindings.createDoubleBinding(() -> cell.getWidth() - 10.0, cell.widthProperty()));
-            text.textProperty().bind(cell.itemProperty());
+            TableCell<ModerationReportFX, String> cell = new TableCell<>() {
+                private final TextFlow textFlow = new TextFlow();
+
+                {
+                    setGraphic(textFlow);
+                    setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+                    column.widthProperty().addListener((obs, oldWidth, newWidth) -> refreshSizing());
+                }
+
+                private void refreshSizing() {
+                    double wrapWidth = Math.max(20.0, column.getWidth() - 10.0);
+                    textFlow.setPrefWidth(wrapWidth);
+                    textFlow.setMaxWidth(wrapWidth);
+                    String item = getItem();
+                    if (!isEmpty() && item != null) {
+                        setPrefHeight(measureWrappedTextHeight(item, wrapWidth) + 12.0);
+                    } else {
+                        setPrefHeight(Control.USE_COMPUTED_SIZE);
+                    }
+                    if (getTableRow() != null) {
+                        getTableRow().requestLayout();
+                    }
+                }
+
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    textFlow.getChildren().clear();
+                    if (!empty && item != null) {
+                        textFlow.getChildren().addAll(buildLinkifiedTextNodes(item, localPreferences));
+                    }
+                    refreshSizing();
+                }
+            };
             return cell;
         });
         reportDescriptionColumn.setId("reportDescriptionColumn");

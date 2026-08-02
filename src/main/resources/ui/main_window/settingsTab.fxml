@@ -76,11 +76,16 @@
                 </VBox>
 
                 <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="0" GridPane.rowIndex="2" GridPane.columnSpan="2">
-                    <Label styleClass="settings-section-title" text="Report Settings"/>
-                    <Label styleClass="settings-help" text="Open the local Reports settings for manual replay lookup, report role labels, chat log, replay, and moderator event options." wrapText="true"/>
-                    <Button fx:id="openReportSettingsButton" mnemonicParsing="false"
-                            onAction="#onOpenReportSettings"
-                            text="GoTo Report Settings"/>
+                    <Label styleClass="settings-section-title" text="Additional Settings"/>
+                    <Label styleClass="settings-help" text="Open the settings pages for Reports or User Management." wrapText="true"/>
+                    <FlowPane hgap="8" vgap="8" styleClass="settings-button-wrap">
+                        <Button fx:id="openReportSettingsButton" mnemonicParsing="false"
+                                onAction="#onOpenReportSettings"
+                                text="GoTo Report Settings"/>
+                        <Button fx:id="openUserSettingsButton" mnemonicParsing="false"
+                                onAction="#onOpenUserSettings"
+                                text="GoTo User Settings"/>
+                    </FlowPane>
                 </VBox>
 
                 <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="0" GridPane.rowIndex="3" GridPane.columnSpan="2">

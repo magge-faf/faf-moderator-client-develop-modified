@@ -221,6 +221,8 @@ public class UserManagementController implements Controller<SplitPane> {
     public Tab lastGamesTab;
     public Tab avatarsTab;
     public Tab userGroupsTab;
+    public TabPane userDetailsTabPane;
+    public Tab userSettingsTab;
 
     public ComboBox<String> searchUserProperties;
     public TextField userSearchTextField;
@@ -2105,6 +2107,12 @@ public class UserManagementController implements Controller<SplitPane> {
         startSmurfVillageLookup(true);
     }
 
+    public void selectUserSettingsTab() {
+        if (userSettingsTab != null && userSettingsTab.getTabPane() != null) {
+            userSettingsTab.getTabPane().getSelectionModel().select(userSettingsTab);
+        }
+    }
+
     private void startSmurfVillageLookup(boolean forceEnableAllSettings) {
         captureSmurfCheckSettings(forceEnableAllSettings);
         clearUserSearchResults();
@@ -3286,6 +3294,10 @@ public class UserManagementController implements Controller<SplitPane> {
         saveColumnLayout(userSearchTableView, localPreferences);
         saveSplitPanePositions(root, localPreferences);
         LocalPreferences.TabUserManagement tab = localPreferences.getTabUserManagement();
+        Tab selectedSubTab = userDetailsTabPane.getSelectionModel().getSelectedItem();
+        if (selectedSubTab != null && selectedSubTab.getId() != null) {
+            tab.setSelectedSubTabId(selectedSubTab.getId());
+        }
         ViewHelper.saveColumnLayout(userBansTableView, tab.getUserBansTableColumnWidths(), tab.getUserBansTableColumnOrder());
         ViewHelper.saveColumnLayout(userNoteTableView, tab.getUserNoteTableColumnWidths(), tab.getUserNoteTableColumnOrder());
         ViewHelper.saveColumnLayout(userNameHistoryTableView, tab.getUserNameHistoryTableColumnWidths(), tab.getUserNameHistoryTableColumnOrder());

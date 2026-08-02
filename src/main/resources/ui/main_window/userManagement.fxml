@@ -194,7 +194,7 @@
         </VBox>
     </SplitPane>
 
-    <TabPane minHeight="200.0" tabClosingPolicy="UNAVAILABLE">
+    <TabPane fx:id="userDetailsTabPane" minHeight="200.0" tabClosingPolicy="UNAVAILABLE">
         <Tab fx:id="notesTab" text="Notes">
             <VBox maxWidth="Infinity" maxHeight="Infinity">
                 <TableView fx:id="userNoteTableView" prefHeight="200.0" prefWidth="200.0" VBox.vgrow="ALWAYS">

@@ -557,10 +557,13 @@ public class LocalPreferences {
     @JsonIgnoreProperties(ignoreUnknown = true)
     @Data
     public static class TabUserManagement {
+        String selectedSubTabId = "notesTab";
+
         // TextField
         String smurfVillageLookupTextField = "";
         String smurfOutputTextArea = "";
         String daysToCheckRecentAccountsTextField = "1";
+        String bulkSmurfLookupWorkerCountTextField = "4";
 
         // CheckBox
         boolean promptUserOnThresholdExceededSmurfVillageLookupCheckBox = true;
@@ -636,6 +639,8 @@ public class LocalPreferences {
     @JsonIgnoreProperties(ignoreUnknown = true)
     @Data
     public static class TabReports {
+        String selectedSubTabId = "reportChatLogTab";
+
         // CheckBoxes
         boolean autoLoadChatLogCheckBox = true;
         boolean showEnforceRatingCheckBox = true;
@@ -665,6 +670,8 @@ public class LocalPreferences {
         // TextFields
         String thresholdToShowSelfDestructionUnitsEventTextField = "0";
         String initialReportsLoadingTextField = "100";
+        String playerNameFilterTextField = "";
+        String getModeratorEventsForReplayIdTextField = "";
 
         // Table column persistence
         Map<String, Double> reportTableColumnWidthsTabReports = new HashMap<>();

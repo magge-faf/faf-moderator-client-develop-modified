@@ -299,6 +299,13 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         }
     }
 
+    public void openUserSettings() {
+        root.getSelectionModel().select(userManagementTab);
+        if (userManagementController != null) {
+            userManagementController.selectUserSettingsTab();
+        }
+    }
+
     private void initMapVaultTab() {
         mapVaultController = uiService.loadFxml("ui/main_window/mapVault.fxml");
         mapVaultTab.setContent(mapVaultController.getRoot());

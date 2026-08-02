@@ -92,6 +92,11 @@ public class SettingsController implements Controller<Pane> {
     }
 
     @FXML
+    public void onOpenUserSettings() {
+        mainController.openUserSettings();
+    }
+
+    @FXML
     public void initialize() throws IOException {
         defaultActiveTabComboBox.setConverter(new StringConverter<>() {
             @Override
