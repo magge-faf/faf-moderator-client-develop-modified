@@ -310,6 +310,7 @@ public class UserManagementController implements Controller<SplitPane> {
         bindUIElementsToPreferences();
         bindForumAccountsReferenceButtonVisibility();
         bindOpenInNppButton();
+        bindBulkSmurfLookupWorkerCountTextField();
         redoLastUserSearchOnStartup();
 
         Tooltip tooltip = catchFirstLayerSmurfsOnlyCheckBox.getTooltip();
@@ -365,6 +366,11 @@ public class UserManagementController implements Controller<SplitPane> {
             ViewHelper.loadColumnLayout(userAvatarsTableView, tab.getUserAvatarsTableColumnWidths(), tab.getUserAvatarsTableColumnOrder());
             ViewHelper.loadColumnLayout(userGroupsTableView, tab.getUserGroupsTableColumnWidths(), tab.getUserGroupsTableColumnOrder());
             ViewHelper.loadColumnLayout(permissionsTableView, tab.getPermissionsTableColumnWidths(), tab.getPermissionsTableColumnOrder());
+            String savedSubTabId = tab.getSelectedSubTabId();
+            userDetailsTabPane.getTabs().stream()
+                    .filter(t -> Objects.equals(t.getId(), savedSubTabId))
+                    .findFirst()
+                    .ifPresent(t -> userDetailsTabPane.getSelectionModel().select(t));
             startupSyncBans();
 
             int smurfCount = bansController.loadExistingBannedUserIds(SmurfManagementController.SMURF_MANAGEMENT_USERS_JSON_PATH).size();
@@ -431,6 +437,14 @@ public class UserManagementController implements Controller<SplitPane> {
         }
     }
 
+    private void bindBulkSmurfLookupWorkerCountTextField() {
+        if (bulkSmurfLookupWorkerCountTextField == null) {
+            return;
+        }
+        bulkSmurfLookupWorkerCountTextField.setTextFormatter(new TextFormatter<>(change ->
+                change.getControlNewText().matches("\\d{0,2}") ? change : null));
+    }
+
     private void bindForumAccountsReferenceButtonVisibility() {
         copyAccountsReferenceTextAndImageButton.visibleProperty()
                 .bind(showForumAccountsReferenceButtonCheckBox.selectedProperty());
@@ -438,23 +452,8 @@ public class UserManagementController implements Controller<SplitPane> {
                 .bind(showForumAccountsReferenceButtonCheckBox.selectedProperty());
     }
 
-    private static final String[] NOTEPAD_PLUS_PLUS_CANDIDATE_PATHS = {
-            System.getenv("ProgramFiles") + "\\Notepad++\\notepad++.exe",
-            System.getenv("ProgramFiles(x86)") + "\\Notepad++\\notepad++.exe",
-            System.getenv("LOCALAPPDATA") + "\\Programs\\Notepad++\\notepad++.exe"
-    };
-
     private Path findNppExecutable() {
-        for (String candidate : NOTEPAD_PLUS_PLUS_CANDIDATE_PATHS) {
-            if (candidate == null) {
-                continue;
-            }
-            Path path = Path.of(candidate);
-            if (Files.isRegularFile(path)) {
-                return path;
-            }
-        }
-        return null;
+        return ViewHelper.resolveNotepadPlusPlusPath();
     }
 
     private void bindOpenInNppButton() {
@@ -1305,6 +1304,7 @@ public class UserManagementController implements Controller<SplitPane> {
         captureSmurfCheckSettings(false);
         clearUserSearchResults();
         resetPreviousStateSmurfVillageLookup();
+        cancelRequestedByUser = false;
         Set<String> userIds = bansController.loadExistingBannedUserIds(filePath);
 
         if (userIds.isEmpty()) {
@@ -1325,7 +1325,7 @@ public class UserManagementController implements Controller<SplitPane> {
                 Platform.runLater(() -> progressLabel.setText("Processing " + total + " users..."));
 
                 for (String userId : userIds) {
-                    if (isCancelled()) break;
+                    if (isCancelled() || cancelRequestedByUser) break;
 
                     try {
                         final int processed = count + 1;
@@ -1548,7 +1548,7 @@ public class UserManagementController implements Controller<SplitPane> {
         List<PlayerFX> users;
         try {
             users = smurfLookupSettings.promptOnThreshold()
-                    ? userService.findUsersByAttributeIn(property, toProcess, thresholdProbeLimit())
+                    ? userService.findUsersByAttributeIn(property, toProcess, thresholdProbeLimit(currentPlayer != null))
                     : userService.findUsersByAttributeIn(property, toProcess);
         } catch (HttpClientErrorException e) {
             updateSmurfVillageLogTextArea(String.format(
@@ -1648,7 +1648,7 @@ public class UserManagementController implements Controller<SplitPane> {
         List<PlayerFX> foundUsers;
         try {
             foundUsers = smurfLookupSettings.promptOnThreshold()
-                    ? userService.findUsersByAttribute(property, value, thresholdProbeLimit())
+                    ? userService.findUsersByAttribute(property, value, thresholdProbeLimit(currentPlayer != null))
                     : userService.findUsersByAttribute(property, value);
         } catch (HttpClientErrorException e) {
             updateSmurfVillageLogTextArea(String.format(
@@ -1732,11 +1732,15 @@ public class UserManagementController implements Controller<SplitPane> {
         if (localLog.length() > 0) updateSmurfVillageLogTextArea(localLog.toString());
     }
 
-    private int thresholdProbeLimit() {
+    private int thresholdProbeLimit(boolean probeIncludesCurrentPlayer) {
         if (smurfLookupSettings.threshold() >= Integer.MAX_VALUE - 1) {
             return Integer.MAX_VALUE;
         }
-        return Math.max(1, smurfLookupSettings.threshold() + 1);
+        // findOtherAccounts() strips the current player out of the probe results before comparing against
+        // the threshold, so the raw fetch needs one extra slot to avoid the current player's own match
+        // silently swallowing a truncated "other account" and hiding a real threshold breach.
+        int limit = smurfLookupSettings.threshold() + 1;
+        return Math.max(1, probeIncludesCurrentPlayer ? limit + 1 : limit);
     }
 
     private List<PlayerFX> findOtherAccounts(List<PlayerFX> users, PlayerFX currentPlayer) {
@@ -2129,7 +2133,6 @@ public class UserManagementController implements Controller<SplitPane> {
     private void runSingleSmurfLookup(String playerID) {
         if (cancelRequestedByUser) {
             updateSmurfVillageLogTextArea("\n[cancelled] Process canceled before starting lookup.\n");
-            cancelRequestedByUser = false;
             return;
         }
 
@@ -3353,7 +3356,7 @@ public class UserManagementController implements Controller<SplitPane> {
         saveSplitPanePositions(root, localPreferences);
         LocalPreferences.TabUserManagement tab = localPreferences.getTabUserManagement();
         Tab selectedSubTab = userDetailsTabPane.getSelectionModel().getSelectedItem();
-        if (selectedSubTab != null && selectedSubTab.getId() != null) {
+        if (selectedSubTab != null && selectedSubTab.getId() != null && selectedSubTab != userSettingsTab) {
             tab.setSelectedSubTabId(selectedSubTab.getId());
         }
         ViewHelper.saveColumnLayout(userBansTableView, tab.getUserBansTableColumnWidths(), tab.getUserBansTableColumnOrder());

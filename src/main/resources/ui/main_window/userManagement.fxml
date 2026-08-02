@@ -318,7 +318,7 @@
                           style="-fx-font-family: 'Consolas', 'Courier New', monospace; -fx-font-size: 12px;"/>
             </VBox>
         </Tab>
-        <Tab text="Settings">
+        <Tab fx:id="userSettingsTab" text="Settings">
             <VBox spacing="8" style="-fx-padding: 8;">
                 <Label text="User Search" style="-fx-font-weight: bold;"/>
                 <CheckBox fx:id="redoLastUserSearchOnStartupCheckBox"
@@ -328,7 +328,11 @@
                 <CheckBox fx:id="showForumAccountsReferenceButtonCheckBox"
                           text="Show Copy Forum Accounts Reference button"/>
                 <CheckBox fx:id="showOpenInNppButtonCheckBox"
-                          text="Show n++ Button"/>
+                          text="Show Open in N++ button"/>
+                <HBox spacing="5" alignment="CENTER_LEFT">
+                    <Label text="Bulk smurf lookup worker count:"/>
+                    <TextField fx:id="bulkSmurfLookupWorkerCountTextField" prefWidth="50"/>
+                </HBox>
             </VBox>
         </Tab>
     </TabPane>
