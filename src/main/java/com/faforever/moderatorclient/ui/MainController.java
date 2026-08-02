@@ -464,7 +464,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         if (recentActivityController != null) recentActivityController.onSave();
         if (apiHistoryController != null) apiHistoryController.onSave();
         boolean preferencesSaved = settingsController != null
-                ? settingsController.saveOnExit()
+                ? (settingsController.saveOnExit() || localPreferencesReaderWriter.write(localPreferences))
                 : localPreferencesReaderWriter.write(localPreferences);
         if (preferencesSaved) {
             log.info("Local preferences saved successfully.");
