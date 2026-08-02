@@ -13,8 +13,10 @@ import javafx.collections.transformation.FilteredList;
 import javafx.collections.transformation.SortedList;
 import javafx.fxml.FXML;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Screen;
@@ -144,10 +146,13 @@ public class SmurfManagementController implements Controller<VBox> {
         DateTimeFormatter formatter = HUMAN_READABLE_FORMATTER;
 
         table.getColumns().addAll(
+                createDateColumn("Date Added", user -> {
+                    Instant added = parseInstantSafe(safeGet(user, UserDataController.UserInfo::getAddedOn));
+                    return added == null ? "" : formatter.format(added);
+                }),
+
                 createNumericColumn("User ID",    user -> safeGet(user, UserDataController.UserInfo::getUserId)),
                 createColumn      ("User Name",   user -> safeGet(user, UserDataController.UserInfo::getUserName)),
-                createColumn      ("Comment",     user -> safeGet(user, UserDataController.UserInfo::getComment)),
-                createColumn      ("Reason",      user -> safeGet(user, UserDataController.UserInfo::getReason)),
 
                 createDateColumn("Last Login", user -> {
                     List<UserDataController.LoginEntry> lastLogins = user.getAccountHistory().getLastLogins();
@@ -156,12 +161,10 @@ public class SmurfManagementController implements Controller<VBox> {
                     return lastLogin == null ? "" : formatter.format(lastLogin);
                 }),
 
-                createDateColumn("Date Added", user -> {
-                    Instant added = parseInstantSafe(safeGet(user, UserDataController.UserInfo::getAddedOn));
-                    return added == null ? "" : formatter.format(added);
-                }),
+                createColumn      ("Comment",     user -> safeGet(user, UserDataController.UserInfo::getComment)),
+                createColumn      ("Reason",      user -> safeGet(user, UserDataController.UserInfo::getReason)),
 
-                createDateColumn("Last Activity", user -> {
+                createDateColumn("Last Record Update", user -> {
                     Instant lastEdit = parseInstantSafe(safeGet(user, UserDataController.UserInfo::getLastEdit));
                     return lastEdit == null ? "" : formatter.format(lastEdit);
                 }),
@@ -181,8 +184,8 @@ public class SmurfManagementController implements Controller<VBox> {
                 }),
 
                 createColumn    ("Ban Status",     user -> getFirstBan(user, UserDataController.BanInfo::getBanStatus)),
-                createDateColumn("Ban Expires At", user -> getFirstBan(user, UserDataController.BanInfo::getBanExpiresAt)),
-                createDateColumn("Ban Created At", user -> getFirstBan(user, UserDataController.BanInfo::getBanCreatedAt))
+                createDateColumn("Ban Expires At", user -> getFirstBan(user, ban -> formatBanExpiry(ban.getBanExpiresAt()))),
+                createDateColumn("Ban Created At", user -> getFirstBan(user, ban -> formatBanCreatedAt(ban.getBanCreatedAt())))
         );
 
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
@@ -215,9 +218,10 @@ public class SmurfManagementController implements Controller<VBox> {
     }
 
     private static Instant parseDateForSort(String s) {
-        if (s == null || s.isBlank() || "Never".equals(s)) return Instant.EPOCH;
+        if (s == null || s.isBlank() || "Never".equals(s) || "Permanent".equals(s)) return Instant.EPOCH;
+        String datePart = s.contains(" (") ? s.substring(0, s.indexOf(" (")) : s;
         try {
-            return HUMAN_READABLE_FORMATTER.parse(s, Instant::from);
+            return HUMAN_READABLE_FORMATTER.parse(datePart, Instant::from);
         } catch (Exception e) {
             return Instant.EPOCH;
         }
@@ -231,6 +235,71 @@ public class SmurfManagementController implements Controller<VBox> {
         } catch (DateTimeParseException e) {
             return null;
         }
+    }
+
+    /**
+     * Parses either an {@link Instant}-style ISO string (ends in "Z") or an
+     * {@link OffsetDateTime}-style ISO string (e.g. "+02:00"), as used by ban dates.
+     */
+    private static Instant parseAnyInstant(String str) {
+        if (str == null || str.isBlank()) return null;
+        try {
+            return Instant.parse(str);
+        } catch (DateTimeParseException e) {
+            try {
+                return OffsetDateTime.parse(str).toInstant();
+            } catch (DateTimeParseException e2) {
+                return null;
+            }
+        }
+    }
+
+    private String formatBanCreatedAt(String raw) {
+        Instant created = parseAnyInstant(raw);
+        return created == null ? "" : HUMAN_READABLE_FORMATTER.format(created);
+    }
+
+    private String formatBanExpiry(String raw) {
+        Instant expires = parseAnyInstant(raw);
+        if (expires == null) return "Permanent";
+        return HUMAN_READABLE_FORMATTER.format(expires) + " (" + humanizeRelative(Instant.now(), expires) + ")";
+    }
+
+    /**
+     * Renders the gap between two instants as a compact "y m d h m" string,
+     * e.g. "in 1y 2m 3d 4h 5m" or "1y 2m 3d 4h 5m ago".
+     */
+    private static String humanizeRelative(Instant from, Instant to) {
+        boolean future = to.isAfter(from);
+        Instant earlier = future ? from : to;
+        Instant later = future ? to : from;
+
+        ZonedDateTime zEarlier = earlier.atZone(ZoneId.systemDefault());
+        ZonedDateTime zLater = later.atZone(ZoneId.systemDefault());
+
+        Period period = Period.between(zEarlier.toLocalDate(), zLater.toLocalDate());
+        ZonedDateTime afterDatePart = zEarlier.plus(period);
+        if (afterDatePart.isAfter(zLater)) {
+            period = period.minusDays(1);
+            afterDatePart = zEarlier.plus(period);
+        }
+        Duration remainder = Duration.between(afterDatePart, zLater);
+
+        long years = period.getYears();
+        long months = period.getMonths();
+        long days = period.getDays();
+        long hours = remainder.toHours();
+        long minutes = remainder.toMinutesPart();
+
+        StringBuilder sb = new StringBuilder();
+        if (years > 0) sb.append(years).append("y ");
+        if (months > 0) sb.append(months).append("m ");
+        if (days > 0) sb.append(days).append("d ");
+        if (hours > 0) sb.append(hours).append("h ");
+        if (minutes > 0 || sb.length() == 0) sb.append(minutes).append("m");
+
+        String duration = sb.toString().trim();
+        return future ? "in " + duration : duration + " ago";
     }
 
     private String safeGet(UserDataController user, Function<UserDataController.UserInfo, String> mapper) {
@@ -273,13 +342,20 @@ public class SmurfManagementController implements Controller<VBox> {
             if (selected != null) editUserField(selected, false);
         });
 
+        MenuItem viewHistoryItem = new MenuItem("View Event History");
+        viewHistoryItem.setOnAction(e -> {
+            UserDataController selected = table.getSelectionModel().getSelectedItem();
+            if (selected != null) showEventHistory(selected);
+        });
+
         MenuItem removeUserItem = new MenuItem("Remove User");
         removeUserItem.setOnAction(e -> {
             UserDataController selected = table.getSelectionModel().getSelectedItem();
             if (selected != null) removeUser(selected);
         });
 
-        menu.getItems().addAll(copyIdItem, copyNameItem, new SeparatorMenuItem(), editCommentItem, editReasonItem, new SeparatorMenuItem(), removeUserItem);
+        menu.getItems().addAll(copyIdItem, copyNameItem, new SeparatorMenuItem(), editCommentItem, editReasonItem,
+                new SeparatorMenuItem(), viewHistoryItem, new SeparatorMenuItem(), removeUserItem);
         table.setContextMenu(menu);
     }
 
@@ -371,6 +447,94 @@ public class SmurfManagementController implements Controller<VBox> {
             }
             loadSmurfManagementUsers();
         });
+    }
+
+    // ---- Event history popup ----
+
+    private void showEventHistory(UserDataController user) {
+        Stage stage = new Stage();
+
+        List<UserDataController.HistoryEntry> historyEntries = Optional.ofNullable(user.getAccountHistory())
+                .map(UserDataController.AccountHistory::getHistory)
+                .orElse(Collections.emptyList());
+        ObservableList<UserDataController.HistoryEntry> allEntries = FXCollections.observableArrayList(historyEntries);
+        FilteredList<UserDataController.HistoryEntry> filteredEntries = new FilteredList<>(allEntries, e -> true);
+        SortedList<UserDataController.HistoryEntry> sortedEntries = new SortedList<>(filteredEntries,
+                Comparator.comparing((UserDataController.HistoryEntry entry) -> {
+                    Instant ts = parseAnyInstant(entry.getTimestamp());
+                    return ts == null ? Instant.EPOCH : ts;
+                }).reversed());
+
+        TableView<UserDataController.HistoryEntry> historyTable = new TableView<>();
+
+        TableColumn<UserDataController.HistoryEntry, String> timeCol = new TableColumn<>("Timestamp");
+        timeCol.setCellValueFactory(cd -> {
+            Instant ts = parseAnyInstant(cd.getValue().getTimestamp());
+            return new SimpleStringProperty(ts == null ? Objects.toString(cd.getValue().getTimestamp(), "") : HUMAN_READABLE_FORMATTER.format(ts));
+        });
+        timeCol.setPrefWidth(180);
+
+        TableColumn<UserDataController.HistoryEntry, String> actionCol = new TableColumn<>("Action");
+        actionCol.setCellValueFactory(cd -> new SimpleStringProperty(Objects.toString(cd.getValue().getAction(), "")));
+        actionCol.setPrefWidth(180);
+
+        TableColumn<UserDataController.HistoryEntry, String> descCol = new TableColumn<>("Description");
+        descCol.setCellValueFactory(cd -> new SimpleStringProperty(Objects.toString(cd.getValue().getDescription(), "")));
+
+        historyTable.getColumns().addAll(timeCol, actionCol, descCol);
+        historyTable.setItems(sortedEntries);
+        historyTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+        VBox.setVgrow(historyTable, Priority.ALWAYS);
+
+        DatePicker fromPicker = new DatePicker();
+        fromPicker.setPromptText("From");
+        DatePicker toPicker = new DatePicker();
+        toPicker.setPromptText("To");
+        Label countLabel = new Label();
+
+        Runnable applyTimeframe = () -> {
+            LocalDate from = fromPicker.getValue();
+            LocalDate to = toPicker.getValue();
+            filteredEntries.setPredicate(entry -> {
+                if (from == null && to == null) return true;
+                Instant ts = parseAnyInstant(entry.getTimestamp());
+                if (ts == null) return true;
+                LocalDate entryDate = ts.atZone(ZoneId.systemDefault()).toLocalDate();
+                if (from != null && entryDate.isBefore(from)) return false;
+                return to == null || !entryDate.isAfter(to);
+            });
+            countLabel.setText(filteredEntries.size() + " / " + allEntries.size() + " events");
+        };
+
+        fromPicker.valueProperty().addListener((obs, oldVal, newVal) -> applyTimeframe.run());
+        toPicker.valueProperty().addListener((obs, oldVal, newVal) -> applyTimeframe.run());
+
+        Button clearButton = new Button("Clear");
+        clearButton.setOnAction(e -> {
+            fromPicker.setValue(null);
+            toPicker.setValue(null);
+        });
+
+        HBox filterBar = new HBox(8, new Label("From:"), fromPicker, new Label("To:"), toPicker, clearButton, countLabel);
+        filterBar.setAlignment(Pos.CENTER_LEFT);
+        filterBar.setPadding(new Insets(5));
+
+        applyTimeframe.run();
+
+        VBox layout = new VBox(filterBar, historyTable);
+        layout.setSpacing(5);
+        layout.setPadding(new Insets(5));
+
+        double w = Screen.getPrimary().getVisualBounds().getWidth();
+        double h = Screen.getPrimary().getVisualBounds().getHeight();
+        Scene scene = new Scene(layout, w * WINDOW_WIDTH_RATIO, h * WINDOW_HEIGHT_RATIO);
+        scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/style/main-dark.css")).toExternalForm());
+
+        stage.setScene(scene);
+        stage.setTitle("Event History: " + safeGet(user, UserDataController.UserInfo::getUserName)
+                + " [id " + safeGet(user, UserDataController.UserInfo::getUserId) + "]");
+        stage.setResizable(true);
+        stage.show();
     }
 
     // ---- Hardware info popup ----
