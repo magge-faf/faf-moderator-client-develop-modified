@@ -47,8 +47,7 @@ public class IrcMentionNotificationService {
 
     public void showMentionToast(String sender, String channel, String message) {
         Platform.runLater(() -> {
-            boolean desktopNotificationPreferred = shouldPreferDesktopNotification();
-            if (desktopNotificationPreferred && showSystemNotification(sender, channel, message)) {
+            if (showSystemNotification(sender, channel, message)) {
                 return;
             }
 
@@ -57,9 +56,7 @@ public class IrcMentionNotificationService {
                 return;
             }
 
-            if (!showSystemNotification(sender, channel, message)) {
-                log.debug("Unable to show a mention notification: no system tray available and no visible window.");
-            }
+            log.debug("Unable to show a mention notification: no system tray available and no visible window.");
         });
     }
 
@@ -203,14 +200,6 @@ public class IrcMentionNotificationService {
         activePopup = popup;
         activeToastAnimation = new SequentialTransition(fadeIn, hold, fadeOut);
         activeToastAnimation.play();
-    }
-
-    private boolean shouldPreferDesktopNotification() {
-        Stage owner = getPrimaryStage();
-        if (owner == null) {
-            return true;
-        }
-        return owner.isIconified() || !owner.isFocused() || !owner.isShowing();
     }
 
     private boolean canShowInAppToast() {
