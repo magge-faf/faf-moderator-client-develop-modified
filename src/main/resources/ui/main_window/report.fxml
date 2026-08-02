@@ -212,7 +212,7 @@
                         </TitledPane>
                         <HBox alignment="CENTER">
                             <Button text="Copy All Stats Data to Clipboard (takes a few seconds)" onAction="#handleCopyAllStatsButtonAction"/>
-                            <Button text="Copy Ban Stats" onAction="#handleCopyBanStatsButtonAction"/>
+                            <Button text="Copy Moderator Stats" onAction="#handleCopyBanStatsButtonAction"/>
                         </HBox>
                     </VBox>
                 </content>

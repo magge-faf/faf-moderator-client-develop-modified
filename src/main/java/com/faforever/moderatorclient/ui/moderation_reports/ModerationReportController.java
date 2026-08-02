@@ -301,6 +301,8 @@ public class ModerationReportController implements Controller<Region> {
         try {
             Path chatLogFile = Files.createTempFile("faf-chat-log-", ".txt");
             Path moderatorEventsFile = Files.createTempFile("faf-moderator-events-", ".txt");
+            chatLogFile.toFile().deleteOnExit();
+            moderatorEventsFile.toFile().deleteOnExit();
             Files.writeString(chatLogFile, chatLog, StandardCharsets.UTF_8);
             Files.writeString(moderatorEventsFile, moderatorEvents, StandardCharsets.UTF_8);
             new ProcessBuilder(resolveNotepadPlusPlusExecutable(),
@@ -313,31 +315,9 @@ public class ModerationReportController implements Controller<Region> {
         }
     }
 
-    private String resolveNotepadPlusPlusExecutable() throws IOException {
-        List<String> candidates = new ArrayList<>();
-
-        String programFiles = System.getenv("ProgramFiles");
-        if (programFiles != null && !programFiles.isBlank()) {
-            candidates.add(Path.of(programFiles, "Notepad++", "notepad++.exe").toString());
-        }
-
-        String programFilesX86 = System.getenv("ProgramFiles(x86)");
-        if (programFilesX86 != null && !programFilesX86.isBlank()) {
-            candidates.add(Path.of(programFilesX86, "Notepad++", "notepad++.exe").toString());
-        }
-
-        String localAppData = System.getenv("LOCALAPPDATA");
-        if (localAppData != null && !localAppData.isBlank()) {
-            candidates.add(Path.of(localAppData, "Programs", "Notepad++", "notepad++.exe").toString());
-        }
-
-        for (String candidate : candidates) {
-            if (Files.isRegularFile(Path.of(candidate))) {
-                return candidate;
-            }
-        }
-
-        return "notepad++";
+    private String resolveNotepadPlusPlusExecutable() {
+        Path path = ViewHelper.resolveNotepadPlusPlusPath();
+        return path != null ? path.toString() : "notepad++";
     }
 
     public void onCopyChatLogButtonOffenderOnly() {
@@ -1069,17 +1049,17 @@ public class ModerationReportController implements Controller<Region> {
     private void resetButtonsToInvalidState() {
         resetGameButtonsToInvalidState();
         copyReporterIdButton.setText(formatPlayerRoleButtonText("Reporter", "Reporter n/a"));
-        styleReportClipboardRoleButton(copyReporterIdButton, "Reporter");
+        styleReportAccountButton(copyReporterIdButton, "Reporter");
         copyReporterIdButton.setId("");
         copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", "Reported User n/a"));
-        styleReportClipboardRoleButton(copyReportedUserIdButton, "Offender");
+        styleReportAccountButton(copyReportedUserIdButton, "Offender");
         copyReportedUserIdButton.setId("");
         createReportForumReporterButton.setId("");
         createReportForumReporterButton.setText("Search Forum Reporter:\nn/a");
-        styleReportForumSearchRoleButton(createReportForumReporterButton, "Reporter");
+        styleReportAccountButton(createReportForumReporterButton, "Reporter");
         createReportForumOffenderButton.setId("");
         createReportForumOffenderButton.setText("Search Forum Offender:\nn/a");
-        styleReportForumSearchRoleButton(createReportForumOffenderButton, "Offender");
+        styleReportAccountButton(createReportForumOffenderButton, "Offender");
         accountPlayersOfCurrentlySelectedReport.clear();
         reportedPlayersOfCurrentlySelectedReport.clear();
     }
@@ -1208,13 +1188,7 @@ public class ModerationReportController implements Controller<Region> {
         dialog.initModality(Modality.NONE);
         dialog.setTitle("Recent bans - selected report");
         LocalPreferences.TabReports tabReports = localPreferences.getTabReports();
-        Scene scene = new Scene(content,
-                validSavedDialogSize(tabReports.getRecentBansDialogWidth(), RECENT_BANS_DIALOG_MIN_WIDTH)
-                        ? tabReports.getRecentBansDialogWidth()
-                        : RECENT_BANS_DIALOG_DEFAULT_WIDTH,
-                validSavedDialogSize(tabReports.getRecentBansDialogHeight(), RECENT_BANS_DIALOG_MIN_HEIGHT)
-                        ? tabReports.getRecentBansDialogHeight()
-                        : RECENT_BANS_DIALOG_DEFAULT_HEIGHT);
+        Scene scene = new Scene(content);
         applyCurrentTheme(scene);
         scene.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.ESCAPE) {
@@ -1224,6 +1198,12 @@ public class ModerationReportController implements Controller<Region> {
         dialog.setScene(scene);
         dialog.setMinWidth(RECENT_BANS_DIALOG_MIN_WIDTH);
         dialog.setMinHeight(RECENT_BANS_DIALOG_MIN_HEIGHT);
+        dialog.setWidth(validSavedDialogSize(tabReports.getRecentBansDialogWidth(), RECENT_BANS_DIALOG_MIN_WIDTH)
+                ? tabReports.getRecentBansDialogWidth()
+                : RECENT_BANS_DIALOG_DEFAULT_WIDTH);
+        dialog.setHeight(validSavedDialogSize(tabReports.getRecentBansDialogHeight(), RECENT_BANS_DIALOG_MIN_HEIGHT)
+                ? tabReports.getRecentBansDialogHeight()
+                : RECENT_BANS_DIALOG_DEFAULT_HEIGHT);
         restoreRecentBansDialogPosition(dialog, tabReports);
         dialog.setOnHidden(event -> saveRecentBansDialogBounds(dialog));
         dialog.show();
@@ -1294,16 +1274,6 @@ public class ModerationReportController implements Controller<Region> {
         bindRecentBansReasonColumnWidth(tableView);
     }
 
-    private void setRecentBansColumnWidth(TableView<BanInfoFX> tableView, String columnText, double width) {
-        tableView.getColumns().stream()
-                .filter(column -> Objects.equals(column.getText(), columnText))
-                .findFirst()
-                .ifPresent(column -> {
-                    column.setMinWidth(Math.min(width, 90));
-                    column.setPrefWidth(width);
-                });
-    }
-
     private void setFixedRecentBansColumnWidth(TableView<BanInfoFX> tableView, String columnText, double width) {
         tableView.getColumns().stream()
                 .filter(column -> Objects.equals(column.getText(), columnText))
@@ -1369,27 +1339,10 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private String formatRecentBanRelativeDuration(java.time.Duration duration) {
-        long days = duration.toDays();
-        long hours = duration.toHoursPart();
-        long minutes = duration.toMinutesPart();
-
-        if (days >= 365) {
-            long years = days / 365;
-            long months = days % 365 / 30;
-            return months > 0 ? years + "y " + months + "m" : years + "y";
+        if (duration.toDays() == 0 && duration.toHoursPart() == 0 && duration.toMinutesPart() == 0) {
+            return "now";
         }
-        if (days >= 30) {
-            long months = days / 30;
-            long remainingDays = days % 30;
-            return remainingDays > 0 ? months + "m " + remainingDays + "d" : months + "m";
-        }
-        if (days > 0) {
-            return hours > 0 ? days + "d " + hours + "h" : days + "d";
-        }
-        if (hours > 0) {
-            return minutes > 0 ? hours + "h " + minutes + "m" : hours + "h";
-        }
-        return minutes > 0 ? minutes + "m" : "now";
+        return ViewHelper.formatCompactDuration(duration);
     }
 
     private String getPlayerRepresentationOrNA(PlayerFX player) {
@@ -1522,28 +1475,28 @@ public class ModerationReportController implements Controller<Region> {
                 ? "Reporter n/a"
                 : newValue.getReporter().getRepresentation();
         copyReporterIdButton.setText(formatPlayerRoleButtonText("Reporter", reporterRepresentation));
-        styleReportClipboardRoleButton(copyReporterIdButton, "Reporter");
+        styleReportAccountButton(copyReporterIdButton, "Reporter");
         copyReporterIdButton.setId(newValue.getReporter() == null ? "" : reporterRepresentation);
         createReportForumReporterButton.setId(newValue.getReporter() == null ? "" : newValue.getReporter().getId());
         createReportForumReporterButton.setText("Search Forum Reporter:\n" + reporterRepresentation);
-        styleReportForumSearchRoleButton(createReportForumReporterButton, "Reporter");
+        styleReportAccountButton(createReportForumReporterButton, "Reporter");
 
         // Since ~2023, reports have only one offender; legacy reports may have several.
         for (PlayerFX offender : reportedPlayersOfCurrentlySelectedReport) {
             copyReportedUserIdButton.setId(offender.getRepresentation());
             copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", offender.getRepresentation()));
-            styleReportClipboardRoleButton(copyReportedUserIdButton, "Offender");
+            styleReportAccountButton(copyReportedUserIdButton, "Offender");
             createReportForumOffenderButton.setId(offender.getId());
             createReportForumOffenderButton.setText("Search Forum Offender:\n" + offender.getRepresentation());
-            styleReportForumSearchRoleButton(createReportForumOffenderButton, "Offender");
+            styleReportAccountButton(createReportForumOffenderButton, "Offender");
         }
         if (reportedPlayersOfCurrentlySelectedReport.isEmpty()) {
             copyReportedUserIdButton.setId("");
             copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", "Reported User n/a"));
-            styleReportClipboardRoleButton(copyReportedUserIdButton, "Offender");
+            styleReportAccountButton(copyReportedUserIdButton, "Offender");
             createReportForumOffenderButton.setId("");
             createReportForumOffenderButton.setText("Search Forum Offender:\nn/a");
-            styleReportForumSearchRoleButton(createReportForumOffenderButton, "Offender");
+            styleReportAccountButton(createReportForumOffenderButton, "Offender");
         }
 
         if (newValue.getGame() != null) {
@@ -3172,9 +3125,9 @@ public class ModerationReportController implements Controller<Region> {
     public void refreshReportPlayerRoleButtonText() {
         if (currentlySelectedItemNotNull == null) {
             copyReporterIdButton.setText(formatPlayerRoleButtonText("Reporter", "Reporter n/a"));
-            styleReportClipboardRoleButton(copyReporterIdButton, "Reporter");
+            styleReportAccountButton(copyReporterIdButton, "Reporter");
             copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", "Reported User n/a"));
-            styleReportClipboardRoleButton(copyReportedUserIdButton, "Offender");
+            styleReportAccountButton(copyReportedUserIdButton, "Offender");
             refreshReportForumSearchRoleButtonStyles();
             return;
         }
@@ -3183,16 +3136,16 @@ public class ModerationReportController implements Controller<Region> {
                 ? "Reporter n/a"
                 : currentlySelectedItemNotNull.getReporter().getRepresentation();
         copyReporterIdButton.setText(formatPlayerRoleButtonText("Reporter", reporterRepresentation));
-        styleReportClipboardRoleButton(copyReporterIdButton, "Reporter");
+        styleReportAccountButton(copyReporterIdButton, "Reporter");
 
         Collection<PlayerFX> reportedUsers = currentlySelectedItemNotNull.getReportedUsers();
         if (reportedUsers == null || reportedUsers.isEmpty()) {
             copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", "Reported User n/a"));
-            styleReportClipboardRoleButton(copyReportedUserIdButton, "Offender");
+            styleReportAccountButton(copyReportedUserIdButton, "Offender");
         } else {
             for (PlayerFX offender : reportedUsers) {
                 copyReportedUserIdButton.setText(formatPlayerRoleButtonText("Offender", offender.getRepresentation()));
-                styleReportClipboardRoleButton(copyReportedUserIdButton, "Offender");
+                styleReportAccountButton(copyReportedUserIdButton, "Offender");
             }
         }
         refreshReportForumSearchRoleButtonStyles();
@@ -3203,16 +3156,8 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private void refreshReportForumSearchRoleButtonStyles() {
-        styleReportForumSearchRoleButton(createReportForumReporterButton, "Reporter");
-        styleReportForumSearchRoleButton(createReportForumOffenderButton, "Offender");
-    }
-
-    private void styleReportClipboardRoleButton(Button button, String role) {
-        styleReportAccountButton(button, role);
-    }
-
-    private void styleReportForumSearchRoleButton(Button button, String role) {
-        styleReportAccountButton(button, role);
+        styleReportAccountButton(createReportForumReporterButton, "Reporter");
+        styleReportAccountButton(createReportForumOffenderButton, "Offender");
     }
 
     private void styleReportAccountButton(Button button, String role) {

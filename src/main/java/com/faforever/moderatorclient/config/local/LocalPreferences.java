@@ -662,10 +662,6 @@ public class LocalPreferences {
         boolean enableManualReplayLookupCheckBox = false;
         boolean showOpenLogsInNotepadPlusPlusButtonCheckBox = false;
         boolean showReportPlayerRoleLabelsCheckBox = true;
-        boolean colorReportTableRoleHeadersCheckBox = true;
-        boolean colorReportedAccountsRoleColumnCheckBox = true;
-        boolean colorReportClipboardRoleButtonsCheckBox = true;
-        boolean colorReportForumSearchRoleButtonsCheckBox = true;
         boolean autoSearchReportedAccountInUserManagementCheckBox = false;
 
         // TextFields
