@@ -1293,6 +1293,7 @@ public class UserManagementController implements Controller<SplitPane> {
                     }
 
                     count++;
+                    processedCount.set(count);
                 }
 
                 return null;
