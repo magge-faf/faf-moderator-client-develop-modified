@@ -46,6 +46,7 @@ import javafx.scene.text.Text;
 import java.time.Duration;
 import java.time.LocalDate;
 import javafx.scene.text.TextAlignment;
+import javafx.scene.text.TextFlow;
 import javafx.stage.Stage;
 import javafx.util.Callback;
 import javafx.util.StringConverter;
@@ -58,7 +59,10 @@ import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.awt.Desktop;
+import java.awt.GraphicsEnvironment;
 import java.io.*;
+import java.net.URI;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -78,6 +82,8 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -333,15 +339,7 @@ public class ViewHelper {
             BanInfoFX banInfo = o.getValue();
             return switch (banInfo.getDuration()) {
                 case PERMANENT -> "PERMANENT";
-                case TEMPORARY -> {
-                    Instant now = Instant.now();
-                    Duration totalDuration = Duration.between(banInfo.getCreateTime(), banInfo.getExpiresAt());
-                    Duration remainingDuration = Duration.between(now, banInfo.getExpiresAt());
-                    long totalDays = totalDuration.toDays();
-                    long remainingDays = remainingDuration.toDays();
-                    long remainingHours = remainingDuration.toHoursPart();
-                    yield "%s days (%s days, %s hours)".formatted(totalDays, remainingDays, remainingHours);
-                }
+                case TEMPORARY -> formatCompactBanDuration(banInfo);
             };
         }, o.getValue().durationProperty()));
         tableView.getColumns().add(banDurationColumn);
@@ -431,6 +429,44 @@ public class ViewHelper {
         tableView.getColumns().add(updateTimeColumn);
 
         applyCopyContextMenus(tableView, extractors);
+    }
+
+    private static String formatCompactBanDuration(BanInfoFX banInfo) {
+        if (banInfo.getCreateTime() == null || banInfo.getExpiresAt() == null) {
+            return "";
+        }
+
+        Duration duration = Duration.between(banInfo.getCreateTime(), banInfo.getExpiresAt());
+        if (duration.isNegative() || duration.isZero()) {
+            return "0d";
+        }
+
+        long totalHours = duration.toHours();
+        if (totalHours < 24) {
+            return totalHours + "h";
+        }
+
+        long totalDays = (long) Math.ceil(totalHours / 24.0);
+        long years = totalDays / 365;
+        long remainingDays = totalDays % 365;
+        long months = remainingDays / 30;
+        long days = remainingDays % 30;
+
+        List<String> parts = new ArrayList<>();
+        if (years > 0) {
+            parts.add(years + "y");
+        }
+        if (months > 0) {
+            parts.add(months + "m");
+        }
+        if (years == 0 && days > 0) {
+            parts.add(days + "d");
+        }
+        if (parts.isEmpty()) {
+            parts.add(totalDays + "d");
+        }
+
+        return String.join(" ", parts);
     }
 
     public static void buildNameHistoryTableView(TableView<NameRecordFX> tableView, ObservableList<NameRecordFX> data) {
@@ -1348,11 +1384,21 @@ public class ViewHelper {
         return "%s (%s)".formatted(DT_DATETIME.format(expiresAt.atZoneSameInstant(ZoneId.systemDefault())), relativeText);
     }
 
-    private static String formatCompactDuration(Duration duration) {
+    public static String formatCompactDuration(Duration duration) {
         long days = duration.toDays();
         int hours = duration.toHoursPart();
         int minutes = duration.toMinutesPart();
 
+        if (days >= 365) {
+            long years = days / 365;
+            long months = days % 365 / 30;
+            return months > 0 ? "%sy %sm".formatted(years, months) : "%sy".formatted(years);
+        }
+        if (days >= 30) {
+            long months = days / 30;
+            long remainingDays = days % 30;
+            return remainingDays > 0 ? "%sm %sd".formatted(months, remainingDays) : "%sm".formatted(months);
+        }
         if (days > 0) {
             return hours > 0 ? "%sd %sh".formatted(days, hours) : "%sd".formatted(days);
         }
@@ -1494,123 +1540,25 @@ public class ViewHelper {
      * @param sourceEvent The event or action that triggered saving or updating the user.
      */
     public static void saveUserToJsonFile(PlayerFX playerFX, Path pathJson, String sourceEvent) {
-        ObjectMapper objectMapper = new ObjectMapper()
-                .registerModule(new JavaTimeModule())
-                .enable(SerializationFeature.INDENT_OUTPUT);
-
         try {
-            // Read existing users
-            List<UserDataController> jsonUsers = readUsersFromJsonFile(pathJson);
-            if (jsonUsers == null) {
-                jsonUsers = new ArrayList<>();
+            // Shared with SmurfManagementController's edit/remove paths and applyBulkPlayerUpdates below:
+            // several bulk-check worker threads (and the UI thread) can hit this file at once, so serialize
+            // the whole read-modify-write.
+            synchronized (com.faforever.moderatorclient.ui.main_window.SmurfManagementController.SMURF_MANAGEMENT_JSON_LOCK) {
+                List<UserDataController> jsonUsers = readOrEmpty(pathJson);
+
+                Optional<UserDataController> existingUserOpt = jsonUsers.stream()
+                        .filter(u -> u.getUserInfo().getUserId().equals(playerFX.getId()))
+                        .findFirst();
+
+                if (existingUserOpt.isPresent()) {
+                    applyPlayerUpdate(existingUserOpt.get(), playerFX, sourceEvent);
+                } else {
+                    jsonUsers.add(applyPlayerUpdate(null, playerFX, sourceEvent));
+                }
+
+                writeUsersToJsonFile(jsonUsers, pathJson);
             }
-
-            Optional<UserDataController> existingUserOpt = jsonUsers.stream()
-                    .filter(u -> u.getUserInfo().getUserId().equals(playerFX.getId()))
-                    .findFirst();
-
-            String timestamp = Instant.now().toString();
-            boolean updated = false;
-
-            if (existingUserOpt.isPresent()) {
-                UserDataController existingUser = existingUserOpt.get();
-
-                // --- Update IPs ---
-                String ip = playerFX.getRecentIpAddress();
-                if (ip != null && !ip.isEmpty()) {
-                    boolean exists = existingUser.getHardwareInfo().getIpAddresses().stream()
-                            .anyMatch(e -> e.getIp().equals(ip));
-                    if (!exists) {
-                        UserDataController.IpAddressEntry ipEntry = new UserDataController.IpAddressEntry();
-                        ipEntry.setIp(ip);
-                        ipEntry.setAddedOn(timestamp);
-                        existingUser.getHardwareInfo().getIpAddresses().add(ipEntry);
-
-                        existingUser.getAccountHistory().getHistory().add(
-                                new UserDataController.HistoryEntry()
-                                        .setAction("New IP detected")
-                                        .setDescription(ip)
-                                        .setTimestamp(timestamp)
-                        );
-                        updated = true;
-                    }
-                }
-
-                // --- Update emails ---
-                String email = playerFX.getEmail();
-                if (email != null && !email.isEmpty()) {
-                    boolean exists = existingUser.getUserInfo().getEmail().stream()
-                            .anyMatch(e -> e.getEmail().equals(email));
-                    if (!exists) {
-                        UserDataController.EmailEntry emailEntry = new UserDataController.EmailEntry();
-                        emailEntry.setEmail(email);
-                        emailEntry.setAddedOn(timestamp);
-                        existingUser.getUserInfo().getEmail().add(emailEntry);
-
-                        existingUser.getAccountHistory().getHistory().add(
-                                new UserDataController.HistoryEntry()
-                                        .setAction("New Email detected")
-                                        .setDescription(email)
-                                        .setTimestamp(timestamp)
-                        );
-                        updated = true;
-                    }
-                }
-
-                // --- Update hardware UUIDs ---
-                if (playerFX.getUniqueIdAssignments() != null) {
-                    for (UniqueIdAssignmentFx item : playerFX.getUniqueIdAssignments()) {
-                        String uuid = item.getUniqueId().getUuid();
-                        boolean exists = existingUser.getHardwareInfo().getUuidEntries().stream()
-                                .anyMatch(e -> e.getUuid().equals(uuid));
-                        if (!exists) {
-                            UserDataController.UuidEntry uuidEntry = new UserDataController.UuidEntry();
-                            uuidEntry.setUuid(uuid);
-                            uuidEntry.setAddedOn(timestamp);
-                            existingUser.getHardwareInfo().getUuidEntries().add(uuidEntry);
-
-                            existingUser.getAccountHistory().getHistory().add(
-                                    new UserDataController.HistoryEntry()
-                                            .setAction("New UUID detected")
-                                            .setDescription(uuid)
-                                            .setTimestamp(timestamp)
-                            );
-                            updated = true;
-                        }
-                    }
-                }
-
-                // --- Update last login only if IP changed ---
-                List<UserDataController.LoginEntry> lastLogins = existingUser.getAccountHistory().getLastLogins();
-                if (lastLogins == null) {
-                    lastLogins = new ArrayList<>();
-                    existingUser.getAccountHistory().setLastLogins(lastLogins);
-                }
-
-                String lastLoginIp = lastLogins.isEmpty() ? null : lastLogins.get(lastLogins.size() - 1).getIp();
-                String lastLoginTime = String.valueOf(playerFX.getLastLogin());
-
-                if (!Objects.equals(lastLoginIp, ip)) {
-                    UserDataController.LoginEntry loginEntry = new UserDataController.LoginEntry();
-                    loginEntry.setIp(ip);
-                    loginEntry.setAddedOn(lastLoginTime);
-                    lastLogins.add(loginEntry);
-                }
-
-                // --- Update lastEdit timestamp only if new items were added ---
-                if (updated) {
-                    existingUser.getUserInfo().setLastEdit(timestamp);
-                }
-
-                log.debug("Updated existing userID {}", existingUser.getUserInfo().getUserId());
-
-            } else {
-                // New user
-                UserDataController newUser = buildUserDataFromPlayer(playerFX, sourceEvent);
-                jsonUsers.add(newUser);
-            }
-
-            objectMapper.writeValue(pathJson.toFile(), jsonUsers);
 
             // Reload JSON and refresh table
             smurfManagementController.loadSmurfManagementUsers();
@@ -1619,6 +1567,211 @@ public class ViewHelper {
         } catch (IOException e) {
             log.error(e.getMessage(), e);
         }
+    }
+
+    /**
+     * Applies a single player's fresh data (IPs/emails/UUIDs/last-login, with history entries for anything
+     * new) onto {@code existingUser}, or builds a brand-new entry via {@link #buildUserDataFromPlayer} if
+     * {@code existingUser} is null. Pure in-memory mutation — no file I/O, so it's safe to call from many
+     * threads at once as long as each thread only ever touches its own {@code existingUser} instance.
+     */
+    public static UserDataController applyPlayerUpdate(UserDataController existingUser, PlayerFX playerFX, String sourceEvent) {
+        if (existingUser == null) {
+            return buildUserDataFromPlayer(playerFX, sourceEvent);
+        }
+
+        String timestamp = Instant.now().toString();
+        boolean updated = false;
+
+        if (existingUser.getHardwareInfo() == null) {
+            existingUser.setHardwareInfo(new UserDataController.HardwareInfo());
+        }
+        if (existingUser.getAccountHistory() == null) {
+            existingUser.setAccountHistory(new UserDataController.AccountHistory());
+        }
+        if (existingUser.getAccountHistory().getHistory() == null) {
+            existingUser.getAccountHistory().setHistory(new ArrayList<>());
+        }
+        if (existingUser.getUserInfo() != null && existingUser.getUserInfo().getEmail() == null) {
+            existingUser.getUserInfo().setEmail(new ArrayList<>());
+        }
+
+        // --- Update IPs ---
+        String ip = playerFX.getRecentIpAddress();
+        if (ip != null && !ip.isEmpty()) {
+            boolean exists = existingUser.getHardwareInfo().getIpAddresses().stream()
+                    .anyMatch(e -> e.getIp().equals(ip));
+            if (!exists) {
+                UserDataController.IpAddressEntry ipEntry = new UserDataController.IpAddressEntry();
+                ipEntry.setIp(ip);
+                ipEntry.setAddedOn(timestamp);
+                existingUser.getHardwareInfo().getIpAddresses().add(ipEntry);
+
+                existingUser.getAccountHistory().getHistory().add(
+                        new UserDataController.HistoryEntry()
+                                .setAction("New IP detected")
+                                .setDescription(ip)
+                                .setTimestamp(timestamp)
+                );
+                updated = true;
+            }
+        }
+
+        // --- Update emails ---
+        String email = playerFX.getEmail();
+        if (email != null && !email.isEmpty() && existingUser.getUserInfo() != null) {
+            boolean exists = existingUser.getUserInfo().getEmail().stream()
+                    .anyMatch(e -> e.getEmail().equals(email));
+            if (!exists) {
+                UserDataController.EmailEntry emailEntry = new UserDataController.EmailEntry();
+                emailEntry.setEmail(email);
+                emailEntry.setAddedOn(timestamp);
+                existingUser.getUserInfo().getEmail().add(emailEntry);
+
+                existingUser.getAccountHistory().getHistory().add(
+                        new UserDataController.HistoryEntry()
+                                .setAction("New Email detected")
+                                .setDescription(email)
+                                .setTimestamp(timestamp)
+                );
+                updated = true;
+            }
+        }
+
+        // --- Update hardware UUIDs ---
+        if (playerFX.getUniqueIdAssignments() != null) {
+            for (UniqueIdAssignmentFx item : playerFX.getUniqueIdAssignments()) {
+                if (item.getUniqueId() == null || item.getUniqueId().getUuid() == null) {
+                    continue;
+                }
+                String uuid = item.getUniqueId().getUuid();
+                boolean exists = existingUser.getHardwareInfo().getUuidEntries().stream()
+                        .anyMatch(e -> Objects.equals(e.getUuid(), uuid));
+                if (!exists) {
+                    UserDataController.UuidEntry uuidEntry = new UserDataController.UuidEntry();
+                    uuidEntry.setUuid(uuid);
+                    uuidEntry.setAddedOn(timestamp);
+                    existingUser.getHardwareInfo().getUuidEntries().add(uuidEntry);
+
+                    existingUser.getAccountHistory().getHistory().add(
+                            new UserDataController.HistoryEntry()
+                                    .setAction("New UUID detected")
+                                    .setDescription(uuid)
+                                    .setTimestamp(timestamp)
+                    );
+                    updated = true;
+                }
+            }
+        }
+
+        // --- Update last login: new entry when the IP changed, otherwise refresh the
+        // timestamp on the latest entry so "Last Login" always reflects the newest login ---
+        List<UserDataController.LoginEntry> lastLogins = existingUser.getAccountHistory().getLastLogins();
+        if (lastLogins == null) {
+            lastLogins = new ArrayList<>();
+            existingUser.getAccountHistory().setLastLogins(lastLogins);
+        }
+
+        if (playerFX.getLastLogin() != null) {
+            String lastLoginIp = lastLogins.isEmpty() ? null : lastLogins.get(lastLogins.size() - 1).getIp();
+            String lastLoginTime = playerFX.getLastLogin().toString();
+
+            if (!Objects.equals(lastLoginIp, ip)) {
+                UserDataController.LoginEntry loginEntry = new UserDataController.LoginEntry();
+                loginEntry.setIp(ip);
+                loginEntry.setAddedOn(lastLoginTime);
+                lastLogins.add(loginEntry);
+                updated = true;
+            } else {
+                UserDataController.LoginEntry latestEntry = lastLogins.get(lastLogins.size() - 1);
+                if (!Objects.equals(latestEntry.getAddedOn(), lastLoginTime)) {
+                    latestEntry.setAddedOn(lastLoginTime);
+                    updated = true;
+                }
+            }
+        }
+
+        // --- Update lastEdit timestamp only if new items were added ---
+        if (updated) {
+            existingUser.getUserInfo().setLastEdit(timestamp);
+        }
+
+        log.debug("Updated existing userID {}", existingUser.getUserInfo().getUserId());
+        return existingUser;
+    }
+
+    /**
+     * Bulk equivalent of {@link #saveUserToJsonFile}: applies every entry in {@code playersById} onto the
+     * current on-disk state in a single read + write, instead of one read + write per user. Used by the
+     * "Run Smurf Management" bulk check, whose parallel workers just collect results in memory
+     * (see {@code UserManagementController.runBulkSmurfLookup}) and hand the whole batch here once all of
+     * them are done. Still safe against a concurrent single-item edit/removal (e.g. a moderator editing a
+     * comment mid-run) because it takes the same lock and re-reads the file fresh right before merging.
+     */
+    public static void applyBulkPlayerUpdates(java.util.Map<String, PlayerFX> playersById, Path pathJson, String sourceEvent) {
+        if (playersById.isEmpty()) return;
+
+        synchronized (com.faforever.moderatorclient.ui.main_window.SmurfManagementController.SMURF_MANAGEMENT_JSON_LOCK) {
+            try {
+                List<UserDataController> jsonUsers = readOrEmpty(pathJson);
+                java.util.Map<String, UserDataController> byId = jsonUsers.stream()
+                        .collect(Collectors.toMap(u -> u.getUserInfo().getUserId(), u -> u, (a, b) -> a));
+
+                for (java.util.Map.Entry<String, PlayerFX> entry : playersById.entrySet()) {
+                    UserDataController existingUser = byId.get(entry.getKey());
+                    UserDataController updatedUser = applyPlayerUpdate(existingUser, entry.getValue(), sourceEvent);
+                    if (existingUser == null) {
+                        jsonUsers.add(updatedUser);
+                    }
+                }
+
+                writeUsersToJsonFile(jsonUsers, pathJson);
+            } catch (IOException e) {
+                log.error("Failed bulk update of {}", pathJson, e);
+                return;
+            }
+        }
+
+        smurfManagementController.loadSmurfManagementUsers();
+        smurfManagementController.createSmurfManagementTable();
+    }
+
+    private static final String[] NOTEPAD_PLUS_PLUS_ENV_CANDIDATES = {"ProgramFiles", "ProgramFiles(x86)"};
+
+    /**
+     * Resolves the Notepad++ executable from its standard install locations, or {@code null} if none exist.
+     * Shared by {@code UserManagementController} (disables its "Open in N++" button when null) and
+     * {@code ModerationReportController} (falls back to a bare "notepad++" PATH lookup when null).
+     */
+    public static Path resolveNotepadPlusPlusPath() {
+        List<String> candidates = new ArrayList<>();
+        for (String envVar : NOTEPAD_PLUS_PLUS_ENV_CANDIDATES) {
+            String dir = System.getenv(envVar);
+            if (dir != null && !dir.isBlank()) {
+                candidates.add(Path.of(dir, "Notepad++", "notepad++.exe").toString());
+            }
+        }
+        String localAppData = System.getenv("LOCALAPPDATA");
+        if (localAppData != null && !localAppData.isBlank()) {
+            candidates.add(Path.of(localAppData, "Programs", "Notepad++", "notepad++.exe").toString());
+        }
+
+        for (String candidate : candidates) {
+            Path path = Path.of(candidate);
+            if (Files.isRegularFile(path)) {
+                return path;
+            }
+        }
+        return null;
+    }
+
+    private static List<UserDataController> readOrEmpty(Path pathJson) {
+        List<UserDataController> users = readUsersFromJsonFile(pathJson);
+        return users == null ? new ArrayList<>() : users;
+    }
+
+    private static void writeUsersToJsonFile(List<UserDataController> users, Path pathJson) throws IOException {
+        com.faforever.moderatorclient.ui.main_window.SmurfManagementController.writeUsersAtomically(objectMapper, pathJson, users);
     }
 
     // Utility class for safe property access on potentially null objects.
@@ -2783,12 +2936,102 @@ public class ViewHelper {
         };
     }
 
+    private static final Pattern URL_PATTERN = Pattern.compile("https?://\\S+");
+
+    private static List<Node> buildLinkifiedTextNodes(String content, LocalPreferences localPreferences) {
+        List<Node> nodes = new ArrayList<>();
+        Matcher matcher = URL_PATTERN.matcher(content);
+        int lastEnd = 0;
+        while (matcher.find()) {
+            if (matcher.start() > lastEnd) {
+                nodes.add(plainDescriptionText(content.substring(lastEnd, matcher.start())));
+            }
+            String url = matcher.group();
+            Hyperlink link = new Hyperlink(url);
+            link.setFocusTraversable(false);
+            link.setStyle("-fx-text-fill: #4ea3ff; -fx-underline: true; -fx-padding: 0; -fx-border-width: 0;");
+            link.setOnAction(event -> openUrlInConfiguredBrowser(url, localPreferences));
+            nodes.add(link);
+            lastEnd = matcher.end();
+        }
+        if (lastEnd < content.length()) {
+            nodes.add(plainDescriptionText(content.substring(lastEnd)));
+        }
+        return nodes;
+    }
+
+    private static double measureWrappedTextHeight(String content, double wrappingWidth) {
+        Text measuringText = new Text(content);
+        measuringText.setWrappingWidth(Math.max(1.0, wrappingWidth));
+        return measuringText.getLayoutBounds().getHeight();
+    }
+
+    private static Text plainDescriptionText(String value) {
+        Text text = new Text(value);
+        text.setFill(Color.WHITE);
+        return text;
+    }
+
+    private static void openUrlInConfiguredBrowser(String url, LocalPreferences localPreferences) {
+        String browser = localPreferences == null ? null : String.valueOf(localPreferences.getUi().getBrowserComboBox());
+
+        if (browser == null || "selectBrowser".equalsIgnoreCase(browser)) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Browser Selection Required");
+            alert.setHeaderText("No Browser Selected");
+            alert.setContentText("Please go to the Settings tab (top right) and select a browser.");
+            alert.showAndWait();
+            return;
+        }
+
+        URI uri;
+        try {
+            uri = URI.create(url);
+        } catch (IllegalArgumentException e) {
+            log.warn("Refusing to open malformed URL: {}", url, e);
+            return;
+        }
+        String scheme = uri.getScheme();
+        if (scheme == null || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))) {
+            log.warn("Refusing to open URL with disallowed scheme: {}", url);
+            return;
+        }
+
+        try {
+            if (!GraphicsEnvironment.isHeadless() && Desktop.isDesktopSupported()
+                    && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+                Desktop.getDesktop().browse(uri);
+            } else {
+                List<String> allowedBrowsers = Arrays.asList("chrome", "firefox", "Microsoft Edge", "edge", "msedge", "iexplore");
+                String lowerBrowser = browser.toLowerCase();
+
+                boolean isAllowed = allowedBrowsers.stream().anyMatch(allowed -> lowerBrowser.contains(allowed.toLowerCase()));
+
+                if (!isAllowed) {
+                    log.warn("Browser not in allow-list: {}", browser);
+                    throw new SecurityException("Browser not permitted: " + browser);
+                }
+
+                ProcessBuilder pb;
+                if ("Microsoft Edge".equalsIgnoreCase(browser)) {
+                    pb = new ProcessBuilder("cmd", "/c", "start", "microsoft-edge:" + url);
+                } else {
+                    pb = new ProcessBuilder("cmd", "/c", "start", browser, url);
+                }
+                pb.start();
+            }
+        } catch (Exception e) {
+            log.warn("Failed to open URL: {}", url, e);
+        }
+    }
+
     public static void buildModerationReportTableView(
             TableView<ModerationReportFX> tableView,
             ObservableList<ModerationReportFX> items,
             Consumer<ModerationReportFX> onChatLog,
             @Nullable UserService userService,
-            @Nullable UiService uiService
+            @Nullable UiService uiService,
+            @Nullable LocalPreferences localPreferences
     ) {
         tableView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         tableView.setItems(items);
@@ -2931,14 +3174,40 @@ public class ViewHelper {
 
         reportDescriptionColumn.setCellValueFactory(param -> param.getValue().reportDescriptionProperty());
         reportDescriptionColumn.setCellFactory(column -> {
-            TableCell<ModerationReportFX, String> cell = new TableCell<>();
-            Text text = new Text();
-            text.setFill(Color.WHITE);
-            cell.setGraphic(text);
-            cell.setPrefHeight(Control.USE_COMPUTED_SIZE);
-            cell.setWrapText(true);
-            text.wrappingWidthProperty().bind(Bindings.createDoubleBinding(() -> cell.getWidth() - 10.0, cell.widthProperty()));
-            text.textProperty().bind(cell.itemProperty());
+            TableCell<ModerationReportFX, String> cell = new TableCell<>() {
+                private final TextFlow textFlow = new TextFlow();
+
+                {
+                    setGraphic(textFlow);
+                    setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+                    column.widthProperty().addListener((obs, oldWidth, newWidth) -> refreshSizing());
+                }
+
+                private void refreshSizing() {
+                    double wrapWidth = Math.max(20.0, column.getWidth() - 10.0);
+                    textFlow.setPrefWidth(wrapWidth);
+                    textFlow.setMaxWidth(wrapWidth);
+                    String item = getItem();
+                    if (!isEmpty() && item != null) {
+                        setPrefHeight(measureWrappedTextHeight(item, wrapWidth) + 12.0);
+                    } else {
+                        setPrefHeight(Control.USE_COMPUTED_SIZE);
+                    }
+                    if (getTableRow() != null) {
+                        getTableRow().requestLayout();
+                    }
+                }
+
+                @Override
+                protected void updateItem(String item, boolean empty) {
+                    super.updateItem(item, empty);
+                    textFlow.getChildren().clear();
+                    if (!empty && item != null) {
+                        textFlow.getChildren().addAll(buildLinkifiedTextNodes(item, localPreferences));
+                    }
+                    refreshSizing();
+                }
+            };
             return cell;
         });
         reportDescriptionColumn.setId("reportDescriptionColumn");

@@ -38,20 +38,25 @@ import java.util.Map;
  */
 @Component
 public class CycleAvoidingMappingContext {
-    private Map<Object, Object> knownInstances = new IdentityHashMap<>();
+    // This bean is a singleton shared across every mapper and is cleared before each
+    // FafApiCommunicationService request. Parallel page fetches (e.g. UserService.fetchRemainingAttributePages)
+    // call clearCache() from multiple worker threads concurrently, and other in-flight mapping calls read/write
+    // the same map, so plain IdentityHashMap access here is a genuine concurrent-corruption risk. Synchronizing
+    // the three operations keeps them mutually exclusive without requiring per-caller isolation.
+    private final Map<Object, Object> knownInstances = new IdentityHashMap<>();
 
     @SuppressWarnings("unchecked")
     @BeforeMapping
-    public <T> T getMappedInstance(Object source, @TargetType Class<T> targetType) {
+    public synchronized <T> T getMappedInstance(Object source, @TargetType Class<T> targetType) {
         return (T) knownInstances.get(source);
     }
 
     @BeforeMapping
-    public void storeMappedInstance(Object source, @MappingTarget Object target) {
+    public synchronized void storeMappedInstance(Object source, @MappingTarget Object target) {
         knownInstances.put(source, target);
     }
 
-    public void clearCache() {
+    public synchronized void clearCache() {
         knownInstances.clear();
     }
 }

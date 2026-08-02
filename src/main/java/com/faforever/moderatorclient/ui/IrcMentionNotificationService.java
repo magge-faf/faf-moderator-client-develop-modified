@@ -1,5 +1,6 @@
 package com.faforever.moderatorclient.ui;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import javafx.animation.FadeTransition;
 import javafx.animation.PauseTransition;
@@ -31,7 +32,7 @@ import java.net.URL;
 @Slf4j
 public class IrcMentionNotificationService {
     private static final String MENTION_SOUND = "/media/userMentionSound.mp3";
-    private static final String TRAY_ICON = "/media/appicon.png";
+    private static final String TRAY_ICON = "/media/favicon.png";
     private static final double TOAST_WIDTH = 320;
     private static final double TOAST_MARGIN = 18;
 
@@ -41,14 +42,25 @@ public class IrcMentionNotificationService {
     private TrayIcon trayIcon;
     private boolean trayUnsupported;
 
+    @PostConstruct
+    public void init() {
+        // Create the tray icon eagerly instead of on first notification: Windows silently drops
+        // TrayIcon.displayMessage() calls made immediately after the icon is added to the tray,
+        // so waiting until the first mention/test click causes that first toast to be lost.
+        try {
+            Platform.runLater(this::getOrCreateTrayIcon);
+        } catch (IllegalStateException ex) {
+            log.debug("JavaFX toolkit not initialized yet; skipping eager tray icon creation", ex);
+        }
+    }
+
     public void playMentionSound() {
         playBundledMentionSound();
     }
 
     public void showMentionToast(String sender, String channel, String message) {
         Platform.runLater(() -> {
-            boolean desktopNotificationPreferred = shouldPreferDesktopNotification();
-            if (desktopNotificationPreferred && showSystemNotification(sender, channel, message)) {
+            if (showSystemNotification(sender, channel, message)) {
                 return;
             }
 
@@ -57,9 +69,7 @@ public class IrcMentionNotificationService {
                 return;
             }
 
-            if (!showSystemNotification(sender, channel, message)) {
-                log.debug("Unable to show a mention notification: no system tray available and no visible window.");
-            }
+            log.debug("Unable to show a mention notification: no system tray available and no visible window.");
         });
     }
 
@@ -86,6 +96,7 @@ public class IrcMentionNotificationService {
 
         String title = "IRC mention";
         String body = abbreviate(sender + " in " + channel + System.lineSeparator() + message, 220);
+        log.debug("Displaying IRC mention system tray notification: {}", body);
         systemTrayIcon.displayMessage(title, body, MessageType.INFO);
         return true;
     }
@@ -98,6 +109,8 @@ public class IrcMentionNotificationService {
             return trayIcon;
         }
         if (GraphicsEnvironment.isHeadless() || !SystemTray.isSupported()) {
+            log.info("System tray notifications unavailable: headless={}, systemTraySupported={}",
+                    GraphicsEnvironment.isHeadless(), SystemTray.isSupported());
             trayUnsupported = true;
             return null;
         }
@@ -113,6 +126,7 @@ public class IrcMentionNotificationService {
             createdTrayIcon.setImageAutoSize(true);
             SystemTray.getSystemTray().add(createdTrayIcon);
             trayIcon = createdTrayIcon;
+            log.info("IRC mention system tray icon initialized");
             return trayIcon;
         } catch (AWTException ex) {
             log.warn("Failed to initialize system tray notifications", ex);
@@ -203,14 +217,6 @@ public class IrcMentionNotificationService {
         activePopup = popup;
         activeToastAnimation = new SequentialTransition(fadeIn, hold, fadeOut);
         activeToastAnimation.play();
-    }
-
-    private boolean shouldPreferDesktopNotification() {
-        Stage owner = getPrimaryStage();
-        if (owner == null) {
-            return true;
-        }
-        return owner.isIconified() || !owner.isFocused() || !owner.isShowing();
     }
 
     private boolean canShowInAppToast() {

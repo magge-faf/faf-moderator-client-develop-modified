@@ -45,6 +45,8 @@
 
                 <Button fx:id="copyChatLogButton" text="Chat Log" onAction="#onCopyChatLog" minWidth="150"/>
                 <Button fx:id="copyChatLogButtonOffenderOnly" text="Chat Log Offender" onAction="#onCopyChatLogButtonOffenderOnly" minWidth="150"/>
+                <Button fx:id="openLogsInNotepadPlusPlusButton" text="Open Logs in N++"
+                        onAction="#onOpenLogsInNotepadPlusPlus" minWidth="150"/>
                 <Button fx:id="copyModeratorEventsButton" text="Moderator Events" onAction="#onCopyModeratorEvents" minWidth="150"/>
 
                 <Separator minHeight="5"/>
@@ -72,13 +74,13 @@
         </ScrollPane>
         <TableView fx:id="reportTableView" maxHeight="Infinity" maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
     </SplitPane>
-    <TabPane tabClosingPolicy="UNAVAILABLE">
-        <Tab text="Chat Log">
+    <TabPane fx:id="reportDetailsTabPane" tabClosingPolicy="UNAVAILABLE">
+        <Tab fx:id="reportChatLogTab" text="Chat Log">
             <ScrollPane prefHeight="200.0" prefWidth="200.0">
                 <TextFlow fx:id="chatLogTextFlow" />
             </ScrollPane>
         </Tab>
-        <Tab text="Reported Accounts">
+        <Tab fx:id="reportReportedAccountsTab" text="Reported Accounts">
             <VBox spacing="6" style="-fx-padding: 6 6 0 6;">
                 <CheckBox fx:id="autoSearchReportedAccountInUserManagementCheckBox" mnemonicParsing="false"
                           text="Auto-search in User Management when selecting a user from the table below"/>
@@ -86,26 +88,27 @@
                            maxWidth="Infinity" VBox.vgrow="ALWAYS"/>
             </VBox>
         </Tab>
-        <Tab text="Moderator Events">
+        <Tab fx:id="reportModeratorEventsTab" text="Moderator Events">
             <ScrollPane prefHeight="200.0" prefWidth="200.0">
                 <TextFlow fx:id="moderatorEventTextFlow" />
             </ScrollPane>
         </Tab>
-        <Tab text="Map Drawings">
-            <VBox>
-                <HBox spacing="10" alignment="CENTER_LEFT" style="-fx-padding: 6;">
-                    <Label text="Time:"/>
-                    <Slider fx:id="paintingTimeSlider" HBox.hgrow="ALWAYS" min="0" max="100" value="100"/>
-                    <Label fx:id="paintingTimeLabel" text="00:00:00" minWidth="70"/>
-                </HBox>
-                <ScrollPane fitToWidth="false" fitToHeight="false" VBox.vgrow="ALWAYS">
+        <Tab fx:id="reportMapDrawingsTab" text="Map Drawings">
+            <HBox spacing="8" alignment="TOP_LEFT" style="-fx-padding: 6;">
+                <ScrollPane fitToWidth="false" fitToHeight="false">
                     <Group>
                         <Canvas fx:id="paintingCanvas" width="600" height="600"/>
                     </Group>
                 </ScrollPane>
-            </VBox>
+                <VBox spacing="6" alignment="TOP_LEFT" style="-fx-padding: 2 0 0 0;">
+                    <Label text="Time:"/>
+                    <Slider fx:id="paintingTimeSlider" min="0" max="100" value="100"
+                            prefWidth="150" maxWidth="150"/>
+                    <Label fx:id="paintingTimeLabel" text="00:00:00" minWidth="70"/>
+                </VBox>
+            </HBox>
         </Tab>
-        <Tab text="Most Reported Accounts">
+        <Tab fx:id="reportMostReportedAccountsTab" text="Most Reported Accounts">
             <TableView fx:id="mostReportedAccountsTableView">
                 <columns>
                     <TableColumn text="Last reported" prefWidth="200">
@@ -142,7 +145,7 @@
                 </columns>
             </TableView>
         </Tab>
-        <Tab text="Moderator Statistics">
+        <Tab fx:id="reportModeratorStatisticsTab" text="Moderator Statistics">
             <ScrollPane fitToWidth="true" fitToHeight="true">
                 <content>
                     <VBox>
@@ -209,13 +212,24 @@
                         </TitledPane>
                         <HBox alignment="CENTER">
                             <Button text="Copy All Stats Data to Clipboard (takes a few seconds)" onAction="#handleCopyAllStatsButtonAction"/>
+                            <Button text="Copy Moderator Stats" onAction="#handleCopyBanStatsButtonAction"/>
                         </HBox>
                     </VBox>
                 </content>
             </ScrollPane>
         </Tab>
-        <Tab text="Settings Moderator Events, Replay and Chat Log">
+        <Tab fx:id="reportSettingsTab" text="Settings">
             <VBox spacing="10">
+                <Label text="Report Tools:"/>
+                <Label text="Enable local Reports workflow options." wrapText="true"/>
+                <CheckBox fx:id="enableManualReplayLookupCheckBox" mnemonicParsing="false"
+                          text="Show manual replay ID field and Get Chat/Events button"/>
+                <CheckBox fx:id="showOpenLogsInNotepadPlusPlusButtonCheckBox" mnemonicParsing="false"
+                          text="Show button to open Chat Log and Moderator Events in Notepad++"/>
+                <Label text="Notepad++ is required for the logs open button." wrapText="true"/>
+                <CheckBox fx:id="showReportPlayerRoleLabelsCheckBox" mnemonicParsing="false"
+                          text="Show Reporter and Offender prefix in report buttons"/>
+                <Separator minHeight="5"/>
 
                 <!-- Game Data -->
                 <Label text="Show Game Data Events:"/>

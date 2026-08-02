@@ -557,10 +557,13 @@ public class LocalPreferences {
     @JsonIgnoreProperties(ignoreUnknown = true)
     @Data
     public static class TabUserManagement {
+        String selectedSubTabId = "notesTab";
+
         // TextField
         String smurfVillageLookupTextField = "";
         String smurfOutputTextArea = "";
         String daysToCheckRecentAccountsTextField = "1";
+        String bulkSmurfLookupWorkerCountTextField = "4";
 
         // CheckBox
         boolean promptUserOnThresholdExceededSmurfVillageLookupCheckBox = true;
@@ -578,6 +581,9 @@ public class LocalPreferences {
         boolean includeProcessorIdCheckBox = false;
         boolean includeProcessorNameCheckBox = false;
         boolean includeManufacturerCheckBox = false;
+        boolean redoLastUserSearchOnStartupCheckBox = false;
+        boolean showForumAccountsReferenceButtonCheckBox = true;
+        boolean showOpenInNppButtonCheckBox = true;
 
         boolean searchHistoryTexAreaVisibilityState = false;
         boolean userNotesTextAreaVisibilityState = false;
@@ -634,6 +640,8 @@ public class LocalPreferences {
     @JsonIgnoreProperties(ignoreUnknown = true)
     @Data
     public static class TabReports {
+        String selectedSubTabId = "reportChatLogTab";
+
         // CheckBoxes
         boolean autoLoadChatLogCheckBox = true;
         boolean showEnforceRatingCheckBox = true;
@@ -652,17 +660,24 @@ public class LocalPreferences {
 
         boolean fetchReportsOnStartupCheckBox = true;
         boolean enableManualReplayLookupCheckBox = false;
+        boolean showOpenLogsInNotepadPlusPlusButtonCheckBox = false;
         boolean showReportPlayerRoleLabelsCheckBox = true;
         boolean autoSearchReportedAccountInUserManagementCheckBox = false;
 
         // TextFields
         String thresholdToShowSelfDestructionUnitsEventTextField = "0";
         String initialReportsLoadingTextField = "100";
+        String playerNameFilterTextField = "";
+        String getModeratorEventsForReplayIdTextField = "";
 
         // Table column persistence
         Map<String, Double> reportTableColumnWidthsTabReports = new HashMap<>();
         List<String> reportTableColumnOrderTabReports = new ArrayList<>();
         List<Double> rootSplitPaneDividerPositionsTabReports = new ArrayList<>();
+        double recentBansDialogX = -1;
+        double recentBansDialogY = -1;
+        double recentBansDialogWidth = 1400;
+        double recentBansDialogHeight = 640;
 
     }
 

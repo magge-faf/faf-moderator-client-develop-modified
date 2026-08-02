@@ -194,7 +194,7 @@
         </VBox>
     </SplitPane>
 
-    <TabPane minHeight="200.0" tabClosingPolicy="UNAVAILABLE">
+    <TabPane fx:id="userDetailsTabPane" minHeight="200.0" tabClosingPolicy="UNAVAILABLE">
         <Tab fx:id="notesTab" text="Notes">
             <VBox maxWidth="Infinity" maxHeight="Infinity">
                 <TableView fx:id="userNoteTableView" prefHeight="200.0" prefWidth="200.0" VBox.vgrow="ALWAYS">
@@ -299,9 +299,40 @@
         </Tab>
 
         <Tab fx:id="smurfOutputTab" text="Smurf Village">
-            <VBox>
+            <VBox spacing="5">
+                <HBox spacing="5" alignment="CENTER_LEFT">
+                    <Button fx:id="copyAccountsReferenceTextAndImageButton" text="Copy Forum Accounts Reference"
+                            onAction="#copyAccountsReferenceTextAndImage" mnemonicParsing="false">
+                        <tooltip>
+                            <Tooltip text="Copies the forum heading, code-block output, and full account table image"/>
+                        </tooltip>
+                    </Button>
+                    <Button fx:id="openInNppButton" text="Open in N++"
+                            onAction="#openSmurfOutputInNpp" mnemonicParsing="false">
+                        <tooltip>
+                            <Tooltip fx:id="openInNppButtonTooltip" text="Opens the Smurf Village output in Notepad++"/>
+                        </tooltip>
+                    </Button>
+                </HBox>
                 <TextArea fx:id="smurfOutputTextArea" VBox.vgrow="ALWAYS"
                           style="-fx-font-family: 'Consolas', 'Courier New', monospace; -fx-font-size: 12px;"/>
+            </VBox>
+        </Tab>
+        <Tab fx:id="userSettingsTab" text="Settings">
+            <VBox spacing="8" style="-fx-padding: 8;">
+                <Label text="User Search" style="-fx-font-weight: bold;"/>
+                <CheckBox fx:id="redoLastUserSearchOnStartupCheckBox"
+                          text="Redo last user search on startup"/>
+                <Separator/>
+                <Label text="Smurf Village" style="-fx-font-weight: bold;"/>
+                <CheckBox fx:id="showForumAccountsReferenceButtonCheckBox"
+                          text="Show Copy Forum Accounts Reference button"/>
+                <CheckBox fx:id="showOpenInNppButtonCheckBox"
+                          text="Show Open in N++ button"/>
+                <HBox spacing="5" alignment="CENTER_LEFT">
+                    <Label text="Bulk smurf lookup worker count:"/>
+                    <TextField fx:id="bulkSmurfLookupWorkerCountTextField" prefWidth="50"/>
+                </HBox>
             </VBox>
         </Tab>
     </TabPane>

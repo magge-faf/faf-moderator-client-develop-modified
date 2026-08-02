@@ -69,6 +69,7 @@ public class FafModeratorClientApplication extends Application {
     @Override
     public void init() {
         SpringApplication app = new SpringApplication(FafModeratorClientApplication.class);
+        app.setHeadless(false);
         applicationContext = app.run();
         applicationContext.getAutowireCapableBeanFactory().autowireBean(this);
         logMaintenanceService.archiveLegacyClientLogs();
@@ -95,6 +96,12 @@ public class FafModeratorClientApplication extends Application {
         primaryStage.setScene(scene);
         primaryStage.setMaximized(true);
         primaryStage.show();
+        Platform.runLater(() -> {
+            primaryStage.setAlwaysOnTop(true);
+            primaryStage.toFront();
+            primaryStage.requestFocus();
+            Platform.runLater(() -> primaryStage.setAlwaysOnTop(false));
+        });
 
         primaryStage.setOnCloseRequest(e -> {
             e.consume();
