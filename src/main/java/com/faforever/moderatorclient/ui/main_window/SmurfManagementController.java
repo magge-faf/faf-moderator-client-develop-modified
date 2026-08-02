@@ -39,6 +39,13 @@ public class SmurfManagementController implements Controller<VBox> {
 
     public static final Path SMURF_MANAGEMENT_USERS_JSON_PATH =
             ApplicationPaths.resolveConfigurationDirectory().resolve("smurf_management.json");
+
+    // Shared with ViewHelper.saveUserToJsonFile: bulk "Run Smurf Management" checks write this file from
+    // several worker threads, and comment/reason edits or user removal write it from the UI thread. All of
+    // those read-modify-write cycles must be serialized on this single lock or concurrent writers clobber
+    // each other's changes (e.g. a comment edit silently reverting a bulk check's updates, or vice versa).
+    public static final Object SMURF_MANAGEMENT_JSON_LOCK = new Object();
+
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final double WINDOW_WIDTH_RATIO = 0.8;
     private static final double WINDOW_HEIGHT_RATIO = 0.8;
@@ -288,18 +295,15 @@ public class SmurfManagementController implements Controller<VBox> {
         String current = isComment
                 ? safeGet(user, UserDataController.UserInfo::getComment)
                 : safeGet(user, UserDataController.UserInfo::getReason);
+        String userId = safeGet(user, UserDataController.UserInfo::getUserId);
         TextInputDialog dialog = new TextInputDialog(current);
         dialog.setTitle("Edit " + label);
         dialog.setHeaderText("Edit " + label + " for: " + safeGet(user, UserDataController.UserInfo::getUserName));
         dialog.setContentText(label + ":");
-        dialog.showAndWait().ifPresent(newValue -> {
-            if (user.getUserInfo() != null) {
-                if (isComment) user.getUserInfo().setComment(newValue);
-                else user.getUserInfo().setReason(newValue);
-            }
-            smurfManagementTableView.refresh();
-            saveUserToSmurfManagement();
-        });
+        dialog.showAndWait().ifPresent(newValue -> updateUserOnDisk(userId, existingUser -> {
+            if (isComment) existingUser.getUserInfo().setComment(newValue);
+            else existingUser.getUserInfo().setReason(newValue);
+        }));
     }
 
     private void setupDoubleClickAction(TableView<UserDataController> table) {
@@ -314,8 +318,23 @@ public class SmurfManagementController implements Controller<VBox> {
     // ---- Data operations ----
 
     private void removeUser(UserDataController user) {
-        smurfManagementUsersList.removeIf(u -> Objects.equals(u.getUserInfo().getUserId(), user.getUserInfo().getUserId()));
-        saveUserToSmurfManagement();
+        String userId = safeGet(user, UserDataController.UserInfo::getUserId);
+        // Drop it from the visible list immediately for snappy feedback; the on-disk removal below
+        // is the source of truth and reconciles the list again once it completes.
+        smurfManagementUsersList.removeIf(u -> Objects.equals(safeGet(u, UserDataController.UserInfo::getUserId), userId));
+        CompletableFuture.runAsync(() -> {
+            synchronized (SMURF_MANAGEMENT_JSON_LOCK) {
+                try {
+                    List<UserDataController> current = OBJECT_MAPPER.readValue(SMURF_MANAGEMENT_USERS_JSON_PATH.toFile(),
+                            new TypeReference<>() {});
+                    current.removeIf(u -> Objects.equals(safeGet(u, UserDataController.UserInfo::getUserId), userId));
+                    OBJECT_MAPPER.writeValue(SMURF_MANAGEMENT_USERS_JSON_PATH.toFile(), current);
+                } catch (IOException e) {
+                    log.error("Failed to remove user {} from {}", userId, SMURF_MANAGEMENT_USERS_JSON_PATH, e);
+                }
+            }
+            loadSmurfManagementUsers();
+        });
     }
 
     public void loadSmurfManagementUsers() {
@@ -330,14 +349,27 @@ public class SmurfManagementController implements Controller<VBox> {
         });
     }
 
-    private void saveUserToSmurfManagement() {
-        List<UserDataController> snapshot = List.copyOf(smurfManagementUsersList);
+    /**
+     * Re-reads the current on-disk state, applies {@code mutator} to the matching user, and writes the
+     * result back — all under {@link #SMURF_MANAGEMENT_JSON_LOCK} so this can't race with a concurrent
+     * bulk "Run Smurf Management" check (or another edit) writing the same file.
+     */
+    private void updateUserOnDisk(String userId, java.util.function.Consumer<UserDataController> mutator) {
         CompletableFuture.runAsync(() -> {
-            try {
-                OBJECT_MAPPER.writeValue(SMURF_MANAGEMENT_USERS_JSON_PATH.toFile(), snapshot);
-            } catch (IOException e) {
-                log.error("Failed to write {}", SMURF_MANAGEMENT_USERS_JSON_PATH, e);
+            synchronized (SMURF_MANAGEMENT_JSON_LOCK) {
+                try {
+                    List<UserDataController> current = OBJECT_MAPPER.readValue(SMURF_MANAGEMENT_USERS_JSON_PATH.toFile(),
+                            new TypeReference<>() {});
+                    current.stream()
+                            .filter(u -> Objects.equals(safeGet(u, UserDataController.UserInfo::getUserId), userId))
+                            .findFirst()
+                            .ifPresent(mutator);
+                    OBJECT_MAPPER.writeValue(SMURF_MANAGEMENT_USERS_JSON_PATH.toFile(), current);
+                } catch (IOException e) {
+                    log.error("Failed to update user {} in {}", userId, SMURF_MANAGEMENT_USERS_JSON_PATH, e);
+                }
             }
+            loadSmurfManagementUsers();
         });
     }
 

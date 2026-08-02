@@ -1536,123 +1536,25 @@ public class ViewHelper {
      * @param sourceEvent The event or action that triggered saving or updating the user.
      */
     public static void saveUserToJsonFile(PlayerFX playerFX, Path pathJson, String sourceEvent) {
-        ObjectMapper objectMapper = new ObjectMapper()
-                .registerModule(new JavaTimeModule())
-                .enable(SerializationFeature.INDENT_OUTPUT);
-
         try {
-            // Read existing users
-            List<UserDataController> jsonUsers = readUsersFromJsonFile(pathJson);
-            if (jsonUsers == null) {
-                jsonUsers = new ArrayList<>();
+            // Shared with SmurfManagementController's edit/remove paths and applyBulkPlayerUpdates below:
+            // several bulk-check worker threads (and the UI thread) can hit this file at once, so serialize
+            // the whole read-modify-write.
+            synchronized (com.faforever.moderatorclient.ui.main_window.SmurfManagementController.SMURF_MANAGEMENT_JSON_LOCK) {
+                List<UserDataController> jsonUsers = readOrEmpty(pathJson);
+
+                Optional<UserDataController> existingUserOpt = jsonUsers.stream()
+                        .filter(u -> u.getUserInfo().getUserId().equals(playerFX.getId()))
+                        .findFirst();
+
+                if (existingUserOpt.isPresent()) {
+                    applyPlayerUpdate(existingUserOpt.get(), playerFX, sourceEvent);
+                } else {
+                    jsonUsers.add(applyPlayerUpdate(null, playerFX, sourceEvent));
+                }
+
+                writeUsersToJsonFile(jsonUsers, pathJson);
             }
-
-            Optional<UserDataController> existingUserOpt = jsonUsers.stream()
-                    .filter(u -> u.getUserInfo().getUserId().equals(playerFX.getId()))
-                    .findFirst();
-
-            String timestamp = Instant.now().toString();
-            boolean updated = false;
-
-            if (existingUserOpt.isPresent()) {
-                UserDataController existingUser = existingUserOpt.get();
-
-                // --- Update IPs ---
-                String ip = playerFX.getRecentIpAddress();
-                if (ip != null && !ip.isEmpty()) {
-                    boolean exists = existingUser.getHardwareInfo().getIpAddresses().stream()
-                            .anyMatch(e -> e.getIp().equals(ip));
-                    if (!exists) {
-                        UserDataController.IpAddressEntry ipEntry = new UserDataController.IpAddressEntry();
-                        ipEntry.setIp(ip);
-                        ipEntry.setAddedOn(timestamp);
-                        existingUser.getHardwareInfo().getIpAddresses().add(ipEntry);
-
-                        existingUser.getAccountHistory().getHistory().add(
-                                new UserDataController.HistoryEntry()
-                                        .setAction("New IP detected")
-                                        .setDescription(ip)
-                                        .setTimestamp(timestamp)
-                        );
-                        updated = true;
-                    }
-                }
-
-                // --- Update emails ---
-                String email = playerFX.getEmail();
-                if (email != null && !email.isEmpty()) {
-                    boolean exists = existingUser.getUserInfo().getEmail().stream()
-                            .anyMatch(e -> e.getEmail().equals(email));
-                    if (!exists) {
-                        UserDataController.EmailEntry emailEntry = new UserDataController.EmailEntry();
-                        emailEntry.setEmail(email);
-                        emailEntry.setAddedOn(timestamp);
-                        existingUser.getUserInfo().getEmail().add(emailEntry);
-
-                        existingUser.getAccountHistory().getHistory().add(
-                                new UserDataController.HistoryEntry()
-                                        .setAction("New Email detected")
-                                        .setDescription(email)
-                                        .setTimestamp(timestamp)
-                        );
-                        updated = true;
-                    }
-                }
-
-                // --- Update hardware UUIDs ---
-                if (playerFX.getUniqueIdAssignments() != null) {
-                    for (UniqueIdAssignmentFx item : playerFX.getUniqueIdAssignments()) {
-                        String uuid = item.getUniqueId().getUuid();
-                        boolean exists = existingUser.getHardwareInfo().getUuidEntries().stream()
-                                .anyMatch(e -> e.getUuid().equals(uuid));
-                        if (!exists) {
-                            UserDataController.UuidEntry uuidEntry = new UserDataController.UuidEntry();
-                            uuidEntry.setUuid(uuid);
-                            uuidEntry.setAddedOn(timestamp);
-                            existingUser.getHardwareInfo().getUuidEntries().add(uuidEntry);
-
-                            existingUser.getAccountHistory().getHistory().add(
-                                    new UserDataController.HistoryEntry()
-                                            .setAction("New UUID detected")
-                                            .setDescription(uuid)
-                                            .setTimestamp(timestamp)
-                            );
-                            updated = true;
-                        }
-                    }
-                }
-
-                // --- Update last login only if IP changed ---
-                List<UserDataController.LoginEntry> lastLogins = existingUser.getAccountHistory().getLastLogins();
-                if (lastLogins == null) {
-                    lastLogins = new ArrayList<>();
-                    existingUser.getAccountHistory().setLastLogins(lastLogins);
-                }
-
-                String lastLoginIp = lastLogins.isEmpty() ? null : lastLogins.get(lastLogins.size() - 1).getIp();
-                String lastLoginTime = String.valueOf(playerFX.getLastLogin());
-
-                if (!Objects.equals(lastLoginIp, ip)) {
-                    UserDataController.LoginEntry loginEntry = new UserDataController.LoginEntry();
-                    loginEntry.setIp(ip);
-                    loginEntry.setAddedOn(lastLoginTime);
-                    lastLogins.add(loginEntry);
-                }
-
-                // --- Update lastEdit timestamp only if new items were added ---
-                if (updated) {
-                    existingUser.getUserInfo().setLastEdit(timestamp);
-                }
-
-                log.debug("Updated existing userID {}", existingUser.getUserInfo().getUserId());
-
-            } else {
-                // New user
-                UserDataController newUser = buildUserDataFromPlayer(playerFX, sourceEvent);
-                jsonUsers.add(newUser);
-            }
-
-            objectMapper.writeValue(pathJson.toFile(), jsonUsers);
 
             // Reload JSON and refresh table
             smurfManagementController.loadSmurfManagementUsers();
@@ -1661,6 +1563,169 @@ public class ViewHelper {
         } catch (IOException e) {
             log.error(e.getMessage(), e);
         }
+    }
+
+    /**
+     * Applies a single player's fresh data (IPs/emails/UUIDs/last-login, with history entries for anything
+     * new) onto {@code existingUser}, or builds a brand-new entry via {@link #buildUserDataFromPlayer} if
+     * {@code existingUser} is null. Pure in-memory mutation — no file I/O, so it's safe to call from many
+     * threads at once as long as each thread only ever touches its own {@code existingUser} instance.
+     */
+    public static UserDataController applyPlayerUpdate(UserDataController existingUser, PlayerFX playerFX, String sourceEvent) {
+        if (existingUser == null) {
+            return buildUserDataFromPlayer(playerFX, sourceEvent);
+        }
+
+        String timestamp = Instant.now().toString();
+        boolean updated = false;
+
+        // --- Update IPs ---
+        String ip = playerFX.getRecentIpAddress();
+        if (ip != null && !ip.isEmpty()) {
+            boolean exists = existingUser.getHardwareInfo().getIpAddresses().stream()
+                    .anyMatch(e -> e.getIp().equals(ip));
+            if (!exists) {
+                UserDataController.IpAddressEntry ipEntry = new UserDataController.IpAddressEntry();
+                ipEntry.setIp(ip);
+                ipEntry.setAddedOn(timestamp);
+                existingUser.getHardwareInfo().getIpAddresses().add(ipEntry);
+
+                existingUser.getAccountHistory().getHistory().add(
+                        new UserDataController.HistoryEntry()
+                                .setAction("New IP detected")
+                                .setDescription(ip)
+                                .setTimestamp(timestamp)
+                );
+                updated = true;
+            }
+        }
+
+        // --- Update emails ---
+        String email = playerFX.getEmail();
+        if (email != null && !email.isEmpty()) {
+            boolean exists = existingUser.getUserInfo().getEmail().stream()
+                    .anyMatch(e -> e.getEmail().equals(email));
+            if (!exists) {
+                UserDataController.EmailEntry emailEntry = new UserDataController.EmailEntry();
+                emailEntry.setEmail(email);
+                emailEntry.setAddedOn(timestamp);
+                existingUser.getUserInfo().getEmail().add(emailEntry);
+
+                existingUser.getAccountHistory().getHistory().add(
+                        new UserDataController.HistoryEntry()
+                                .setAction("New Email detected")
+                                .setDescription(email)
+                                .setTimestamp(timestamp)
+                );
+                updated = true;
+            }
+        }
+
+        // --- Update hardware UUIDs ---
+        if (playerFX.getUniqueIdAssignments() != null) {
+            for (UniqueIdAssignmentFx item : playerFX.getUniqueIdAssignments()) {
+                String uuid = item.getUniqueId().getUuid();
+                boolean exists = existingUser.getHardwareInfo().getUuidEntries().stream()
+                        .anyMatch(e -> e.getUuid().equals(uuid));
+                if (!exists) {
+                    UserDataController.UuidEntry uuidEntry = new UserDataController.UuidEntry();
+                    uuidEntry.setUuid(uuid);
+                    uuidEntry.setAddedOn(timestamp);
+                    existingUser.getHardwareInfo().getUuidEntries().add(uuidEntry);
+
+                    existingUser.getAccountHistory().getHistory().add(
+                            new UserDataController.HistoryEntry()
+                                    .setAction("New UUID detected")
+                                    .setDescription(uuid)
+                                    .setTimestamp(timestamp)
+                    );
+                    updated = true;
+                }
+            }
+        }
+
+        // --- Update last login: new entry when the IP changed, otherwise refresh the
+        // timestamp on the latest entry so "Last Login" always reflects the newest login ---
+        List<UserDataController.LoginEntry> lastLogins = existingUser.getAccountHistory().getLastLogins();
+        if (lastLogins == null) {
+            lastLogins = new ArrayList<>();
+            existingUser.getAccountHistory().setLastLogins(lastLogins);
+        }
+
+        if (playerFX.getLastLogin() != null) {
+            String lastLoginIp = lastLogins.isEmpty() ? null : lastLogins.get(lastLogins.size() - 1).getIp();
+            String lastLoginTime = playerFX.getLastLogin().toString();
+
+            if (!Objects.equals(lastLoginIp, ip)) {
+                UserDataController.LoginEntry loginEntry = new UserDataController.LoginEntry();
+                loginEntry.setIp(ip);
+                loginEntry.setAddedOn(lastLoginTime);
+                lastLogins.add(loginEntry);
+                updated = true;
+            } else {
+                UserDataController.LoginEntry latestEntry = lastLogins.get(lastLogins.size() - 1);
+                if (!Objects.equals(latestEntry.getAddedOn(), lastLoginTime)) {
+                    latestEntry.setAddedOn(lastLoginTime);
+                    updated = true;
+                }
+            }
+        }
+
+        // --- Update lastEdit timestamp only if new items were added ---
+        if (updated) {
+            existingUser.getUserInfo().setLastEdit(timestamp);
+        }
+
+        log.debug("Updated existing userID {}", existingUser.getUserInfo().getUserId());
+        return existingUser;
+    }
+
+    /**
+     * Bulk equivalent of {@link #saveUserToJsonFile}: applies every entry in {@code playersById} onto the
+     * current on-disk state in a single read + write, instead of one read + write per user. Used by the
+     * "Run Smurf Management" bulk check, whose parallel workers just collect results in memory
+     * (see {@code UserManagementController.runBulkSmurfLookup}) and hand the whole batch here once all of
+     * them are done. Still safe against a concurrent single-item edit/removal (e.g. a moderator editing a
+     * comment mid-run) because it takes the same lock and re-reads the file fresh right before merging.
+     */
+    public static void applyBulkPlayerUpdates(java.util.Map<String, PlayerFX> playersById, Path pathJson, String sourceEvent) {
+        if (playersById.isEmpty()) return;
+
+        synchronized (com.faforever.moderatorclient.ui.main_window.SmurfManagementController.SMURF_MANAGEMENT_JSON_LOCK) {
+            try {
+                List<UserDataController> jsonUsers = readOrEmpty(pathJson);
+                java.util.Map<String, UserDataController> byId = jsonUsers.stream()
+                        .collect(Collectors.toMap(u -> u.getUserInfo().getUserId(), u -> u, (a, b) -> a));
+
+                for (java.util.Map.Entry<String, PlayerFX> entry : playersById.entrySet()) {
+                    UserDataController existingUser = byId.get(entry.getKey());
+                    UserDataController updatedUser = applyPlayerUpdate(existingUser, entry.getValue(), sourceEvent);
+                    if (existingUser == null) {
+                        jsonUsers.add(updatedUser);
+                    }
+                }
+
+                writeUsersToJsonFile(jsonUsers, pathJson);
+            } catch (IOException e) {
+                log.error("Failed bulk update of {}", pathJson, e);
+                return;
+            }
+        }
+
+        smurfManagementController.loadSmurfManagementUsers();
+        smurfManagementController.createSmurfManagementTable();
+    }
+
+    private static List<UserDataController> readOrEmpty(Path pathJson) {
+        List<UserDataController> users = readUsersFromJsonFile(pathJson);
+        return users == null ? new ArrayList<>() : users;
+    }
+
+    private static void writeUsersToJsonFile(List<UserDataController> users, Path pathJson) throws IOException {
+        new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .enable(SerializationFeature.INDENT_OUTPUT)
+                .writeValue(pathJson.toFile(), users);
     }
 
     // Utility class for safe property access on potentially null objects.
