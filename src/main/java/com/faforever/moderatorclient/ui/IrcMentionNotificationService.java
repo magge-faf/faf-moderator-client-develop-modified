@@ -96,7 +96,7 @@ public class IrcMentionNotificationService {
 
         String title = "IRC mention";
         String body = abbreviate(sender + " in " + channel + System.lineSeparator() + message, 220);
-        log.info("Displaying IRC mention system tray notification: {}", body);
+        log.debug("Displaying IRC mention system tray notification: {}", body);
         systemTrayIcon.displayMessage(title, body, MessageType.INFO);
         return true;
     }
