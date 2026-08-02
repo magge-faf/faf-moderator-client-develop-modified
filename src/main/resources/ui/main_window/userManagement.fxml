@@ -307,6 +307,12 @@
                             <Tooltip text="Copies the forum heading, code-block output, and full account table image"/>
                         </tooltip>
                     </Button>
+                    <Button fx:id="openInNppButton" text="Open in N++"
+                            onAction="#openSmurfOutputInNpp" mnemonicParsing="false">
+                        <tooltip>
+                            <Tooltip fx:id="openInNppButtonTooltip" text="Opens the Smurf Village output in Notepad++"/>
+                        </tooltip>
+                    </Button>
                 </HBox>
                 <TextArea fx:id="smurfOutputTextArea" VBox.vgrow="ALWAYS"
                           style="-fx-font-family: 'Consolas', 'Courier New', monospace; -fx-font-size: 12px;"/>
@@ -321,6 +327,8 @@
                 <Label text="Smurf Village" style="-fx-font-weight: bold;"/>
                 <CheckBox fx:id="showForumAccountsReferenceButtonCheckBox"
                           text="Show Copy Forum Accounts Reference button"/>
+                <CheckBox fx:id="showOpenInNppButtonCheckBox"
+                          text="Show n++ Button"/>
             </VBox>
         </Tab>
     </TabPane>

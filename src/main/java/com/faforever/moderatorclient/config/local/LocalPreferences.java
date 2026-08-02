@@ -583,6 +583,7 @@ public class LocalPreferences {
         boolean includeManufacturerCheckBox = false;
         boolean redoLastUserSearchOnStartupCheckBox = false;
         boolean showForumAccountsReferenceButtonCheckBox = true;
+        boolean showOpenInNppButtonCheckBox = true;
 
         boolean searchHistoryTexAreaVisibilityState = false;
         boolean userNotesTextAreaVisibilityState = false;

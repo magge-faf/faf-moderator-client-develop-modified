@@ -104,6 +104,12 @@ public class UserManagementController implements Controller<SplitPane> {
     @FXML
     public CheckBox showForumAccountsReferenceButtonCheckBox;
     @FXML
+    public Button openInNppButton;
+    @FXML
+    public Tooltip openInNppButtonTooltip;
+    @FXML
+    public CheckBox showOpenInNppButtonCheckBox;
+    @FXML
     public CheckBox redoLastUserSearchOnStartupCheckBox;
     public Label userNotesLabel;
     @FXML
@@ -303,6 +309,7 @@ public class UserManagementController implements Controller<SplitPane> {
         initializeSearchProperties();
         bindUIElementsToPreferences();
         bindForumAccountsReferenceButtonVisibility();
+        bindOpenInNppButton();
         redoLastUserSearchOnStartup();
 
         Tooltip tooltip = catchFirstLayerSmurfsOnlyCheckBox.getTooltip();
@@ -429,6 +436,53 @@ public class UserManagementController implements Controller<SplitPane> {
                 .bind(showForumAccountsReferenceButtonCheckBox.selectedProperty());
         copyAccountsReferenceTextAndImageButton.managedProperty()
                 .bind(showForumAccountsReferenceButtonCheckBox.selectedProperty());
+    }
+
+    private static final String[] NOTEPAD_PLUS_PLUS_CANDIDATE_PATHS = {
+            System.getenv("ProgramFiles") + "\\Notepad++\\notepad++.exe",
+            System.getenv("ProgramFiles(x86)") + "\\Notepad++\\notepad++.exe",
+            System.getenv("LOCALAPPDATA") + "\\Programs\\Notepad++\\notepad++.exe"
+    };
+
+    private Path findNppExecutable() {
+        for (String candidate : NOTEPAD_PLUS_PLUS_CANDIDATE_PATHS) {
+            if (candidate == null) {
+                continue;
+            }
+            Path path = Path.of(candidate);
+            if (Files.isRegularFile(path)) {
+                return path;
+            }
+        }
+        return null;
+    }
+
+    private void bindOpenInNppButton() {
+        openInNppButton.visibleProperty().bind(showOpenInNppButtonCheckBox.selectedProperty());
+        openInNppButton.managedProperty().bind(showOpenInNppButtonCheckBox.selectedProperty());
+
+        Path nppPath = findNppExecutable();
+        if (nppPath == null) {
+            openInNppButton.setDisable(true);
+            openInNppButtonTooltip.setText("Notepad++ is not installed. Install it to enable this button.");
+        }
+    }
+
+    @FXML
+    private void openSmurfOutputInNpp() {
+        Path nppPath = findNppExecutable();
+        if (nppPath == null) {
+            return;
+        }
+
+        try {
+            Path tempFile = Files.createTempFile("smurf-village-output-", ".txt");
+            tempFile.toFile().deleteOnExit();
+            Files.writeString(tempFile, smurfOutputTextArea.getText());
+            new ProcessBuilder(nppPath.toString(), tempFile.toString()).start();
+        } catch (IOException e) {
+            log.warn("Failed to open Smurf Village output in Notepad++", e);
+        }
     }
 
     private void redoLastUserSearchOnStartup() {
