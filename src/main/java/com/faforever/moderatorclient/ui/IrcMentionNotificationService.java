@@ -47,7 +47,11 @@ public class IrcMentionNotificationService {
         // Create the tray icon eagerly instead of on first notification: Windows silently drops
         // TrayIcon.displayMessage() calls made immediately after the icon is added to the tray,
         // so waiting until the first mention/test click causes that first toast to be lost.
-        Platform.runLater(this::getOrCreateTrayIcon);
+        try {
+            Platform.runLater(this::getOrCreateTrayIcon);
+        } catch (IllegalStateException ex) {
+            log.debug("JavaFX toolkit not initialized yet; skipping eager tray icon creation", ex);
+        }
     }
 
     public void playMentionSound() {
