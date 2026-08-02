@@ -118,6 +118,13 @@ public class FafModeratorClientApplication extends Application {
         startTimerThread(primaryStage);
     }
 
+    @Override
+    public void stop() {
+        if (applicationContext != null) {
+            applicationContext.close();
+        }
+    }
+
     private void startTimerThread(Stage primaryStage) {
         long startTime = System.currentTimeMillis();
         Timer timer = new Timer(true);
