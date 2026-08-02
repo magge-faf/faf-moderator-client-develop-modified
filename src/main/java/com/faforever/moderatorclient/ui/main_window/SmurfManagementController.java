@@ -218,7 +218,8 @@ public class SmurfManagementController implements Controller<VBox> {
     }
 
     private static Instant parseDateForSort(String s) {
-        if (s == null || s.isBlank() || "Never".equals(s) || "Permanent".equals(s)) return Instant.EPOCH;
+        if (s == null || s.isBlank() || "Never".equals(s)) return Instant.EPOCH;
+        if ("Permanent".equals(s)) return Instant.MAX;
         String datePart = s.contains(" (") ? s.substring(0, s.indexOf(" (")) : s;
         try {
             return HUMAN_READABLE_FORMATTER.parse(datePart, Instant::from);
@@ -260,8 +261,9 @@ public class SmurfManagementController implements Controller<VBox> {
     }
 
     private String formatBanExpiry(String raw) {
+        if (raw == null || raw.isBlank()) return "Permanent";
         Instant expires = parseAnyInstant(raw);
-        if (expires == null) return "Permanent";
+        if (expires == null) return raw;
         return HUMAN_READABLE_FORMATTER.format(expires) + " (" + humanizeRelative(Instant.now(), expires) + ")";
     }
 
@@ -280,7 +282,9 @@ public class SmurfManagementController implements Controller<VBox> {
         Period period = Period.between(zEarlier.toLocalDate(), zLater.toLocalDate());
         ZonedDateTime afterDatePart = zEarlier.plus(period);
         if (afterDatePart.isAfter(zLater)) {
-            period = period.minusDays(1);
+            // Period.minusDays() only adjusts the raw "days" field without borrowing from months/years,
+            // so it can go negative here. Re-derive from the shifted end date instead so the period stays normalized.
+            period = Period.between(zEarlier.toLocalDate(), zLater.toLocalDate().minusDays(1));
             afterDatePart = zEarlier.plus(period);
         }
         Duration remainder = Duration.between(afterDatePart, zLater);
@@ -372,6 +376,7 @@ public class SmurfManagementController implements Controller<VBox> {
                 ? safeGet(user, UserDataController.UserInfo::getComment)
                 : safeGet(user, UserDataController.UserInfo::getReason);
         String userId = safeGet(user, UserDataController.UserInfo::getUserId);
+        if (userId.isEmpty()) return;
         TextInputDialog dialog = new TextInputDialog(current);
         dialog.setTitle("Edit " + label);
         dialog.setHeaderText("Edit " + label + " for: " + safeGet(user, UserDataController.UserInfo::getUserName));
@@ -398,19 +403,8 @@ public class SmurfManagementController implements Controller<VBox> {
         // Drop it from the visible list immediately for snappy feedback; the on-disk removal below
         // is the source of truth and reconciles the list again once it completes.
         smurfManagementUsersList.removeIf(u -> Objects.equals(safeGet(u, UserDataController.UserInfo::getUserId), userId));
-        CompletableFuture.runAsync(() -> {
-            synchronized (SMURF_MANAGEMENT_JSON_LOCK) {
-                try {
-                    List<UserDataController> current = OBJECT_MAPPER.readValue(SMURF_MANAGEMENT_USERS_JSON_PATH.toFile(),
-                            new TypeReference<>() {});
-                    current.removeIf(u -> Objects.equals(safeGet(u, UserDataController.UserInfo::getUserId), userId));
-                    OBJECT_MAPPER.writeValue(SMURF_MANAGEMENT_USERS_JSON_PATH.toFile(), current);
-                } catch (IOException e) {
-                    log.error("Failed to remove user {} from {}", userId, SMURF_MANAGEMENT_USERS_JSON_PATH, e);
-                }
-            }
-            loadSmurfManagementUsers();
-        });
+        updateUsersOnDisk(current ->
+                current.removeIf(u -> Objects.equals(safeGet(u, UserDataController.UserInfo::getUserId), userId)));
     }
 
     public void loadSmurfManagementUsers() {
@@ -426,27 +420,53 @@ public class SmurfManagementController implements Controller<VBox> {
     }
 
     /**
-     * Re-reads the current on-disk state, applies {@code mutator} to the matching user, and writes the
+     * Re-reads the current on-disk state, applies {@code mutator} to the whole list, and writes the
      * result back — all under {@link #SMURF_MANAGEMENT_JSON_LOCK} so this can't race with a concurrent
      * bulk "Run Smurf Management" check (or another edit) writing the same file.
      */
-    private void updateUserOnDisk(String userId, java.util.function.Consumer<UserDataController> mutator) {
+    private void updateUsersOnDisk(java.util.function.Consumer<List<UserDataController>> mutator) {
         CompletableFuture.runAsync(() -> {
             synchronized (SMURF_MANAGEMENT_JSON_LOCK) {
                 try {
                     List<UserDataController> current = OBJECT_MAPPER.readValue(SMURF_MANAGEMENT_USERS_JSON_PATH.toFile(),
                             new TypeReference<>() {});
-                    current.stream()
-                            .filter(u -> Objects.equals(safeGet(u, UserDataController.UserInfo::getUserId), userId))
-                            .findFirst()
-                            .ifPresent(mutator);
-                    OBJECT_MAPPER.writeValue(SMURF_MANAGEMENT_USERS_JSON_PATH.toFile(), current);
+                    mutator.accept(current);
+                    writeUsersAtomically(OBJECT_MAPPER, SMURF_MANAGEMENT_USERS_JSON_PATH, current);
                 } catch (IOException e) {
-                    log.error("Failed to update user {} in {}", userId, SMURF_MANAGEMENT_USERS_JSON_PATH, e);
+                    log.error("Failed to update {}", SMURF_MANAGEMENT_USERS_JSON_PATH, e);
                 }
             }
             loadSmurfManagementUsers();
+        }).exceptionally(ex -> {
+            log.error("Unexpected failure updating {}", SMURF_MANAGEMENT_USERS_JSON_PATH, ex);
+            return null;
         });
+    }
+
+    private void updateUserOnDisk(String userId, java.util.function.Consumer<UserDataController> mutator) {
+        updateUsersOnDisk(current -> current.stream()
+                .filter(u -> Objects.equals(safeGet(u, UserDataController.UserInfo::getUserId), userId))
+                .findFirst()
+                .ifPresent(mutator));
+    }
+
+    /**
+     * Writes {@code users} to {@code targetPath} without ever leaving a truncated or partially-written
+     * file behind: serializes to a temporary file in the same directory, then swaps it into place via an
+     * atomic move (falling back to a plain move if the filesystem doesn't support atomic moves).
+     */
+    public static void writeUsersAtomically(ObjectMapper mapper, Path targetPath, List<UserDataController> users) throws IOException {
+        Path tempFile = Files.createTempFile(targetPath.getParent(), "smurf-management-", ".tmp");
+        try {
+            mapper.writeValue(tempFile.toFile(), users);
+            try {
+                Files.move(tempFile, targetPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(tempFile, targetPath, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally {
+            Files.deleteIfExists(tempFile);
+        }
     }
 
     // ---- Event history popup ----
