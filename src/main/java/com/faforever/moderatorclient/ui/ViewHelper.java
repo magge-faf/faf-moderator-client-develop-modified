@@ -442,7 +442,11 @@ public class ViewHelper {
         }
 
         long totalHours = duration.toHours();
-        long totalDays = Math.max(1, (long) Math.ceil(totalHours / 24.0));
+        if (totalHours < 24) {
+            return totalHours + "h";
+        }
+
+        long totalDays = (long) Math.ceil(totalHours / 24.0);
         long years = totalDays / 365;
         long remainingDays = totalDays % 365;
         long months = remainingDays / 30;
@@ -459,7 +463,7 @@ public class ViewHelper {
             parts.add(days + "d");
         }
         if (parts.isEmpty()) {
-            parts.add(totalHours + "h");
+            parts.add(totalDays + "d");
         }
 
         return String.join(" ", parts);
@@ -1380,7 +1384,7 @@ public class ViewHelper {
         return "%s (%s)".formatted(DT_DATETIME.format(expiresAt.atZoneSameInstant(ZoneId.systemDefault())), relativeText);
     }
 
-    private static String formatCompactDuration(Duration duration) {
+    public static String formatCompactDuration(Duration duration) {
         long days = duration.toDays();
         int hours = duration.toHoursPart();
         int minutes = duration.toMinutesPart();
@@ -1579,6 +1583,19 @@ public class ViewHelper {
         String timestamp = Instant.now().toString();
         boolean updated = false;
 
+        if (existingUser.getHardwareInfo() == null) {
+            existingUser.setHardwareInfo(new UserDataController.HardwareInfo());
+        }
+        if (existingUser.getAccountHistory() == null) {
+            existingUser.setAccountHistory(new UserDataController.AccountHistory());
+        }
+        if (existingUser.getAccountHistory().getHistory() == null) {
+            existingUser.getAccountHistory().setHistory(new ArrayList<>());
+        }
+        if (existingUser.getUserInfo() != null && existingUser.getUserInfo().getEmail() == null) {
+            existingUser.getUserInfo().setEmail(new ArrayList<>());
+        }
+
         // --- Update IPs ---
         String ip = playerFX.getRecentIpAddress();
         if (ip != null && !ip.isEmpty()) {
@@ -1602,7 +1619,7 @@ public class ViewHelper {
 
         // --- Update emails ---
         String email = playerFX.getEmail();
-        if (email != null && !email.isEmpty()) {
+        if (email != null && !email.isEmpty() && existingUser.getUserInfo() != null) {
             boolean exists = existingUser.getUserInfo().getEmail().stream()
                     .anyMatch(e -> e.getEmail().equals(email));
             if (!exists) {
@@ -1624,9 +1641,12 @@ public class ViewHelper {
         // --- Update hardware UUIDs ---
         if (playerFX.getUniqueIdAssignments() != null) {
             for (UniqueIdAssignmentFx item : playerFX.getUniqueIdAssignments()) {
+                if (item.getUniqueId() == null || item.getUniqueId().getUuid() == null) {
+                    continue;
+                }
                 String uuid = item.getUniqueId().getUuid();
                 boolean exists = existingUser.getHardwareInfo().getUuidEntries().stream()
-                        .anyMatch(e -> e.getUuid().equals(uuid));
+                        .anyMatch(e -> Objects.equals(e.getUuid(), uuid));
                 if (!exists) {
                     UserDataController.UuidEntry uuidEntry = new UserDataController.UuidEntry();
                     uuidEntry.setUuid(uuid);
@@ -1716,16 +1736,42 @@ public class ViewHelper {
         smurfManagementController.createSmurfManagementTable();
     }
 
+    private static final String[] NOTEPAD_PLUS_PLUS_ENV_CANDIDATES = {"ProgramFiles", "ProgramFiles(x86)"};
+
+    /**
+     * Resolves the Notepad++ executable from its standard install locations, or {@code null} if none exist.
+     * Shared by {@code UserManagementController} (disables its "Open in N++" button when null) and
+     * {@code ModerationReportController} (falls back to a bare "notepad++" PATH lookup when null).
+     */
+    public static Path resolveNotepadPlusPlusPath() {
+        List<String> candidates = new ArrayList<>();
+        for (String envVar : NOTEPAD_PLUS_PLUS_ENV_CANDIDATES) {
+            String dir = System.getenv(envVar);
+            if (dir != null && !dir.isBlank()) {
+                candidates.add(Path.of(dir, "Notepad++", "notepad++.exe").toString());
+            }
+        }
+        String localAppData = System.getenv("LOCALAPPDATA");
+        if (localAppData != null && !localAppData.isBlank()) {
+            candidates.add(Path.of(localAppData, "Programs", "Notepad++", "notepad++.exe").toString());
+        }
+
+        for (String candidate : candidates) {
+            Path path = Path.of(candidate);
+            if (Files.isRegularFile(path)) {
+                return path;
+            }
+        }
+        return null;
+    }
+
     private static List<UserDataController> readOrEmpty(Path pathJson) {
         List<UserDataController> users = readUsersFromJsonFile(pathJson);
         return users == null ? new ArrayList<>() : users;
     }
 
     private static void writeUsersToJsonFile(List<UserDataController> users, Path pathJson) throws IOException {
-        new ObjectMapper()
-                .registerModule(new JavaTimeModule())
-                .enable(SerializationFeature.INDENT_OUTPUT)
-                .writeValue(pathJson.toFile(), users);
+        com.faforever.moderatorclient.ui.main_window.SmurfManagementController.writeUsersAtomically(objectMapper, pathJson, users);
     }
 
     // Utility class for safe property access on potentially null objects.
@@ -2938,10 +2984,23 @@ public class ViewHelper {
             return;
         }
 
+        URI uri;
+        try {
+            uri = URI.create(url);
+        } catch (IllegalArgumentException e) {
+            log.warn("Refusing to open malformed URL: {}", url, e);
+            return;
+        }
+        String scheme = uri.getScheme();
+        if (scheme == null || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))) {
+            log.warn("Refusing to open URL with disallowed scheme: {}", url);
+            return;
+        }
+
         try {
             if (!GraphicsEnvironment.isHeadless() && Desktop.isDesktopSupported()
                     && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-                Desktop.getDesktop().browse(URI.create(url));
+                Desktop.getDesktop().browse(uri);
             } else {
                 List<String> allowedBrowsers = Arrays.asList("chrome", "firefox", "Microsoft Edge", "edge", "msedge", "iexplore");
                 String lowerBrowser = browser.toLowerCase();
