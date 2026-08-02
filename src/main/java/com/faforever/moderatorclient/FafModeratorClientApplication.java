@@ -95,6 +95,12 @@ public class FafModeratorClientApplication extends Application {
         primaryStage.setScene(scene);
         primaryStage.setMaximized(true);
         primaryStage.show();
+        Platform.runLater(() -> {
+            primaryStage.setAlwaysOnTop(true);
+            primaryStage.toFront();
+            primaryStage.requestFocus();
+            Platform.runLater(() -> primaryStage.setAlwaysOnTop(false));
+        });
 
         primaryStage.setOnCloseRequest(e -> {
             e.consume();
