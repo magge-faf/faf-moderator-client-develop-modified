@@ -69,6 +69,7 @@ public class FafModeratorClientApplication extends Application {
     @Override
     public void init() {
         SpringApplication app = new SpringApplication(FafModeratorClientApplication.class);
+        app.setHeadless(false);
         applicationContext = app.run();
         applicationContext.getAutowireCapableBeanFactory().autowireBean(this);
         logMaintenanceService.archiveLegacyClientLogs();
