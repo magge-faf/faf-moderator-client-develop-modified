@@ -76,6 +76,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
@@ -91,6 +92,9 @@ import org.springframework.web.client.HttpClientErrorException;
 @Component
 @RequiredArgsConstructor
 public class UserManagementController implements Controller<SplitPane> {
+    private static final int DEFAULT_BULK_SMURF_LOOKUP_PARALLELISM = 4;
+    private static final int MAX_BULK_SMURF_LOOKUP_PARALLELISM = 8;
+
     @FXML
     public Button checkTemporaryBansButton;
     @FXML
@@ -104,6 +108,8 @@ public class UserManagementController implements Controller<SplitPane> {
     public Label userNotesLabel;
     @FXML
     public TextField maxMatchesBeforePromptSmurfVillageLookupTextField;
+    @FXML
+    public TextField bulkSmurfLookupWorkerCountTextField;
     @FXML
     public CheckBox promptUserOnThresholdExceededSmurfVillageLookupCheckBox;
     @FXML
@@ -160,14 +166,18 @@ public class UserManagementController implements Controller<SplitPane> {
     private volatile boolean isPaused = false;
     private volatile boolean isStopped = false;
     private final Object pauseLock = new Object();
+    private final Object thresholdPromptLock = new Object();
+    private volatile boolean thresholdPromptOpen = false;
 
     // Snapshot of UI state captured on FX thread before each background task starts.
     // Background threads read this instead of touching live JavaFX nodes.
     private volatile SmurfLookupSettings smurfLookupSettings = SmurfLookupSettings.defaults();
+    private volatile int smurfLookupPageParallelism = DEFAULT_BULK_SMURF_LOOKUP_PARALLELISM;
 
     @FXML
     public Button checkRecentAccountsForSmurfsStopButton;
     private final StringBuilder logOutput = new StringBuilder();
+    private final ThreadLocal<StringBuilder> bulkLookupLogBuffer = new ThreadLocal<>();
     private final UiService uiService;
     private final PlatformService platformService;
     private final UserService userService;
@@ -1250,6 +1260,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
         Task<Void> task = new Task<>() {
             private long startTime;
+            private final AtomicInteger processedCount = new AtomicInteger();
 
             @Override
             protected Void call() {
@@ -1306,7 +1317,12 @@ public class UserManagementController implements Controller<SplitPane> {
                         formattedTime = String.format("%ds", seconds);
                     }
 
-                    progressLabel.setText("Done: " + userIds.size() + "/" + userIds.size() + " users in " + formattedTime + ".");
+                    int processed = processedCount.get();
+                    if (cancelRequestedByUser) {
+                        progressLabel.setText("Cancelled: " + processed + "/" + userIds.size() + " users in " + formattedTime + ".");
+                    } else {
+                        progressLabel.setText("Done: " + processed + "/" + userIds.size() + " users in " + formattedTime + ".");
+                    }
                 });
             }
 
@@ -1322,6 +1338,42 @@ public class UserManagementController implements Controller<SplitPane> {
         };
 
         new Thread(task).start();
+    }
+
+    private String captureLookupOutput(Runnable lookupAction) {
+        StringBuilder existingBuffer = bulkLookupLogBuffer.get();
+        if (existingBuffer != null) {
+            lookupAction.run();
+            return "";
+        }
+
+        bulkLookupLogBuffer.set(new StringBuilder());
+        try {
+            lookupAction.run();
+        } catch (RuntimeException e) {
+            log.error("Error while capturing lookup output", e);
+        }
+        return drainBulkLookupLogBuffer();
+    }
+
+    private int readBulkSmurfLookupParallelism() {
+        String configuredValue = bulkSmurfLookupWorkerCountTextField == null
+                ? ""
+                : bulkSmurfLookupWorkerCountTextField.getText();
+        String trimmedValue = configuredValue == null ? "" : configuredValue.trim();
+        int parsedValue;
+        try {
+            parsedValue = Integer.parseInt(trimmedValue);
+        } catch (RuntimeException e) {
+            parsedValue = DEFAULT_BULK_SMURF_LOOKUP_PARALLELISM;
+        }
+
+        int normalizedValue = Math.max(1, Math.min(MAX_BULK_SMURF_LOOKUP_PARALLELISM, parsedValue));
+        if (bulkSmurfLookupWorkerCountTextField != null
+                && !String.valueOf(normalizedValue).equals(trimmedValue)) {
+            bulkSmurfLookupWorkerCountTextField.setText(String.valueOf(normalizedValue));
+        }
+        return normalizedValue;
     }
 
     /**
@@ -1398,7 +1450,7 @@ public class UserManagementController implements Controller<SplitPane> {
                                     Set<String> cumulativeAccounts, PlayerFX currentPlayer,
                                     List<Map<String, Object>> excludedItems) {
         if (cancelRequestedByUser) {
-            updateSmurfVillageLogTextArea("\nProcess canceled by user.\n");
+            updateSmurfVillageLogTextArea("\n[cancelled] Process canceled by user.\n");
             return;
         }
 
@@ -1408,7 +1460,7 @@ public class UserManagementController implements Controller<SplitPane> {
         Set<String> toProcess = new LinkedHashSet<>();
         for (String item : items) {
             if (item == null || item.isBlank()) continue;
-            if (alreadyCheckedSet.contains(item)) {
+            if (!alreadyCheckedSet.add(item)) {
                 log.debug("Ignoring duplicate: {} [{}] already processed.", type, item);
                 continue;
             }
@@ -1423,29 +1475,18 @@ public class UserManagementController implements Controller<SplitPane> {
             if (excluded) {
                 if (!smurfLookupSettings.suppressExcludedItems()) {
                     updateSmurfVillageLogTextArea(String.format(
-                            "\n  EXCLUDED: [%s] = [%s] (in excluded_items.json, skipping)", displayAttr, item));
+                            "\n[excluded] [%s] = [%s] (in excluded_items.json, skipping)", displayAttr, item));
                 }
             } else {
                 toProcess.add(item);
             }
         }
 
-        // Mark everything as processed so we don't revisit (including excluded values)
-        items.stream().filter(i -> i != null && !i.isBlank()).forEach(alreadyCheckedSet::add);
-
         if (toProcess.isEmpty()) return;
 
         Platform.runLater(() -> statusTextFieldProcessingItem.setText(type + ": [" + toProcess.size() + " value(s)]"));
 
-        try {
-            synchronized (pauseLock) {
-                while (isPaused) {
-                    updateSmurfVillageLogTextArea("\t\t PROCESS PAUSED. Waiting for RESUME.\n");
-                    pauseLock.wait();
-                }
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+        if (!waitUntilLookupMayContinue(true)) {
             return;
         }
 
@@ -1456,7 +1497,7 @@ public class UserManagementController implements Controller<SplitPane> {
                     : userService.findUsersByAttributeIn(property, toProcess);
         } catch (HttpClientErrorException e) {
             updateSmurfVillageLogTextArea(String.format(
-                    "\t\t ERROR fetching users for [%s] batch: %s\n", displayAttr, e.getMessage()));
+                    "\n[error] fetching users for [%s] batch: %s\n", displayAttr, e.getMessage()));
             return;
         }
 
@@ -1464,7 +1505,7 @@ public class UserManagementController implements Controller<SplitPane> {
             // Batch exceeded threshold — fall back to per-value so each hot value
             // can be individually excluded, continued, or used to cancel.
             updateSmurfVillageLogTextArea(String.format(
-                    "\n  [%s] batch exceeded threshold (%d) — switching to per-value for exclusion control",
+                    "\n[%s] batch exceeded threshold (%d) - switching to per-value for exclusion control",
                     displayAttr, smurfLookupSettings.threshold()));
             for (String value : toProcess) {
                 if (cancelRequestedByUser) return;
@@ -1495,7 +1536,7 @@ public class UserManagementController implements Controller<SplitPane> {
         }
 
         if (otherAccounts.isEmpty()) {
-            if (!smurfLookupSettings.onlyShowActive()) localLog.append("   (no matches)");
+            if (!smurfLookupSettings.onlyShowActive()) localLog.append("\n(no matches)");
         } else {
             if (currentPlayer != null) addPlayerDirectlyToTable(currentPlayer);
             List<String> activeLines = new ArrayList<>();
@@ -1523,7 +1564,7 @@ public class UserManagementController implements Controller<SplitPane> {
                 if (showMatchedValues) {
                     List<String> matchedValues = getMatchingAttributeValues(user, property, toProcess);
                     if (!matchedValues.isEmpty()) {
-                        activeLines.add(String.format("\n       shared %s: %s", displayAttr, String.join(" | ", matchedValues)));
+                        activeLines.add(String.format("\n      shared %s: %s", displayAttr, String.join(" | ", matchedValues)));
                     }
                 }
                 addPlayerDirectlyToTable(user);
@@ -1545,12 +1586,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
         Platform.runLater(() -> statusTextFieldProcessingItem.setText(displayAttr + ": [" + value + "]"));
 
-        try {
-            synchronized (pauseLock) {
-                while (isPaused) pauseLock.wait();
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+        if (!waitUntilLookupMayContinue(false)) {
             return;
         }
 
@@ -1561,85 +1597,43 @@ public class UserManagementController implements Controller<SplitPane> {
                     : userService.findUsersByAttribute(property, value);
         } catch (HttpClientErrorException e) {
             updateSmurfVillageLogTextArea(String.format(
-                    "\t\t ERROR fetching users for [%s] = [%s]: %s\n", displayAttr, value, e.getMessage()));
+                    "\n[error] fetching users for [%s] = [%s]: %s\n", displayAttr, value, e.getMessage()));
             return;
         }
 
         List<PlayerFX> otherAccounts = findOtherAccounts(foundUsers, currentPlayer);
 
         if (smurfLookupSettings.promptOnThreshold() && otherAccounts.size() > smurfLookupSettings.threshold()) {
-            boolean decided = false;
-            while (!decided && !cancelRequestedByUser) {
-                CountDownLatch latch = new CountDownLatch(1);
-                AtomicReference<String> choice = new AtomicReference<>("continue");
-                List<PlayerFX> snapshot = new ArrayList<>(otherAccounts);
-
-                Platform.runLater(() -> {
-                    Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-                    alert.setTitle("Threshold Exceeded");
-                    alert.setHeaderText(String.format("[%s] = [%s]%nReturned more than %d results",
-                            displayAttr, value, smurfLookupSettings.threshold()));
-                    alert.setContentText("How do you want to handle this value?");
-
-                    ButtonType addToExclude = new ButtonType("Add to exclusion list and skip");
-                    ButtonType continueBtn  = new ButtonType("Continue");
-                    ButtonType showAccounts = new ButtonType("Show Related Accounts");
-                    ButtonType cancelProcess = new ButtonType("Cancel Process", ButtonBar.ButtonData.CANCEL_CLOSE);
-
-                    alert.getButtonTypes().setAll(addToExclude, continueBtn, showAccounts, cancelProcess);
-                    Optional<ButtonType> result = alert.showAndWait();
-
-                    if (result.isPresent()) {
-                        if      (result.get() == addToExclude)  choice.set("exclude");
-                        else if (result.get() == continueBtn)   choice.set("continue");
-                        else if (result.get() == showAccounts)  choice.set("show");
-                        else                                     choice.set("cancel");
-                    }
-                    latch.countDown();
-                });
-
-                try { latch.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
-
-                switch (choice.get()) {
-                    case "cancel" -> { cancelRequestedByUser = true; return; }
-                    case "exclude" -> {
-                        Map<String, Object> newExcluded = new LinkedHashMap<>();
-                        newExcluded.put(property, value);
-                        newExcluded.put("AddedOn", LocalDateTime.now().toString());
-                        newExcluded.put(
-                                "comment",
-                                String.format(
-                                        "Excluded by user prompt: more than %d related accounts found for [%s = %s]",
-                                        smurfLookupSettings.threshold(),
-                                        property,
-                                        value));
-                        excludedItems.add(newExcluded);
-                        excludedHardwareItemsController.saveExcludedItem(newExcluded);
-                        updateSmurfVillageLogTextArea(String.format(
-                                "\n  EXCLUDED: [%s] = [%s] (added to exclusion list)", displayAttr, value));
-                        return;
-                    }
-                    case "show" -> {
-                        CountDownLatch showLatch = new CountDownLatch(1);
-                        Platform.runLater(() -> {
-                            showUserDetailsWindow(
-                                    () -> findOtherAccounts(userService.findUsersByAttribute(property, value), currentPlayer),
-                                    showLatch);
-                        });
-                        try { showLatch.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
-                        // loop back — dialog re-shows
-                    }
-                    default -> {
-                        foundUsers = userService.findUsersByAttribute(property, value);
-                        otherAccounts = findOtherAccounts(foundUsers, currentPlayer);
-                        decided = true;
-                    }
+            ThresholdDecision decision = resolveThresholdDecision(value, property, displayAttr, otherAccounts, currentPlayer);
+            switch (decision) {
+                case CANCEL -> {
+                    cancelRequestedByUser = true;
+                    return;
                 }
+                case EXCLUDE -> {
+                    Map<String, Object> newExcluded = new LinkedHashMap<>();
+                    newExcluded.put(property, value);
+                    newExcluded.put("AddedOn", LocalDateTime.now().toString());
+                    newExcluded.put(
+                            "comment",
+                            String.format(
+                                    "Excluded by user prompt: more than %d related accounts found for [%s = %s]",
+                                    smurfLookupSettings.threshold(),
+                                    property,
+                                    value));
+                    excludedItems.add(newExcluded);
+                    excludedHardwareItemsController.saveExcludedItem(newExcluded);
+                    updateSmurfVillageLogTextArea(String.format(
+                            "\n[excluded] [%s] = [%s] (added to exclusion list)", displayAttr, value));
+                    return;
+                }
+                case CONTINUE -> otherAccounts = findOtherAccounts(
+                        userService.findUsersByAttribute(property, value, Integer.MAX_VALUE, smurfLookupPageParallelism),
+                        currentPlayer);
             }
-            if (cancelRequestedByUser) return;
         }
 
-        String headerLine = String.format("\n  [%s]  %s", displayAttr, value);
+        String headerLine = String.format("\n[%s]  %s", displayAttr, value);
         StringBuilder localLog = new StringBuilder();
         boolean headerEmitted = false;
 
@@ -1649,7 +1643,7 @@ public class UserManagementController implements Controller<SplitPane> {
         }
 
         if (otherAccounts.isEmpty()) {
-            if (!smurfLookupSettings.onlyShowActive()) localLog.append("   (no matches)");
+            if (!smurfLookupSettings.onlyShowActive()) localLog.append("\n(no matches)");
         } else {
             if (currentPlayer != null) addPlayerDirectlyToTable(currentPlayer);
             List<String> activeLines = new ArrayList<>();
@@ -1703,13 +1697,125 @@ public class UserManagementController implements Controller<SplitPane> {
                 .toList();
     }
 
+    private boolean waitUntilLookupMayContinue(boolean logManualPause) {
+        try {
+            synchronized (pauseLock) {
+                while (isPaused) {
+                    if (logManualPause) {
+                        updateSmurfVillageLogTextArea("\n[paused] Waiting for resume.\n");
+                    }
+                    pauseLock.wait();
+                }
+            }
+
+            synchronized (thresholdPromptLock) {
+                while (thresholdPromptOpen) {
+                    thresholdPromptLock.wait();
+                }
+            }
+
+            return !cancelRequestedByUser;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    private ThresholdDecision resolveThresholdDecision(String value, String property, String displayAttr,
+                                                       List<PlayerFX> otherAccounts, PlayerFX currentPlayer) {
+        try {
+            synchronized (thresholdPromptLock) {
+                while (thresholdPromptOpen) {
+                    thresholdPromptLock.wait();
+                }
+                thresholdPromptOpen = true;
+            }
+
+            boolean decided = false;
+            while (!decided && !cancelRequestedByUser) {
+                CountDownLatch latch = new CountDownLatch(1);
+                AtomicReference<ThresholdDecision> choice = new AtomicReference<>(ThresholdDecision.CONTINUE);
+                AtomicReference<Boolean> showAccounts = new AtomicReference<>(false);
+
+                Platform.runLater(() -> {
+                    Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+                    alert.setTitle("Threshold Exceeded");
+                    alert.setHeaderText(String.format("[%s] = [%s]%nReturned more than %d results",
+                            displayAttr, value, smurfLookupSettings.threshold()));
+                    alert.setContentText("How do you want to handle this value?");
+
+                    ButtonType addToExclude = new ButtonType("Add to exclusion list and skip");
+                    ButtonType continueBtn = new ButtonType("Continue");
+                    ButtonType showAccountsButton = new ButtonType("Show Related Accounts");
+                    ButtonType cancelProcess = new ButtonType("Cancel Process", ButtonBar.ButtonData.CANCEL_CLOSE);
+
+                    alert.getButtonTypes().setAll(addToExclude, continueBtn, showAccountsButton, cancelProcess);
+                    Optional<ButtonType> result = alert.showAndWait();
+
+                    if (result.isPresent()) {
+                        if (result.get() == addToExclude) {
+                            choice.set(ThresholdDecision.EXCLUDE);
+                        } else if (result.get() == continueBtn) {
+                            choice.set(ThresholdDecision.CONTINUE);
+                        } else if (result.get() == showAccountsButton) {
+                            showAccounts.set(true);
+                        } else {
+                            choice.set(ThresholdDecision.CANCEL);
+                        }
+                    }
+                    latch.countDown();
+                });
+
+                latch.await();
+
+                if (showAccounts.get()) {
+                    CountDownLatch showLatch = new CountDownLatch(1);
+                    AtomicInteger fetchedAccountCount = new AtomicInteger(otherAccounts.size());
+                    Platform.runLater(() -> showUserDetailsWindow(
+                            () -> findOtherAccounts(
+                                    userService.findUsersByAttribute(
+                                            property,
+                                            value,
+                                            Integer.MAX_VALUE,
+                                            smurfLookupPageParallelism,
+                                            fetchedAccountCount::set),
+                                    currentPlayer),
+                            displayAttr,
+                            value,
+                            fetchedAccountCount,
+                            showLatch));
+                    showLatch.await();
+                    continue;
+                }
+
+                return choice.get();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return ThresholdDecision.CANCEL;
+        } finally {
+            synchronized (thresholdPromptLock) {
+                thresholdPromptOpen = false;
+                thresholdPromptLock.notifyAll();
+            }
+        }
+
+        return ThresholdDecision.CANCEL;
+    }
+
+    private enum ThresholdDecision {
+        CONTINUE,
+        EXCLUDE,
+        CANCEL
+    }
+
     private String formatLookupHeader(String displayAttr, Collection<String> values) {
         List<String> orderedValues = new ArrayList<>(values);
         if (orderedValues.size() <= 3) {
-            return String.format("\n  [%s]  %s", displayAttr, String.join("|", orderedValues));
+            return String.format("\n[%s]  %s", displayAttr, String.join("|", orderedValues));
         }
 
-        return String.format("\n  [%s]  %d values queried", displayAttr, orderedValues.size());
+        return String.format("\n[%s]  %d values queried", displayAttr, orderedValues.size());
     }
 
     private List<String> getMatchingAttributeValues(PlayerFX player, String property, Collection<String> queriedValues) {
@@ -1765,7 +1871,8 @@ public class UserManagementController implements Controller<SplitPane> {
         showUserDetailsWindowContent(users, null);
     }
 
-    private void showUserDetailsWindow(Supplier<List<PlayerFX>> usersLoader, CountDownLatch closedLatch) {
+    private void showUserDetailsWindow(Supplier<List<PlayerFX>> usersLoader, String displayAttr, String value,
+                                       AtomicInteger fetchedAccountCount, CountDownLatch closedLatch) {
         Stage detailsStage = new Stage();
         detailsStage.setTitle("Related Accounts");
 
@@ -1773,14 +1880,35 @@ public class UserManagementController implements Controller<SplitPane> {
         progressIndicator.setMaxSize(48, 48);
         Label loadingLabel = new Label("Fetching related accounts...");
         loadingLabel.setStyle("-fx-font-weight: bold;");
+        Label detailsLabel = new Label(String.format("Checking all accounts for [%s] = [%s].", displayAttr, value));
+        detailsLabel.setWrapText(true);
+        Label progressLabel = new Label(String.format(
+                "Still checking. The API has fetched at least %d matching accounts.",
+                fetchedAccountCount.get()));
+        progressLabel.setWrapText(true);
+        Label returnLabel = new Label("Stopping returns to the threshold prompt.");
+        returnLabel.setWrapText(true);
+        Button stopButton = new Button("Stop and go back");
 
-        VBox loadingLayout = new VBox(12, progressIndicator, loadingLabel);
+        VBox loadingLayout = new VBox(12, progressIndicator, loadingLabel, detailsLabel, progressLabel, returnLabel, stopButton);
         loadingLayout.setAlignment(Pos.CENTER);
         loadingLayout.setPadding(new Insets(20));
 
         Scene scene = new Scene(loadingLayout, 700, 400);
         detailsStage.setScene(scene);
         detailsStage.initModality(Modality.APPLICATION_MODAL);
+        AtomicReference<Thread> loaderThread = new AtomicReference<>();
+        long loadTaskStartTime = System.currentTimeMillis();
+        Timeline progressTicker = new Timeline(
+                new KeyFrame(javafx.util.Duration.seconds(1), event -> {
+                    long elapsedSeconds = Math.max(1, loadTaskElapsedSeconds(loadTaskStartTime));
+                    progressLabel.setText(String.format(
+                            "Still checking. The API has fetched at least %d matching accounts. Elapsed: %ds.",
+                            fetchedAccountCount.get(),
+                            elapsedSeconds));
+                })
+        );
+        progressTicker.setCycleCount(Animation.INDEFINITE);
 
         Task<List<PlayerFX>> loadTask = new Task<>() {
             @Override
@@ -1789,27 +1917,57 @@ public class UserManagementController implements Controller<SplitPane> {
             }
         };
 
-        loadTask.setOnSucceeded(event -> showUserDetailsWindowContent(loadTask.getValue(), detailsStage));
+        stopButton.setOnAction(event -> {
+            loadTask.cancel(true);
+            Thread thread = loaderThread.get();
+            if (thread != null) {
+                thread.interrupt();
+            }
+            detailsStage.close();
+        });
+
+        loadTask.setOnSucceeded(event -> {
+            progressTicker.stop();
+            showUserDetailsWindowContent(loadTask.getValue(), detailsStage);
+        });
         loadTask.setOnFailed(event -> {
+            progressTicker.stop();
             Throwable failure = loadTask.getException();
             log.warn("Failed to fetch related accounts", failure);
             Label errorLabel = new Label("Failed to fetch related accounts.");
             errorLabel.setStyle("-fx-font-weight: bold;");
-            Label detailsLabel = new Label(failure == null ? "Unknown error" : failure.getMessage());
-            detailsLabel.setWrapText(true);
+            Label errorDetailsLabel = new Label(failure == null ? "Unknown error" : failure.getMessage());
+            errorDetailsLabel.setWrapText(true);
             Button closeButton = new Button("Close");
             closeButton.setOnAction(e -> detailsStage.close());
-            VBox errorLayout = new VBox(10, errorLabel, detailsLabel, closeButton);
+            VBox errorLayout = new VBox(10, errorLabel, errorDetailsLabel, closeButton);
             errorLayout.setAlignment(Pos.CENTER);
             errorLayout.setPadding(new Insets(20));
             detailsStage.getScene().setRoot(errorLayout);
         });
+        loadTask.setOnCancelled(event -> progressTicker.stop());
 
-        detailsStage.setOnHidden(event -> closedLatch.countDown());
-        Thread loaderThread = new Thread(loadTask, "related-accounts-loader");
-        loaderThread.setDaemon(true);
-        loaderThread.start();
+        detailsStage.setOnHidden(event -> {
+            if (loadTask.isRunning()) {
+                loadTask.cancel(true);
+                Thread activeLoaderThread = loaderThread.get();
+                if (activeLoaderThread != null) {
+                    activeLoaderThread.interrupt();
+                }
+            }
+            progressTicker.stop();
+            closedLatch.countDown();
+        });
+        Thread thread = new Thread(loadTask, "related-accounts-loader");
+        thread.setDaemon(true);
+        loaderThread.set(thread);
+        thread.start();
+        progressTicker.play();
         detailsStage.show();
+    }
+
+    private long loadTaskElapsedSeconds(long startTime) {
+        return (System.currentTimeMillis() - startTime) / 1000;
     }
 
     @SuppressWarnings("unchecked")
@@ -1883,17 +2041,17 @@ public class UserManagementController implements Controller<SplitPane> {
         }
     }
 
-    private Set<String> alreadyCheckedUsers = new HashSet<>();
-    private Set<String> alreadyCheckedUuids = new HashSet<>();
-    private Set<String> alreadyCheckedHashes = new HashSet<>();
-    private Set<String> alreadyCheckedIps = new HashSet<>();
-    private Set<String> alreadyCheckedMemorySerialNumbers = new HashSet<>();
-    private Set<String> alreadyCheckedVolumeSerialNumbers = new HashSet<>();
-    private Set<String> alreadyCheckedSerialNumbers = new HashSet<>();
-    private Set<String> alreadyCheckedProcessorIds = new HashSet<>();
-    private Set<String> alreadyCheckedCpuNames = new HashSet<>();
-    private Set<String> alreadyCheckedBiosVersions = new HashSet<>();
-    private Set<String> alreadyCheckedManufacturers = new HashSet<>();
+    private Set<String> alreadyCheckedUsers = ConcurrentHashMap.newKeySet();
+    private Set<String> alreadyCheckedUuids = ConcurrentHashMap.newKeySet();
+    private Set<String> alreadyCheckedHashes = ConcurrentHashMap.newKeySet();
+    private Set<String> alreadyCheckedIps = ConcurrentHashMap.newKeySet();
+    private Set<String> alreadyCheckedMemorySerialNumbers = ConcurrentHashMap.newKeySet();
+    private Set<String> alreadyCheckedVolumeSerialNumbers = ConcurrentHashMap.newKeySet();
+    private Set<String> alreadyCheckedSerialNumbers = ConcurrentHashMap.newKeySet();
+    private Set<String> alreadyCheckedProcessorIds = ConcurrentHashMap.newKeySet();
+    private Set<String> alreadyCheckedCpuNames = ConcurrentHashMap.newKeySet();
+    private Set<String> alreadyCheckedBiosVersions = ConcurrentHashMap.newKeySet();
+    private Set<String> alreadyCheckedManufacturers = ConcurrentHashMap.newKeySet();
 
     void setStatusWorking() {
         statusLabelSmurfVillageLookup.setStyle("-fx-background-color: orange; -fx-text-fill: black; -fx-background-radius: 1;");
@@ -1907,24 +2065,29 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     public void onSmurfVillageLookup(String playerID) {
+        String lookupOutput = captureLookupOutput(() -> runSingleSmurfLookup(playerID));
+        if (!lookupOutput.isEmpty()) {
+            updateSmurfVillageLogTextArea(lookupOutput);
+        }
+    }
+
+    private void runSingleSmurfLookup(String playerID) {
         if (cancelRequestedByUser) {
-            updateSmurfVillageLogTextArea("\nProcess canceled before starting lookup.\n");
+            updateSmurfVillageLogTextArea("\n[cancelled] Process canceled before starting lookup.\n");
             cancelRequestedByUser = false;
             return;
         }
 
-        if (!smurfLookupSettings.suppressCleanOutput()) {
-            updateSmurfVillageLogTextArea(String.format("\n=== Checking PlayerID: %s ===", playerID));
-        }
+        String checkingHeader = String.format("\n== Checking PlayerID: %s ==", playerID);
+        updateSmurfVillageLogTextArea(checkingHeader);
         Platform.runLater(() -> statusTextFieldProcessingPlayerID.setText(playerID));
 
-        if (alreadyCheckedUsers.contains(playerID)) {
+        if (!alreadyCheckedUsers.add(playerID)) {
             if (!smurfLookupSettings.suppressCleanOutput()) {
-                updateSmurfVillageLogTextArea("\nSkipping, we already have checked that account: " + playerID);
+                updateSmurfVillageLogTextArea("\n[skip] already checked account: " + playerID);
             }
             return;
         }
-        alreadyCheckedUsers.add(playerID);
 
         // Retrieve property mappings
         String propertyId = searchUserPropertyMapping.get("User ID");
@@ -1939,6 +2102,9 @@ public class UserManagementController implements Controller<SplitPane> {
         String propertyManufacturer = searchUserPropertyMapping.get("Manufacturer");
 
         // Fetch player data and extract hardware attributes
+        if (!waitUntilLookupMayContinue(false)) {
+            return;
+        }
         List<PlayerFX> userFoundList = userService.findUsersByAttribute(propertyId, playerID);
         PlayerFX currentPlayer = userFoundList.isEmpty() ? null : userFoundList.getFirst();
 
@@ -2002,7 +2168,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
         for (AttributeSet attr : attributeSets) {
             if (cancelRequestedByUser) {
-                updateSmurfVillageLogTextArea("\nProcess canceled during attribute scanning.\n");
+                updateSmurfVillageLogTextArea("\n[cancelled] Process canceled during attribute scanning.\n");
                 return;
             }
 
@@ -2017,17 +2183,14 @@ public class UserManagementController implements Controller<SplitPane> {
         }
 
         if (cancelRequestedByUser) {
-            updateSmurfVillageLogTextArea("\nProcess canceled before recursion.\n");
+            updateSmurfVillageLogTextArea("\n[cancelled] Process canceled before recursion.\n");
             return;
         }
 
         if (!accountsWithSharedAttributes.isEmpty()) {
-            if (smurfLookupSettings.suppressCleanOutput()) {
-                updateSmurfVillageLogTextArea(String.format("\n=== Checking PlayerID: %s ===", playerID));
-            }
-            updateSmurfVillageLogTextArea("\n  " + playerID + " → related: " + new ArrayList<>(accountsWithSharedAttributes) + "\n");
+            updateSmurfVillageLogTextArea("\n" + playerID + " → related: " + new ArrayList<>(accountsWithSharedAttributes) + "\n");
         } else if (!smurfLookupSettings.suppressCleanOutput()) {
-            updateSmurfVillageLogTextArea("\n  → no related accounts\n");
+            updateSmurfVillageLogTextArea("\n→ no related accounts\n");
         }
 
         if (smurfLookupSettings.catchFirstLayerOnly()) {
@@ -2037,10 +2200,10 @@ public class UserManagementController implements Controller<SplitPane> {
 
         for (String id : accountsWithSharedAttributes) {
             if (cancelRequestedByUser) {
-                updateSmurfVillageLogTextArea("\nProcess canceled during recursive lookup.\n");
+                updateSmurfVillageLogTextArea("\n[cancelled] Process canceled during recursive lookup.\n");
                 return;
             }
-            onSmurfVillageLookup(id);
+            runSingleSmurfLookup(id);
         }
     }
 
@@ -2079,6 +2242,7 @@ public class UserManagementController implements Controller<SplitPane> {
     private void captureSmurfCheckSettings(boolean forceEnableAllSettings) {
         SmurfLookupSettings settings = readSmurfLookupSettingsFromUi();
         smurfLookupSettings = forceEnableAllSettings ? settings.withAllLookupIdentifiersEnabled() : settings;
+        smurfLookupPageParallelism = readBulkSmurfLookupParallelism();
     }
 
     private void resetPreviousStateSmurfVillageLookup() {
@@ -2213,6 +2377,18 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     public void updateSmurfVillageLogTextArea(String... texts) {
+        StringBuilder bufferedOutput = bulkLookupLogBuffer.get();
+        if (bufferedOutput != null) {
+            if (texts != null) {
+                for (String text : texts) {
+                    if (text != null) {
+                        bufferedOutput.append(text);
+                    }
+                }
+            }
+            return;
+        }
+
         Platform.runLater(() -> {
             try {
                 if (texts != null) {
@@ -2228,6 +2404,16 @@ public class UserManagementController implements Controller<SplitPane> {
                 log.error("RuntimeException in updateSmurfVillageLogTextArea: {}", e.getMessage(), e);
             }
         });
+    }
+
+    private String drainBulkLookupLogBuffer() {
+        StringBuilder bufferedOutput = bulkLookupLogBuffer.get();
+        bulkLookupLogBuffer.remove();
+        if (bufferedOutput == null || bufferedOutput.isEmpty()) {
+            return "";
+        }
+
+        return bufferedOutput.toString();
     }
 
     @FXML

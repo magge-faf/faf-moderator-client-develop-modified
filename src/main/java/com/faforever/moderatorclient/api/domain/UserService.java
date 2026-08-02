@@ -25,6 +25,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.function.IntConsumer;
 
 @Service
 @Slf4j
@@ -104,24 +109,110 @@ public class UserService {
     }
 
     public List<PlayerFX> findUsersByAttribute(@NotNull String attribute, @NotNull String pattern, int maxResults) {
+        return findUsersByAttribute(attribute, pattern, maxResults, 1, ignored -> {});
+    }
+
+    public List<PlayerFX> findUsersByAttribute(@NotNull String attribute, @NotNull String pattern, int maxResults, int pageParallelism) {
+        return findUsersByAttribute(attribute, pattern, maxResults, pageParallelism, ignored -> {});
+    }
+
+    public List<PlayerFX> findUsersByAttribute(@NotNull String attribute, @NotNull String pattern, int maxResults,
+                                               int pageParallelism, IntConsumer loadedCountConsumer) {
         if (maxResults <= 0) return Collections.emptyList();
         log.debug("Searching for player by attribute '{}' with pattern: {}", attribute, pattern);
-        ElideNavigatorOnCollection<Player> navigator = ElideNavigator.of(Player.class)
-                .collection()
-                .setFilter(ElideNavigator.qBuilder().string(attribute).eq(pattern));
-        addModeratorIncludes(navigator);
+        ElideNavigatorOnCollection<Player> navigator = createFindUsersByAttributeNavigator(attribute, pattern);
         int firstPageSize = Math.min(environmentProperties.getMaxPageSizeSmurfVillageLookup(), maxResults);
         List<Player> firstPage = fafApi.getFirstPageOnlyForFindUsersByAttribute(Player.class, navigator, firstPageSize);
+        loadedCountConsumer.accept(firstPage.size());
 
         if (firstPage.size() < firstPageSize || firstPage.size() >= maxResults) {
             return playerMapper.mapToFx(firstPage);
         }
 
-        // Otherwise, fetch all pages
-        List<Player> allPlayers = maxResults == Integer.MAX_VALUE
-                ? fafApi.getAll(Player.class, navigator)
-                : fafApi.getMany(Player.class, navigator, maxResults, Collections.emptyMap());
+        List<Player> allPlayers = new ArrayList<>(firstPage);
+        fetchRemainingAttributePages(attribute, pattern, firstPageSize, maxResults, pageParallelism, allPlayers, loadedCountConsumer);
         return playerMapper.mapToFx(allPlayers);
+    }
+
+    private ElideNavigatorOnCollection<Player> createFindUsersByAttributeNavigator(String attribute, String pattern) {
+        ElideNavigatorOnCollection<Player> navigator = ElideNavigator.of(Player.class)
+                .collection()
+                .setFilter(ElideNavigator.qBuilder().string(attribute).eq(pattern));
+        addModeratorIncludes(navigator);
+        return navigator;
+    }
+
+    private void fetchRemainingAttributePages(String attribute, String pattern, int pageSize, int maxResults,
+                                              int pageParallelism, List<Player> allPlayers,
+                                              IntConsumer loadedCountConsumer) {
+        int normalizedParallelism = Math.max(1, pageParallelism);
+        ExecutorService executor = Executors.newFixedThreadPool(normalizedParallelism, runnable -> {
+            Thread thread = new Thread(runnable, "user-attribute-page-loader");
+            thread.setDaemon(true);
+            return thread;
+        });
+
+        try {
+            int nextPage = 2;
+            boolean reachedEnd = false;
+            while (!reachedEnd && allPlayers.size() < maxResults) {
+                int pagesToFetch = normalizedParallelism;
+                if (maxResults != Integer.MAX_VALUE) {
+                    int remainingResults = maxResults - allPlayers.size();
+                    pagesToFetch = Math.max(1, Math.min(normalizedParallelism, (int) Math.ceil(remainingResults / (double) pageSize)));
+                }
+
+                List<Future<List<Player>>> futures = new ArrayList<>();
+                for (int i = 0; i < pagesToFetch; i++) {
+                    int page = nextPage + i;
+                    futures.add(executor.submit(() -> fafApi.getPage(
+                            Player.class,
+                            createFindUsersByAttributeNavigator(attribute, pattern),
+                            pageSize,
+                            page,
+                            Collections.emptyMap())));
+                }
+
+                nextPage += pagesToFetch;
+
+                for (Future<List<Player>> future : futures) {
+                    List<Player> page;
+                    try {
+                        page = future.get();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        reachedEnd = true;
+                        break;
+                    } catch (ExecutionException e) {
+                        log.warn("Failed to fetch additional player page for attribute '{}'", attribute, e.getCause());
+                        reachedEnd = true;
+                        break;
+                    }
+
+                    int remainingCapacity = maxResults == Integer.MAX_VALUE
+                            ? Integer.MAX_VALUE
+                            : maxResults - allPlayers.size();
+                    if (remainingCapacity <= 0) {
+                        reachedEnd = true;
+                        break;
+                    }
+
+                    if (page.size() > remainingCapacity) {
+                        allPlayers.addAll(page.subList(0, remainingCapacity));
+                    } else {
+                        allPlayers.addAll(page);
+                    }
+                    loadedCountConsumer.accept(allPlayers.size());
+
+                    if (page.size() < pageSize) {
+                        reachedEnd = true;
+                        break;
+                    }
+                }
+            }
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     public List<TeamkillFX> findLatestTeamkills() {
