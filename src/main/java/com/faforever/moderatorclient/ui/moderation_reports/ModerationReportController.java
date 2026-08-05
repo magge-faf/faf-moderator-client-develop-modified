@@ -2605,10 +2605,9 @@ public class ModerationReportController implements Controller<Region> {
 
         // Assign one color per player using all strokes for a stable legend
         Map<String, Color> playerColors = new LinkedHashMap<>();
-        int idx = 0;
         for (PaintingBrushStroke s : currentPaintingStrokes) {
-            playerColors.putIfAbsent(s.playerName(),
-                    PAINTING_PLAYER_COLORS[idx++ % PAINTING_PLAYER_COLORS.length]);
+            playerColors.computeIfAbsent(s.playerName(),
+                    name -> PAINTING_PLAYER_COLORS[playerColors.size() % PAINTING_PLAYER_COLORS.length]);
         }
 
         // Draw the visible (filtered) strokes
