@@ -1180,8 +1180,8 @@ public class ModerationReportController implements Controller<Region> {
                 .toList());
 
         HBox content = new HBox(8,
-                createRecentBansPane("Reporter - " + getPlayerRepresentationOrNA(reporter), reporterBans),
-                createRecentBansPane("Offender - " + getOffenderRecentBansTitle(), offenderBans));
+                createRecentBansPane("Reporter", getPlayerRepresentationOrNA(reporter), Color.LIGHTBLUE, reporterBans),
+                createRecentBansPane("Offender", getOffenderRecentBansTitle(), Color.LIGHTCORAL, offenderBans));
         content.setPadding(new Insets(8));
 
         Stage dialog = new Stage();
@@ -1245,13 +1245,26 @@ public class ModerationReportController implements Controller<Region> {
                 .toList());
     }
 
-    private VBox createRecentBansPane(String title, ObservableList<BanInfoFX> bans) {
+    private VBox createRecentBansPane(String prefixLabel, String name, Color color, ObservableList<BanInfoFX> bans) {
         TableView<BanInfoFX> tableView = new TableView<>();
         ViewHelper.buildBanTableView(tableView, bans, true, localPreferences, userService, uiService);
         tableView.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
         configureRecentBansTableColumns(tableView);
 
-        VBox pane = new VBox(6, new Label(title + " (" + bans.size() + " events)"), tableView);
+        Color plainTextColor = localPreferences.getTabSettings().isDarkModeCheckBox() ? Color.LIGHTGRAY : Color.BLACK;
+        Text prefixText = new Text(prefixLabel);
+        prefixText.setFill(color);
+        prefixText.setStyle("-fx-font-weight: bold;");
+        Text nameText = new Text(name);
+        nameText.setFill(color);
+        nameText.setStyle("-fx-font-weight: bold;");
+        TextFlow titleFlow = new TextFlow(
+                prefixText,
+                styledPlainText(" - ", plainTextColor),
+                nameText,
+                styledPlainText(" (" + bans.size() + " events)", plainTextColor));
+
+        VBox pane = new VBox(6, titleFlow, tableView);
         pane.setPrefWidth(730);
         pane.setMinWidth(520);
         pane.setMaxWidth(Double.MAX_VALUE);
@@ -2410,6 +2423,12 @@ public class ModerationReportController implements Controller<Region> {
         if (pos < line.length()) {
             textFlow.getChildren().add(styledText(line.substring(pos), Color.WHITE));
         }
+    }
+
+    private static Text styledPlainText(String content, Color color) {
+        Text t = new Text(content);
+        t.setFill(color);
+        return t;
     }
 
     private static Text styledText(String content, Color color) {
