@@ -290,6 +290,11 @@ public class UserManagementController implements Controller<SplitPane> {
     private final File EXCLUDED_ITEMS_FILE =
             ApplicationPaths.resolveConfigurationDirectory().resolve("excluded_items.json").toFile();
 
+    private static final File AUTO_CONTINUE_THRESHOLD_FILE =
+            ApplicationPaths.resolveConfigurationDirectory().resolve("auto_continue_threshold_values.json").toFile();
+    private static final ObjectMapper AUTO_CONTINUE_OBJECT_MAPPER = new ObjectMapper();
+    private final Set<String> autoContinueThresholdKeys = ConcurrentHashMap.newKeySet();
+
     private final LocalPreferences localPreferences;
 
     @FXML
@@ -297,6 +302,7 @@ public class UserManagementController implements Controller<SplitPane> {
         loadStateCheckBox();
         addListeners();
         loadContent();
+        loadAutoContinueThresholdValues();
         configureSearchHistoryVisibility();
         configureUserNotesVisibility();
         setLastSearchTerm();
@@ -1659,32 +1665,44 @@ public class UserManagementController implements Controller<SplitPane> {
         List<PlayerFX> otherAccounts = findOtherAccounts(foundUsers, currentPlayer);
 
         if (smurfLookupSettings.promptOnThreshold() && otherAccounts.size() > smurfLookupSettings.threshold()) {
-            ThresholdDecision decision = resolveThresholdDecision(value, property, displayAttr, otherAccounts, currentPlayer);
-            switch (decision) {
-                case CANCEL -> {
-                    cancelRequestedByUser = true;
-                    return;
-                }
-                case EXCLUDE -> {
-                    Map<String, Object> newExcluded = new LinkedHashMap<>();
-                    newExcluded.put(property, value);
-                    newExcluded.put("AddedOn", LocalDateTime.now().toString());
-                    newExcluded.put(
-                            "comment",
-                            String.format(
-                                    "Excluded by user prompt: more than %d related accounts found for [%s = %s]",
-                                    smurfLookupSettings.threshold(),
-                                    property,
-                                    value));
-                    excludedItems.add(newExcluded);
-                    excludedHardwareItemsController.saveExcludedItem(newExcluded);
-                    updateSmurfVillageLogTextArea(String.format(
-                            "\n[excluded] [%s] = [%s] (added to exclusion list)", displayAttr, value));
-                    return;
-                }
-                case CONTINUE -> otherAccounts = findOtherAccounts(
+            if (isAutoContinueThreshold(property, value)) {
+                otherAccounts = findOtherAccounts(
                         userService.findUsersByAttribute(property, value, Integer.MAX_VALUE, smurfLookupPageParallelism),
                         currentPlayer);
+            } else {
+                ThresholdDecision decision = resolveThresholdDecision(value, property, displayAttr, otherAccounts, currentPlayer);
+                switch (decision) {
+                    case CANCEL -> {
+                        cancelRequestedByUser = true;
+                        return;
+                    }
+                    case EXCLUDE -> {
+                        Map<String, Object> newExcluded = new LinkedHashMap<>();
+                        newExcluded.put(property, value);
+                        newExcluded.put("AddedOn", LocalDateTime.now().toString());
+                        newExcluded.put(
+                                "comment",
+                                String.format(
+                                        "Excluded by user prompt: more than %d related accounts found for [%s = %s]",
+                                        smurfLookupSettings.threshold(),
+                                        property,
+                                        value));
+                        excludedItems.add(newExcluded);
+                        excludedHardwareItemsController.saveExcludedItem(newExcluded);
+                        updateSmurfVillageLogTextArea(String.format(
+                                "\n[excluded] [%s] = [%s] (added to exclusion list)", displayAttr, value));
+                        return;
+                    }
+                    case CONTINUE -> otherAccounts = findOtherAccounts(
+                            userService.findUsersByAttribute(property, value, Integer.MAX_VALUE, smurfLookupPageParallelism),
+                            currentPlayer);
+                    case CONTINUE_ALWAYS -> {
+                        saveAutoContinueThresholdValue(property, value);
+                        otherAccounts = findOtherAccounts(
+                                userService.findUsersByAttribute(property, value, Integer.MAX_VALUE, smurfLookupPageParallelism),
+                                currentPlayer);
+                    }
+                }
             }
         }
 
@@ -1805,10 +1823,11 @@ public class UserManagementController implements Controller<SplitPane> {
 
                     ButtonType addToExclude = new ButtonType("Add to exclusion list and skip");
                     ButtonType continueBtn = new ButtonType("Continue");
+                    ButtonType continueAlwaysBtn = new ButtonType("Continue & Don't Ask Again");
                     ButtonType showAccountsButton = new ButtonType("Show Related Accounts");
                     ButtonType cancelProcess = new ButtonType("Cancel Process", ButtonBar.ButtonData.CANCEL_CLOSE);
 
-                    alert.getButtonTypes().setAll(addToExclude, continueBtn, showAccountsButton, cancelProcess);
+                    alert.getButtonTypes().setAll(addToExclude, continueBtn, continueAlwaysBtn, showAccountsButton, cancelProcess);
                     Optional<ButtonType> result = alert.showAndWait();
 
                     if (result.isPresent()) {
@@ -1816,6 +1835,8 @@ public class UserManagementController implements Controller<SplitPane> {
                             choice.set(ThresholdDecision.EXCLUDE);
                         } else if (result.get() == continueBtn) {
                             choice.set(ThresholdDecision.CONTINUE);
+                        } else if (result.get() == continueAlwaysBtn) {
+                            choice.set(ThresholdDecision.CONTINUE_ALWAYS);
                         } else if (result.get() == showAccountsButton) {
                             showAccounts.set(true);
                         } else {
@@ -1864,8 +1885,57 @@ public class UserManagementController implements Controller<SplitPane> {
 
     private enum ThresholdDecision {
         CONTINUE,
+        CONTINUE_ALWAYS,
         EXCLUDE,
         CANCEL
+    }
+
+    private static String autoContinueThresholdKey(String property, String value) {
+        return property + " " + value;
+    }
+
+    private boolean isAutoContinueThreshold(String property, String value) {
+        return autoContinueThresholdKeys.contains(autoContinueThresholdKey(property, value));
+    }
+
+    private void loadAutoContinueThresholdValues() {
+        CompletableFuture.runAsync(() -> {
+            try {
+                if (AUTO_CONTINUE_THRESHOLD_FILE.exists() && AUTO_CONTINUE_THRESHOLD_FILE.length() > 0) {
+                    TypeReference<List<Map<String, String>>> typeRef = new TypeReference<>() {};
+                    List<Map<String, String>> entries =
+                            AUTO_CONTINUE_OBJECT_MAPPER.readValue(AUTO_CONTINUE_THRESHOLD_FILE, typeRef);
+                    entries.forEach(entry ->
+                            autoContinueThresholdKeys.add(autoContinueThresholdKey(entry.get("property"), entry.get("value"))));
+                }
+            } catch (IOException e) {
+                log.error("Failed to load auto-continue threshold values", e);
+            }
+        });
+    }
+
+    private void saveAutoContinueThresholdValue(String property, String value) {
+        if (!autoContinueThresholdKeys.add(autoContinueThresholdKey(property, value))) {
+            return;
+        }
+        CompletableFuture.runAsync(() -> {
+            synchronized (AUTO_CONTINUE_THRESHOLD_FILE) {
+                try {
+                    List<Map<String, String>> entries = new ArrayList<>();
+                    for (String key : autoContinueThresholdKeys) {
+                        int separatorIndex = key.indexOf(' ');
+                        Map<String, String> entry = new LinkedHashMap<>();
+                        entry.put("property", key.substring(0, separatorIndex));
+                        entry.put("value", key.substring(separatorIndex + 1));
+                        entries.add(entry);
+                    }
+                    AUTO_CONTINUE_THRESHOLD_FILE.getParentFile().mkdirs();
+                    AUTO_CONTINUE_OBJECT_MAPPER.writeValue(AUTO_CONTINUE_THRESHOLD_FILE, entries);
+                } catch (IOException e) {
+                    log.error("Failed to save auto-continue threshold values", e);
+                }
+            }
+        });
     }
 
     private String formatLookupHeader(String displayAttr, Collection<String> values) {
