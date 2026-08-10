@@ -2500,7 +2500,15 @@ public class UserManagementController implements Controller<SplitPane> {
         return strippedOutput;
     }
 
+    // Upper bound on how many times we'll grow the table while trying to realize every
+    // row - each attempt at least doubles the previous guess, so this covers many orders
+    // of magnitude of under-estimation without risking an infinite loop.
+    private static final int MAX_SNAPSHOT_SIZE_PASSES = 8;
+
     private WritableImage snapshotFullUserSearchTable(int rowCount) {
+        double originalMinWidth = userSearchTableView.getMinWidth();
+        double originalPrefWidth = userSearchTableView.getPrefWidth();
+        double originalMaxWidth = userSearchTableView.getMaxWidth();
         double originalMinHeight = userSearchTableView.getMinHeight();
         double originalPrefHeight = userSearchTableView.getPrefHeight();
         double originalMaxHeight = userSearchTableView.getMaxHeight();
@@ -2508,31 +2516,74 @@ public class UserManagementController implements Controller<SplitPane> {
         double originalHeight = userSearchTableView.getHeight();
         boolean originalManaged = userSearchTableView.isManaged();
 
-        double firstPassHeight = estimateFullUserSearchTableHeight();
+        double fullWidth = estimateFullUserSearchTableWidth();
 
         try {
             userSearchTableView.setManaged(false);
-            resizeUserSearchTableForSnapshot(firstPassHeight);
-            userSearchTableView.applyCss();
-            userSearchTableView.layout();
-
-            double fullHeight = measureUserSearchTableContentHeight(rowCount);
-            resizeUserSearchTableForSnapshot(fullHeight);
-            userSearchTableView.applyCss();
-            userSearchTableView.layout();
+            double contentHeight = growUserSearchTableUntilAllRowsRealized(rowCount, fullWidth);
 
             WritableImage snapshot = userSearchTableView.snapshot(null, null);
-            int croppedHeight = Math.max(1, Math.min((int) Math.ceil(fullHeight), (int) snapshot.getHeight()));
-            return new WritableImage(snapshot.getPixelReader(), 0, 0, (int) snapshot.getWidth(), croppedHeight);
+            int croppedWidth = Math.max(1, Math.min((int) Math.ceil(fullWidth), (int) snapshot.getWidth()));
+            int croppedHeight = Math.max(1, Math.min((int) Math.ceil(contentHeight), (int) snapshot.getHeight()));
+            return new WritableImage(snapshot.getPixelReader(), 0, 0, croppedWidth, croppedHeight);
         } finally {
+            userSearchTableView.setMinWidth(originalMinWidth);
+            userSearchTableView.setPrefWidth(originalPrefWidth);
+            userSearchTableView.setMaxWidth(originalMaxWidth);
             userSearchTableView.setMinHeight(originalMinHeight);
             userSearchTableView.setPrefHeight(originalPrefHeight);
             userSearchTableView.setMaxHeight(originalMaxHeight);
             userSearchTableView.setManaged(originalManaged);
             userSearchTableView.resize(originalWidth, originalHeight);
+            stabilizeUserSearchTableLayout();
+        }
+    }
+
+    /**
+     * Row heights vary a lot (each row can expand to show multiple unique-ID
+     * assignments), so a single heuristic guess at the table's full height can come up
+     * short. A short guess doesn't just misjudge the crop - the virtual flow simply
+     * never realizes rows beyond the guessed viewport, so they're silently missing from
+     * the screenshot entirely. Instead, keep growing the table and re-checking which
+     * rows actually got realized until all of them have, then return the exact content
+     * height measured from their real bounds.
+     */
+    private double growUserSearchTableUntilAllRowsRealized(int rowCount, double fullWidth) {
+        double heightGuess = estimateFullUserSearchTableHeight();
+        for (int attempt = 0; attempt < MAX_SNAPSHOT_SIZE_PASSES; attempt++) {
+            resizeUserSearchTableForSnapshot(fullWidth, heightGuess);
+            stabilizeUserSearchTableLayout();
+
+            Map<Integer, Double> rowHeightsByIndex = collectRealizedUserSearchTableRowHeights(rowCount);
+            if (rowHeightsByIndex.size() >= rowCount) {
+                double rowsHeight = rowHeightsByIndex.values().stream().mapToDouble(Double::doubleValue).sum();
+                return Math.ceil(measureUserSearchTableHeaderHeight() + rowsHeight + 2);
+            }
+            heightGuess = heightGuess * 1.75 + 500;
+        }
+
+        log.warn("Could not realize all {} rows of the user search table for the reference screenshot after {} attempts; the image may be incomplete.",
+                rowCount, MAX_SNAPSHOT_SIZE_PASSES);
+        return heightGuess;
+    }
+
+    private void stabilizeUserSearchTableLayout() {
+        // A single applyCss()/layout() pass isn't enough for every virtualized row to
+        // finish relaying out its cells to the new column widths after a big resize -
+        // trailing rows can still show stale, narrower cell content. Run a couple of
+        // extra passes so all rows converge before the snapshot is taken.
+        for (int i = 0; i < 3; i++) {
             userSearchTableView.applyCss();
             userSearchTableView.layout();
         }
+    }
+
+    private double estimateFullUserSearchTableWidth() {
+        double columnsWidth = userSearchTableView.getColumns().stream()
+                .filter(TableColumnBase::isVisible)
+                .mapToDouble(TableColumnBase::getWidth)
+                .sum();
+        return Math.max(userSearchTableView.getWidth(), columnsWidth + 2);
     }
 
     private double estimateFullUserSearchTableHeight() {
@@ -2542,31 +2593,28 @@ public class UserManagementController implements Controller<SplitPane> {
         return 64 + estimatedRowsHeight;
     }
 
-    private void resizeUserSearchTableForSnapshot(double height) {
+    private void resizeUserSearchTableForSnapshot(double width, double height) {
+        userSearchTableView.setMinWidth(width);
+        userSearchTableView.setPrefWidth(width);
+        userSearchTableView.setMaxWidth(width);
         userSearchTableView.setMinHeight(height);
         userSearchTableView.setPrefHeight(height);
         userSearchTableView.setMaxHeight(height);
-        userSearchTableView.resize(userSearchTableView.getWidth(), height);
+        userSearchTableView.resize(width, height);
     }
 
-    private double measureUserSearchTableContentHeight(int rowCount) {
-        double headerHeight = Optional.ofNullable(userSearchTableView.lookup(".column-header-background"))
+    private double measureUserSearchTableHeaderHeight() {
+        return Optional.ofNullable(userSearchTableView.lookup(".column-header-background"))
                 .map(node -> node.getBoundsInParent().getHeight())
                 .orElse(28.0);
-        double rowsHeight = userSearchTableView.lookupAll(".table-row-cell").stream()
+    }
+
+    private Map<Integer, Double> collectRealizedUserSearchTableRowHeights(int rowCount) {
+        return userSearchTableView.lookupAll(".table-row-cell").stream()
                 .filter(TableRow.class::isInstance)
                 .map(TableRow.class::cast)
                 .filter(row -> !row.isEmpty() && row.getIndex() >= 0 && row.getIndex() < rowCount)
-                .mapToDouble(row -> row.getBoundsInParent().getHeight())
-                .sum();
-        double horizontalScrollHeight = userSearchTableView.lookupAll(".scroll-bar").stream()
-                .filter(Node::isVisible)
-                .filter(node -> "horizontal".equals(node.getProperties().get("orientation"))
-                        || node.getStyleClass().contains("horizontal"))
-                .mapToDouble(node -> node.getBoundsInParent().getHeight())
-                .max()
-                .orElse(0.0);
-        return Math.ceil(headerHeight + rowsHeight + horizontalScrollHeight + 2);
+                .collect(Collectors.toMap(TableRow::getIndex, row -> row.getBoundsInParent().getHeight(), Math::max));
     }
 
     private Timeline loadingAnimation;
