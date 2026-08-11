@@ -2554,8 +2554,8 @@ public class UserManagementController implements Controller<SplitPane> {
         }
 
         ClipboardContent content = new ClipboardContent();
-        content.putString("\n\n```\n" + referenceBody + "\n```");
         content.putImage(snapshotFullUserSearchTable(rowCount));
+        content.putString("\n\n```\n" + referenceBody + "\n```");
         Clipboard.getSystemClipboard().setContent(content);
     }
 
