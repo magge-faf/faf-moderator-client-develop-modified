@@ -1287,6 +1287,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
     public void handleCheckTemporaryBans() {
         smurfOutputTextArea.setText("");
+        clearUserSearchResults();
         checkTemporaryBansButton.setDisable(true);
         checkTemporaryBansButton.setText("Check Temporary Bans (awaiting data...)");
         temporaryBanProgressLabel.setText("Fetching temporary bans...");
