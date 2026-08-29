@@ -1561,6 +1561,9 @@ public class UserManagementController implements Controller<SplitPane> {
             updateSmurfVillageLogTextArea(String.format(
                     "\n[error] fetching users for [%s] batch: %s\n", displayAttr, e.getMessage()));
             return;
+        } catch (RuntimeException e) {
+            if (isUserCancellation(e)) return;
+            throw e;
         }
 
         if (smurfLookupSettings.promptOnThreshold() && users.size() > smurfLookupSettings.threshold()) {
@@ -1661,6 +1664,9 @@ public class UserManagementController implements Controller<SplitPane> {
             updateSmurfVillageLogTextArea(String.format(
                     "\n[error] fetching users for [%s] = [%s]: %s\n", displayAttr, value, e.getMessage()));
             return;
+        } catch (RuntimeException e) {
+            if (isUserCancellation(e)) return;
+            throw e;
         }
 
         List<PlayerFX> otherAccounts = findOtherAccounts(foundUsers, currentPlayer);
@@ -2340,6 +2346,14 @@ public class UserManagementController implements Controller<SplitPane> {
         if (value != null && !value.isBlank()) set.add(value);
     }
 
+    private boolean isUserCancellation(Throwable throwable) {
+        if (!cancelRequestedByUser && !Thread.currentThread().isInterrupted()) return false;
+        for (Throwable cause = throwable; cause != null; cause = cause.getCause()) {
+            if (cause instanceof InterruptedException) return true;
+        }
+        return Thread.currentThread().isInterrupted() || cancelRequestedByUser;
+    }
+
     private void addPlayerDirectlyToTable(PlayerFX player) {
         if (player == null) return;
         Platform.runLater(() -> {
@@ -2462,6 +2476,7 @@ public class UserManagementController implements Controller<SplitPane> {
                     onSmurfVillageLookup(userID);
 
                 } catch (Exception e) {
+                    if (isUserCancellation(e)) return null;
                     Platform.runLater(() ->
                             smurfOutputTextArea.appendText("Error: " + e.getMessage() + "\n")
                     );
@@ -3487,4 +3502,3 @@ public class UserManagementController implements Controller<SplitPane> {
         ViewHelper.saveColumnLayout(permissionsTableView, tab.getPermissionsTableColumnWidths(), tab.getPermissionsTableColumnOrder());
     }
 }
-
