@@ -564,6 +564,7 @@ public class LocalPreferences {
         String smurfOutputTextArea = "";
         String daysToCheckRecentAccountsTextField = "1";
         String bulkSmurfLookupWorkerCountTextField = "4";
+        String desyncCheckGamesCountField = "25";
 
         // CheckBox
         boolean promptUserOnThresholdExceededSmurfVillageLookupCheckBox = true;
@@ -584,6 +585,7 @@ public class LocalPreferences {
         boolean redoLastUserSearchOnStartupCheckBox = false;
         boolean showForumAccountsReferenceButtonCheckBox = true;
         boolean showOpenInNppButtonCheckBox = true;
+        boolean checkReplayDesyncsCheckBox = false;
 
         boolean searchHistoryTexAreaVisibilityState = false;
         boolean userNotesTextAreaVisibilityState = false;

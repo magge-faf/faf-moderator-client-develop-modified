@@ -7,6 +7,9 @@ import com.faforever.commons.api.update.AvatarAssignmentUpdate;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
+import com.faforever.commons.replay.ReplayDataParser;
+import com.faforever.commons.replay.body.Event;
+import com.faforever.moderatorclient.replay.ReplayStorageService;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.AvatarService;
 import com.faforever.moderatorclient.api.domain.PermissionService;
@@ -30,7 +33,6 @@ import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
-import javafx.event.Event;
 import javafx.fxml.FXML;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -68,6 +70,10 @@ import org.springframework.util.Assert;
 import java.io.*;
 import java.lang.reflect.Field;
 import java.net.URLEncoder;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -153,7 +159,11 @@ public class UserManagementController implements Controller<SplitPane> {
             statusTextFieldProcessingItem,
             playerIDField1SharedGamesTextfield,
             playerIDField2SharedGamesTextfield,
-            ratingCheckGamesCountField;
+            ratingCheckGamesCountField,
+            desyncCheckGamesCountField;
+
+    @FXML
+    public CheckBox checkReplayDesyncsCheckBox;
 
     @FXML
     public CheckBox
@@ -190,6 +200,8 @@ public class UserManagementController implements Controller<SplitPane> {
     private final AvatarService avatarService;
     private final PermissionService permissionService;
     private final GamePlayerStatsMapper gamePlayerStatsMapper;
+    private final ReplayStorageService replayStorageService;
+    private final ObjectMapper objectMapper;
 
     private final ObservableList<PlayerFX> users = FXCollections.observableArrayList();
     private final ObservableList<UserNoteFX> userNotes = FXCollections.observableArrayList();
@@ -2979,7 +2991,7 @@ public class UserManagementController implements Controller<SplitPane> {
             } catch (NumberFormatException ignored) {}
         }
         // Create defensive copy and sort by game start time (newest-first) to ensure most recent games are analyzed
-        List<GamePlayerStatsFX> games = allLoaded.stream()
+        List<GamePlayerStatsFX> sortedGames = allLoaded.stream()
                 .sorted((g1, g2) -> {
                     OffsetDateTime t1 = g1.getGame() != null ? g1.getGame().getStartTime() : null;
                     OffsetDateTime t2 = g2.getGame() != null ? g2.getGame().getStartTime() : null;
@@ -2988,8 +3000,10 @@ public class UserManagementController implements Controller<SplitPane> {
                     if (t2 == null) return -1;
                     return t2.compareTo(t1); // Descending order (newest first)
                 })
-                .limit(limit)
                 .toList();
+        List<GamePlayerStatsFX> games = sortedGames.stream().limit(limit).toList();
+        int desyncLimit = parsePositiveLimit(desyncCheckGamesCountField.getText());
+        List<GamePlayerStatsFX> desyncGames = sortedGames.stream().limit(desyncLimit).toList();
 
         List<GamePlayerStatsFX> ratedGames = games.stream()
                 .filter(g -> g.ratingChangeProperty().get() != null)
@@ -3161,7 +3175,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
         // --- Rating History chart tab ---
         // Reverse so index 0 = oldest game (left of chart)
-        List<GamePlayerStatsFX> chronological = new ArrayList<>(games);
+        List<GamePlayerStatsFX> chronological = new ArrayList<>(desyncGames);
         Collections.reverse(chronological);
 
         // Build one series per leaderboard, using epoch-seconds as X so the axis shows real dates.
@@ -3252,18 +3266,6 @@ public class UserManagementController implements Controller<SplitPane> {
         chart.setPrefHeight(440);
         chart.getData().addAll(seriesMap.values());
 
-        // Tooltips: include date + leaderboard + rating
-        for (XYChart.Series<Number, Number> series : seriesMap.values()) {
-            for (XYChart.Data<Number, Number> dp : series.getData()) {
-                String dateLabel = epochToLabel.getOrDefault(dp.getXValue().longValue(), "");
-                String label = (dateLabel.isEmpty() ? "" : dateLabel + "\n")
-                        + series.getName() + ": " + dp.getYValue().intValue();
-                dp.nodeProperty().addListener((obs, oldNode, node) -> {
-                    if (node != null) Tooltip.install(node, new Tooltip(label));
-                });
-            }
-        }
-
         // Drag-select zoom: draw a selection box; on release, zoom to that region.
         // Double-click resets to full view.
         Rectangle selectionRect = new Rectangle(0, 0, 0, 0);
@@ -3333,15 +3335,81 @@ public class UserManagementController implements Controller<SplitPane> {
             }
         });
 
+        Label desyncStatus = new Label(checkReplayDesyncsCheckBox.isSelected()
+                ? "Desync history: checking " + desyncGames.size() + " replay(s), newest first…"
+                : "Desync checking is disabled. Enable it before running the check.");
+        TextArea desyncLog = new TextArea("Detected desyncs will be listed here.");
+        desyncLog.setEditable(false);
+        desyncLog.setWrapText(false);
+        desyncLog.setStyle("-fx-font-family: monospace; -fx-font-size: 12;");
+        VBox desyncContent = new VBox(8, desyncStatus, new Label("Detected desyncs"), desyncLog);
+        VBox.setVgrow(desyncLog, javafx.scene.layout.Priority.ALWAYS);
+
+        if (checkReplayDesyncsCheckBox.isSelected()) CompletableFuture.runAsync(() -> {
+            int desyncCount = 0;
+            int checkedCount = 0;
+            HttpClient httpClient = HttpClient.newBuilder()
+                    .followRedirects(HttpClient.Redirect.NORMAL)
+                    .connectTimeout(java.time.Duration.ofSeconds(15))
+                    .build();
+            for (GamePlayerStatsFX gameStats : desyncGames) {
+                if (gameStats.getGame() == null || gameStats.getGame().getId() == null) continue;
+                Path replayFile = null;
+                    boolean desync = false;
+                try {
+                    String replayUrl = gameStats.getGame().getReplayUrl(replayDownLoadFormat);
+                    if (replayUrl == null || replayUrl.isBlank()) continue;
+                    replayFile = replayStorageService.createTemporaryReplayFile("rating-desync-");
+                    // Count replay downloads in the same rolling request budget shown in the title bar.
+                    FafApiCommunicationService.checkRateLimit();
+                    HttpRequest request = HttpRequest.newBuilder(URI.create(replayUrl))
+                            .timeout(java.time.Duration.ofSeconds(30))
+                            .build();
+                    HttpResponse<Path> response = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(replayFile));
+                    if (response.statusCode() != 200) continue;
+                    try (ReplayStorageService.PreparedReplay prepared = replayStorageService.prepareReplayForParsing(replayFile)) {
+                        ReplayDataParser parser = new ReplayDataParser(prepared.path(), objectMapper);
+                        desync = ReplayAnalysisController
+                                .checkReplayEventsForDesync(parser.getEvents())
+                                .desync();
+                    }
+                    checkedCount++;
+                    if (desync) desyncCount++;
+                    final boolean pointDesync = desync;
+                    final String gameId = String.valueOf(gameStats.getGame().getId());
+                    final OffsetDateTime pointTime = gameStats.getScoreTime() != null ? gameStats.getScoreTime() : gameStats.getGame().getStartTime();
+                    final String gameDate = pointTime == null
+                            ? "Unknown date"
+                            : pointTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+                    if (pointDesync) Platform.runLater(() -> {
+                        if (desyncLog.getText().equals("Detected desyncs will be listed here.")) {
+                            desyncLog.clear();
+                        }
+                        desyncLog.appendText("Game " + gameId + " | " + gameDate + " | Desync detected\n");
+                    });
+                } catch (Exception e) {
+                    log.debug("Could not check replay for game {}", gameStats.getGame().getId(), e);
+                } finally {
+                    if (replayFile != null) try { Files.deleteIfExists(replayFile); } catch (IOException ignored) { }
+                }
+                final int checked = checkedCount, found = desyncCount;
+                Platform.runLater(() -> desyncStatus.setText("Desync history: " + found + " desync(s), " + checked + "/" + desyncGames.size() + " replays checked."));
+            }
+            int finalCheckedCount = checkedCount;
+            Platform.runLater(() -> { if (finalCheckedCount == 0) desyncStatus.setText("Desync history: no replay data could be checked."); });
+        });
+
         // --- Tabbed dialog ---
         Tab analysisTab = new Tab("Analysis", textArea);
         analysisTab.setClosable(false);
         Tab chartTab = new Tab("Rating History", chartContainer);
         chartTab.setClosable(false);
+        Tab desyncTab = new Tab("Desync History", desyncContent);
+        desyncTab.setClosable(false);
         Tab settingsTab = new Tab("Settings", settingsGrid);
         settingsTab.setClosable(false);
 
-        TabPane tabPane = new TabPane(analysisTab, chartTab, settingsTab);
+        TabPane tabPane = new TabPane(analysisTab, chartTab, desyncTab, settingsTab);
 
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.setTitle("Rating Manipulation Analysis — " + playerName);
@@ -3355,6 +3423,15 @@ public class UserManagementController implements Controller<SplitPane> {
 
     private static String formatCheckLine(boolean flagged, String checkName, String value) {
         return String.format("[%-4s]  %-45s %s%n", flagged ? "FLAG" : "OK", checkName, value);
+    }
+
+    private static int parsePositiveLimit(String text) {
+        try {
+            int value = Integer.parseInt(text == null ? "" : text.trim());
+            return value > 0 ? value : Integer.MAX_VALUE;
+        } catch (NumberFormatException ignored) {
+            return Integer.MAX_VALUE;
+        }
     }
 
     private void applyDialogStylesheet(Alert alert) {
