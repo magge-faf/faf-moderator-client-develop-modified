@@ -12,7 +12,9 @@ import com.faforever.commons.replay.ReplayDataParser;
 import com.faforever.commons.replay.ReplayMetadata;
 import com.faforever.commons.replay.GameOption;
 import com.faforever.commons.replay.body.Event;
+import com.faforever.commons.replay.body.EventCommandType;
 import com.faforever.commons.replay.shared.LuaData;
+import com.faforever.commons.map.PreviewGenerator;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.BanService;
 import com.faforever.moderatorclient.api.domain.ModerationReportService;
@@ -23,10 +25,12 @@ import com.faforever.moderatorclient.replay.ReplayStorageService;
 import com.faforever.moderatorclient.ui.*;
 import com.faforever.moderatorclient.ui.domain.BanInfoFX;
 import com.faforever.moderatorclient.ui.domain.GameFX;
+import com.faforever.moderatorclient.ui.domain.MapVersionFX;
 import com.faforever.moderatorclient.ui.domain.ModerationReportFX;
 import com.faforever.moderatorclient.ui.domain.PlayerFX;
 import com.faforever.moderatorclient.config.local.LocalPreferences;
 import javafx.animation.KeyFrame;
+import javafx.animation.Animation;
 import javafx.animation.PauseTransition;
 import javafx.animation.Timeline;
 import javafx.collections.*;
@@ -59,6 +63,8 @@ import javafx.scene.input.ClipboardContent;
 import javafx.scene.input.KeyCode;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.image.Image;
+import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -67,6 +73,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.StrokeLineCap;
 import javafx.scene.shape.StrokeLineJoin;
+import javafx.scene.shape.Circle;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import lombok.AccessLevel;
@@ -81,6 +88,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.awt.datatransfer.StringSelection;
 import java.io.*;
 import java.lang.reflect.Field;
@@ -98,6 +106,7 @@ import java.util.List;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -207,8 +216,31 @@ public class ModerationReportController implements Controller<Region> {
     @FXML
     public Slider paintingTimeSlider;
     @FXML
-    public Label paintingTimeLabel;
+    public TextField replayTimeTextField;
+    @FXML
+    public TextField replayDrawingFadeSecondsTextField;
+    @FXML
+    public TextField replayMarkerFadeSecondsTextField;
+    @FXML
+    public TextField replayPlaybackSpeedTextField;
+    @FXML
+    public Button replayPlayPauseButton;
+    @FXML
+    public Label replayEventDetailLabel;
+    @FXML
+    public ListView<ReplayTimelineEntry> replayTimelineListView;
+    @FXML
+    public VBox replayPlayersLegend;
     private List<PaintingBrushStroke> currentPaintingStrokes = new ArrayList<>();
+    private List<ReplayMapMarker> currentReplayMapMarkers = new ArrayList<>();
+    private List<ReplayTimelineEntry> currentReplayTimeline = new ArrayList<>();
+    private Image replayMapPreview;
+    private Map<String, Color> currentReplayPlayerColors = new LinkedHashMap<>();
+    private Timeline replayPlaybackTimeline;
+    private boolean synchronizingReplayTimelineSelection;
+    private int currentReplayTimelineIndex = -1;
+    private float replayMapWidth;
+    private float replayMapHeight;
     private float paintingMinX, paintingMinZ, paintingMaxX, paintingMaxZ;
     @FXML
     public TextField getModeratorEventsForReplayIdTextField;
@@ -1574,7 +1606,7 @@ public class ModerationReportController implements Controller<Region> {
         showGameResultCheckBox.setSelected(tabReports.isShowGameResultCheckBox());
         showJsonStatsCheckBox.setSelected(tabReports.isShowJsonStatsCheckBox());
         showGameEndedCheckBox.setSelected(tabReports.isShowGameEndedCheckBox());
-        showNotifyChatMessages.setSelected(tabReports.isAutoLoadChatLogCheckBox());
+        showNotifyChatMessages.setSelected(tabReports.isShowNotifyChatMessages());
         autoLoadChatLogCheckBox.setSelected(tabReports.isAutoLoadChatLogCheckBox());
         showFocusArmyFromCheckBox.setSelected(tabReports.isShowFocusArmyFromCheckBox());
         pingOfTypeAlertFilterCheckBox.setSelected(tabReports.isPingOfTypeAlertFilterCheckBox());
@@ -1623,13 +1655,41 @@ public class ModerationReportController implements Controller<Region> {
         });
 
         paintingTimeSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
-            long seconds = newVal.longValue();
-            paintingTimeLabel.setText(formatDurationHMS(seconds));
-            java.time.Duration limit = java.time.Duration.ofSeconds(seconds);
-            List<PaintingBrushStroke> visible = currentPaintingStrokes.stream()
-                    .filter(s -> s.time().compareTo(limit) <= 0)
-                    .collect(Collectors.toList());
-            renderPaintingStrokes(visible);
+            long milliseconds = Math.round(newVal.doubleValue() * 1_000);
+            replayTimeTextField.setText(formatReplayTime(java.time.Duration.ofMillis(milliseconds)));
+            java.time.Duration limit = java.time.Duration.ofMillis(milliseconds);
+            renderReplayMap(visiblePaintingStrokes(limit), limit);
+            synchronizeReplayTimeline(limit);
+        });
+        replayPlaybackTimeline = new Timeline(new KeyFrame(Duration.millis(100), event -> advanceReplayPlayback()));
+        replayPlaybackTimeline.setCycleCount(Timeline.INDEFINITE);
+        replayTimelineListView.setCellFactory(listView -> new ListCell<>() {
+            @Override
+            protected void updateItem(ReplayTimelineEntry entry, boolean empty) {
+                super.updateItem(entry, empty);
+                if (empty || entry == null) {
+                    setText(null);
+                    setGraphic(null);
+                    return;
+                }
+                Label time = new Label(formatReplayTime(entry.time()));
+                time.setMinWidth(54);
+                Label category = new Label(entry.category());
+                category.setMinWidth(110);
+                Label player = new Label(entry.playerName());
+                player.setMinWidth(120);
+                player.setTextFill(currentReplayPlayerColors.getOrDefault(entry.playerName(), Color.WHITE));
+                Label details = new Label(entry.details());
+                details.setWrapText(true);
+                HBox.setHgrow(details, Priority.ALWAYS);
+                setText(null);
+                setGraphic(new HBox(8, time, category, player, details));
+            }
+        });
+        replayTimelineListView.getSelectionModel().selectedItemProperty().addListener((obs, oldEntry, entry) -> {
+            if (entry != null && !synchronizingReplayTimelineSelection) {
+                paintingTimeSlider.setValue(entry.time().toMillis() / 1_000d);
+            }
         });
     }
 
@@ -2002,7 +2062,7 @@ public class ModerationReportController implements Controller<Region> {
                         }
 
                         try {
-                            processAndDisplayReplay(header, tempFilePath, String.valueOf(contentGamingModeratorTask));
+                            processAndDisplayReplay(header, tempFilePath, String.valueOf(contentGamingModeratorTask), game);
                         } catch (Exception e) {
                             log.error("An error occurred while processing and displaying the replay", e);
                         }
@@ -2195,7 +2255,7 @@ public class ModerationReportController implements Controller<Region> {
     @Getter
     private static Map<Integer, PlayerInfo> playerInfoMap;
 
-    private void processAndDisplayReplay(String header, Path tempFilePath, String promptAI) {
+    private void processAndDisplayReplay(String header, Path tempFilePath, String promptAI, GameFX game) {
         try {
             try (ReplayStorageService.PreparedReplay preparedReplay = replayStorageService.prepareReplayForParsing(tempFilePath)) {
                 ReplayDataParser replayDataParser = new ReplayDataParser(preparedReplay.path(), objectMapper);
@@ -2224,25 +2284,54 @@ public class ModerationReportController implements Controller<Region> {
                 showModeratorEvent(moderatorEvents, playerInfoMap);
 
                 List<PaintingBrushStroke> paintingStrokes = extractPaintingStrokes(replayDataParser);
+                ReplayTimelineData replayTimelineData = extractReplayTimeline(replayDataParser);
+                ReplayMapPreview mapPreview = loadMapPreview(game, replayDataParser);
                 Platform.runLater(() -> {
                     currentPaintingStrokes = paintingStrokes;
-                    paintingMinX = Float.MAX_VALUE; paintingMaxX = -Float.MAX_VALUE;
-                    paintingMinZ = Float.MAX_VALUE; paintingMaxZ = -Float.MAX_VALUE;
-                    for (PaintingBrushStroke s : paintingStrokes) {
-                        for (float[] pt : s.points()) {
-                            if (pt[0] < paintingMinX) paintingMinX = pt[0];
-                            if (pt[0] > paintingMaxX) paintingMaxX = pt[0];
-                            if (pt[1] < paintingMinZ) paintingMinZ = pt[1];
-                            if (pt[1] > paintingMaxZ) paintingMaxZ = pt[1];
+                    currentReplayMapMarkers = replayTimelineData.mapMarkers();
+                    currentReplayTimeline = replayTimelineData.timelineEntries();
+                    stopReplayPlayback();
+                    currentReplayPlayerColors = extractReplayPlayerColors(replayDataParser);
+                    replayMapPreview = mapPreview.image();
+                    replayMapWidth = mapPreview.width();
+                    replayMapHeight = mapPreview.height();
+                    renderReplayPlayerLegend(extractReplayPlayers(replayDataParser, replayTimelineData.mapMarkers(),
+                            currentReplayPlayerColors));
+                    if (replayMapWidth > 0 && replayMapHeight > 0) {
+                        paintingMinX = 0;
+                        paintingMaxX = replayMapWidth;
+                        paintingMinZ = 0;
+                        paintingMaxZ = replayMapHeight;
+                    } else {
+                        paintingMinX = Float.MAX_VALUE; paintingMaxX = -Float.MAX_VALUE;
+                        paintingMinZ = Float.MAX_VALUE; paintingMaxZ = -Float.MAX_VALUE;
+                        for (PaintingBrushStroke s : paintingStrokes) {
+                            for (float[] pt : s.points()) {
+                                if (pt[0] < paintingMinX) paintingMinX = pt[0];
+                                if (pt[0] > paintingMaxX) paintingMaxX = pt[0];
+                                if (pt[1] < paintingMinZ) paintingMinZ = pt[1];
+                                if (pt[1] > paintingMaxZ) paintingMaxZ = pt[1];
+                            }
+                        }
+                        for (ReplayMapMarker marker : currentReplayMapMarkers) {
+                            paintingMinX = Math.min(paintingMinX, marker.x());
+                            paintingMaxX = Math.max(paintingMaxX, marker.x());
+                            paintingMinZ = Math.min(paintingMinZ, marker.z());
+                            paintingMaxZ = Math.max(paintingMaxZ, marker.z());
                         }
                     }
-                    long maxSec = paintingStrokes.isEmpty() ? 0
-                            : paintingStrokes.stream().mapToLong(s -> s.time().getSeconds()).max().orElse(0);
+                    long maxSec = Math.max(
+                            currentReplayTimeline.stream().mapToLong(entry -> entry.time().getSeconds()).max().orElse(0),
+                            Math.max(
+                                    paintingStrokes.stream().mapToLong(stroke -> stroke.time().getSeconds()).max().orElse(0),
+                                    currentReplayMapMarkers.stream().mapToLong(marker -> marker.time().getSeconds()).max().orElse(0)
+                            )
+                    );
                     paintingTimeSlider.setMin(0);
                     paintingTimeSlider.setMax(Math.max(maxSec, 1));
-                    paintingTimeSlider.setValue(maxSec);
-                    paintingTimeLabel.setText(formatDurationHMS(maxSec));
-                    renderPaintingStrokes(paintingStrokes);
+                    paintingTimeSlider.setValue(0);
+                    renderReplayMap(visiblePaintingStrokes(java.time.Duration.ZERO), java.time.Duration.ZERO);
+                    renderReplayTimeline();
                 });
 
                 chatLogFiltered.append("\n").append(promptAI);
@@ -2534,6 +2623,26 @@ public class ModerationReportController implements Controller<Region> {
     private record PaintingBrushStroke(
             java.time.Duration time, String playerName, String adapterIdentifier, int shareId, List<float[]> points) {}
 
+    private enum ReplayMapMarkerType { START_POSITION, ATTACK_ORDER, PING }
+
+    private record ReplayMapMarker(java.time.Duration time, ReplayMapMarkerType type, String playerName, float x, float z,
+                                   String label) {}
+
+    private record ReplayTimelineEntry(java.time.Duration time, String category, String playerName, String details,
+                                       ReplayMapMarker mapMarker) {}
+
+    private record ReplayPlayerEntry(String name, boolean startRecorded, Color color, String team) {}
+
+    private record ReplayTimelineData(List<ReplayMapMarker> mapMarkers, List<ReplayTimelineEntry> timelineEntries) {}
+
+    private record ReplayMapPreview(Image image, float width, float height) {
+        private static ReplayMapPreview unavailable() {
+            return new ReplayMapPreview(null, 0, 0);
+        }
+    }
+
+    private record MapDimensions(float width, float height) {}
+
     private static final Color[] PAINTING_PLAYER_COLORS = {
         Color.CORNFLOWERBLUE, Color.TOMATO,       Color.LIMEGREEN,    Color.GOLD,
         Color.ORANGE,         Color.MEDIUMPURPLE,  Color.CYAN,         Color.HOTPINK,
@@ -2595,6 +2704,434 @@ public class ModerationReportController implements Controller<Region> {
         return strokes;
     }
 
+    private ReplayTimelineData extractReplayTimeline(ReplayDataParser parser) {
+        int tick = 0;
+        int commandSource = -1;
+        Map<Integer, Map<String, Object>> armies = parser.getArmies();
+        Set<Integer> commanderStartRecorded = new HashSet<>();
+        List<ReplayMapMarker> mapMarkers = new ArrayList<>();
+        List<ReplayTimelineEntry> timelineEntries = new ArrayList<>();
+
+        for (Event event : parser.getEvents()) {
+            if (event instanceof Event.Advance advance) {
+                tick += advance.ticksToAdvance();
+                continue;
+            }
+            if (event instanceof Event.SetCommandSource source) {
+                commandSource = source.playerIndex();
+                continue;
+            }
+
+            java.time.Duration time = java.time.Duration.ofSeconds(tick / 10L);
+            String playerName = playerNameForArmy(armies, commandSource);
+            if (event instanceof Event.CommandSourceTerminated) {
+                timelineEntries.add(new ReplayTimelineEntry(time, "Player left", playerName, "Command source terminated", null));
+            } else if (event instanceof Event.CreateUnit createdUnit
+                    && createdUnit.playerIndex() >= 0
+                    && time.compareTo(java.time.Duration.ofMinutes(1)) <= 0
+                    && commanderStartRecorded.add(createdUnit.playerIndex())) {
+                String commanderPlayer = playerNameForArmy(armies, createdUnit.playerIndex());
+                mapMarkers.add(new ReplayMapMarker(time, ReplayMapMarkerType.START_POSITION, commanderPlayer,
+                        createdUnit.px(), createdUnit.pz(), "Start position — " + commanderPlayer));
+                timelineEntries.add(new ReplayTimelineEntry(time, "Start position", commanderPlayer,
+                        "Initial unit created: " + createdUnit.blueprintId(), mapMarkers.getLast()));
+            } else if (event instanceof Event.IssueCommand issueCommand
+                    && isAttackCommand(issueCommand.commandData().commandType())
+                    && issueCommand.commandData().commandTarget() instanceof Event.CommandTarget.Position target) {
+                mapMarkers.add(new ReplayMapMarker(time, ReplayMapMarkerType.ATTACK_ORDER, playerName,
+                        target.px(), target.pz(), "Attack order — " + playerName));
+                timelineEntries.add(new ReplayTimelineEntry(time, "Attack order", playerName,
+                        "Attack target marked on map", mapMarkers.getLast()));
+            } else if (event instanceof Event.LuaSimCallback callback
+                    && "SpawnPing".equals(callback.func())
+                    && callback.parametersLua() instanceof LuaData.Table parameters) {
+                ReplayMapMarker pingMarker = extractPingMarker(time, playerName, parameters);
+                if (pingMarker != null) {
+                    mapMarkers.add(pingMarker);
+                    timelineEntries.add(new ReplayTimelineEntry(time,
+                            parameters.getBool("Marker") == Boolean.TRUE ? "Text marker" : "Ping",
+                            playerName, pingMarker.label(), pingMarker));
+                }
+            }
+        }
+
+        for (ModeratorEvent event : parser.getModeratorEvents()) {
+            if (isMapPingEvent(event.message())) {
+                continue;
+            }
+            String category = event.message().contains("Created a ping of type 'Attack'") ? "Attack ping"
+                    : event.message().contains("Created a marker with the text") ? "Text marker"
+                    : "Moderator event";
+            timelineEntries.add(new ReplayTimelineEntry(event.time(), category,
+                    event.playerNameFromCommandSource() == null ? "Unknown" : event.playerNameFromCommandSource(),
+                    event.message(), null));
+        }
+        for (ChatMessage message : parser.getChatMessages()) {
+            if (isDuplicateTextMarkerChatMessage(message, parser.getModeratorEvents())) {
+                continue;
+            }
+            if (!localPreferences.getTabReports().isShowNotifyChatMessages()
+                    && isNotifyChatMessage(message.getMessage())) {
+                continue;
+            }
+            timelineEntries.add(new ReplayTimelineEntry(message.getTime(), "Chat", message.getSender(), message.getMessage(), null));
+        }
+
+        timelineEntries.sort(Comparator.comparing(ReplayTimelineEntry::time));
+        return new ReplayTimelineData(mapMarkers, timelineEntries);
+    }
+
+    private static boolean isAttackCommand(EventCommandType commandType) {
+        return commandType == EventCommandType.ATTACK || commandType == EventCommandType.FORM_ATTACK;
+    }
+
+    private static boolean isCommanderBlueprint(String blueprintId) {
+        if (blueprintId == null) return false;
+        String normalized = blueprintId.toLowerCase(Locale.ROOT);
+        return normalized.contains("uel0001") || normalized.contains("ual0001") || normalized.contains("url0001")
+                || normalized.contains("xsl0001") || normalized.contains("xnl0001");
+    }
+
+    private static boolean isDuplicateTextMarkerChatMessage(ChatMessage chatMessage, List<ModeratorEvent> moderatorEvents) {
+        return moderatorEvents.stream()
+                .filter(event -> event.message() != null && event.message().contains("Created a marker with the text"))
+                .filter(event -> event.time().equals(chatMessage.getTime()))
+                .anyMatch(event -> event.playerNameFromCommandSource() == null
+                        || chatMessage.getSender() == null
+                        || event.playerNameFromCommandSource().equalsIgnoreCase(chatMessage.getSender()));
+    }
+
+    private ReplayMapMarker extractPingMarker(java.time.Duration time, String playerName, LuaData.Table parameters) {
+        LuaData.Table location = parameters.getTable("Location");
+        if (location == null) {
+            return null;
+        }
+        Float x = floatByLuaIndex(location, 1);
+        Float z = floatByLuaIndex(location, 3);
+        if (x == null || z == null) {
+            return null;
+        }
+        boolean textMarker = parameters.getBool("Marker") == Boolean.TRUE;
+        String type = textMarker ? parameters.getString("Name") : parameters.getString("Type");
+        String label = (textMarker ? "Text marker" : "Ping") + (type == null ? "" : ": " + type)
+                + " — " + playerName;
+        return new ReplayMapMarker(time, ReplayMapMarkerType.PING, playerName, x, z, label);
+    }
+
+    private static boolean isMapPingEvent(String message) {
+        return message != null && (message.contains("Created a ping of type")
+                || message.contains("Created a marker with the text"));
+    }
+
+    private static List<ReplayPlayerEntry> extractReplayPlayers(ReplayDataParser parser, List<ReplayMapMarker> markers,
+                                                                 Map<String, Color> playerColors) {
+        Set<String> playersWithRecordedStart = markers.stream()
+                .filter(marker -> marker.type() == ReplayMapMarkerType.START_POSITION)
+                .map(ReplayMapMarker::playerName)
+                .collect(Collectors.toSet());
+        return parser.getArmies().values().stream()
+                .filter(army -> army.get("PlayerName") instanceof String player && !"civilian".equalsIgnoreCase(player))
+                .sorted(Comparator.comparing(ModerationReportController::teamForArmy)
+                        .thenComparing(army -> (String) army.get("PlayerName"), String.CASE_INSENSITIVE_ORDER))
+                .map(army -> {
+                    String player = (String) army.get("PlayerName");
+                    return new ReplayPlayerEntry(player, playersWithRecordedStart.contains(player),
+                            playerColors.getOrDefault(player, Color.WHITE), teamForArmy(army));
+                })
+                .collect(Collectors.toList());
+    }
+
+    private static String teamForArmy(Map<String, Object> army) {
+        Object team = army.get("Team");
+        if (team instanceof Number number && number.intValue() >= 0) {
+            return "Team " + number.intValue();
+        }
+        if (team instanceof String name && !name.isBlank()) {
+            return name;
+        }
+        return "Spectator";
+    }
+
+    private static Map<String, Color> extractReplayPlayerColors(ReplayDataParser parser) {
+        Map<String, Color> colors = new LinkedHashMap<>();
+        parser.getArmies().values().stream()
+                .map(army -> army.get("PlayerName"))
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .forEach(player -> colors.computeIfAbsent(player,
+                        ignored -> PAINTING_PLAYER_COLORS[colors.size() % PAINTING_PLAYER_COLORS.length]));
+        return colors;
+    }
+
+    private void renderReplayPlayerLegend(List<ReplayPlayerEntry> players) {
+        List<javafx.scene.Node> legendRows = new ArrayList<>();
+        players.stream().collect(Collectors.groupingBy(ReplayPlayerEntry::team, LinkedHashMap::new, Collectors.toList()))
+                .forEach((team, teammates) -> {
+                    Label teamLabel = new Label(team);
+                    teamLabel.setStyle("-fx-font-weight: bold;");
+                    legendRows.add(teamLabel);
+                    teammates.forEach(player -> {
+                        Circle color = new Circle(6, player.color());
+                        Label text = new Label(player.name() + (player.startRecorded() ? " — start position recorded" : ""));
+                        text.setWrapText(true);
+                        text.setMaxWidth(Double.MAX_VALUE);
+                        HBox row = new HBox(7, color, text);
+                        HBox.setHgrow(text, Priority.ALWAYS);
+                        legendRows.add(row);
+                    });
+                });
+        replayPlayersLegend.getChildren().setAll(legendRows);
+    }
+
+    private ReplayMapPreview loadMapPreview(GameFX game, ReplayDataParser replayDataParser) {
+        MapVersionFX mapVersion = game == null ? null : game.getMapVersion();
+        if (mapVersion != null && mapVersion.getThumbnailUrlLarge() != null) {
+            Image preview = new Image(mapVersion.getThumbnailUrlLarge().toExternalForm(), true);
+            preview.progressProperty().addListener((observable, oldProgress, progress) -> {
+                if (progress.doubleValue() >= 1 && !preview.isError()) {
+                    Platform.runLater(() -> {
+                        java.time.Duration currentTime = java.time.Duration.ofMillis(
+                                Math.round(paintingTimeSlider.getValue() * 1_000));
+                        renderReplayMap(visiblePaintingStrokes(currentTime), currentTime);
+                    });
+                }
+            });
+            return new ReplayMapPreview(preview, mapVersion.getWidth(), mapVersion.getHeight());
+        }
+
+        Optional<Path> installedMapDirectory = resolveInstalledReplayMapDirectory(replayDataParser.getMap());
+        if (installedMapDirectory.isPresent()) {
+            return loadInstalledMapPreview(installedMapDirectory.get(), replayDataParser.getMap());
+        }
+        return generateNeroxisMapPreview(replayDataParser.getMap()).orElseGet(() -> {
+            log.info("No local map directory or generator preview available for replay map '{}'", replayDataParser.getMap());
+            return ReplayMapPreview.unavailable();
+        });
+    }
+
+    private ReplayMapPreview loadInstalledMapPreview(Path installedMapDirectory, String replayMap) {
+        try {
+            MapDimensions dimensions = readMapDimensions(installedMapDirectory);
+            Optional<Path> existingPreview = findInstalledMapPreview(installedMapDirectory);
+            if (existingPreview.isPresent()) {
+                return new ReplayMapPreview(new Image(existingPreview.get().toUri().toString(), false),
+                        dimensions.width(), dimensions.height());
+            }
+            BufferedImage preview = PreviewGenerator.generatePreview(installedMapDirectory, 1024, 1024);
+            return new ReplayMapPreview(SwingFXUtils.toFXImage(preview, null), dimensions.width(), dimensions.height());
+        } catch (IOException | RuntimeException e) {
+            log.warn("Could not render installed replay map '{}' from {}", replayMap, installedMapDirectory, e);
+            return ReplayMapPreview.unavailable();
+        }
+    }
+
+    private Optional<ReplayMapPreview> generateNeroxisMapPreview(String replayMap) {
+        Optional<String> mapName = generatedMapName(replayMap);
+        if (mapName.isEmpty()) {
+            return Optional.empty();
+        }
+        Optional<Path> generatorJar = resolveNeroxisGeneratorJar(mapName.get());
+        Optional<Path> javaExecutable = resolveFafJavaExecutable();
+        if (generatorJar.isEmpty() || javaExecutable.isEmpty()) {
+            log.warn("Cannot generate replay map '{}': FAF generator or its Java runtime is unavailable", mapName.get());
+            return Optional.empty();
+        }
+
+        Path cacheDirectory = ApplicationPaths.resolveConfigurationDirectory().resolve("generated-map-previews");
+        Path cachedPreview = cacheDirectory.resolve(mapName.get() + "_preview.png");
+        Path cachedDimensions = cacheDirectory.resolve(mapName.get() + ".dimensions");
+        try {
+            Files.createDirectories(cacheDirectory);
+            if (Files.isRegularFile(cachedPreview) && Files.isRegularFile(cachedDimensions)) {
+                MapDimensions dimensions = readCachedMapDimensions(cachedDimensions);
+                return Optional.of(new ReplayMapPreview(new Image(cachedPreview.toUri().toString(), false),
+                        dimensions.width(), dimensions.height()));
+            }
+
+            Path generationDirectory = Files.createTempDirectory(cacheDirectory, "neroxis-");
+            try {
+                Process process = new ProcessBuilder(javaExecutable.get().toString(), "-jar", generatorJar.get().toString(),
+                        "--map-name", mapName.get(), "--out-path", generationDirectory.toString())
+                        .redirectErrorStream(true)
+                        .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                        .start();
+                if (!process.waitFor(2, TimeUnit.MINUTES)) {
+                    process.destroyForcibly();
+                    log.warn("Timed out generating replay map '{}'", mapName.get());
+                    return Optional.empty();
+                }
+                if (process.exitValue() != 0) {
+                    log.warn("Map generator exited with {} for replay map '{}'", process.exitValue(), mapName.get());
+                    return Optional.empty();
+                }
+
+                Path generatedMapDirectory = generationDirectory.resolve(mapName.get());
+                Path generatedPreview = findInstalledMapPreview(generatedMapDirectory)
+                        .orElseThrow(() -> new FileNotFoundException("Generated map preview is missing"));
+                MapDimensions dimensions = readMapDimensions(generatedMapDirectory);
+                Files.copy(generatedPreview, cachedPreview, StandardCopyOption.REPLACE_EXISTING);
+                Files.writeString(cachedDimensions, dimensions.width() + "," + dimensions.height(), StandardCharsets.UTF_8);
+                return Optional.of(new ReplayMapPreview(new Image(cachedPreview.toUri().toString(), false),
+                        dimensions.width(), dimensions.height()));
+            } finally {
+                deleteGeneratedMapDirectory(generationDirectory);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Could not generate preview for replay map '{}'", mapName.get(), e);
+            return Optional.empty();
+        } catch (IOException e) {
+            log.warn("Could not generate preview for replay map '{}'", mapName.get(), e);
+            return Optional.empty();
+        }
+    }
+
+    private Optional<String> generatedMapName(String replayMap) {
+        if (replayMap == null) {
+            return Optional.empty();
+        }
+        Matcher matcher = Pattern.compile("(?i)/maps/(neroxis_map_generator_[^/]+)/").matcher(replayMap.replace('\\', '/'));
+        return matcher.find() ? Optional.of(matcher.group(1)) : Optional.empty();
+    }
+
+    private Optional<Path> resolveNeroxisGeneratorJar(String mapName) {
+        String[] segments = mapName.split("_");
+        if (segments.length < 4) {
+            return Optional.empty();
+        }
+        String programData = System.getenv("ProgramData");
+        if (programData == null || programData.isBlank()) {
+            return Optional.empty();
+        }
+        Path generator = Path.of(programData, "FAForever", "map_generator", "MapGenerator_" + segments[3] + ".jar");
+        return Files.isRegularFile(generator) ? Optional.of(generator) : Optional.empty();
+    }
+
+    private Optional<Path> resolveFafJavaExecutable() {
+        String programFiles = System.getenv("ProgramFiles");
+        if (programFiles == null || programFiles.isBlank()) {
+            return Optional.empty();
+        }
+        Path javaExecutable = Path.of(programFiles, "FAF Client", "jre", "bin", "java.exe");
+        return Files.isRegularFile(javaExecutable) ? Optional.of(javaExecutable) : Optional.empty();
+    }
+
+    private MapDimensions readCachedMapDimensions(Path dimensionsFile) throws IOException {
+        String[] values = Files.readString(dimensionsFile, StandardCharsets.UTF_8).split(",");
+        if (values.length != 2) {
+            throw new IOException("Invalid cached map dimensions");
+        }
+        return new MapDimensions(Float.parseFloat(values[0]), Float.parseFloat(values[1]));
+    }
+
+    private void deleteGeneratedMapDirectory(Path generationDirectory) {
+        try (var paths = Files.walk(generationDirectory)) {
+            paths.sorted(Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException e) {
+                    log.debug("Could not remove temporary map-generation file {}", path, e);
+                }
+            });
+        } catch (IOException e) {
+            log.debug("Could not remove temporary map-generation directory {}", generationDirectory, e);
+        }
+    }
+
+    private Optional<Path> resolveInstalledReplayMapDirectory(String replayMap) {
+        if (replayMap == null || replayMap.isBlank()) {
+            return Optional.empty();
+        }
+        String normalizedMap = replayMap.replace('\\', '/').toLowerCase(Locale.ROOT);
+        List<String> pathParts = Arrays.stream(normalizedMap.split("/"))
+                .filter(part -> !part.isBlank() && !part.endsWith(".scmap"))
+                .toList();
+        for (Path mapsDirectory : localFafMapsDirectories()) {
+            for (String pathPart : pathParts) {
+                Path candidate = mapsDirectory.resolve(pathPart);
+                if (containsScmap(candidate)) {
+                    return Optional.of(candidate);
+                }
+            }
+            try (var directories = Files.list(mapsDirectory)) {
+                Optional<Path> matchingDirectory = directories
+                        .filter(Files::isDirectory)
+                        .filter(directory -> normalizedMap.contains("/" + directory.getFileName().toString().toLowerCase(Locale.ROOT) + "/"))
+                        .filter(this::containsScmap)
+                        .findFirst();
+                if (matchingDirectory.isPresent()) {
+                    return matchingDirectory;
+                }
+            } catch (IOException e) {
+                log.debug("Could not inspect FAF maps directory {}", mapsDirectory, e);
+            }
+        }
+        return Optional.empty();
+    }
+
+    private List<Path> localFafMapsDirectories() {
+        List<Path> directories = new ArrayList<>();
+        String oneDrive = System.getenv("OneDrive");
+        if (oneDrive != null && !oneDrive.isBlank()) {
+            directories.add(Path.of(oneDrive, "Documents", "My Games", "Gas Powered Games",
+                    "Supreme Commander Forged Alliance", "maps"));
+        }
+        directories.add(Path.of(System.getProperty("user.home"), "Documents", "My Games", "Gas Powered Games",
+                "Supreme Commander Forged Alliance", "maps"));
+        return directories.stream().filter(Files::isDirectory).distinct().toList();
+    }
+
+    private boolean containsScmap(Path directory) {
+        if (!Files.isDirectory(directory)) {
+            return false;
+        }
+        try (var files = Files.list(directory)) {
+            return files.anyMatch(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".scmap"));
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private Optional<Path> findInstalledMapPreview(Path mapDirectory) throws IOException {
+        try (var files = Files.list(mapDirectory)) {
+            return files
+                    .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith("_preview.png"))
+                    .findFirst();
+        }
+    }
+
+    private MapDimensions readMapDimensions(Path mapDirectory) throws IOException {
+        Path scmapFile;
+        try (var files = Files.list(mapDirectory)) {
+            scmapFile = files
+                    .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".scmap"))
+                    .findFirst()
+                    .orElseThrow(() -> new FileNotFoundException("No .scmap file in " + mapDirectory));
+        }
+        try (DataInputStream input = new DataInputStream(Files.newInputStream(scmapFile))) {
+            input.skipNBytes(16);
+            float width = Float.intBitsToFloat(Integer.reverseBytes(input.readInt()));
+            float height = Float.intBitsToFloat(Integer.reverseBytes(input.readInt()));
+            return new MapDimensions(width, height);
+        }
+    }
+
+    private static String playerNameForArmy(Map<Integer, Map<String, Object>> armies, int armyIndex) {
+        Map<String, Object> army = armies.get(armyIndex);
+        if (army != null && army.get("PlayerName") instanceof String playerName) {
+            return playerName;
+        }
+        return armies.values().stream()
+                .filter(candidate -> candidate.get("ArmyIndex") instanceof Number index
+                        && (index.intValue() == armyIndex || index.intValue() - 1 == armyIndex))
+                .map(candidate -> candidate.get("PlayerName"))
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
+                .findFirst()
+                .orElse("Unknown");
+    }
+
     /** LoadUtils stores numeric Lua keys as String.valueOf(float), e.g. "1.0", "2.0". */
     private Float floatByLuaIndex(LuaData.Table table, int index) {
         Float v = table.getFloat(String.valueOf((float) index));
@@ -2602,18 +3139,28 @@ public class ModerationReportController implements Controller<Region> {
         return table.getFloat(String.valueOf(index));
     }
 
-    private void renderPaintingStrokes(List<PaintingBrushStroke> strokes) {
+    private void renderReplayMap(List<PaintingBrushStroke> strokes, java.time.Duration limit) {
         GraphicsContext gc = paintingCanvas.getGraphicsContext2D();
         double w = paintingCanvas.getWidth();
         double h = paintingCanvas.getHeight();
 
-        gc.setFill(Color.rgb(28, 33, 38));
-        gc.fillRect(0, 0, w, h);
+        if (replayMapPreview != null && !replayMapPreview.isError() && replayMapPreview.getProgress() >= 1) {
+            gc.drawImage(replayMapPreview, 0, 0, w, h);
+        } else {
+            gc.setFill(Color.rgb(42, 48, 54));
+            gc.fillRect(0, 0, w, h);
+            gc.setFill(Color.LIGHTGRAY);
+            gc.setFont(javafx.scene.text.Font.font(15));
+            gc.fillText("Map preview unavailable", 24, h / 2 - 10);
+            gc.setFont(javafx.scene.text.Font.font(12));
+            gc.fillText("The map is not installed locally, so its exact generated terrain cannot be rendered.",
+                    24, h / 2 + 14);
+        }
 
-        if (currentPaintingStrokes.isEmpty()) {
+        if (currentPaintingStrokes.isEmpty() && currentReplayMapMarkers.isEmpty()) {
             gc.setFill(Color.GRAY);
             gc.setFont(javafx.scene.text.Font.font(14));
-            gc.fillText("No painting strokes found in this replay.", 20, h / 2);
+            gc.fillText("No replay map coordinates found in this replay.", 20, h / 2);
             return;
         }
 
@@ -2623,9 +3170,13 @@ public class ModerationReportController implements Controller<Region> {
         double scale = (Math.min(w, h) - 2 * padding) / range;
 
         // Assign one color per player using all strokes for a stable legend
-        Map<String, Color> playerColors = new LinkedHashMap<>();
+        Map<String, Color> playerColors = new LinkedHashMap<>(currentReplayPlayerColors);
         for (PaintingBrushStroke s : currentPaintingStrokes) {
             playerColors.computeIfAbsent(s.playerName(),
+                    name -> PAINTING_PLAYER_COLORS[playerColors.size() % PAINTING_PLAYER_COLORS.length]);
+        }
+        for (ReplayMapMarker marker : currentReplayMapMarkers) {
+            playerColors.computeIfAbsent(marker.playerName(),
                     name -> PAINTING_PLAYER_COLORS[playerColors.size() % PAINTING_PLAYER_COLORS.length]);
         }
 
@@ -2655,15 +3206,157 @@ public class ModerationReportController implements Controller<Region> {
             gc.stroke();
         }
 
-        // Legend (top-right corner)
-        double legendX = w - 170;
-        double legendY = padding;
-        gc.setFont(javafx.scene.text.Font.font(12));
-        for (Map.Entry<String, Color> entry : playerColors.entrySet()) {
-            gc.setFill(entry.getValue());
-            gc.fillRoundRect(legendX, legendY, 14, 14, 4, 4);
-            gc.fillText(entry.getKey(), legendX + 18, legendY + 12);
-            legendY += 20;
+        for (ReplayMapMarker marker : currentReplayMapMarkers) {
+            boolean visible = marker.type() == ReplayMapMarkerType.START_POSITION
+                    || Math.abs(marker.time().minus(limit).toMillis()) <= replayMarkerFadeMillis();
+            if (!visible) continue;
+            double x = padding + (marker.x() - paintingMinX) * scale;
+            double y = padding + (marker.z() - paintingMinZ) * scale;
+            if (marker.type() == ReplayMapMarkerType.START_POSITION) {
+                Color color = playerColors.getOrDefault(marker.playerName(), Color.WHITE);
+                gc.setFill(color);
+                gc.fillOval(x - 5, y - 5, 10, 10);
+                gc.setFill(Color.WHITE);
+                gc.setFont(javafx.scene.text.Font.font(12));
+                gc.fillText(marker.playerName(), x + 8, y - 8);
+            } else {
+                Color markerColor = marker.type() == ReplayMapMarkerType.PING ? Color.GOLD : Color.ORANGERED;
+                gc.setStroke(markerColor);
+                gc.setLineWidth(2.5);
+                gc.strokeOval(x - 8, y - 8, 16, 16);
+                gc.strokeLine(x - 12, y, x + 12, y);
+                gc.strokeLine(x, y - 12, x, y + 12);
+                gc.setFill(Color.WHITE);
+                gc.setFont(javafx.scene.text.Font.font(12));
+                gc.fillText(marker.label(), x + 10, y - 10);
+            }
+        }
+    }
+
+    private void renderReplayTimeline() {
+        replayTimelineListView.setItems(FXCollections.observableArrayList(currentReplayTimeline));
+        currentReplayTimelineIndex = -1;
+        synchronizeReplayTimeline(java.time.Duration.ofMillis(Math.round(paintingTimeSlider.getValue() * 1_000)));
+    }
+
+    private void synchronizeReplayTimeline(java.time.Duration currentTime) {
+        int matchingIndex = -1;
+        for (int index = 0; index < currentReplayTimeline.size(); index++) {
+            if (currentReplayTimeline.get(index).time().compareTo(currentTime) <= 0) {
+                matchingIndex = index;
+            } else {
+                break;
+            }
+        }
+        if (matchingIndex == currentReplayTimelineIndex) {
+            return;
+        }
+        currentReplayTimelineIndex = matchingIndex;
+        synchronizingReplayTimelineSelection = true;
+        try {
+            if (matchingIndex < 0) {
+                replayTimelineListView.getSelectionModel().clearSelection();
+                replayTimelineListView.scrollTo(0);
+                replayEventDetailLabel.setText("No recorded event yet at " + formatDurationHMS(currentTime.getSeconds()) + ".");
+            } else {
+                ReplayTimelineEntry entry = currentReplayTimeline.get(matchingIndex);
+                replayTimelineListView.getSelectionModel().select(matchingIndex);
+                replayTimelineListView.scrollTo(matchingIndex);
+                replayEventDetailLabel.setText(entry.mapMarker() == null
+                        ? "Current event: " + formatReplayTimelineEntry(entry)
+                        : "Current event: " + formatReplayTimelineEntry(entry) + " — map marker shown.");
+            }
+        } finally {
+            synchronizingReplayTimelineSelection = false;
+        }
+    }
+
+    private static String formatReplayTimelineEntry(ReplayTimelineEntry entry) {
+        return String.format("%s | %s | %s | %s", formatReplayTime(entry.time()),
+                entry.category(), entry.playerName(), entry.details());
+    }
+
+    private static String formatReplayTime(java.time.Duration time) {
+        long totalSeconds = time.getSeconds();
+        return totalSeconds >= 3_600 ? formatDurationHMS(totalSeconds)
+                : String.format("%02d:%02d", totalSeconds / 60, totalSeconds % 60);
+    }
+
+    @FXML
+    public void onReplayTimeEntered() {
+        String value = replayTimeTextField.getText();
+        try {
+            String[] parts = value.trim().split(":");
+            long seconds = parts.length == 3
+                    ? Long.parseLong(parts[0]) * 3600 + Long.parseLong(parts[1]) * 60 + Long.parseLong(parts[2])
+                    : parts.length == 2 ? Long.parseLong(parts[0]) * 60 + Long.parseLong(parts[1])
+                    : Long.parseLong(parts[0]);
+            paintingTimeSlider.setValue(Math.max(paintingTimeSlider.getMin(),
+                    Math.min(paintingTimeSlider.getMax(), seconds)));
+        } catch (NumberFormatException ignored) {
+            replayTimeTextField.setText(formatReplayTime(java.time.Duration.ofMillis(
+                    Math.round(paintingTimeSlider.getValue() * 1_000))));
+        }
+    }
+
+    @FXML
+    public void onToggleReplayPlayback() {
+        if (replayPlaybackTimeline.getStatus() == Animation.Status.RUNNING) {
+            stopReplayPlayback();
+        } else {
+            replayPlaybackTimeline.play();
+            replayPlayPauseButton.setText("Pause");
+        }
+    }
+
+    private void advanceReplayPlayback() {
+        double nextTime = paintingTimeSlider.getValue() + replayPlaybackSpeed() / 10d;
+        if (nextTime >= paintingTimeSlider.getMax()) {
+            paintingTimeSlider.setValue(paintingTimeSlider.getMax());
+            stopReplayPlayback();
+            return;
+        }
+        paintingTimeSlider.setValue(nextTime);
+    }
+
+    private void stopReplayPlayback() {
+        if (replayPlaybackTimeline != null) {
+            replayPlaybackTimeline.stop();
+        }
+        if (replayPlayPauseButton != null) {
+            replayPlayPauseButton.setText("Play");
+        }
+    }
+
+    private List<PaintingBrushStroke> visiblePaintingStrokes(java.time.Duration limit) {
+        long earliestVisibleTime = limit.toMillis() - replayDrawingFadeMillis();
+        return currentPaintingStrokes.stream()
+                .filter(stroke -> stroke.time().toMillis() >= earliestVisibleTime
+                        && stroke.time().compareTo(limit) <= 0)
+                .collect(Collectors.toList());
+    }
+
+    private long replayDrawingFadeMillis() {
+        return replayFadeSeconds(replayDrawingFadeSecondsTextField, 10) * 1_000L;
+    }
+
+    private long replayMarkerFadeMillis() {
+        return replayFadeSeconds(replayMarkerFadeSecondsTextField, 10) * 1_000L;
+    }
+
+    private static long replayFadeSeconds(TextField field, long fallback) {
+        try {
+            return Math.max(0, Long.parseLong(field.getText().trim()));
+        } catch (NumberFormatException | NullPointerException ignored) {
+            return fallback;
+        }
+    }
+
+    private double replayPlaybackSpeed() {
+        try {
+            return Math.max(0.01, Double.parseDouble(replayPlaybackSpeedTextField.getText().trim()));
+        } catch (NumberFormatException ignored) {
+            return 1;
         }
     }
 
@@ -2676,6 +3369,7 @@ public class ModerationReportController implements Controller<Region> {
 
     private String generateChatLog(ReplayDataParser replayDataParser) {
         return replayDataParser.getChatMessages().stream()
+                .filter(message -> !isDuplicateTextMarkerChatMessage(message, replayDataParser.getModeratorEvents()))
                 .map(this::formatChatMessage)
                 .collect(Collectors.joining("\n"));
     }
@@ -2875,17 +3569,11 @@ public class ModerationReportController implements Controller<Region> {
         StringBuilder filteredChatLog = new StringBuilder();
         BufferedReader bufReader = new BufferedReader(new StringReader(chatLog));
 
-        String compileSentences = "Can you give me some mass, |Can you give me some energy, |" +
-                "Can you give me one Engineer, |→ notify: |→ allies: Sent Mass |→ allies: Sent Energy |" +
-                "→ allies: sent |give me Mass";
-
-        Pattern pattern = Pattern.compile(compileSentences);
         String chatLine;
         int lineNum = 0;
 
         while ((chatLine = bufReader.readLine()) != null) {
-            boolean matchFound = pattern.matcher(chatLine).find();
-            if (!localPreferences.getTabReports().isShowNotifyChatMessages() && matchFound) {
+            if (!localPreferences.getTabReports().isShowNotifyChatMessages() && isNotifyChatMessage(chatLine)) {
                 continue;
             }
             lineNum++;
@@ -2893,6 +3581,17 @@ public class ModerationReportController implements Controller<Region> {
         }
 
         return filteredChatLog.toString();
+    }
+
+    private static boolean isNotifyChatMessage(String message) {
+        if (message == null) {
+            return false;
+        }
+        return Pattern.compile("(?i)(?:can you )?give me (?:some )?(?:mass|energy)|give me one engineer|"
+                        + "(?:→|to) notify:|(?:→|to) allies: sent (?:mass|energy)|sent (?:mass|energy) [0-9]|"
+                        + "starting tech [123].*(?:upgrade|cancelled)|t[123] done!")
+                .matcher(message)
+                .find();
     }
 
     public void onCreateReportForumReporterButton() throws IOException {

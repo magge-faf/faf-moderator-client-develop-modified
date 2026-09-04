@@ -658,6 +658,10 @@ public class LocalPreferences {
         boolean showSelfDestructionUnitsCheckBox = true;
         boolean showNotifyChatMessages = true;
 
+        String replayDrawingFadeSecondsTextField = "60";
+        String replayMarkerFadeSecondsTextField = "30";
+        String replayPlaybackSpeedTextField = "1";
+
         boolean fetchReportsOnStartupCheckBox = true;
         boolean enableManualReplayLookupCheckBox = false;
         boolean showOpenLogsInNotepadPlusPlusButtonCheckBox = false;

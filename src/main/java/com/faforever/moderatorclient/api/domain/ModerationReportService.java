@@ -82,6 +82,7 @@ public class ModerationReportService {
 							.addInclude("reporter")
 							.addInclude("reporter.bans")
 							.addInclude("game")
+							.addInclude("game.mapVersion")
 							.addInclude("lastModerator")
 							.addInclude("reportedUsers")
 							.addInclude("reportedUsers.bans")

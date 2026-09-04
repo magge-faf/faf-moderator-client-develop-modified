@@ -8,6 +8,9 @@
 <?import javafx.scene.control.TableView?>
 <?import javafx.scene.control.TabPane?>
 <?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.TextFormatter?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.ListView?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.control.CheckBox?>
@@ -21,7 +24,6 @@
 <?import javafx.scene.canvas.Canvas?>
 <?import javafx.scene.Group?>
 <?import javafx.scene.control.Slider?>
-<?import javafx.scene.control.TextFormatter?>
 <SplitPane fx:id="root" dividerPositions="0.25" orientation="VERTICAL" xmlns="http://javafx.com/javafx/11.0.1"
            xmlns:fx="http://javafx.com/fxml/1"
            fx:controller="com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController">
@@ -93,20 +95,41 @@
                 <TextFlow fx:id="moderatorEventTextFlow" />
             </ScrollPane>
         </Tab>
-        <Tab fx:id="reportMapDrawingsTab" text="Map Drawings">
-            <HBox spacing="8" alignment="TOP_LEFT" style="-fx-padding: 6;">
-                <ScrollPane fitToWidth="false" fitToHeight="false">
-                    <Group>
-                        <Canvas fx:id="paintingCanvas" width="600" height="600"/>
-                    </Group>
-                </ScrollPane>
-                <VBox spacing="6" alignment="TOP_LEFT" style="-fx-padding: 2 0 0 0;">
-                    <Label text="Time:"/>
-                    <Slider fx:id="paintingTimeSlider" min="0" max="100" value="100"
-                            prefWidth="150" maxWidth="150"/>
-                    <Label fx:id="paintingTimeLabel" text="00:00:00" minWidth="70"/>
-                </VBox>
-            </HBox>
+        <Tab fx:id="reportMapDrawingsTab" text="Replay Map &amp; Timeline">
+            <VBox spacing="8" style="-fx-padding: 6;">
+                <HBox spacing="8" alignment="TOP_LEFT">
+                    <ScrollPane fitToWidth="false" fitToHeight="false">
+                        <Group>
+                            <Canvas fx:id="paintingCanvas" width="600" height="600"/>
+                        </Group>
+                    </ScrollPane>
+                    <VBox spacing="6" alignment="TOP_LEFT" style="-fx-padding: 2 0 0 0;">
+                        <Label text="Time:"/>
+                        <Slider fx:id="paintingTimeSlider" min="0" max="100" value="100"
+                                prefWidth="180" maxWidth="180" blockIncrement="0.1"/>
+                        <TextField fx:id="replayTimeTextField" promptText="mm:ss or HH:mm:ss" onAction="#onReplayTimeEntered"
+                                   prefWidth="180" maxWidth="180"/>
+                        <HBox spacing="6" alignment="CENTER_LEFT">
+                            <Button fx:id="replayPlayPauseButton" text="Play" onAction="#onToggleReplayPlayback"/>
+                            <TextField fx:id="replayPlaybackSpeedTextField" promptText="Speed" prefWidth="70"/>
+                        </HBox>
+                        <HBox spacing="6" alignment="CENTER_LEFT">
+                            <Label text="Draw fade (s)"/>
+                            <TextField fx:id="replayDrawingFadeSecondsTextField" prefWidth="42"/>
+                        </HBox>
+                        <HBox spacing="6" alignment="CENTER_LEFT">
+                            <Label text="Marker fade (s)"/>
+                            <TextField fx:id="replayMarkerFadeSecondsTextField" prefWidth="42"/>
+                        </HBox>
+                        <Label text="Players / recorded starts"/>
+                        <VBox fx:id="replayPlayersLegend" spacing="4" prefWidth="360"/>
+                        <Label text="Select an event below to jump there. Drawings and map markers fade using the values above." wrapText="true" maxWidth="210"/>
+                    </VBox>
+                </HBox>
+                <Label text="Replay timeline — select an event to jump to it"/>
+                <ListView fx:id="replayTimelineListView" prefHeight="220" VBox.vgrow="ALWAYS"/>
+                <Label fx:id="replayEventDetailLabel" wrapText="true"/>
+            </VBox>
         </Tab>
         <Tab fx:id="reportMostReportedAccountsTab" text="Most Reported Accounts">
             <TableView fx:id="mostReportedAccountsTableView">
