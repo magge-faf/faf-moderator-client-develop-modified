@@ -296,7 +296,7 @@ public class SettingsController implements Controller<Pane> {
                 {
                 "setReportStatusTo": "COMPLETED",
                   "buttonName": "Completed - Replay Desync",
-                  "descriptionPublicNote": "Thank you for bringing this to our attention. Unfortunately, the game desyncs. I have made a note for the player in case it becomes a pattern."
+                  "descriptionPublicNote": "Thank you for bringing this to our attention. We were unable to fully assess the replay because it desynchronized. We have noted this for the player in case a pattern emerges."
                 },
               {
                 "setReportStatusTo": "COMPLETED",
@@ -306,7 +306,7 @@ public class SettingsController implements Controller<Pane> {
               {
                 "setReportStatusTo": "COMPLETED",
                   "buttonName": "Completed - User Note",
-                  "descriptionPublicNote": "Thank you for bringing this to our attention. I have noted this for the user in case of a pattern. Please report any further violations."
+                  "descriptionPublicNote": "Thank you for bringing this to our attention. We have noted this for the user in case of a pattern."
                 },
               {
                 "setReportStatusTo": "DISCARDED",
@@ -516,7 +516,7 @@ public class SettingsController implements Controller<Pane> {
     public void onPurgeOldReplayFiles() {
         boolean confirmed = ViewHelper.confirmDialog(
                 "Purge all replay files",
-                "This will permanently delete all stored replay downloads and temp replay files. Continue?"
+                "This will permanently delete every regular file inside the Moderator Client temporary replay folder. It does not affect the FAF Client replay folder. Continue?"
         );
         if (!confirmed) {
             return;

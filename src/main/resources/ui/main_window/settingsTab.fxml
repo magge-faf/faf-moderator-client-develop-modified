@@ -60,6 +60,8 @@
                 <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="0" GridPane.rowIndex="1">
                     <Label styleClass="settings-section-title" text="Replay Folder"/>
                     <Label fx:id="replayFolderInfoLabel" styleClass="settings-help" wrapText="true"/>
+                    <Label styleClass="settings-help" wrapText="true"
+                           text="What is stored here: replay files downloaded by the Moderator Client (Mordor) for replay analysis, normally as .fafreplay files. This is separate from the replay files and folders used by the FAF Client.\n\nPurge Replays: deletes every regular file inside the Moderator Client replay folder, including its temporary replay files. It does not delete anything from the FAF Client replay folder. The automatic one-day cleanup affects only recognized .fafreplay files in the temporary subfolder."/>
                     <CheckBox fx:id="autoPurgeTempReplaysOlderThanOneDayCheckBox" mnemonicParsing="false"
                               text="Automatically remove temp replay files older than 1 day"/>
                     <HBox spacing="8" styleClass="settings-action-row">
