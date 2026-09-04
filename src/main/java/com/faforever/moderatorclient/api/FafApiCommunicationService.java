@@ -399,6 +399,9 @@ public class FafApiCommunicationService {
                     Array.newInstance(clazz, 0).getClass(),
                     params);
         } catch (RuntimeException t) {
+            if (isInterruptedRequest(t)) {
+                throw t;
+            }
             log.error("API returned error on getPage for route ''{}''", route, t);
             applicationEventPublisher.publishEvent(new FafApiFailGetEvent(t, route, routeBuilder.getDtoClass()));
             throw t;
@@ -433,10 +436,25 @@ public class FafApiCommunicationService {
                     Array.newInstance(clazz, 0).getClass(),
                     params);
         } catch (RuntimeException t) {
+            if (isInterruptedRequest(t)) {
+                throw t;
+            }
             log.error("API returned error on Smurf Village Lookup for route '{}'", route, t);
             applicationEventPublisher.publishEvent(new FafApiFailGetEvent(t, route, routeBuilder.getDtoClass()));
             throw t;
         }
+    }
+
+    private static boolean isInterruptedRequest(Throwable throwable) {
+        if (Thread.currentThread().isInterrupted()) {
+            return true;
+        }
+        for (Throwable cause = throwable; cause != null; cause = cause.getCause()) {
+            if (cause instanceof InterruptedException) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static int getRequestsInLastMinute() {
