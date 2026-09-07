@@ -111,7 +111,8 @@
                                    prefWidth="180" maxWidth="180"/>
                         <HBox spacing="6" alignment="CENTER_LEFT">
                             <Button fx:id="replayPlayPauseButton" text="Play" onAction="#onToggleReplayPlayback"/>
-                            <TextField fx:id="replayPlaybackSpeedTextField" promptText="Speed" prefWidth="70"/>
+                            <Label text="Playback speed"/>
+                            <TextField fx:id="replayPlaybackSpeedTextField" promptText="e.g. 1" prefWidth="70"/>
                         </HBox>
                         <HBox spacing="6" alignment="CENTER_LEFT">
                             <Label text="Draw fade (s)"/>
@@ -129,6 +130,13 @@
                 <Label text="Replay timeline — select an event to jump to it"/>
                 <ListView fx:id="replayTimelineListView" prefHeight="220" VBox.vgrow="ALWAYS"/>
                 <Label fx:id="replayEventDetailLabel" wrapText="true"/>
+            </VBox>
+        </Tab>
+        <Tab text="Replay Detail (Test)">
+            <VBox spacing="8" style="-fx-padding: 6;">
+                <Label text="Recorded commands and unit lifecycle events — select a row to jump to its replay time."/>
+                <Label fx:id="replayDetailSummaryLabel" wrapText="true"/>
+                <ListView fx:id="replayDetailListView" VBox.vgrow="ALWAYS"/>
             </VBox>
         </Tab>
         <Tab fx:id="reportMostReportedAccountsTab" text="Most Reported Accounts">

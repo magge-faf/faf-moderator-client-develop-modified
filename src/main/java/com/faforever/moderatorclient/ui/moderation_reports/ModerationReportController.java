@@ -231,6 +231,10 @@ public class ModerationReportController implements Controller<Region> {
     public ListView<ReplayTimelineEntry> replayTimelineListView;
     @FXML
     public VBox replayPlayersLegend;
+    @FXML
+    public ListView<ReplayDetailEntry> replayDetailListView;
+    @FXML
+    public Label replayDetailSummaryLabel;
     private List<PaintingBrushStroke> currentPaintingStrokes = new ArrayList<>();
     private List<ReplayMapMarker> currentReplayMapMarkers = new ArrayList<>();
     private List<ReplayTimelineEntry> currentReplayTimeline = new ArrayList<>();
@@ -1678,7 +1682,8 @@ public class ModerationReportController implements Controller<Region> {
                 category.setMinWidth(110);
                 Label player = new Label(entry.playerName());
                 player.setMinWidth(120);
-                player.setTextFill(currentReplayPlayerColors.getOrDefault(entry.playerName(), Color.WHITE));
+                player.setStyle("-fx-text-fill: " + colorCss(currentReplayPlayerColors
+                        .getOrDefault(entry.playerName(), Color.WHITE)) + ";");
                 Label details = new Label(entry.details());
                 details.setWrapText(true);
                 HBox.setHgrow(details, Priority.ALWAYS);
@@ -1688,6 +1693,35 @@ public class ModerationReportController implements Controller<Region> {
         });
         replayTimelineListView.getSelectionModel().selectedItemProperty().addListener((obs, oldEntry, entry) -> {
             if (entry != null && !synchronizingReplayTimelineSelection) {
+                paintingTimeSlider.setValue(entry.time().toMillis() / 1_000d);
+            }
+        });
+        replayDetailListView.setCellFactory(listView -> new ListCell<>() {
+            @Override
+            protected void updateItem(ReplayDetailEntry entry, boolean empty) {
+                super.updateItem(entry, empty);
+                if (empty || entry == null) {
+                    setText(null);
+                    setGraphic(null);
+                    return;
+                }
+                Label time = new Label(formatReplayTime(entry.time()));
+                time.setMinWidth(54);
+                Label category = new Label(entry.category());
+                category.setMinWidth(104);
+                Label player = new Label(entry.playerName());
+                player.setMinWidth(120);
+                player.setStyle("-fx-text-fill: " + colorCss(currentReplayPlayerColors
+                        .getOrDefault(entry.playerName(), Color.WHITE)) + ";");
+                Label details = new Label(entry.details());
+                details.setWrapText(true);
+                HBox.setHgrow(details, Priority.ALWAYS);
+                setText(null);
+                setGraphic(new HBox(8, time, category, player, details));
+            }
+        });
+        replayDetailListView.getSelectionModel().selectedItemProperty().addListener((obs, oldEntry, entry) -> {
+            if (entry != null) {
                 paintingTimeSlider.setValue(entry.time().toMillis() / 1_000d);
             }
         });
@@ -2204,8 +2238,9 @@ public class ModerationReportController implements Controller<Region> {
 
     private String formatChatHeader(ModerationReportFX report, GameFX game) {
         String validity = game.getValidity() != null ? game.getValidity().name() : "UNKNOWN";
-        return format("CHAT LOG -- Report ID {0} -- Replay ID {1} -- Title \"{2}\" -- Rank Status: {3}\n\n",
-                report.getId(), game.getId(), game.getName(), validity);
+        OffsetDateTime playedAt = game.getStartTime() != null ? game.getStartTime() : game.getEndTime();
+        return format("CHAT LOG -- Report ID {0} -- Replay ID {1} -- Title \"{2}\" -- Rank Status: {3} -- Played: {4}\n\n",
+                report.getId(), game.getId(), game.getName(), validity, formatGameAge(playedAt, OffsetDateTime.now()));
     }
 
     private Path createTempFile(GameFX game) {
@@ -2285,11 +2320,13 @@ public class ModerationReportController implements Controller<Region> {
 
                 List<PaintingBrushStroke> paintingStrokes = extractPaintingStrokes(replayDataParser);
                 ReplayTimelineData replayTimelineData = extractReplayTimeline(replayDataParser);
+                List<ReplayDetailEntry> replayDetailEntries = extractReplayDetailEntries(replayDataParser);
                 ReplayMapPreview mapPreview = loadMapPreview(game, replayDataParser);
                 Platform.runLater(() -> {
                     currentPaintingStrokes = paintingStrokes;
                     currentReplayMapMarkers = replayTimelineData.mapMarkers();
                     currentReplayTimeline = replayTimelineData.timelineEntries();
+                    renderReplayDetailEntries(replayDetailEntries);
                     stopReplayPlayback();
                     currentReplayPlayerColors = extractReplayPlayerColors(replayDataParser);
                     replayMapPreview = mapPreview.image();
@@ -2635,10 +2672,41 @@ public class ModerationReportController implements Controller<Region> {
 
     private record ReplayTimelineData(List<ReplayMapMarker> mapMarkers, List<ReplayTimelineEntry> timelineEntries) {}
 
+    private record ReplayDetailEntry(java.time.Duration time, String category, String playerName, String details) {}
+
     private record ReplayMapPreview(Image image, float width, float height) {
         private static ReplayMapPreview unavailable() {
             return new ReplayMapPreview(null, 0, 0);
         }
+    }
+
+    static String formatGameAge(OffsetDateTime playedAt, OffsetDateTime now) {
+        if (playedAt == null) {
+            return "time unavailable";
+        }
+
+        long minutes = Math.max(0, java.time.Duration.between(playedAt, now).toMinutes());
+        if (minutes < 1) {
+            return "just now";
+        }
+        if (minutes < 60) {
+            return minutes + "m ago";
+        }
+        long hours = minutes / 60;
+        if (hours < 24) {
+            return hours + "h ago";
+        }
+        long days = hours / 24;
+        if (days < 14) {
+            return days + "d ago";
+        }
+        if (days < 60) {
+            return days / 7 + "w ago";
+        }
+        if (days < 730) {
+            return days / 30 + "mo ago";
+        }
+        return days / 365 + "y ago";
     }
 
     private record MapDimensions(float width, float height) {}
@@ -2781,6 +2849,78 @@ public class ModerationReportController implements Controller<Region> {
         return new ReplayTimelineData(mapMarkers, timelineEntries);
     }
 
+    private List<ReplayDetailEntry> extractReplayDetailEntries(ReplayDataParser parser) {
+        final int maximumEntries = 25_000;
+        int tick = 0;
+        int commandSource = -1;
+        List<ReplayDetailEntry> entries = new ArrayList<>();
+        Map<Integer, Map<String, Object>> armies = parser.getArmies();
+        for (Event event : parser.getEvents()) {
+            if (event instanceof Event.Advance advance) {
+                tick += advance.ticksToAdvance();
+                continue;
+            }
+            if (event instanceof Event.SetCommandSource source) {
+                commandSource = source.playerIndex();
+                continue;
+            }
+            if (entries.size() >= maximumEntries) {
+                break;
+            }
+            java.time.Duration time = java.time.Duration.ofSeconds(tick / 10L);
+            String playerName = playerNameForArmy(armies, commandSource);
+            if (event instanceof Event.IssueCommand command) {
+                entries.add(new ReplayDetailEntry(time, "Command", playerName,
+                        command.commandData().commandType() + " — " + command.commandUnits().count() + " selected; "
+                                + describeCommandTarget(command.commandData().commandTarget())));
+            } else if (event instanceof Event.IssueFactoryCommand command) {
+                entries.add(new ReplayDetailEntry(time, "Factory command", playerName,
+                        command.commandData().commandType() + " — " + command.commandUnits().count() + " selected; "
+                                + describeCommandTarget(command.commandData().commandTarget())));
+            } else if (event instanceof Event.CreateUnit unit) {
+                entries.add(new ReplayDetailEntry(time, "Unit created", playerNameForArmy(armies, unit.playerIndex()),
+                        shortBlueprintName(unit.blueprintId()) + " at " + formatReplayPosition(unit.px(), unit.pz())));
+            } else if (event instanceof Event.DestroyEntity destroyed) {
+                entries.add(new ReplayDetailEntry(time, "Entity destroyed", playerName,
+                        "Entity " + destroyed.entityId()));
+            } else if (event instanceof Event.WarpEntity warped) {
+                entries.add(new ReplayDetailEntry(time, "Entity warped", playerName,
+                        "Entity " + warped.entityId() + " to " + formatReplayPosition(warped.px(), warped.pz())));
+            } else if (event instanceof Event.CommandSourceTerminated) {
+                entries.add(new ReplayDetailEntry(time, "Player left", playerName, "Command source terminated"));
+            } else if (event instanceof Event.RequestPause) {
+                entries.add(new ReplayDetailEntry(time, "Pause", playerName, "Pause requested"));
+            } else if (event instanceof Event.RequestResume) {
+                entries.add(new ReplayDetailEntry(time, "Resume", playerName, "Resume requested"));
+            } else if (event instanceof Event.EndGame) {
+                entries.add(new ReplayDetailEntry(time, "Game ended", playerName, "End game event"));
+            }
+        }
+        return entries;
+    }
+
+    private static String describeCommandTarget(Event.CommandTarget target) {
+        if (target instanceof Event.CommandTarget.Position position) {
+            return "target " + formatReplayPosition(position.px(), position.pz());
+        }
+        if (target instanceof Event.CommandTarget.Entity entity) {
+            return "target entity " + entity.unitId();
+        }
+        return "no explicit target";
+    }
+
+    private static String formatReplayPosition(float x, float z) {
+        return String.format(Locale.ROOT, "(%.0f, %.0f)", x, z);
+    }
+
+    private static String shortBlueprintName(String blueprintId) {
+        if (blueprintId == null || blueprintId.isBlank()) {
+            return "Unknown blueprint";
+        }
+        int separator = Math.max(blueprintId.lastIndexOf('/'), blueprintId.lastIndexOf('\\'));
+        return separator >= 0 ? blueprintId.substring(separator + 1) : blueprintId;
+    }
+
     private static boolean isAttackCommand(EventCommandType commandType) {
         return commandType == EventCommandType.ATTACK || commandType == EventCommandType.FORM_ATTACK;
     }
@@ -2829,22 +2969,35 @@ public class ModerationReportController implements Controller<Region> {
                 .filter(marker -> marker.type() == ReplayMapMarkerType.START_POSITION)
                 .map(ReplayMapMarker::playerName)
                 .collect(Collectors.toSet());
+        List<Integer> rawTeams = parser.getArmies().values().stream()
+                .map(army -> army.get("Team"))
+                .filter(Number.class::isInstance)
+                .map(Number.class::cast)
+                .map(Number::intValue)
+                .filter(team -> team >= 0)
+                .distinct()
+                .sorted()
+                .toList();
+        Map<Integer, String> displayTeams = new LinkedHashMap<>();
+        for (int index = 0; index < rawTeams.size(); index++) {
+            displayTeams.put(rawTeams.get(index), "Team " + (index + 1));
+        }
         return parser.getArmies().values().stream()
                 .filter(army -> army.get("PlayerName") instanceof String player && !"civilian".equalsIgnoreCase(player))
-                .sorted(Comparator.comparing(ModerationReportController::teamForArmy)
+                .sorted(Comparator.<Map<String, Object>, String>comparing(army -> teamForArmy(army, displayTeams))
                         .thenComparing(army -> (String) army.get("PlayerName"), String.CASE_INSENSITIVE_ORDER))
                 .map(army -> {
                     String player = (String) army.get("PlayerName");
                     return new ReplayPlayerEntry(player, playersWithRecordedStart.contains(player),
-                            playerColors.getOrDefault(player, Color.WHITE), teamForArmy(army));
+                            playerColors.getOrDefault(player, Color.WHITE), teamForArmy(army, displayTeams));
                 })
                 .collect(Collectors.toList());
     }
 
-    private static String teamForArmy(Map<String, Object> army) {
+    private static String teamForArmy(Map<String, Object> army, Map<Integer, String> displayTeams) {
         Object team = army.get("Team");
         if (team instanceof Number number && number.intValue() >= 0) {
-            return "Team " + number.intValue();
+            return displayTeams.getOrDefault(number.intValue(), "Team " + number.intValue());
         }
         if (team instanceof String name && !name.isBlank()) {
             return name;
@@ -2874,6 +3027,7 @@ public class ModerationReportController implements Controller<Region> {
                     teammates.forEach(player -> {
                         Circle color = new Circle(6, player.color());
                         Label text = new Label(player.name() + (player.startRecorded() ? " — start position recorded" : ""));
+                        text.setStyle("-fx-text-fill: " + colorCss(player.color()) + ";");
                         text.setWrapText(true);
                         text.setMaxWidth(Double.MAX_VALUE);
                         HBox row = new HBox(7, color, text);
@@ -3144,11 +3298,13 @@ public class ModerationReportController implements Controller<Region> {
         double w = paintingCanvas.getWidth();
         double h = paintingCanvas.getHeight();
 
+        // Generated previews contain transparent margins. Paint an opaque base on every frame so a
+        // previous replay can never show through a later replay's preview.
+        gc.setFill(Color.rgb(42, 48, 54));
+        gc.fillRect(0, 0, w, h);
         if (replayMapPreview != null && !replayMapPreview.isError() && replayMapPreview.getProgress() >= 1) {
             gc.drawImage(replayMapPreview, 0, 0, w, h);
         } else {
-            gc.setFill(Color.rgb(42, 48, 54));
-            gc.fillRect(0, 0, w, h);
             gc.setFill(Color.LIGHTGRAY);
             gc.setFont(javafx.scene.text.Font.font(15));
             gc.fillText("Map preview unavailable", 24, h / 2 - 10);
@@ -3233,10 +3389,40 @@ public class ModerationReportController implements Controller<Region> {
         }
     }
 
+    private void clearReplayMapTimeline() {
+        stopReplayPlayback();
+        currentPaintingStrokes = List.of();
+        currentReplayMapMarkers = List.of();
+        currentReplayTimeline = List.of();
+        currentReplayPlayerColors = Map.of();
+        replayMapPreview = null;
+        replayMapWidth = 0;
+        replayMapHeight = 0;
+        replayPlayersLegend.getChildren().clear();
+        replayTimelineListView.getItems().clear();
+        replayDetailListView.getItems().clear();
+        replayDetailSummaryLabel.setText("Load a replay to inspect recorded commands and unit events.");
+        paintingTimeSlider.setMin(0);
+        paintingTimeSlider.setMax(1);
+        paintingTimeSlider.setValue(0);
+        renderReplayMap(List.of(), java.time.Duration.ZERO);
+    }
+
+    private static String colorCss(Color color) {
+        return String.format("#%02X%02X%02X", Math.round(color.getRed() * 255), Math.round(color.getGreen() * 255),
+                Math.round(color.getBlue() * 255));
+    }
+
     private void renderReplayTimeline() {
         replayTimelineListView.setItems(FXCollections.observableArrayList(currentReplayTimeline));
         currentReplayTimelineIndex = -1;
         synchronizeReplayTimeline(java.time.Duration.ofMillis(Math.round(paintingTimeSlider.getValue() * 1_000)));
+    }
+
+    private void renderReplayDetailEntries(List<ReplayDetailEntry> entries) {
+        replayDetailListView.setItems(FXCollections.observableArrayList(entries));
+        replayDetailSummaryLabel.setText(entries.size() + " recorded command and lifecycle event(s). "
+                + "These are replay events, not continuous mouse or unit movement.");
     }
 
     private void synchronizeReplayTimeline(java.time.Duration currentTime) {
