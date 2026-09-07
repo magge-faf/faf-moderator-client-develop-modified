@@ -1497,6 +1497,7 @@ public class ModerationReportController implements Controller<Region> {
     private void setupReportSelectionListener() {
         reportTableView.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
             if (newValue == null) {
+                currentlySelectedItemNotNull = null;
                 resetButtonsToInvalidState();
                 return;
             }
@@ -2045,15 +2046,33 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private volatile boolean isTaskRunning = false;
+    private ModerationReportFX pendingChatLogReport;
 
     @SneakyThrows
-    private void showChatLog(ModerationReportFX report) {
+    private synchronized void showChatLog(ModerationReportFX report) {
+        if (report == null || report.getGame() == null) {
+            return;
+        }
+        String reportId = report.getId();
+        String gameId = report.getGame().getId();
+        Platform.runLater(() -> {
+            if (isSelectedReportGame(reportId, gameId)) {
+                markReplayOutputLoading(gameId);
+            }
+        });
         if (isTaskRunning) {
-            log.debug("Task is already running for report: {}", report.getId());
+            pendingChatLogReport = report;
+            log.debug("Queued replay {} while another replay is loading", report.getGame().getId());
             return;
         }
 
         isTaskRunning = true;
+        pendingChatLogReport = null;
+        Platform.runLater(() -> {
+            if (isSelectedReportGame(reportId, gameId)) {
+                clearReplayMapTimeline();
+            }
+        });
 
         Task<Void> task = new Task<>() {
             @Override
@@ -2065,14 +2084,15 @@ public class ModerationReportController implements Controller<Region> {
                     tempFilePath = createTempFile(game);
 
                     if (tempFilePath == null) {
-                        updateUIUnavailable(header, "An error occurred while creating a temporary file.");
+                        updateUIUnavailable(reportId, gameId, header,
+                                "An error occurred while creating a temporary file.");
                         return null;
                     }
 
                     HttpResponse<Path> response = downloadReplay(game, tempFilePath);
 
                     if (response == null || response.statusCode() == 404) {
-                        updateUIUnavailable(header, """
+                        updateUIUnavailable(reportId, gameId, header, """
                                 Server Status Code 404 - Replay not available.
                                 Please note that new replays may take some time to become accessible when they got immediately reported after a game.
                                 Additionally, legacy replays are hosted on a separate server, which may occasionally experience issues requiring a restart.""");
@@ -2096,14 +2116,15 @@ public class ModerationReportController implements Controller<Region> {
                         }
 
                         try {
-                            processAndDisplayReplay(header, tempFilePath, String.valueOf(contentGamingModeratorTask), game);
+                            processAndDisplayReplay(reportId, gameId, header, tempFilePath,
+                                    String.valueOf(contentGamingModeratorTask), game, report);
                         } catch (Exception e) {
                             log.error("An error occurred while processing and displaying the replay", e);
                         }
                     }
                 } finally {
                     deleteTempFile(tempFilePath);
-                    isTaskRunning = false;
+                    schedulePendingChatLogLoad();
                 }
                 return null;
             }
@@ -2111,7 +2132,44 @@ public class ModerationReportController implements Controller<Region> {
         BACKGROUND_EXECUTOR.submit(task);
     }
 
-    private void showModeratorEvent(List<ModeratorEvent> moderatorEvents, Map<Integer, PlayerInfo> playerInfoMap) {
+    private void markReplayOutputLoading(String gameId) {
+        copyChatLogButton.setText("Loading Chat Log");
+        copyChatLogButton.setId("");
+        copyChatLogButtonOffenderOnly.setText("Loading Chat Offender");
+        copyChatLogButtonOffenderOnly.setId("");
+        copyModeratorEventsButton.setText("Loading Moderator Events");
+        copyModeratorEventsButton.setId("");
+        openLogsInNotepadPlusPlusButton.setDisable(true);
+        chatLogTextFlow.getChildren().setAll(new Text("Loading Replay ID " + gameId + "..."));
+        moderatorEventTextFlow.getChildren().setAll(new Text("Loading Replay ID " + gameId + "..."));
+    }
+
+    private void schedulePendingChatLogLoad() {
+        ModerationReportFX nextReport;
+        synchronized (this) {
+            isTaskRunning = false;
+            nextReport = pendingChatLogReport;
+            pendingChatLogReport = null;
+        }
+        if (nextReport != null) {
+            Platform.runLater(() -> {
+                GameFX nextGame = nextReport.getGame();
+                if (nextGame != null && isSelectedReportGame(nextReport.getId(), nextGame.getId())) {
+                    showChatLog(nextReport);
+                }
+            });
+        }
+    }
+
+    private boolean isSelectedReportGame(String reportId, String gameId) {
+        ModerationReportFX selected = currentlySelectedItemNotNull;
+        return selected != null && selected.getGame() != null
+                && Objects.equals(reportId, selected.getId())
+                && Objects.equals(gameId, selected.getGame().getId());
+    }
+
+    private void showModeratorEvent(String reportId, String gameId, List<ModeratorEvent> moderatorEvents,
+                                    Map<Integer, PlayerInfo> playerInfoMap, String reporterName, String offenderName) {
         LocalPreferences.TabReports settings = localPreferences.getTabReports();
 
         boolean enforceRating = settings.isShowEnforceRatingCheckBox();
@@ -2218,13 +2276,15 @@ public class ModerationReportController implements Controller<Region> {
                 .collect(Collectors.joining("\n"));
 
         Platform.runLater(() -> {
+            if (!isSelectedReportGame(reportId, gameId)) {
+                return;
+            }
             copyModeratorEventsButton.setId(moderatorEventsLog);
             copyModeratorEventsButton.setText("Copy Moderator Events");
             refreshOpenLogsInNotepadPlusPlusVisibility();
             moderatorEventTextFlow.getChildren().clear();
             updateModeratorEventToColorTextFlow(moderatorEventTextFlow, moderatorEventsLog,
-                    extractName(copyReporterIdButton.getText()),
-                    extractName(copyReportedUserIdButton.getText()));
+                    reporterName, offenderName);
         });
     }
 
@@ -2270,8 +2330,11 @@ public class ModerationReportController implements Controller<Region> {
         }
     }
 
-    private void updateUIUnavailable(String header, String message) {
+    private void updateUIUnavailable(String reportId, String gameId, String header, String message) {
         Platform.runLater(() -> {
+            if (!isSelectedReportGame(reportId, gameId)) {
+                return;
+            }
             startReplayButton.setText("Replay n/a");
             copyChatLogButton.setText("Chat Log n/a");
             copyChatLogButton.setId("");
@@ -2290,7 +2353,8 @@ public class ModerationReportController implements Controller<Region> {
     @Getter
     private static Map<Integer, PlayerInfo> playerInfoMap;
 
-    private void processAndDisplayReplay(String header, Path tempFilePath, String promptAI, GameFX game) {
+    private void processAndDisplayReplay(String reportId, String gameId, String header, Path tempFilePath,
+                                         String promptAI, GameFX game, ModerationReportFX report) {
         try {
             try (ReplayStorageService.PreparedReplay preparedReplay = replayStorageService.prepareReplayForParsing(tempFilePath)) {
                 ReplayDataParser replayDataParser = new ReplayDataParser(preparedReplay.path(), objectMapper);
@@ -2298,7 +2362,14 @@ public class ModerationReportController implements Controller<Region> {
 
                 StringBuilder chatLogFiltered = new StringBuilder();
                 StringBuilder chatLogFilteredOffenderOnly = new StringBuilder();
-                String reportedUser = extractName(copyReportedUserIdButton.getText());
+                String reportedUser = report.getReportedUsers().stream()
+                        .findFirst()
+                        .map(PlayerFX::getRepresentation)
+                        .map(ModerationReportController::extractName)
+                        .orElse("");
+                String reporterName = report.getReporter() == null
+                        ? ""
+                        : extractName(report.getReporter().getRepresentation());
 
                 chatLogFiltered.append(header);
 
@@ -2316,13 +2387,16 @@ public class ModerationReportController implements Controller<Region> {
                         ));
 
                 List<ModeratorEvent> moderatorEvents = replayDataParser.getModeratorEvents();
-                showModeratorEvent(moderatorEvents, playerInfoMap);
+                showModeratorEvent(reportId, gameId, moderatorEvents, playerInfoMap, reporterName, reportedUser);
 
                 List<PaintingBrushStroke> paintingStrokes = extractPaintingStrokes(replayDataParser);
                 ReplayTimelineData replayTimelineData = extractReplayTimeline(replayDataParser);
                 List<ReplayDetailEntry> replayDetailEntries = extractReplayDetailEntries(replayDataParser);
                 ReplayMapPreview mapPreview = loadMapPreview(game, replayDataParser);
                 Platform.runLater(() -> {
+                    if (!isSelectedReportGame(reportId, gameId)) {
+                        return;
+                    }
                     currentPaintingStrokes = paintingStrokes;
                     currentReplayMapMarkers = replayTimelineData.mapMarkers();
                     currentReplayTimeline = replayTimelineData.timelineEntries();
@@ -2382,6 +2456,9 @@ public class ModerationReportController implements Controller<Region> {
                 chatLogFilteredOffenderOnly.append("\n\n").append(promptAI);
 
                 Platform.runLater(() -> {
+                    if (!isSelectedReportGame(reportId, gameId)) {
+                        return;
+                    }
                     copyChatLogButton.setId(chatLogFiltered.toString());
                     copyChatLogButton.setText("Copy Chat Log");
                     refreshOpenLogsInNotepadPlusPlusVisibility();
@@ -2390,8 +2467,7 @@ public class ModerationReportController implements Controller<Region> {
                     copyChatLogButtonOffenderOnly.setId(chatLogFilteredOffenderOnly.toString());
 
                     updateChatLogToColorTextFlow(chatLogTextFlow, String.valueOf(chatLogFiltered),
-                            extractName(copyReporterIdButton.getText()),
-                            extractName(copyReportedUserIdButton.getText()));
+                            reporterName, reportedUser);
                 });
             }
         } catch (Exception e) {
