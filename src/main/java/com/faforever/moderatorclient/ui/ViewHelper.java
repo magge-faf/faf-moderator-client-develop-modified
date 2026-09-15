@@ -2976,12 +2976,10 @@ public class ViewHelper {
         String browser = localPreferences == null ? null : String.valueOf(localPreferences.getUi().getBrowserComboBox());
 
         if (browser == null || "selectBrowser".equalsIgnoreCase(browser)) {
-            Alert alert = new Alert(Alert.AlertType.WARNING);
-            alert.setTitle("Browser Selection Required");
-            alert.setHeaderText("No Browser Selected");
-            alert.setContentText("Please go to the Settings tab (top right) and select a browser.");
-            alert.showAndWait();
-            return;
+            browser = promptForBrowserSelection(localPreferences);
+            if (browser == null) {
+                return;
+            }
         }
 
         URI uri;
@@ -3023,6 +3021,20 @@ public class ViewHelper {
         } catch (Exception e) {
             log.warn("Failed to open URL: {}", url, e);
         }
+    }
+
+    public static String promptForBrowserSelection(LocalPreferences localPreferences) {
+        List<String> options = List.of("Firefox", "Chrome", "Opera", "Microsoft Edge");
+        ChoiceDialog<String> dialog = new ChoiceDialog<>(options.getFirst(), options);
+        dialog.setTitle("Browser Selection Required");
+        dialog.setHeaderText("No Browser Selected");
+        dialog.setContentText("Pick the browser to open links with. You can change this later in Settings.");
+        return dialog.showAndWait().map(browser -> {
+            if (localPreferences != null) {
+                localPreferences.getUi().setBrowserComboBox(browser);
+            }
+            return browser;
+        }).orElse(null);
     }
 
     public static void buildModerationReportTableView(

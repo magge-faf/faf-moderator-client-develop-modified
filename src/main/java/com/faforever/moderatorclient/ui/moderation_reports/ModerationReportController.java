@@ -3965,13 +3965,10 @@ public class ModerationReportController implements Controller<Region> {
         String browser = String.valueOf(localPreferences.getUi().getBrowserComboBox());
 
         if ("selectBrowser".equalsIgnoreCase(browser)) {
-            Alert alert = new Alert(Alert.AlertType.WARNING);
-            alert.setTitle("Browser Selection Required");
-            alert.setHeaderText("No Browser Selected");
-            alert.setContentText("Please go to the Settings tab (top right) and select a browser.");
-
-            alert.showAndWait();
-            return;
+            browser = ViewHelper.promptForBrowserSelection(localPreferences);
+            if (browser == null) {
+                return;
+            }
         }
 
         // Use Desktop.browse() when available to avoid command injection risks
