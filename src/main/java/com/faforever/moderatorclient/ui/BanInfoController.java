@@ -92,6 +92,11 @@ public class BanInfoController implements Controller<Pane> {
 
     private static final String MULTI_ACCOUNT_REASON =
             "Account suspended due to detection of multiple accounts for the same user.";
+    // The FAF API/DB currently caps the ban reason column at 255 chars and rejects longer values
+    // with a raw "data too long for column" error instead of a clear message. We warn client-side
+    // here as a stopgap until that is fixed at the API/schema level.
+    // See https://github.com/FAForever/db/issues/335
+    private static final int BAN_REASON_MAX_LENGTH = 255;
 
     @Getter
     private BanInfoFX banInfo;
@@ -328,7 +333,7 @@ public class BanInfoController implements Controller<Pane> {
             if (isBanReasonTooLong(exception)) {
                 ViewHelper.errorDialog("Ban not saved",
                         "The ban reason is too long for the FAF API to store. "
-                                + "Shorten it to 255 characters or fewer and try again.");
+                                + "Shorten it to " + BAN_REASON_MAX_LENGTH + " characters or fewer and try again.");
                 return;
             }
             throw exception;
@@ -353,6 +358,9 @@ public class BanInfoController implements Controller<Pane> {
 
         if (StringUtils.isBlank(banReasonTextField.getText())) {
             validationErrors.add("No ban reason is given.");
+        } else if (banReasonTextField.getText().length() > BAN_REASON_MAX_LENGTH) {
+            validationErrors.add("Ban reason is " + banReasonTextField.getText().length()
+                    + " characters, but the limit is " + BAN_REASON_MAX_LENGTH + ". Please shorten it.");
         }
 
         if (!forNoOfDaysBanRadioButton.isSelected() && !temporaryBanRadioButton.isSelected()
