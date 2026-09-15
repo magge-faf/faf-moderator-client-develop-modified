@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.prefs.Preferences;
 
@@ -100,6 +101,22 @@ class LocalPreferencesTest {
                 localPreferences.getVersionReminder().getEffectiveNextReminderEpoch(),
                 is(1000L + TimeUnit.DAYS.toMillis(3))
         );
+    }
+
+    @Test
+    void mainTabLayoutRoundTripsThroughPreferencesJson() throws Exception {
+        LocalPreferences preferences = new LocalPreferences();
+        assertThat(preferences.getUi().isHideTabsWithoutPermission(), is(true));
+        preferences.getUi().setMainTabOrder(List.of("reportTab", "userManagementTab", "settingsTab"));
+        preferences.getUi().setHiddenMainTabs(List.of("modVaultTab"));
+        preferences.getUi().setHideTabsWithoutPermission(true);
+
+        LocalPreferences reloaded = objectMapper.readValue(objectMapper.writeValueAsString(preferences),
+                LocalPreferences.class);
+
+        assertThat(reloaded.getUi().getMainTabOrder(), is(List.of("reportTab", "userManagementTab", "settingsTab")));
+        assertThat(reloaded.getUi().getHiddenMainTabs(), is(List.of("modVaultTab")));
+        assertThat(reloaded.getUi().isHideTabsWithoutPermission(), is(true));
     }
 
     private static String legacyEncryptToken(String token) {

@@ -123,6 +123,8 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     private ChangelogController changelogController;
 
     private final Map<Tab, Boolean> dataLoadingState = new HashMap<>();
+    private final List<Tab> allMainTabs = new ArrayList<>();
+    private final Map<Tab, Boolean> mainTabPermissionAvailable = new IdentityHashMap<>();
 
     private final FafApiCommunicationService communicationService;
     @Override
@@ -131,7 +133,9 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     }
 
     private boolean checkPermissionForTab(Tab tab, String... permissionTechnicalName) {
-        if (!communicationService.hasPermission(permissionTechnicalName)) {
+        boolean hasPermission = communicationService.hasPermission(permissionTechnicalName);
+        mainTabPermissionAvailable.put(tab, hasPermission);
+        if (!hasPermission) {
             tab.setDisable(true);
             return false;
         }
@@ -141,6 +145,10 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     }
 
     private void initializeAfterLogin() {
+        if (allMainTabs.isEmpty()) {
+            allMainTabs.addAll(root.getTabs());
+            allMainTabs.forEach(tab -> mainTabPermissionAvailable.put(tab, true));
+        }
         replayStorageService.purgeReplayFilesIfEnabled();
         initUserManagementTab();
         initMatchmakerMapPoolTab();
@@ -164,7 +172,82 @@ public class MainController implements Controller<TabPane>, DisposableBean {
         initExcludedHardwareItemsTab();
         initApiHistoryTab();
         initChangelogTab();
+        applyMainTabPreferences();
+        if (settingsController != null) {
+            settingsController.refreshMainTabLayoutSettings();
+        }
         selectActiveTab();
+    }
+
+    public List<Tab> getConfiguredMainTabs() {
+        Map<String, Integer> savedPositions = savedMainTabPositions();
+        return allMainTabs.stream()
+                .sorted(Comparator.comparingInt(tab -> savedPositions.getOrDefault(tab.getId(), Integer.MAX_VALUE)))
+                .toList();
+    }
+
+    public boolean isMainTabExplicitlyVisible(Tab tab) {
+        return tab == settingsTab || !localPreferences.getUi().getHiddenMainTabs().contains(tab.getId());
+    }
+
+    public boolean isMainTabPermissionAvailable(Tab tab) {
+        return mainTabPermissionAvailable.getOrDefault(tab, true);
+    }
+
+    public void updateMainTabOrder(List<String> tabIds) {
+        localPreferences.getUi().setMainTabOrder(new ArrayList<>(tabIds));
+        applyMainTabPreferences();
+    }
+
+    public void updateMainTabVisibility(String tabId, boolean visible) {
+        if (Objects.equals(tabId, settingsTab.getId())) {
+            return;
+        }
+        List<String> hiddenTabs = new ArrayList<>(localPreferences.getUi().getHiddenMainTabs());
+        if (visible) {
+            hiddenTabs.remove(tabId);
+        } else if (!hiddenTabs.contains(tabId)) {
+            hiddenTabs.add(tabId);
+        }
+        localPreferences.getUi().setHiddenMainTabs(hiddenTabs);
+        applyMainTabPreferences();
+    }
+
+    public void updateHideTabsWithoutPermission(boolean hide) {
+        localPreferences.getUi().setHideTabsWithoutPermission(hide);
+        applyMainTabPreferences();
+        if (userManagementController != null) {
+            userManagementController.refreshPermissionTabVisibility();
+        }
+        if (recentActivityController != null) {
+            recentActivityController.refreshPermissionTabVisibility();
+        }
+    }
+
+    private void applyMainTabPreferences() {
+        if (allMainTabs.isEmpty()) {
+            return;
+        }
+        Set<String> hiddenTabs = new HashSet<>(localPreferences.getUi().getHiddenMainTabs());
+        boolean hideWithoutPermission = localPreferences.getUi().isHideTabsWithoutPermission();
+        List<Tab> visibleTabs = getConfiguredMainTabs().stream()
+                .filter(tab -> tab == settingsTab || (!hiddenTabs.contains(tab.getId())
+                        && (!hideWithoutPermission || isMainTabPermissionAvailable(tab))))
+                .toList();
+        Tab selectedTab = root.getSelectionModel().getSelectedItem();
+        root.getTabs().setAll(visibleTabs);
+        if (selectedTab != null && visibleTabs.contains(selectedTab)) {
+            root.getSelectionModel().select(selectedTab);
+        }
+    }
+
+    private Map<String, Integer> savedMainTabPositions() {
+        Map<String, Integer> positions = new HashMap<>();
+        List<String> savedOrder = localPreferences.getUi().getMainTabOrder();
+        for (int index = 0; index < savedOrder.size(); index++) {
+            positions.putIfAbsent(savedOrder.get(index), index);
+        }
+        return positions;
     }
 
     private void selectActiveTab() {

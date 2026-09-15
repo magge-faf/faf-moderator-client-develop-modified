@@ -291,8 +291,13 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     private void disableTabOnMissingPermission(Tab tab, String permissionTechnicalName) {
-        tab.setDisable(!communicationService.hasPermission(permissionTechnicalName));
+        boolean hasPermission = communicationService.hasPermission(permissionTechnicalName);
+        userDetailTabPermissionAvailable.put(tab, hasPermission);
+        tab.setDisable(!hasPermission);
     }
+
+    private final List<Tab> allUserDetailTabs = new ArrayList<>();
+    private final Map<Tab, Boolean> userDetailTabPermissionAvailable = new IdentityHashMap<>();
 
     @FXML
     private Button minimizeSearchHistoryButton;
@@ -311,6 +316,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
     @FXML
     public void initialize() {
+        allUserDetailTabs.addAll(userDetailsTabPane.getTabs());
         loadStateCheckBox();
         addListeners();
         loadContent();
@@ -548,6 +554,17 @@ public class UserManagementController implements Controller<SplitPane> {
         disableTabOnMissingPermission(teamkillsTab, GroupPermission.ROLE_READ_TEAMKILL_REPORT);
         disableTabOnMissingPermission(avatarsTab, GroupPermission.ROLE_WRITE_AVATAR);
         disableTabOnMissingPermission(userGroupsTab, GroupPermission.ROLE_READ_USER_GROUP);
+        refreshPermissionTabVisibility();
+    }
+
+    public void refreshPermissionTabVisibility() {
+        if (allUserDetailTabs.isEmpty()) {
+            return;
+        }
+        boolean hide = localPreferences.getUi().isHideTabsWithoutPermission();
+        userDetailsTabPane.getTabs().setAll(allUserDetailTabs.stream()
+                .filter(tab -> !hide || userDetailTabPermissionAvailable.getOrDefault(tab, true))
+                .toList());
     }
 
     private void setupTableViews() {

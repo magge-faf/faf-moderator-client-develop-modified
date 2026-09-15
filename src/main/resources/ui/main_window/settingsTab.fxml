@@ -72,12 +72,25 @@
                 </VBox>
 
                 <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="1" GridPane.rowIndex="1">
+                    <Label styleClass="settings-section-title" text="Main Tabs"/>
+                    <Label styleClass="settings-help" text="Tick tabs to show them. Select a tab and move it up or down to change the main tab order. Settings always remains visible." wrapText="true"/>
+                    <Label fx:id="mainTabsCountLabel" styleClass="settings-status" wrapText="true"/>
+                    <ListView fx:id="mainTabsListView" prefHeight="560" minHeight="420"/>
+                    <HBox spacing="8" styleClass="settings-action-row">
+                        <Button mnemonicParsing="false" onAction="#onMoveMainTabUp" text="Move Up"/>
+                        <Button mnemonicParsing="false" onAction="#onMoveMainTabDown" text="Move Down"/>
+                    </HBox>
+                    <CheckBox fx:id="hideTabsWithoutPermissionCheckBox" mnemonicParsing="false"
+                              text="Hide tabs without required permission"/>
+                </VBox>
+
+                <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="0" GridPane.rowIndex="2" GridPane.columnSpan="2">
                     <Label styleClass="settings-section-title" text="IRC"/>
                     <Label styleClass="settings-help" text="Advanced IRC diagnostics." wrapText="true"/>
                     <CheckBox fx:id="ircDebugTrafficCheckBox" mnemonicParsing="false" text="Debug raw IRC traffic"/>
                 </VBox>
 
-                <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="0" GridPane.rowIndex="2" GridPane.columnSpan="2">
+                <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="0" GridPane.rowIndex="3" GridPane.columnSpan="2">
                     <Label styleClass="settings-section-title" text="Additional Settings"/>
                     <Label styleClass="settings-help" text="Open the settings pages for Reports or User Management." wrapText="true"/>
                     <FlowPane hgap="8" vgap="8" styleClass="settings-button-wrap">
@@ -90,7 +103,7 @@
                     </FlowPane>
                 </VBox>
 
-                <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="0" GridPane.rowIndex="3" GridPane.columnSpan="2">
+                <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="0" GridPane.rowIndex="4" GridPane.columnSpan="2">
                     <Label styleClass="settings-section-title" text="Config Backups"/>
                     <Label styleClass="settings-help" text="Automatic backups use 10 rotating slots. Manual backups are timestamped and do not overwrite those slots." wrapText="true"/>
                     <CheckBox fx:id="automaticConfigurationBackupsOnExitCheckBox" mnemonicParsing="false"
@@ -124,7 +137,7 @@
                     <Label fx:id="updaterDataFolderStatusLabel" styleClass="settings-status" text="" wrapText="true"/>
                 </VBox>
 
-                <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="0" GridPane.rowIndex="4" GridPane.columnSpan="2">
+                <VBox spacing="10" styleClass="settings-section" GridPane.columnIndex="0" GridPane.rowIndex="5" GridPane.columnSpan="2">
                     <Label styleClass="settings-section-title" text="Browser"/>
                     <GridPane hgap="10" vgap="8">
                         <columnConstraints>

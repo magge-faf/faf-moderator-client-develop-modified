@@ -28,6 +28,7 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -49,6 +50,12 @@ public class SettingsController implements Controller<Pane> {
     public CheckBox darkModeCheckBox;
     @FXML
     public ComboBox<Tab> defaultActiveTabComboBox;
+    @FXML
+    public ListView<Tab> mainTabsListView;
+    @FXML
+    public Label mainTabsCountLabel;
+    @FXML
+    public CheckBox hideTabsWithoutPermissionCheckBox;
     @FXML
     public Button openAiPromptButton;
 
@@ -123,6 +130,8 @@ public class SettingsController implements Controller<Pane> {
             }
         });
 
+        initializeMainTabLayoutSettings();
+
         fetchBansOnStartupCheckBox.setSelected(localPreferences.getTabSettings().isFetchBansOnStartupCheckBox());
         ircDebugTrafficCheckBox.setSelected(localPreferences.getTabIrcChat().isDebugTraffic());
         ircDebugTrafficCheckBox.selectedProperty().addListener((obs, oldVal, newVal) ->
@@ -176,6 +185,66 @@ public class SettingsController implements Controller<Pane> {
         initTemplatesFinishReports();
         createTemplateGamingModeratorTask();
         bindUIElementsToPreferences();
+    }
+
+    private void initializeMainTabLayoutSettings() {
+        refreshMainTabLayoutSettings();
+        mainTabsListView.setCellFactory(list -> new ListCell<>() {
+            private final CheckBox visibleCheckBox = new CheckBox();
+
+            @Override
+            protected void updateItem(Tab tab, boolean empty) {
+                super.updateItem(tab, empty);
+                if (empty || tab == null) {
+                    visibleCheckBox.setOnAction(null);
+                    setGraphic(null);
+                    return;
+                }
+                boolean permissionAvailable = mainController.isMainTabPermissionAvailable(tab);
+                visibleCheckBox.setText(tab.getText() + (permissionAvailable ? "" : " (no permission)"));
+                visibleCheckBox.setSelected(mainController.isMainTabExplicitlyVisible(tab)
+                        && (!hideTabsWithoutPermissionCheckBox.isSelected() || permissionAvailable));
+                visibleCheckBox.setDisable(tab == mainController.settingsTab
+                        || (hideTabsWithoutPermissionCheckBox.isSelected() && !permissionAvailable));
+                visibleCheckBox.setOnAction(event ->
+                        mainController.updateMainTabVisibility(tab.getId(), visibleCheckBox.isSelected()));
+                setGraphic(visibleCheckBox);
+            }
+        });
+        hideTabsWithoutPermissionCheckBox.setSelected(localPreferences.getUi().isHideTabsWithoutPermission());
+        hideTabsWithoutPermissionCheckBox.selectedProperty().addListener((obs, oldValue, hide) -> {
+            mainController.updateHideTabsWithoutPermission(hide);
+            mainTabsListView.refresh();
+        });
+    }
+
+    public void refreshMainTabLayoutSettings() {
+        mainTabsListView.getItems().setAll(mainController.getConfiguredMainTabs());
+        mainTabsCountLabel.setText(mainTabsListView.getItems().size()
+                + " main tabs — scroll this list to reach tabs near the bottom.");
+        mainTabsListView.refresh();
+    }
+
+    @FXML
+    public void onMoveMainTabUp() {
+        moveSelectedMainTab(-1);
+    }
+
+    @FXML
+    public void onMoveMainTabDown() {
+        moveSelectedMainTab(1);
+    }
+
+    private void moveSelectedMainTab(int offset) {
+        int currentIndex = mainTabsListView.getSelectionModel().getSelectedIndex();
+        int targetIndex = currentIndex + offset;
+        if (currentIndex < 0 || targetIndex < 0 || targetIndex >= mainTabsListView.getItems().size()) {
+            return;
+        }
+        Tab selectedTab = mainTabsListView.getItems().get(currentIndex);
+        Collections.swap(mainTabsListView.getItems(), currentIndex, targetIndex);
+        mainTabsListView.getSelectionModel().select(selectedTab);
+        mainController.updateMainTabOrder(mainTabsListView.getItems().stream().map(Tab::getId).toList());
     }
     private void bindUIElementsToPreferences() {
         LocalPreferences.TabReports tabReports = localPreferences.getTabReports();

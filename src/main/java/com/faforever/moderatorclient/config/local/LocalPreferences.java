@@ -552,6 +552,9 @@ public class LocalPreferences {
         boolean darkMode = true;
         String startUpTab = "userManagementTab";
         boolean suppressRateLimitWarning = false;
+        List<String> mainTabOrder = new ArrayList<>();
+        List<String> hiddenMainTabs = new ArrayList<>();
+        boolean hideTabsWithoutPermission = true;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
