@@ -99,6 +99,30 @@ class LocalPreferencesReaderWriterTest {
         }
     }
 
+    @Test
+    void writeReplacesFileAtomicallyAndLeavesNoTempFileBehind(@TempDir Path tempDir) throws Exception {
+        String originalUserDir = System.getProperty("user.dir");
+        String originalAppHome = System.getProperty("faf.app.home");
+        try {
+            System.setProperty("user.dir", tempDir.toString());
+            LocalPreferencesReaderWriter readerWriter = new LocalPreferencesReaderWriter(new ObjectMapper());
+            LocalPreferences preferences = new LocalPreferences();
+            preferences.getAutoLogin().setEnvironment("faforever.com");
+
+            assertThat(readerWriter.write(preferences), is(true));
+
+            Path configPrefs = tempDir.resolve("config").resolve("client-prefs.json");
+            assertThat(Files.exists(configPrefs), is(true));
+            assertThat(Files.exists(tempDir.resolve("config").resolve("client-prefs.json.tmp")), is(false));
+
+            LocalPreferences reloaded = readerWriter.read();
+            assertThat(reloaded.getAutoLogin().getEnvironment(), is("faforever.com"));
+        } finally {
+            System.setProperty("user.dir", originalUserDir);
+            restoreAppHome(originalAppHome);
+        }
+    }
+
     private static void restoreAppHome(String originalAppHome) {
         if (originalAppHome == null) {
             System.clearProperty("faf.app.home");

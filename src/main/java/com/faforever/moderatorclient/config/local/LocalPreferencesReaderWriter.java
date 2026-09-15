@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -67,9 +68,15 @@ public class LocalPreferencesReaderWriter {
             if (prefsPath.getParent() != null && Files.notExists(prefsPath.getParent())) {
                 Files.createDirectories(prefsPath.getParent());
             }
-            try (BufferedWriter writer = Files.newBufferedWriter(prefsPath)) {
+            Path tmpPath = prefsPath.resolveSibling(prefsPath.getFileName() + ".tmp");
+            try (BufferedWriter writer = Files.newBufferedWriter(tmpPath)) {
                 objectMapper.writerWithDefaultPrettyPrinter()
                         .writeValue(writer, localPreferences);
+            }
+            try {
+                Files.move(tmpPath, prefsPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(tmpPath, prefsPath, StandardCopyOption.REPLACE_EXISTING);
             }
             log.info("Preferences saved to {}", prefsPath);
             return true;
