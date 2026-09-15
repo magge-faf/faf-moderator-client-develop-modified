@@ -41,7 +41,7 @@ if (javafxPlatform == "unspecified") {
 println "Platform is: ${javafxPlatform}"
 
 dependencies {
-    def springBootVersion = "4.0.6"
+    def springBootVersion = "4.1.1"
     def mapStructVersion = "1.6.3"
     def commonsVersion = "20260628-7c450f0"
 
@@ -55,7 +55,7 @@ dependencies {
     implementation("org.jetbrains:annotations:26.1.0")
     implementation("org.springframework.boot:spring-boot-starter")
     implementation("org.springframework.boot:spring-boot-starter-validation")
-    implementation("org.springframework.boot:spring-boot-starter-oauth2-client:4.0.6")
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-client:4.1.1")
     implementation("io.projectreactor.netty:reactor-netty-http")
     implementation("javax.inject:javax.inject:1")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
