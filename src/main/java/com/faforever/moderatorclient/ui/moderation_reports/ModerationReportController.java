@@ -214,6 +214,8 @@ public class ModerationReportController implements Controller<Region> {
     @FXML
     public Canvas paintingCanvas;
     @FXML
+    public Canvas paintingOverviewCanvas;
+    @FXML
     public Slider paintingTimeSlider;
     @FXML
     public TextField replayTimeTextField;
@@ -242,6 +244,7 @@ public class ModerationReportController implements Controller<Region> {
     private Map<String, Color> currentReplayPlayerColors = new LinkedHashMap<>();
     private Timeline replayPlaybackTimeline;
     private boolean synchronizingReplayTimelineSelection;
+    private boolean selectingReplayTimelineFromUser;
     private int currentReplayTimelineIndex = -1;
     private float replayMapWidth;
     private float replayMapHeight;
@@ -1664,14 +1667,28 @@ public class ModerationReportController implements Controller<Region> {
             replayTimeTextField.setText(formatReplayTime(java.time.Duration.ofMillis(milliseconds)));
             java.time.Duration limit = java.time.Duration.ofMillis(milliseconds);
             renderReplayMap(visiblePaintingStrokes(limit), limit);
+            renderPaintingOverview(limit);
             synchronizeReplayTimeline(limit);
         });
         replayPlaybackTimeline = new Timeline(new KeyFrame(Duration.millis(100), event -> advanceReplayPlayback()));
         replayPlaybackTimeline.setCycleCount(Timeline.INDEFINITE);
         replayTimelineListView.setCellFactory(listView -> new ListCell<>() {
+            private void updateSelectionStyle() {
+                setStyle(isSelected()
+                        ? "-fx-background-color: #465159; -fx-border-color: transparent transparent transparent #72818c; -fx-border-width: 0 0 0 2;"
+                        : "-fx-background-color: transparent; -fx-border-color: transparent;");
+            }
+
+            @Override
+            public void updateSelected(boolean selected) {
+                super.updateSelected(selected);
+                updateSelectionStyle();
+            }
+
             @Override
             protected void updateItem(ReplayTimelineEntry entry, boolean empty) {
                 super.updateItem(entry, empty);
+                updateSelectionStyle();
                 if (empty || entry == null) {
                     setText(null);
                     setGraphic(null);
@@ -1694,7 +1711,16 @@ public class ModerationReportController implements Controller<Region> {
         });
         replayTimelineListView.getSelectionModel().selectedItemProperty().addListener((obs, oldEntry, entry) -> {
             if (entry != null && !synchronizingReplayTimelineSelection) {
-                paintingTimeSlider.setValue(entry.time().toMillis() / 1_000d);
+                selectingReplayTimelineFromUser = true;
+                try {
+                    currentReplayTimelineIndex = replayTimelineListView.getSelectionModel().getSelectedIndex();
+                    paintingTimeSlider.setValue(entry.time().toMillis() / 1_000d);
+                    replayEventDetailLabel.setText(entry.mapMarker() == null
+                            ? "Current event: " + formatReplayTimelineEntry(entry)
+                            : "Current event: " + formatReplayTimelineEntry(entry) + " — map marker shown.");
+                } finally {
+                    selectingReplayTimelineFromUser = false;
+                }
             }
         });
         replayDetailListView.setCellFactory(listView -> new ListCell<>() {
@@ -2442,6 +2468,7 @@ public class ModerationReportController implements Controller<Region> {
                     paintingTimeSlider.setMax(Math.max(maxSec, 1));
                     paintingTimeSlider.setValue(0);
                     renderReplayMap(visiblePaintingStrokes(java.time.Duration.ZERO), java.time.Duration.ZERO);
+                    renderPaintingOverview(java.time.Duration.ZERO);
                     renderReplayTimeline();
                 });
 
@@ -3465,6 +3492,63 @@ public class ModerationReportController implements Controller<Region> {
         }
     }
 
+    private void renderPaintingOverview(java.time.Duration limit) {
+        GraphicsContext gc = paintingOverviewCanvas.getGraphicsContext2D();
+        double width = paintingOverviewCanvas.getWidth();
+        double height = paintingOverviewCanvas.getHeight();
+        double padding = 24;
+
+        gc.setFill(Color.rgb(12, 14, 16));
+        gc.fillRect(0, 0, width, height);
+        gc.setStroke(Color.rgb(90, 98, 104));
+        gc.setLineWidth(2);
+        gc.strokeRect(padding, padding, width - 2 * padding, height - 2 * padding);
+
+        if (currentPaintingStrokes.isEmpty()) {
+            gc.setFill(Color.LIGHTGRAY);
+            gc.setFont(javafx.scene.text.Font.font(14));
+            gc.fillText("No painting strokes found in this replay.", 38, height / 2);
+            return;
+        }
+
+        float range = Math.max(Math.max(paintingMaxX - paintingMinX, paintingMaxZ - paintingMinZ), 1f);
+        double scale = (Math.min(width, height) - 2 * padding) / range;
+        Map<String, Color> playerColors = new LinkedHashMap<>(currentReplayPlayerColors);
+        for (PaintingBrushStroke stroke : currentPaintingStrokes) {
+            playerColors.computeIfAbsent(stroke.playerName(),
+                    name -> PAINTING_PLAYER_COLORS[playerColors.size() % PAINTING_PLAYER_COLORS.length]);
+        }
+
+        gc.setLineWidth(2);
+        gc.setLineCap(StrokeLineCap.ROUND);
+        gc.setLineJoin(StrokeLineJoin.ROUND);
+        for (PaintingBrushStroke stroke : currentPaintingStrokes) {
+            if (stroke.time().compareTo(limit) > 0) {
+                continue;
+            }
+            List<float[]> points = stroke.points();
+            if (points.isEmpty()) {
+                continue;
+            }
+            Color color = playerColors.getOrDefault(stroke.playerName(), Color.WHITE);
+            double startX = padding + (points.getFirst()[0] - paintingMinX) * scale;
+            double startY = padding + (points.getFirst()[1] - paintingMinZ) * scale;
+            if (points.size() == 1) {
+                gc.setFill(color);
+                gc.fillOval(startX - 3, startY - 3, 6, 6);
+                continue;
+            }
+            gc.setStroke(color);
+            gc.beginPath();
+            gc.moveTo(startX, startY);
+            for (int index = 1; index < points.size(); index++) {
+                gc.lineTo(padding + (points.get(index)[0] - paintingMinX) * scale,
+                        padding + (points.get(index)[1] - paintingMinZ) * scale);
+            }
+            gc.stroke();
+        }
+    }
+
     private void clearReplayMapTimeline() {
         stopReplayPlayback();
         currentPaintingStrokes = List.of();
@@ -3482,6 +3566,7 @@ public class ModerationReportController implements Controller<Region> {
         paintingTimeSlider.setMax(1);
         paintingTimeSlider.setValue(0);
         renderReplayMap(List.of(), java.time.Duration.ZERO);
+        renderPaintingOverview(java.time.Duration.ZERO);
     }
 
     private static String colorCss(Color color) {
@@ -3502,6 +3587,9 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private void synchronizeReplayTimeline(java.time.Duration currentTime) {
+        if (selectingReplayTimelineFromUser) {
+            return;
+        }
         int matchingIndex = -1;
         for (int index = 0; index < currentReplayTimeline.size(); index++) {
             if (currentReplayTimeline.get(index).time().compareTo(currentTime) <= 0) {
@@ -3523,7 +3611,9 @@ public class ModerationReportController implements Controller<Region> {
             } else {
                 ReplayTimelineEntry entry = currentReplayTimeline.get(matchingIndex);
                 replayTimelineListView.getSelectionModel().select(matchingIndex);
-                replayTimelineListView.scrollTo(matchingIndex);
+                // Keep the current event near the top. Scrolling directly to a row can
+                // bottom-align short lists and leave most of the timeline visibly empty.
+                replayTimelineListView.scrollTo(Math.max(0, matchingIndex - 5));
                 replayEventDetailLabel.setText(entry.mapMarker() == null
                         ? "Current event: " + formatReplayTimelineEntry(entry)
                         : "Current event: " + formatReplayTimelineEntry(entry) + " — map marker shown.");

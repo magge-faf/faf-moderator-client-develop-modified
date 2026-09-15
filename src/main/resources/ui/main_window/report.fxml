@@ -97,6 +97,7 @@
         </Tab>
         <Tab fx:id="reportMapDrawingsTab" text="Replay Map &amp; Timeline">
             <VBox spacing="8" style="-fx-padding: 6;">
+                <ScrollPane fitToHeight="true" pannable="true" hbarPolicy="AS_NEEDED" vbarPolicy="AS_NEEDED">
                 <HBox spacing="8" alignment="TOP_LEFT">
                     <ScrollPane fitToWidth="false" fitToHeight="false">
                         <Group>
@@ -126,7 +127,16 @@
                         <VBox fx:id="replayPlayersLegend" spacing="4" prefWidth="360"/>
                         <Label text="Select an event below to jump there. Drawings and map markers fade using the values above." wrapText="true" maxWidth="210"/>
                     </VBox>
+                    <VBox spacing="6" alignment="TOP_LEFT">
+                        <Label text="Quick draft — drawings up to selected time"/>
+                        <ScrollPane fitToWidth="false" fitToHeight="false">
+                            <Group>
+                                <Canvas fx:id="paintingOverviewCanvas" width="600" height="600"/>
+                            </Group>
+                        </ScrollPane>
+                    </VBox>
                 </HBox>
+                </ScrollPane>
                 <Label text="Replay timeline — select an event to jump to it"/>
                 <ListView fx:id="replayTimelineListView" prefHeight="220" VBox.vgrow="ALWAYS"/>
                 <Label fx:id="replayEventDetailLabel" wrapText="true"/>
