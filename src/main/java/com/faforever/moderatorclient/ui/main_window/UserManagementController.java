@@ -794,7 +794,7 @@ public class UserManagementController implements Controller<SplitPane> {
             return;
         }
 
-        searchUserProperties.getSelectionModel().select("Name");
+        searchUserProperties.getSelectionModel().select("All In One");
         userSearchTextField.setText(login);
         onUserSearch();
     }
