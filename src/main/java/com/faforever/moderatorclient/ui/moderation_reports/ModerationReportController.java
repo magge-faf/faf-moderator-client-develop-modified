@@ -248,6 +248,7 @@ public class ModerationReportController implements Controller<Region> {
     private static final String REPLAY_VAULT_URL = "https://vault.jipwijnia.nl/replay/";
     private String replayVaultGameId;
     private List<ReplayDetailEntry> currentReplayDetailEntries = List.of();
+    private Map<String, ReplayFaction> currentReplayPlayerFactions = Map.of();
     private List<PaintingBrushStroke> currentPaintingStrokes = new ArrayList<>();
     private List<ReplayMapMarker> currentReplayMapMarkers = new ArrayList<>();
     private List<ReplayTimelineEntry> currentReplayTimeline = new ArrayList<>();
@@ -2470,6 +2471,7 @@ public class ModerationReportController implements Controller<Region> {
                     renderReplayDetailEntries(replayDetailEntries);
                     stopReplayPlayback();
                     currentReplayPlayerColors = extractReplayPlayerColors(replayDataParser);
+                    currentReplayPlayerFactions = extractReplayPlayerFactions(replayDataParser, replayTimelineData);
                     replayMapPreview = mapPreview.image();
                     replayMapWidth = mapPreview.width();
                     replayMapHeight = mapPreview.height();
@@ -2796,6 +2798,51 @@ public class ModerationReportController implements Controller<Region> {
 
     private record ReplayDetailEntry(java.time.Duration time, String category, String playerName, String details) {}
 
+    private enum ReplayFaction {
+        UEF("U", Color.rgb(41, 121, 255)),
+        AEON("A", Color.rgb(118, 214, 72)),
+        CYBRAN("C", Color.rgb(230, 57, 53)),
+        SERAPHIM("S", Color.rgb(255, 196, 0)),
+        NOMADS("N", Color.rgb(255, 140, 40)),
+        UNKNOWN("?", Color.LIGHTGRAY);
+
+        private final String glyph;
+        private final Color color;
+
+        ReplayFaction(String glyph, Color color) {
+            this.glyph = glyph;
+            this.color = color;
+        }
+
+        /** Lobby faction index as stored in the replay's army options (1 = UEF ... 5 = Nomads). */
+        static ReplayFaction fromLobbyIndex(Object value) {
+            if (!(value instanceof Number number)) {
+                return UNKNOWN;
+            }
+            return switch (number.intValue()) {
+                case 1 -> UEF;
+                case 2 -> AEON;
+                case 3 -> CYBRAN;
+                case 4 -> SERAPHIM;
+                case 5 -> NOMADS;
+                default -> UNKNOWN;
+            };
+        }
+
+        /** Commander blueprints: uel/ual/url/xsl/xnl0001. */
+        static ReplayFaction fromBlueprint(String blueprintId) {
+            String id = blueprintId == null ? "" : blueprintId.toLowerCase(Locale.ROOT);
+            int slash = id.lastIndexOf('/');
+            id = slash >= 0 ? id.substring(slash + 1) : id;
+            if (id.startsWith("ue")) return UEF;
+            if (id.startsWith("ua")) return AEON;
+            if (id.startsWith("ur")) return CYBRAN;
+            if (id.startsWith("xs")) return SERAPHIM;
+            if (id.startsWith("xn")) return NOMADS;
+            return UNKNOWN;
+        }
+    }
+
     private record ReplayMapPreview(Image image, float width, float height) {
         private static ReplayMapPreview unavailable() {
             return new ReplayMapPreview(null, 0, 0);
@@ -2899,6 +2946,8 @@ public class ModerationReportController implements Controller<Region> {
         int commandSource = -1;
         Map<Integer, Map<String, Object>> armies = parser.getArmies();
         Set<Integer> commanderStartRecorded = new HashSet<>();
+        // source index -> {sumX, sumZ, count} of early build orders, used to estimate spawns
+        Map<Integer, float[]> earlyBuildOrders = new LinkedHashMap<>();
         List<ReplayMapMarker> mapMarkers = new ArrayList<>();
         List<ReplayTimelineEntry> timelineEntries = new ArrayList<>();
 
@@ -2914,6 +2963,7 @@ public class ModerationReportController implements Controller<Region> {
 
             java.time.Duration time = java.time.Duration.ofSeconds(tick / 10L);
             String playerName = playerNameForArmy(armies, commandSource);
+            recordEarlyBuildOrder(earlyBuildOrders, event, tick, commandSource);
             if (event instanceof Event.CommandSourceTerminated) {
                 timelineEntries.add(new ReplayTimelineEntry(time, "Player left", playerName, "Command source terminated", null));
             } else if (event instanceof Event.CreateUnit createdUnit
@@ -2968,6 +3018,14 @@ public class ModerationReportController implements Controller<Region> {
         }
 
         timelineEntries.sort(Comparator.comparing(ReplayTimelineEntry::time));
+        earlyBuildOrders.forEach((source, sum) -> {
+            if (commanderStartRecorded.contains(source)) {
+                return;
+            }
+            String player = playerNameForArmy(armies, source);
+            mapMarkers.add(new ReplayMapMarker(java.time.Duration.ZERO, ReplayMapMarkerType.START_POSITION, player,
+                    sum[0] / sum[2], sum[1] / sum[2], "Estimated start position — " + player));
+        });
         return new ReplayTimelineData(mapMarkers, timelineEntries);
     }
 
@@ -3041,6 +3099,38 @@ public class ModerationReportController implements Controller<Region> {
         }
         int separator = Math.max(blueprintId.lastIndexOf('/'), blueprintId.lastIndexOf('\\'));
         return separator >= 0 ? blueprintId.substring(separator + 1) : blueprintId;
+    }
+
+    private static final int SPAWN_ESTIMATE_MAX_TICK = 1200;
+    private static final int SPAWN_ESTIMATE_SAMPLES = 5;
+
+    /**
+     * Replays do not store spawn coordinates. Like Jip's Vault, estimate them from the centroid of each
+     * player's first construction orders in the first two minutes, which cluster around the commander.
+     */
+    private static void recordEarlyBuildOrder(Map<Integer, float[]> sums, Event event, int tick, int source) {
+        if (tick > SPAWN_ESTIMATE_MAX_TICK || source < 0) {
+            return;
+        }
+        Event.CommandData data = event instanceof Event.IssueCommand command ? command.commandData()
+                : event instanceof Event.IssueFactoryCommand command ? command.commandData()
+                : null;
+        if (data == null || !isConstructionCommand(data.commandType())
+                || !(data.commandTarget() instanceof Event.CommandTarget.Position target)) {
+            return;
+        }
+        float[] sum = sums.computeIfAbsent(source, ignored -> new float[3]);
+        if (sum[2] < SPAWN_ESTIMATE_SAMPLES) {
+            sum[0] += target.px();
+            sum[1] += target.pz();
+            sum[2]++;
+        }
+    }
+
+    private static boolean isConstructionCommand(EventCommandType commandType) {
+        return commandType == EventCommandType.BUILD_FACTORY || commandType == EventCommandType.BUILD_MOBILE
+                || commandType == EventCommandType.UPGRADE || commandType == EventCommandType.BUILD_SILO_TACTICAL
+                || commandType == EventCommandType.BUILD_SILO_NUKE;
     }
 
     private static boolean isAttackCommand(EventCommandType commandType) {
@@ -3139,6 +3229,53 @@ public class ModerationReportController implements Controller<Region> {
         return colors;
     }
 
+    private static Map<String, ReplayFaction> extractReplayPlayerFactions(ReplayDataParser parser,
+                                                                          ReplayTimelineData timelineData) {
+        Map<String, ReplayFaction> factions = new HashMap<>();
+        parser.getArmies().values().forEach(army -> {
+            if (army.get("PlayerName") instanceof String name) {
+                ReplayFaction faction = ReplayFaction.fromLobbyIndex(army.get("Faction"));
+                if (faction != ReplayFaction.UNKNOWN) {
+                    factions.put(name, faction);
+                }
+            }
+        });
+        // Random faction picks are only resolved in-game, so fall back to the spawned commander blueprint.
+        timelineData.timelineEntries().stream()
+                .filter(entry -> "Start position".equals(entry.category()))
+                .forEach(entry -> factions.merge(entry.playerName(),
+                        ReplayFaction.fromBlueprint(entry.details().replace("Initial unit created: ", "")),
+                        (lobby, commander) -> commander == ReplayFaction.UNKNOWN ? lobby : commander));
+        return factions;
+    }
+
+    private void drawStartPositionBadge(GraphicsContext gc, double x, double y, String playerName, Color playerColor) {
+        ReplayFaction faction = currentReplayPlayerFactions.getOrDefault(playerName, ReplayFaction.UNKNOWN);
+        double radius = 13;
+        gc.setFill(Color.rgb(0, 0, 0, 0.35));
+        gc.fillOval(x - radius - 1, y - radius + 2, radius * 2 + 2, radius * 2 + 2);
+        gc.setFill(Color.rgb(24, 26, 30));
+        gc.fillOval(x - radius, y - radius, radius * 2, radius * 2);
+        gc.setStroke(playerColor);
+        gc.setLineWidth(3);
+        gc.strokeOval(x - radius, y - radius, radius * 2, radius * 2);
+
+        gc.setFill(faction.color);
+        gc.setFont(javafx.scene.text.Font.font("System", javafx.scene.text.FontWeight.BOLD, 14));
+        gc.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
+        gc.setTextBaseline(javafx.geometry.VPos.CENTER);
+        gc.fillText(faction.glyph, x, y + 1);
+
+        gc.setFont(javafx.scene.text.Font.font("System", javafx.scene.text.FontWeight.BOLD, 11));
+        gc.setTextBaseline(javafx.geometry.VPos.TOP);
+        gc.setFill(Color.rgb(0, 0, 0, 0.8));
+        gc.fillText(playerName, x + 1, y + radius + 4);
+        gc.setFill(Color.WHITE);
+        gc.fillText(playerName, x, y + radius + 3);
+        gc.setTextAlign(javafx.scene.text.TextAlignment.LEFT);
+        gc.setTextBaseline(javafx.geometry.VPos.BASELINE);
+    }
+
     private void renderReplayPlayerLegend(List<ReplayPlayerEntry> players) {
         List<javafx.scene.Node> legendRows = new ArrayList<>();
         players.stream().collect(Collectors.groupingBy(ReplayPlayerEntry::team, LinkedHashMap::new, Collectors.toList()))
@@ -3148,7 +3285,7 @@ public class ModerationReportController implements Controller<Region> {
                     legendRows.add(teamLabel);
                     teammates.forEach(player -> {
                         Circle color = new Circle(6, player.color());
-                        Label text = new Label(player.name() + (player.startRecorded() ? " — start position recorded" : ""));
+                        Label text = new Label(player.name());
                         text.setStyle("-fx-text-fill: " + colorCss(player.color()) + ";");
                         text.setWrapText(true);
                         text.setMaxWidth(Double.MAX_VALUE);
@@ -3210,7 +3347,7 @@ public class ModerationReportController implements Controller<Region> {
         Optional<Path> generatorJar = resolveNeroxisGeneratorJar(mapName.get());
         Optional<Path> javaExecutable = resolveFafJavaExecutable();
         if (generatorJar.isEmpty() || javaExecutable.isEmpty()) {
-            log.warn("Cannot generate replay map '{}': FAF generator or its Java runtime is unavailable", mapName.get());
+            log.warn("Cannot generate replay map '{}': map generator could not be found or downloaded, or no Java runtime is available", mapName.get());
             return Optional.empty();
         }
 
@@ -3271,26 +3408,84 @@ public class ModerationReportController implements Controller<Region> {
         return matcher.find() ? Optional.of(matcher.group(1)) : Optional.empty();
     }
 
+    private static final Pattern NEROXIS_VERSION_PATTERN = Pattern.compile("[0-9]+([.][0-9]+){1,3}");
+    private static final String NEROXIS_RELEASE_URL =
+            "https://github.com/FAForever/Neroxis-Map-Generator/releases/download/%s/NeroxisGen_%s.jar";
+    private static final Object NEROXIS_DOWNLOAD_LOCK = new Object();
+
     private Optional<Path> resolveNeroxisGeneratorJar(String mapName) {
         String[] segments = mapName.split("_");
-        if (segments.length < 4) {
+        if (segments.length < 4 || !NEROXIS_VERSION_PATTERN.matcher(segments[3]).matches()) {
             return Optional.empty();
         }
+        String version = segments[3];
         String programData = System.getenv("ProgramData");
-        if (programData == null || programData.isBlank()) {
+        if (programData != null && !programData.isBlank()) {
+            Path generator = Path.of(programData, "FAForever", "map_generator", "MapGenerator_" + version + ".jar");
+            if (Files.isRegularFile(generator)) {
+                return Optional.of(generator);
+            }
+        }
+        return downloadNeroxisGeneratorJar(version);
+    }
+
+    /** Fallback when the FAF client has not installed this generator version: fetch it once from the official release. */
+    private Optional<Path> downloadNeroxisGeneratorJar(String version) {
+        Path directory = ApplicationPaths.resolveConfigurationDirectory().resolve("map-generator");
+        Path jar = directory.resolve("NeroxisGen_" + version + ".jar");
+        synchronized (NEROXIS_DOWNLOAD_LOCK) {
+            if (Files.isRegularFile(jar)) {
+                return Optional.of(jar);
+            }
+            Path partial = directory.resolve("NeroxisGen_" + version + ".jar.part");
+            try {
+                Files.createDirectories(directory);
+                log.info("Downloading map generator {} for replay map preview", version);
+                HttpClient client = HttpClient.newBuilder()
+                        .followRedirects(HttpClient.Redirect.NORMAL)
+                        .connectTimeout(java.time.Duration.ofSeconds(15))
+                        .build();
+                HttpRequest request = HttpRequest.newBuilder(URI.create(String.format(NEROXIS_RELEASE_URL, version, version)))
+                        .timeout(java.time.Duration.ofMinutes(3))
+                        .GET()
+                        .build();
+                HttpResponse<Path> response = client.send(request, HttpResponse.BodyHandlers.ofFile(partial));
+                if (response.statusCode() != 200 || Files.size(partial) == 0) {
+                    log.warn("Could not download map generator {}: HTTP {}", version, response.statusCode());
+                    Files.deleteIfExists(partial);
+                    return Optional.empty();
+                }
+                Files.move(partial, jar, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                return Optional.of(jar);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("Interrupted while downloading map generator {}", version, e);
+            } catch (IOException e) {
+                log.warn("Could not download map generator {}", version, e);
+            }
+            try {
+                Files.deleteIfExists(partial);
+            } catch (IOException ignored) {
+                // best effort
+            }
             return Optional.empty();
         }
-        Path generator = Path.of(programData, "FAForever", "map_generator", "MapGenerator_" + segments[3] + ".jar");
-        return Files.isRegularFile(generator) ? Optional.of(generator) : Optional.empty();
     }
 
     private Optional<Path> resolveFafJavaExecutable() {
         String programFiles = System.getenv("ProgramFiles");
         if (programFiles == null || programFiles.isBlank()) {
-            return Optional.empty();
+            return currentJavaExecutable();
         }
         Path javaExecutable = Path.of(programFiles, "FAF Client", "jre", "bin", "java.exe");
-        return Files.isRegularFile(javaExecutable) ? Optional.of(javaExecutable) : Optional.empty();
+        if (Files.isRegularFile(javaExecutable)) {
+            return Optional.of(javaExecutable);
+        }
+        return currentJavaExecutable();
+    }
+
+    private static Optional<Path> currentJavaExecutable() {
+        return ProcessHandle.current().info().command().map(Path::of).filter(Files::isRegularFile);
     }
 
     private MapDimensions readCachedMapDimensions(Path dimensionsFile) throws IOException {
@@ -3497,12 +3692,8 @@ public class ModerationReportController implements Controller<Region> {
             double x = padding + (marker.x() - paintingMinX) * scale;
             double y = padding + (marker.z() - paintingMinZ) * scale;
             if (marker.type() == ReplayMapMarkerType.START_POSITION) {
-                Color color = playerColors.getOrDefault(marker.playerName(), Color.WHITE);
-                gc.setFill(color);
-                gc.fillOval(x - 5, y - 5, 10, 10);
-                gc.setFill(Color.WHITE);
-                gc.setFont(javafx.scene.text.Font.font(12));
-                gc.fillText(marker.playerName(), x + 8, y - 8);
+                drawStartPositionBadge(gc, x, y, marker.playerName(),
+                        playerColors.getOrDefault(marker.playerName(), Color.WHITE));
             } else {
                 Color markerColor = marker.type() == ReplayMapMarkerType.PING ? Color.GOLD : Color.ORANGERED;
                 gc.setStroke(markerColor);
@@ -3580,6 +3771,7 @@ public class ModerationReportController implements Controller<Region> {
         currentReplayMapMarkers = List.of();
         currentReplayTimeline = List.of();
         currentReplayPlayerColors = Map.of();
+        currentReplayPlayerFactions = Map.of();
         replayMapPreview = null;
         replayMapWidth = 0;
         replayMapHeight = 0;

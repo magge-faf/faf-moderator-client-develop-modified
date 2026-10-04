@@ -551,6 +551,8 @@ public class LocalPreferences {
         String browserComboBox = "SelectBrowser";
         boolean darkMode = true;
         String startUpTab = "userManagementTab";
+        /** Main tab that was open when the client was last closed; takes precedence over startUpTab. */
+        String lastMainTab;
         boolean suppressRateLimitWarning = false;
         List<String> mainTabOrder = new ArrayList<>();
         List<String> hiddenMainTabs = new ArrayList<>();

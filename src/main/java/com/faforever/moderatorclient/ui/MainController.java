@@ -177,6 +177,11 @@ public class MainController implements Controller<TabPane>, DisposableBean {
             settingsController.refreshMainTabLayoutSettings();
         }
         selectActiveTab();
+        root.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
+            if (newTab != null && newTab.getId() != null) {
+                localPreferences.getUi().setLastMainTab(newTab.getId());
+            }
+        });
     }
 
     public List<Tab> getConfiguredMainTabs() {
@@ -251,13 +256,13 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     }
 
     private void selectActiveTab() {
+        var lastMainTab = localPreferences.getUi().getLastMainTab();
         var startUpTab = localPreferences.getUi().getStartUpTab();
-        if (startUpTab == null) return;
 
         try {
-            root.getTabs()
-                    .stream().filter(tab -> Objects.equals(tab.getId(), startUpTab))
+            root.getTabs().stream().filter(tab -> Objects.equals(tab.getId(), lastMainTab))
                     .findFirst()
+                    .or(() -> root.getTabs().stream().filter(tab -> Objects.equals(tab.getId(), startUpTab)).findFirst())
                     .ifPresent(tab -> root.getSelectionModel().select(tab));
         } catch (Exception e) {
             log.error("Error selecting active tab", e);
