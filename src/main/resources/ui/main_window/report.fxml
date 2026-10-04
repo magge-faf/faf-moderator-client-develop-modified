@@ -24,6 +24,7 @@
 <?import javafx.scene.canvas.Canvas?>
 <?import javafx.scene.Group?>
 <?import javafx.scene.control.Slider?>
+<?import javafx.scene.control.ComboBox?>
 <SplitPane fx:id="root" dividerPositions="0.25" orientation="VERTICAL" xmlns="http://javafx.com/javafx/11.0.1"
            xmlns:fx="http://javafx.com/fxml/1"
            fx:controller="com.faforever.moderatorclient.ui.moderation_reports.ModerationReportController">
@@ -145,6 +146,15 @@
         <Tab text="Replay Detail (Test)">
             <VBox spacing="8" style="-fx-padding: 6;">
                 <Label text="Recorded commands and unit lifecycle events — select a row to jump to its replay time."/>
+                <HBox spacing="8" alignment="CENTER_LEFT">
+                    <Label text="Player:"/>
+                    <ComboBox fx:id="replayDetailPlayerFilterComboBox" prefWidth="180"/>
+                    <Label text="Event:"/>
+                    <ComboBox fx:id="replayDetailEventFilterComboBox" prefWidth="200"/>
+                    <TextField fx:id="replayDetailSearchTextField" promptText="Search details..." prefWidth="220"/>
+                    <Button text="Clear" onAction="#clearReplayDetailFilters"/>
+                    <Button text="Open Jip&apos;s Vault" onAction="#openReplayVaultInBrowser"/>
+                </HBox>
                 <Label fx:id="replayDetailSummaryLabel" wrapText="true"/>
                 <ListView fx:id="replayDetailListView" VBox.vgrow="ALWAYS"/>
             </VBox>

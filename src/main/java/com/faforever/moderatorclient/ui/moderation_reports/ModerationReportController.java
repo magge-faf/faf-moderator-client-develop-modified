@@ -237,6 +237,16 @@ public class ModerationReportController implements Controller<Region> {
     public ListView<ReplayDetailEntry> replayDetailListView;
     @FXML
     public Label replayDetailSummaryLabel;
+    @FXML
+    public ComboBox<String> replayDetailPlayerFilterComboBox;
+    @FXML
+    public ComboBox<String> replayDetailEventFilterComboBox;
+    @FXML
+    public TextField replayDetailSearchTextField;
+    private static final String REPLAY_DETAIL_FILTER_ALL = "All";
+    private static final String REPLAY_VAULT_URL = "https://vault.jipwijnia.nl/replay/";
+    private String replayVaultGameId;
+    private List<ReplayDetailEntry> currentReplayDetailEntries = List.of();
     private List<PaintingBrushStroke> currentPaintingStrokes = new ArrayList<>();
     private List<ReplayMapMarker> currentReplayMapMarkers = new ArrayList<>();
     private List<ReplayTimelineEntry> currentReplayTimeline = new ArrayList<>();
@@ -1752,6 +1762,9 @@ public class ModerationReportController implements Controller<Region> {
                 paintingTimeSlider.setValue(entry.time().toMillis() / 1_000d);
             }
         });
+        replayDetailPlayerFilterComboBox.valueProperty().addListener((obs, oldValue, newValue) -> applyReplayDetailFilters());
+        replayDetailEventFilterComboBox.valueProperty().addListener((obs, oldValue, newValue) -> applyReplayDetailFilters());
+        replayDetailSearchTextField.textProperty().addListener((obs, oldValue, newValue) -> applyReplayDetailFilters());
     }
 
     private void addReportToolPreferenceListeners() {
@@ -2097,6 +2110,7 @@ public class ModerationReportController implements Controller<Region> {
         Platform.runLater(() -> {
             if (isSelectedReportGame(reportId, gameId)) {
                 clearReplayMapTimeline();
+                replayVaultGameId = gameId;
             }
         });
 
@@ -3560,7 +3574,12 @@ public class ModerationReportController implements Controller<Region> {
         replayMapHeight = 0;
         replayPlayersLegend.getChildren().clear();
         replayTimelineListView.getItems().clear();
+        currentReplayDetailEntries = List.of();
         replayDetailListView.getItems().clear();
+        replayDetailPlayerFilterComboBox.setItems(FXCollections.observableArrayList(REPLAY_DETAIL_FILTER_ALL));
+        replayDetailPlayerFilterComboBox.setValue(REPLAY_DETAIL_FILTER_ALL);
+        replayDetailEventFilterComboBox.setItems(FXCollections.observableArrayList(REPLAY_DETAIL_FILTER_ALL));
+        replayDetailEventFilterComboBox.setValue(REPLAY_DETAIL_FILTER_ALL);
         replayDetailSummaryLabel.setText("Load a replay to inspect recorded commands and unit events.");
         paintingTimeSlider.setMin(0);
         paintingTimeSlider.setMax(1);
@@ -3581,9 +3600,72 @@ public class ModerationReportController implements Controller<Region> {
     }
 
     private void renderReplayDetailEntries(List<ReplayDetailEntry> entries) {
-        replayDetailListView.setItems(FXCollections.observableArrayList(entries));
-        replayDetailSummaryLabel.setText(entries.size() + " recorded command and lifecycle event(s). "
+        currentReplayDetailEntries = List.copyOf(entries);
+        String previousPlayer = replayDetailPlayerFilterComboBox.getValue();
+        String previousEvent = replayDetailEventFilterComboBox.getValue();
+        List<String> players = new ArrayList<>();
+        players.add(REPLAY_DETAIL_FILTER_ALL);
+        entries.stream().map(ReplayDetailEntry::playerName).filter(Objects::nonNull).distinct().sorted().forEach(players::add);
+        List<String> events = new ArrayList<>();
+        events.add(REPLAY_DETAIL_FILTER_ALL);
+        entries.stream().map(ModerationReportController::replayDetailEventType).distinct().sorted().forEach(events::add);
+        replayDetailPlayerFilterComboBox.setItems(FXCollections.observableArrayList(players));
+        replayDetailPlayerFilterComboBox.setValue(players.contains(previousPlayer) ? previousPlayer : REPLAY_DETAIL_FILTER_ALL);
+        replayDetailEventFilterComboBox.setItems(FXCollections.observableArrayList(events));
+        replayDetailEventFilterComboBox.setValue(events.contains(previousEvent) ? previousEvent : REPLAY_DETAIL_FILTER_ALL);
+        applyReplayDetailFilters();
+    }
+
+    /** Command rows are grouped by their command type (e.g. RECLAIM), all other rows by their category. */
+    private static String replayDetailEventType(ReplayDetailEntry entry) {
+        if (entry.category().endsWith("ommand") && entry.details() != null) {
+            int separator = entry.details().indexOf(" — ");
+            if (separator > 0) {
+                return entry.details().substring(0, separator);
+            }
+        }
+        return entry.category();
+    }
+
+    private void applyReplayDetailFilters() {
+        if (replayDetailPlayerFilterComboBox == null) {
+            return;
+        }
+        String player = replayDetailPlayerFilterComboBox.getValue();
+        String event = replayDetailEventFilterComboBox.getValue();
+        String search = Optional.ofNullable(replayDetailSearchTextField.getText()).orElse("").trim().toLowerCase(Locale.ROOT);
+        List<ReplayDetailEntry> filtered = currentReplayDetailEntries.stream()
+                .filter(entry -> player == null || REPLAY_DETAIL_FILTER_ALL.equals(player) || player.equals(entry.playerName()))
+                .filter(entry -> event == null || REPLAY_DETAIL_FILTER_ALL.equals(event) || event.equals(replayDetailEventType(entry)))
+                .filter(entry -> search.isEmpty()
+                        || (entry.category() + " " + entry.playerName() + " " + entry.details()).toLowerCase(Locale.ROOT).contains(search))
+                .toList();
+        replayDetailListView.setItems(FXCollections.observableArrayList(filtered));
+        String count = filtered.size() == currentReplayDetailEntries.size()
+                ? String.valueOf(filtered.size())
+                : filtered.size() + " of " + currentReplayDetailEntries.size();
+        replayDetailSummaryLabel.setText(count + " recorded command and lifecycle event(s). "
                 + "These are replay events, not continuous mouse or unit movement.");
+    }
+
+    @FXML
+    public void openReplayVaultInBrowser() {
+        if (replayVaultGameId == null || replayVaultGameId.isBlank()) {
+            return;
+        }
+        try {
+            Desktop.getDesktop().browse(URI.create(REPLAY_VAULT_URL + replayVaultGameId));
+        } catch (Exception e) {
+            log.warn("Could not open Replay Vault in browser", e);
+            replayDetailSummaryLabel.setText("Could not open the browser: " + e.getMessage());
+        }
+    }
+
+    @FXML
+    public void clearReplayDetailFilters() {
+        replayDetailPlayerFilterComboBox.setValue(REPLAY_DETAIL_FILTER_ALL);
+        replayDetailEventFilterComboBox.setValue(REPLAY_DETAIL_FILTER_ALL);
+        replayDetailSearchTextField.clear();
     }
 
     private void synchronizeReplayTimeline(java.time.Duration currentTime) {
