@@ -552,6 +552,9 @@ public class LocalPreferences {
         boolean darkMode = true;
         String startUpTab = "userManagementTab";
         boolean suppressRateLimitWarning = false;
+        List<String> mainTabOrder = new ArrayList<>();
+        List<String> hiddenMainTabs = new ArrayList<>();
+        boolean hideTabsWithoutPermission = true;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -564,6 +567,7 @@ public class LocalPreferences {
         String smurfOutputTextArea = "";
         String daysToCheckRecentAccountsTextField = "1";
         String bulkSmurfLookupWorkerCountTextField = "4";
+        String desyncCheckGamesCountField = "25";
 
         // CheckBox
         boolean promptUserOnThresholdExceededSmurfVillageLookupCheckBox = true;
@@ -584,6 +588,7 @@ public class LocalPreferences {
         boolean redoLastUserSearchOnStartupCheckBox = false;
         boolean showForumAccountsReferenceButtonCheckBox = true;
         boolean showOpenInNppButtonCheckBox = true;
+        boolean checkReplayDesyncsCheckBox = false;
 
         boolean searchHistoryTexAreaVisibilityState = false;
         boolean userNotesTextAreaVisibilityState = false;
@@ -657,6 +662,10 @@ public class LocalPreferences {
 
         boolean showSelfDestructionUnitsCheckBox = true;
         boolean showNotifyChatMessages = true;
+
+        String replayDrawingFadeSecondsTextField = "60";
+        String replayMarkerFadeSecondsTextField = "30";
+        String replayPlaybackSpeedTextField = "1";
 
         boolean fetchReportsOnStartupCheckBox = true;
         boolean enableManualReplayLookupCheckBox = false;

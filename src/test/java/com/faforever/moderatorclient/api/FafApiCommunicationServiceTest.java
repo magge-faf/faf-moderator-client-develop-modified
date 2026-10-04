@@ -9,6 +9,11 @@ import com.faforever.moderatorclient.api.event.HydraAuthorizedEvent;
 import com.faforever.moderatorclient.config.EnvironmentProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.web.client.RestTemplate;
+import java.io.InterruptedIOException;
+import java.nio.channels.ClosedByInterruptException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.util.MultiValueMap;
 
@@ -26,6 +31,8 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
@@ -162,6 +169,64 @@ class FafApiCommunicationServiceTest {
                 org.springframework.util.CollectionUtils.toMultiValueMap(Collections.emptyMap())));
 
         verify(eventPublisher).publishEvent(any(com.faforever.moderatorclient.api.event.FafApiFailGetEvent.class));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void interruptionCausesDoNotPublishFailureEvents(boolean smurfLookup) throws Exception {
+        for (Throwable cause : List.of(new InterruptedException(), new InterruptedIOException(),
+                new ClosedByInterruptException())) {
+            ApplicationEventPublisher publisher = mock();
+            RuntimeException failure = new RuntimeException(new RuntimeException(cause));
+            FafApiCommunicationService service = failingRequestService(publisher, failure, false);
+
+            assertSame(failure, assertThrows(RuntimeException.class, () -> fetchPage(service, smurfLookup)));
+
+            verify(publisher, never()).publishEvent(any(com.faforever.moderatorclient.api.event.FafApiFailGetEvent.class));
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void unrelatedFailureStillPublishesEventWhenThreadBecomesInterrupted(boolean smurfLookup) throws Exception {
+        ApplicationEventPublisher publisher = mock();
+        RuntimeException failure = new IllegalStateException("Unrelated request failure");
+        FafApiCommunicationService service = failingRequestService(publisher, failure, true);
+        try {
+            assertSame(failure, assertThrows(RuntimeException.class, () -> fetchPage(service, smurfLookup)));
+            assertTrue(Thread.currentThread().isInterrupted());
+            verify(publisher).publishEvent(any(com.faforever.moderatorclient.api.event.FafApiFailGetEvent.class));
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    private FafApiCommunicationService failingRequestService(ApplicationEventPublisher publisher,
+                                                              RuntimeException failure,
+                                                              boolean interruptThread) throws Exception {
+        FafApiCommunicationService service = new FafApiCommunicationService(null, null, null, null,
+                publisher, mock(), null, null, new EnvironmentProperties(), null);
+        authorizedLatch(service).countDown();
+        RestTemplate restTemplate = mock();
+        when(restTemplate.getForObject(any(String.class), any(Class.class), any(Map.class)))
+                .thenAnswer(invocation -> {
+                    if (interruptThread) Thread.currentThread().interrupt();
+                    throw failure;
+                });
+        Field field = FafApiCommunicationService.class.getDeclaredField("restTemplate");
+        field.setAccessible(true);
+        field.set(service, restTemplate);
+        return service;
+    }
+
+    private void fetchPage(FafApiCommunicationService service, boolean smurfLookup) {
+        var route = ElideNavigator.of(MapVersion.class).collection();
+        if (smurfLookup) {
+            service.getPageForSmurfVillageLookup(MapVersion.class, route, 10, 1,
+                    org.springframework.util.CollectionUtils.toMultiValueMap(Collections.emptyMap()));
+        } else {
+            service.getPage(MapVersion.class, route, 10, 1, Collections.emptyMap());
+        }
     }
 
     @SuppressWarnings("unchecked")

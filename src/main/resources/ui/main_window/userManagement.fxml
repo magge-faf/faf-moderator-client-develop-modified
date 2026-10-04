@@ -266,6 +266,19 @@
                     <TextField fx:id="ratingCheckGamesCountField" prefWidth="55" text="100" promptText="all"/>
                     <Label text="games"/>
                     <Button text="Check Rating Manipulation" onAction="#onCheckRatingManipulation" mnemonicParsing="false"/>
+                    <Separator orientation="VERTICAL"/>
+                    <CheckBox fx:id="checkReplayDesyncsCheckBox" text="Check replay desyncs" selected="false">
+                        <tooltip>
+                            <Tooltip text="Optional and disabled by default. Every replay must be downloaded and verified individually. Large quantities are not recommended." wrapText="true"/>
+                        </tooltip>
+                    </CheckBox>
+                    <Label text="last"/>
+                    <TextField fx:id="desyncCheckGamesCountField" prefWidth="55" text="25" promptText="all">
+                        <tooltip>
+                            <Tooltip text="Number of recent games whose replays should be downloaded and checked for desyncs." wrapText="true"/>
+                        </tooltip>
+                    </TextField>
+                    <Label text="games for desyncs"/>
                 </HBox>
 
                 <TableView fx:id="userLastGamesTable" maxHeight="1.7976931348623157E308"

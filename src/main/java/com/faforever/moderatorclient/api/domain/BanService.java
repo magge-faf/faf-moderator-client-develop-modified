@@ -81,11 +81,12 @@ public class BanService {
     }
 
     private void tryRevokeTokens(String playerId) {
-        // Best-effort: Cloudflare may block Java HTTP clients that haven't passed a browser challenge.
-        // The ban is always applied — tokens will expire naturally if revocation is blocked.
+        // Best-effort session cleanup: revoking all refresh tokens forces the banned player to sign in again on FAF
+        // clients once their current access token expires. user.faforever.com may protect this endpoint against
+        // non-browser clients, so keep the request optional until the server can explicitly allow this client.
         boolean revoked = fafUser.tryPost(REVOKE_ENDPOINT, RevokeRefreshTokenRequest.allClientsOf(playerId));
         if (!revoked) {
-            log.warn("Failed to revoke tokens for player {} (ban will still be applied)", playerId);
+            log.warn("Could not revoke refresh tokens for player {}; the ban is applied, but existing sessions remain until their access tokens expire", playerId);
         }
     }
 

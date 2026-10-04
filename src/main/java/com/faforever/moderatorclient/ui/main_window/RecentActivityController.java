@@ -53,11 +53,15 @@ public class RecentActivityController implements Controller<VBox> {
     public TextArea statsLatestRegistrations;
 
     @FXML public TabPane recentActivityTabPane;
+    private final List<Tab> allRecentActivityTabs = new ArrayList<>();
+    private final Map<Tab, Boolean> recentActivityTabPermissionAvailable = new IdentityHashMap<>();
 
     @Override public VBox getRoot() {return root;}
 
     private boolean checkPermissionForTab(String permissionTechnicalName, Tab tab) {
-        if (communicationService.hasPermission(permissionTechnicalName)) {
+        boolean hasPermission = communicationService.hasPermission(permissionTechnicalName);
+        recentActivityTabPermissionAvailable.put(tab, hasPermission);
+        if (hasPermission) {
             tab.setDisable(false);
             return true;
         } else {
@@ -68,6 +72,7 @@ public class RecentActivityController implements Controller<VBox> {
 
     @FXML
     public void initialize() {
+        allRecentActivityTabs.addAll(recentActivityTabPane.getTabs());
         refreshLatestRegistrationsExtendedStats();
         refreshLatestRegistrationsButton.setOnAction(event -> refreshLatestRegistrationsExtendedStats());
         LocalPreferences.TabRecentActivity tab = localPreferences.getTabRecentActivity();
@@ -97,6 +102,17 @@ public class RecentActivityController implements Controller<VBox> {
         } else {
             refreshLatestMapUploadsButton.setDisable(true);
         }
+        refreshPermissionTabVisibility();
+    }
+
+    public void refreshPermissionTabVisibility() {
+        if (allRecentActivityTabs.isEmpty()) {
+            return;
+        }
+        boolean hide = localPreferences.getUi().isHideTabsWithoutPermission();
+        recentActivityTabPane.getTabs().setAll(allRecentActivityTabs.stream()
+                .filter(tab -> !hide || recentActivityTabPermissionAvailable.getOrDefault(tab, true))
+                .toList());
     }
 
     private void addBan(PlayerFX playerFX) {

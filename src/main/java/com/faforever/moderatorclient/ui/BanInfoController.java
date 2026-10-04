@@ -26,6 +26,7 @@ import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
+import org.springframework.web.client.HttpClientErrorException;
 
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -72,6 +73,7 @@ public class BanInfoController implements Controller<Pane> {
     public RadioButton vaultBanRadioButton;
     public RadioButton globalBanRadioButton;
     public Button revokeButton;
+    public Button directEditBanButton;
     public Button specificTimeButton;
     public Button saveButton;
     public Button cancelButton;
@@ -90,12 +92,19 @@ public class BanInfoController implements Controller<Pane> {
 
     private static final String MULTI_ACCOUNT_REASON =
             "Account suspended due to detection of multiple accounts for the same user.";
+    // The FAF API/DB currently caps the ban reason column at 255 chars and rejects longer values
+    // with a raw "data too long for column" error instead of a clear message. We warn client-side
+    // here as a stopgap until that is fixed at the API/schema level.
+    // See https://github.com/FAForever/db/issues/335
+    private static final int BAN_REASON_MAX_LENGTH = 255;
 
     @Getter
     private BanInfoFX banInfo;
     @Getter
     private String dialogTitle = "Apply new ban";
     private BanStatus originalBanStatus;
+    private boolean directEditUnlocked;
+    private boolean directEditConfirmationArmed;
     private Consumer<BanInfoFX> postedListener;
     private Runnable onBanRevoked;
 
@@ -164,6 +173,8 @@ public class BanInfoController implements Controller<Pane> {
     public void setBanInfo(BanInfoFX banInfo) {
         this.banInfo = banInfo;
         this.originalBanStatus = banInfo.getId() == null ? null : banInfo.getBanStatus();
+        this.directEditUnlocked = false;
+        this.directEditConfirmationArmed = false;
         refreshDialogMode();
 
         if (banInfo.getId() != null) {
@@ -217,6 +228,31 @@ public class BanInfoController implements Controller<Pane> {
         refreshDialogMode();
     }
 
+    public void onUnlockDirectEdit() {
+        if (directEditUnlocked) {
+            return;
+        }
+
+        if (!directEditConfirmationArmed) {
+            directEditConfirmationArmed = true;
+            directEditBanButton.setText("Press again to unlock direct edit");
+            return;
+        }
+
+        if (!ViewHelper.confirmDialog(
+                "Directly edit active ban",
+                "This changes the current active ban rather than creating a replacement. The change is still logged, "
+                        + "but direct editing is only for minor wording corrections. For all other changes, cancel and use the normal replacement workflow."
+        )) {
+            directEditConfirmationArmed = false;
+            directEditBanButton.setText("Directly edit current ban");
+            return;
+        }
+
+        directEditUnlocked = true;
+        refreshDialogMode();
+    }
+
     public void onSave() {
         Assert.notNull(banInfo, "You can't save if banInfo is null.");
 
@@ -257,36 +293,56 @@ public class BanInfoController implements Controller<Pane> {
         }
 
 
-        if (banInfo.getId() == null) {
-            log.debug("Creating ban for player '{}' with reason: {}", banInfo.getPlayer().toString(), banReasonTextField.getText());
-            String newBanId = banService.createBan(banInfo);
-            BanInfoFX loadedBanInfo = banService.getBanInfoById(newBanId);
-            if (postedListener != null) {
-                postedListener.accept(loadedBanInfo);
-            }
-            runPostBanActions();
-        } else {
-            log.debug("Updating ban id '{}'", banInfo.getId());
-            if (originalBanStatus == BanStatus.BANNED) {
-                if (!ViewHelper.confirmDialog(
-                        "Disable or Replace active ban",
-                        "Saving here will disable the current active ban and create a new replacement ban with the updated values. Use Revocation instead if you only want to disable the ban."
-                )) {
-                    return;
-                }
-                // Active ban: revoke old entry and create a new one so all fields are persisted
-                String newBanId = banService.revokeThenCreateBan(banInfo);
+        try {
+            if (banInfo.getId() == null) {
+                log.debug("Creating ban for player '{}' with reason: {}", banInfo.getPlayer().toString(), banReasonTextField.getText());
+                String newBanId = banService.createBan(banInfo);
                 BanInfoFX loadedBanInfo = banService.getBanInfoById(newBanId);
                 if (postedListener != null) {
                     postedListener.accept(loadedBanInfo);
                 }
                 runPostBanActions();
             } else {
-                banService.patchBanInfo(banInfo);
-                runPostBanActions();
+                log.debug("Updating ban id '{}'", banInfo.getId());
+                if (originalBanStatus == BanStatus.BANNED) {
+                    if (directEditUnlocked) {
+                        banService.patchBanInfo(banInfo);
+                        runPostBanActions();
+                        close();
+                        return;
+                    }
+                    if (!ViewHelper.confirmDialog(
+                            "Disable or Replace active ban",
+                            "Saving here will disable the current active ban and create a new replacement ban with the updated values. Use Revocation instead if you only want to disable the ban."
+                    )) {
+                        return;
+                    }
+                    // Active ban: revoke old entry and create a new one so all fields are persisted
+                    String newBanId = banService.revokeThenCreateBan(banInfo);
+                    BanInfoFX loadedBanInfo = banService.getBanInfoById(newBanId);
+                    if (postedListener != null) {
+                        postedListener.accept(loadedBanInfo);
+                    }
+                    runPostBanActions();
+                } else {
+                    banService.patchBanInfo(banInfo);
+                    runPostBanActions();
+                }
             }
+        } catch (HttpClientErrorException exception) {
+            if (isBanReasonTooLong(exception)) {
+                ViewHelper.errorDialog("Ban not saved",
+                        "The ban reason is too long for the FAF API to store. "
+                                + "Shorten it to " + BAN_REASON_MAX_LENGTH + " characters or fewer and try again.");
+                return;
+            }
+            throw exception;
         }
         close();
+    }
+
+    private static boolean isBanReasonTooLong(HttpClientErrorException exception) {
+        return exception.getResponseBodyAsString().matches("(?is).*data too long for column.*reason.*");
     }
 
     private boolean validate() {
@@ -302,6 +358,9 @@ public class BanInfoController implements Controller<Pane> {
 
         if (StringUtils.isBlank(banReasonTextField.getText())) {
             validationErrors.add("No ban reason is given.");
+        } else if (banReasonTextField.getText().length() > BAN_REASON_MAX_LENGTH) {
+            validationErrors.add("Ban reason is " + banReasonTextField.getText().length()
+                    + " characters, but the limit is " + BAN_REASON_MAX_LENGTH + ". Please shorten it.");
         }
 
         if (!forNoOfDaysBanRadioButton.isSelected() && !temporaryBanRadioButton.isSelected()
@@ -490,11 +549,29 @@ public class BanInfoController implements Controller<Pane> {
             editModeNoticeLabel.setVisible(false);
             saveButton.setText("Apply ban");
             cancelButton.setText("Cancel");
+            directEditBanButton.setVisible(false);
+            directEditBanButton.setManaged(false);
             return;
         }
 
         if (originalBanStatus == BanStatus.BANNED) {
+            directEditBanButton.setVisible(true);
+            directEditBanButton.setManaged(true);
             dialogTitle = "Replace or disable active ban";
+            if (directEditUnlocked) {
+                editModeNoticeLabel.setText("Direct edit is unlocked for this save. Saving will update the current active ban directly. "
+                        + "This change is still logged; use this only for a minor wording correction.");
+                editModeNoticeLabel.setVisible(true);
+                saveButton.setText("Save current ban directly");
+                cancelButton.setText("Cancel direct edit");
+                directEditBanButton.setText("Direct edit unlocked");
+                directEditBanButton.setDisable(true);
+                return;
+            }
+            directEditBanButton.setDisable(false);
+            directEditBanButton.setText(directEditConfirmationArmed
+                    ? "Press again to unlock direct edit"
+                    : "Directly edit current ban");
             editModeNoticeLabel.setText("Saving this form will disable the current active ban and create a new replacement ban with the updated values. The old ban stays in history as disabled. Use Revocation below only if you want to disable the ban without creating a replacement.");
             editModeNoticeLabel.setVisible(true);
             saveButton.setText("Disable old ban and create replacement");
@@ -503,6 +580,8 @@ public class BanInfoController implements Controller<Pane> {
         }
 
         if (originalBanStatus == BanStatus.EXPIRED) {
+            directEditBanButton.setVisible(false);
+            directEditBanButton.setManaged(false);
             dialogTitle = "Edit expired ban";
             editModeNoticeLabel.setText("This ban is already expired. Saving updates this existing record only and will not create a replacement ban.");
             editModeNoticeLabel.setVisible(true);
@@ -512,6 +591,8 @@ public class BanInfoController implements Controller<Pane> {
         }
 
         dialogTitle = "Edit disabled ban";
+        directEditBanButton.setVisible(false);
+        directEditBanButton.setManaged(false);
         editModeNoticeLabel.setText("This ban is already disabled. Saving updates this existing record only and will not create a replacement ban.");
         editModeNoticeLabel.setVisible(true);
         saveButton.setText("Save disabled ban");

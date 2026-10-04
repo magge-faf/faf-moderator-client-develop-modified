@@ -7,6 +7,9 @@ import com.faforever.commons.api.update.AvatarAssignmentUpdate;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
+import com.faforever.commons.replay.ReplayDataParser;
+import com.faforever.commons.replay.body.Event;
+import com.faforever.moderatorclient.replay.ReplayStorageService;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.domain.AvatarService;
 import com.faforever.moderatorclient.api.domain.PermissionService;
@@ -30,7 +33,6 @@ import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
-import javafx.event.Event;
 import javafx.fxml.FXML;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -68,6 +70,10 @@ import org.springframework.util.Assert;
 import java.io.*;
 import java.lang.reflect.Field;
 import java.net.URLEncoder;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -153,7 +159,11 @@ public class UserManagementController implements Controller<SplitPane> {
             statusTextFieldProcessingItem,
             playerIDField1SharedGamesTextfield,
             playerIDField2SharedGamesTextfield,
-            ratingCheckGamesCountField;
+            ratingCheckGamesCountField,
+            desyncCheckGamesCountField;
+
+    @FXML
+    public CheckBox checkReplayDesyncsCheckBox;
 
     @FXML
     public CheckBox
@@ -190,6 +200,8 @@ public class UserManagementController implements Controller<SplitPane> {
     private final AvatarService avatarService;
     private final PermissionService permissionService;
     private final GamePlayerStatsMapper gamePlayerStatsMapper;
+    private final ReplayStorageService replayStorageService;
+    private final ObjectMapper objectMapper;
 
     private final ObservableList<PlayerFX> users = FXCollections.observableArrayList();
     private final ObservableList<UserNoteFX> userNotes = FXCollections.observableArrayList();
@@ -279,8 +291,13 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     private void disableTabOnMissingPermission(Tab tab, String permissionTechnicalName) {
-        tab.setDisable(!communicationService.hasPermission(permissionTechnicalName));
+        boolean hasPermission = communicationService.hasPermission(permissionTechnicalName);
+        userDetailTabPermissionAvailable.put(tab, hasPermission);
+        tab.setDisable(!hasPermission);
     }
+
+    private final List<Tab> allUserDetailTabs = new ArrayList<>();
+    private final Map<Tab, Boolean> userDetailTabPermissionAvailable = new IdentityHashMap<>();
 
     @FXML
     private Button minimizeSearchHistoryButton;
@@ -290,10 +307,17 @@ public class UserManagementController implements Controller<SplitPane> {
     private final File EXCLUDED_ITEMS_FILE =
             ApplicationPaths.resolveConfigurationDirectory().resolve("excluded_items.json").toFile();
 
+    private static final File AUTO_CONTINUE_THRESHOLD_FILE =
+            ApplicationPaths.resolveConfigurationDirectory().resolve("auto_continue_threshold_values.json").toFile();
+    private static final ObjectMapper AUTO_CONTINUE_OBJECT_MAPPER = new ObjectMapper();
+    private final Set<String> autoContinueThresholdKeys = ConcurrentHashMap.newKeySet();
+
     private final LocalPreferences localPreferences;
 
     @FXML
     public void initialize() {
+        loadAutoContinueThresholdValues();
+        allUserDetailTabs.addAll(userDetailsTabPane.getTabs());
         loadStateCheckBox();
         addListeners();
         loadContent();
@@ -530,6 +554,17 @@ public class UserManagementController implements Controller<SplitPane> {
         disableTabOnMissingPermission(teamkillsTab, GroupPermission.ROLE_READ_TEAMKILL_REPORT);
         disableTabOnMissingPermission(avatarsTab, GroupPermission.ROLE_WRITE_AVATAR);
         disableTabOnMissingPermission(userGroupsTab, GroupPermission.ROLE_READ_USER_GROUP);
+        refreshPermissionTabVisibility();
+    }
+
+    public void refreshPermissionTabVisibility() {
+        if (allUserDetailTabs.isEmpty()) {
+            return;
+        }
+        boolean hide = localPreferences.getUi().isHideTabsWithoutPermission();
+        userDetailsTabPane.getTabs().setAll(allUserDetailTabs.stream()
+                .filter(tab -> !hide || userDetailTabPermissionAvailable.getOrDefault(tab, true))
+                .toList());
     }
 
     private void setupTableViews() {
@@ -759,7 +794,7 @@ public class UserManagementController implements Controller<SplitPane> {
             return;
         }
 
-        searchUserProperties.getSelectionModel().select("Name");
+        searchUserProperties.getSelectionModel().select("All In One");
         userSearchTextField.setText(login);
         onUserSearch();
     }
@@ -1281,6 +1316,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
     public void handleCheckTemporaryBans() {
         smurfOutputTextArea.setText("");
+        clearUserSearchResults();
         checkTemporaryBansButton.setDisable(true);
         checkTemporaryBansButton.setText("Check Temporary Bans (awaiting data...)");
         temporaryBanProgressLabel.setText("Fetching temporary bans...");
@@ -1554,6 +1590,9 @@ public class UserManagementController implements Controller<SplitPane> {
             updateSmurfVillageLogTextArea(String.format(
                     "\n[error] fetching users for [%s] batch: %s\n", displayAttr, e.getMessage()));
             return;
+        } catch (RuntimeException e) {
+            if (isUserCancellation(e)) return;
+            throw e;
         }
 
         if (smurfLookupSettings.promptOnThreshold() && users.size() > smurfLookupSettings.threshold()) {
@@ -1654,37 +1693,52 @@ public class UserManagementController implements Controller<SplitPane> {
             updateSmurfVillageLogTextArea(String.format(
                     "\n[error] fetching users for [%s] = [%s]: %s\n", displayAttr, value, e.getMessage()));
             return;
+        } catch (RuntimeException e) {
+            if (isUserCancellation(e)) return;
+            throw e;
         }
 
         List<PlayerFX> otherAccounts = findOtherAccounts(foundUsers, currentPlayer);
 
         if (smurfLookupSettings.promptOnThreshold() && otherAccounts.size() > smurfLookupSettings.threshold()) {
-            ThresholdDecision decision = resolveThresholdDecision(value, property, displayAttr, otherAccounts, currentPlayer);
-            switch (decision) {
-                case CANCEL -> {
-                    cancelRequestedByUser = true;
-                    return;
-                }
-                case EXCLUDE -> {
-                    Map<String, Object> newExcluded = new LinkedHashMap<>();
-                    newExcluded.put(property, value);
-                    newExcluded.put("AddedOn", LocalDateTime.now().toString());
-                    newExcluded.put(
-                            "comment",
-                            String.format(
-                                    "Excluded by user prompt: more than %d related accounts found for [%s = %s]",
-                                    smurfLookupSettings.threshold(),
-                                    property,
-                                    value));
-                    excludedItems.add(newExcluded);
-                    excludedHardwareItemsController.saveExcludedItem(newExcluded);
-                    updateSmurfVillageLogTextArea(String.format(
-                            "\n[excluded] [%s] = [%s] (added to exclusion list)", displayAttr, value));
-                    return;
-                }
-                case CONTINUE -> otherAccounts = findOtherAccounts(
+            if (isAutoContinueThreshold(property, value)) {
+                otherAccounts = findOtherAccounts(
                         userService.findUsersByAttribute(property, value, Integer.MAX_VALUE, smurfLookupPageParallelism),
                         currentPlayer);
+            } else {
+                ThresholdDecision decision = resolveThresholdDecision(value, property, displayAttr, otherAccounts, currentPlayer);
+                switch (decision) {
+                    case CANCEL -> {
+                        cancelRequestedByUser = true;
+                        return;
+                    }
+                    case EXCLUDE -> {
+                        Map<String, Object> newExcluded = new LinkedHashMap<>();
+                        newExcluded.put(property, value);
+                        newExcluded.put("AddedOn", LocalDateTime.now().toString());
+                        newExcluded.put(
+                                "comment",
+                                String.format(
+                                        "Excluded by user prompt: more than %d related accounts found for [%s = %s]",
+                                        smurfLookupSettings.threshold(),
+                                        property,
+                                        value));
+                        excludedItems.add(newExcluded);
+                        excludedHardwareItemsController.saveExcludedItem(newExcluded);
+                        updateSmurfVillageLogTextArea(String.format(
+                                "\n[excluded] [%s] = [%s] (added to exclusion list)", displayAttr, value));
+                        return;
+                    }
+                    case CONTINUE -> otherAccounts = findOtherAccounts(
+                            userService.findUsersByAttribute(property, value, Integer.MAX_VALUE, smurfLookupPageParallelism),
+                            currentPlayer);
+                    case CONTINUE_ALWAYS -> {
+                        saveAutoContinueThresholdValue(property, value);
+                        otherAccounts = findOtherAccounts(
+                                userService.findUsersByAttribute(property, value, Integer.MAX_VALUE, smurfLookupPageParallelism),
+                                currentPlayer);
+                    }
+                }
             }
         }
 
@@ -1805,10 +1859,11 @@ public class UserManagementController implements Controller<SplitPane> {
 
                     ButtonType addToExclude = new ButtonType("Add to exclusion list and skip");
                     ButtonType continueBtn = new ButtonType("Continue");
+                    ButtonType continueAlwaysBtn = new ButtonType("Continue & Don't Ask Again");
                     ButtonType showAccountsButton = new ButtonType("Show Related Accounts");
                     ButtonType cancelProcess = new ButtonType("Cancel Process", ButtonBar.ButtonData.CANCEL_CLOSE);
 
-                    alert.getButtonTypes().setAll(addToExclude, continueBtn, showAccountsButton, cancelProcess);
+                    alert.getButtonTypes().setAll(addToExclude, continueBtn, continueAlwaysBtn, showAccountsButton, cancelProcess);
                     Optional<ButtonType> result = alert.showAndWait();
 
                     if (result.isPresent()) {
@@ -1816,6 +1871,8 @@ public class UserManagementController implements Controller<SplitPane> {
                             choice.set(ThresholdDecision.EXCLUDE);
                         } else if (result.get() == continueBtn) {
                             choice.set(ThresholdDecision.CONTINUE);
+                        } else if (result.get() == continueAlwaysBtn) {
+                            choice.set(ThresholdDecision.CONTINUE_ALWAYS);
                         } else if (result.get() == showAccountsButton) {
                             showAccounts.set(true);
                         } else {
@@ -1864,8 +1921,55 @@ public class UserManagementController implements Controller<SplitPane> {
 
     private enum ThresholdDecision {
         CONTINUE,
+        CONTINUE_ALWAYS,
         EXCLUDE,
         CANCEL
+    }
+
+    private static String autoContinueThresholdKey(String property, String value) {
+        return property + " " + value;
+    }
+
+    private boolean isAutoContinueThreshold(String property, String value) {
+        return autoContinueThresholdKeys.contains(autoContinueThresholdKey(property, value));
+    }
+
+    private void loadAutoContinueThresholdValues() {
+        try {
+            if (AUTO_CONTINUE_THRESHOLD_FILE.exists() && AUTO_CONTINUE_THRESHOLD_FILE.length() > 0) {
+                TypeReference<List<Map<String, String>>> typeRef = new TypeReference<>() {};
+                List<Map<String, String>> entries =
+                        AUTO_CONTINUE_OBJECT_MAPPER.readValue(AUTO_CONTINUE_THRESHOLD_FILE, typeRef);
+                entries.forEach(entry ->
+                        autoContinueThresholdKeys.add(autoContinueThresholdKey(entry.get("property"), entry.get("value"))));
+            }
+        } catch (IOException e) {
+            log.error("Failed to load auto-continue threshold values", e);
+        }
+    }
+
+    private void saveAutoContinueThresholdValue(String property, String value) {
+        if (!autoContinueThresholdKeys.add(autoContinueThresholdKey(property, value))) {
+            return;
+        }
+        CompletableFuture.runAsync(() -> {
+            synchronized (AUTO_CONTINUE_THRESHOLD_FILE) {
+                try {
+                    List<Map<String, String>> entries = new ArrayList<>();
+                    for (String key : autoContinueThresholdKeys) {
+                        int separatorIndex = key.indexOf(' ');
+                        Map<String, String> entry = new LinkedHashMap<>();
+                        entry.put("property", key.substring(0, separatorIndex));
+                        entry.put("value", key.substring(separatorIndex + 1));
+                        entries.add(entry);
+                    }
+                    AUTO_CONTINUE_THRESHOLD_FILE.getParentFile().mkdirs();
+                    AUTO_CONTINUE_OBJECT_MAPPER.writeValue(AUTO_CONTINUE_THRESHOLD_FILE, entries);
+                } catch (IOException e) {
+                    log.error("Failed to save auto-continue threshold values", e);
+                }
+            }
+        });
     }
 
     private String formatLookupHeader(String displayAttr, Collection<String> values) {
@@ -2269,6 +2373,14 @@ public class UserManagementController implements Controller<SplitPane> {
         if (value != null && !value.isBlank()) set.add(value);
     }
 
+    private boolean isUserCancellation(Throwable throwable) {
+        if (!cancelRequestedByUser && !Thread.currentThread().isInterrupted()) return false;
+        for (Throwable cause = throwable; cause != null; cause = cause.getCause()) {
+            if (cause instanceof InterruptedException) return true;
+        }
+        return Thread.currentThread().isInterrupted() || cancelRequestedByUser;
+    }
+
     private void addPlayerDirectlyToTable(PlayerFX player) {
         if (player == null) return;
         Platform.runLater(() -> {
@@ -2391,6 +2503,7 @@ public class UserManagementController implements Controller<SplitPane> {
                     onSmurfVillageLookup(userID);
 
                 } catch (Exception e) {
+                    if (isUserCancellation(e)) return null;
                     Platform.runLater(() ->
                             smurfOutputTextArea.appendText("Error: " + e.getMessage() + "\n")
                     );
@@ -2483,8 +2596,8 @@ public class UserManagementController implements Controller<SplitPane> {
         }
 
         ClipboardContent content = new ClipboardContent();
-        content.putString("\n\n```\n" + referenceBody + "\n```");
         content.putImage(snapshotFullUserSearchTable(rowCount));
+        content.putString("\n\n```\n" + referenceBody + "\n```");
         Clipboard.getSystemClipboard().setContent(content);
     }
 
@@ -2500,7 +2613,15 @@ public class UserManagementController implements Controller<SplitPane> {
         return strippedOutput;
     }
 
+    // Upper bound on how many times we'll grow the table while trying to realize every
+    // row - each attempt at least doubles the previous guess, so this covers many orders
+    // of magnitude of under-estimation without risking an infinite loop.
+    private static final int MAX_SNAPSHOT_SIZE_PASSES = 8;
+
     private WritableImage snapshotFullUserSearchTable(int rowCount) {
+        double originalMinWidth = userSearchTableView.getMinWidth();
+        double originalPrefWidth = userSearchTableView.getPrefWidth();
+        double originalMaxWidth = userSearchTableView.getMaxWidth();
         double originalMinHeight = userSearchTableView.getMinHeight();
         double originalPrefHeight = userSearchTableView.getPrefHeight();
         double originalMaxHeight = userSearchTableView.getMaxHeight();
@@ -2508,31 +2629,74 @@ public class UserManagementController implements Controller<SplitPane> {
         double originalHeight = userSearchTableView.getHeight();
         boolean originalManaged = userSearchTableView.isManaged();
 
-        double firstPassHeight = estimateFullUserSearchTableHeight();
+        double fullWidth = estimateFullUserSearchTableWidth();
 
         try {
             userSearchTableView.setManaged(false);
-            resizeUserSearchTableForSnapshot(firstPassHeight);
-            userSearchTableView.applyCss();
-            userSearchTableView.layout();
-
-            double fullHeight = measureUserSearchTableContentHeight(rowCount);
-            resizeUserSearchTableForSnapshot(fullHeight);
-            userSearchTableView.applyCss();
-            userSearchTableView.layout();
+            double contentHeight = growUserSearchTableUntilAllRowsRealized(rowCount, fullWidth);
 
             WritableImage snapshot = userSearchTableView.snapshot(null, null);
-            int croppedHeight = Math.max(1, Math.min((int) Math.ceil(fullHeight), (int) snapshot.getHeight()));
-            return new WritableImage(snapshot.getPixelReader(), 0, 0, (int) snapshot.getWidth(), croppedHeight);
+            int croppedWidth = Math.max(1, Math.min((int) Math.ceil(fullWidth), (int) snapshot.getWidth()));
+            int croppedHeight = Math.max(1, Math.min((int) Math.ceil(contentHeight), (int) snapshot.getHeight()));
+            return new WritableImage(snapshot.getPixelReader(), 0, 0, croppedWidth, croppedHeight);
         } finally {
+            userSearchTableView.setMinWidth(originalMinWidth);
+            userSearchTableView.setPrefWidth(originalPrefWidth);
+            userSearchTableView.setMaxWidth(originalMaxWidth);
             userSearchTableView.setMinHeight(originalMinHeight);
             userSearchTableView.setPrefHeight(originalPrefHeight);
             userSearchTableView.setMaxHeight(originalMaxHeight);
             userSearchTableView.setManaged(originalManaged);
             userSearchTableView.resize(originalWidth, originalHeight);
+            stabilizeUserSearchTableLayout();
+        }
+    }
+
+    /**
+     * Row heights vary a lot (each row can expand to show multiple unique-ID
+     * assignments), so a single heuristic guess at the table's full height can come up
+     * short. A short guess doesn't just misjudge the crop - the virtual flow simply
+     * never realizes rows beyond the guessed viewport, so they're silently missing from
+     * the screenshot entirely. Instead, keep growing the table and re-checking which
+     * rows actually got realized until all of them have, then return the exact content
+     * height measured from their real bounds.
+     */
+    private double growUserSearchTableUntilAllRowsRealized(int rowCount, double fullWidth) {
+        double heightGuess = estimateFullUserSearchTableHeight();
+        for (int attempt = 0; attempt < MAX_SNAPSHOT_SIZE_PASSES; attempt++) {
+            resizeUserSearchTableForSnapshot(fullWidth, heightGuess);
+            stabilizeUserSearchTableLayout();
+
+            Map<Integer, Double> rowHeightsByIndex = collectRealizedUserSearchTableRowHeights(rowCount);
+            if (rowHeightsByIndex.size() >= rowCount) {
+                double rowsHeight = rowHeightsByIndex.values().stream().mapToDouble(Double::doubleValue).sum();
+                return Math.ceil(measureUserSearchTableHeaderHeight() + rowsHeight + 2);
+            }
+            heightGuess = heightGuess * 1.75 + 500;
+        }
+
+        log.warn("Could not realize all {} rows of the user search table for the reference screenshot after {} attempts; the image may be incomplete.",
+                rowCount, MAX_SNAPSHOT_SIZE_PASSES);
+        return heightGuess;
+    }
+
+    private void stabilizeUserSearchTableLayout() {
+        // A single applyCss()/layout() pass isn't enough for every virtualized row to
+        // finish relaying out its cells to the new column widths after a big resize -
+        // trailing rows can still show stale, narrower cell content. Run a couple of
+        // extra passes so all rows converge before the snapshot is taken.
+        for (int i = 0; i < 3; i++) {
             userSearchTableView.applyCss();
             userSearchTableView.layout();
         }
+    }
+
+    private double estimateFullUserSearchTableWidth() {
+        double columnsWidth = userSearchTableView.getColumns().stream()
+                .filter(TableColumnBase::isVisible)
+                .mapToDouble(TableColumnBase::getWidth)
+                .sum();
+        return Math.max(userSearchTableView.getWidth(), columnsWidth + 2);
     }
 
     private double estimateFullUserSearchTableHeight() {
@@ -2542,31 +2706,28 @@ public class UserManagementController implements Controller<SplitPane> {
         return 64 + estimatedRowsHeight;
     }
 
-    private void resizeUserSearchTableForSnapshot(double height) {
+    private void resizeUserSearchTableForSnapshot(double width, double height) {
+        userSearchTableView.setMinWidth(width);
+        userSearchTableView.setPrefWidth(width);
+        userSearchTableView.setMaxWidth(width);
         userSearchTableView.setMinHeight(height);
         userSearchTableView.setPrefHeight(height);
         userSearchTableView.setMaxHeight(height);
-        userSearchTableView.resize(userSearchTableView.getWidth(), height);
+        userSearchTableView.resize(width, height);
     }
 
-    private double measureUserSearchTableContentHeight(int rowCount) {
-        double headerHeight = Optional.ofNullable(userSearchTableView.lookup(".column-header-background"))
+    private double measureUserSearchTableHeaderHeight() {
+        return Optional.ofNullable(userSearchTableView.lookup(".column-header-background"))
                 .map(node -> node.getBoundsInParent().getHeight())
                 .orElse(28.0);
-        double rowsHeight = userSearchTableView.lookupAll(".table-row-cell").stream()
+    }
+
+    private Map<Integer, Double> collectRealizedUserSearchTableRowHeights(int rowCount) {
+        return userSearchTableView.lookupAll(".table-row-cell").stream()
                 .filter(TableRow.class::isInstance)
                 .map(TableRow.class::cast)
                 .filter(row -> !row.isEmpty() && row.getIndex() >= 0 && row.getIndex() < rowCount)
-                .mapToDouble(row -> row.getBoundsInParent().getHeight())
-                .sum();
-        double horizontalScrollHeight = userSearchTableView.lookupAll(".scroll-bar").stream()
-                .filter(Node::isVisible)
-                .filter(node -> "horizontal".equals(node.getProperties().get("orientation"))
-                        || node.getStyleClass().contains("horizontal"))
-                .mapToDouble(node -> node.getBoundsInParent().getHeight())
-                .max()
-                .orElse(0.0);
-        return Math.ceil(headerHeight + rowsHeight + horizontalScrollHeight + 2);
+                .collect(Collectors.toMap(TableRow::getIndex, row -> row.getBoundsInParent().getHeight(), Math::max));
     }
 
     private Timeline loadingAnimation;
@@ -2845,7 +3006,7 @@ public class UserManagementController implements Controller<SplitPane> {
             } catch (NumberFormatException ignored) {}
         }
         // Create defensive copy and sort by game start time (newest-first) to ensure most recent games are analyzed
-        List<GamePlayerStatsFX> games = allLoaded.stream()
+        List<GamePlayerStatsFX> sortedGames = allLoaded.stream()
                 .sorted((g1, g2) -> {
                     OffsetDateTime t1 = g1.getGame() != null ? g1.getGame().getStartTime() : null;
                     OffsetDateTime t2 = g2.getGame() != null ? g2.getGame().getStartTime() : null;
@@ -2854,14 +3015,16 @@ public class UserManagementController implements Controller<SplitPane> {
                     if (t2 == null) return -1;
                     return t2.compareTo(t1); // Descending order (newest first)
                 })
-                .limit(limit)
                 .toList();
+        List<GamePlayerStatsFX> games = sortedGames.stream().limit(limit).toList();
+        int desyncLimit = parsePositiveLimit(desyncCheckGamesCountField.getText());
+        List<GamePlayerStatsFX> desyncGames = sortedGames.stream().limit(desyncLimit).toList();
 
         List<GamePlayerStatsFX> ratedGames = games.stream()
                 .filter(g -> g.ratingChangeProperty().get() != null)
                 .toList();
 
-        if (ratedGames.isEmpty()) {
+        if (ratedGames.isEmpty() && !checkReplayDesyncsCheckBox.isSelected()) {
             Alert warn = new Alert(Alert.AlertType.WARNING, "No rating journal data available for the selected games.", ButtonType.OK);
             warn.setTitle("Rating Manipulation Check");
             applyDialogStylesheet(warn);
@@ -2869,7 +3032,7 @@ public class UserManagementController implements Controller<SplitPane> {
             return;
         }
 
-        String playerName = ratedGames.stream()
+        String playerName = (ratedGames.isEmpty() ? games : ratedGames).stream()
                 .map(g -> g.getPlayer() != null ? g.getPlayer().getLogin() : null)
                 .filter(Objects::nonNull)
                 .findFirst()
@@ -2922,6 +3085,10 @@ public class UserManagementController implements Controller<SplitPane> {
         final List<GamePlayerStatsFX> gamesFinal = games;
         final List<GamePlayerStatsFX> ratedGamesFinal = ratedGames;
         Runnable runAnalysis = () -> {
+            if (ratedGamesFinal.isEmpty()) {
+                textArea.setText("No rating journal data available for the selected games.");
+                return;
+            }
             double lossRatePct  = spLossRate.getValue();
             int netRatingMin    = spNetRating.getValue();
             int streakMin       = spStreak.getValue();
@@ -3027,7 +3194,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
         // --- Rating History chart tab ---
         // Reverse so index 0 = oldest game (left of chart)
-        List<GamePlayerStatsFX> chronological = new ArrayList<>(games);
+        List<GamePlayerStatsFX> chronological = new ArrayList<>(desyncGames);
         Collections.reverse(chronological);
 
         // Build one series per leaderboard, using epoch-seconds as X so the axis shows real dates.
@@ -3118,18 +3285,6 @@ public class UserManagementController implements Controller<SplitPane> {
         chart.setPrefHeight(440);
         chart.getData().addAll(seriesMap.values());
 
-        // Tooltips: include date + leaderboard + rating
-        for (XYChart.Series<Number, Number> series : seriesMap.values()) {
-            for (XYChart.Data<Number, Number> dp : series.getData()) {
-                String dateLabel = epochToLabel.getOrDefault(dp.getXValue().longValue(), "");
-                String label = (dateLabel.isEmpty() ? "" : dateLabel + "\n")
-                        + series.getName() + ": " + dp.getYValue().intValue();
-                dp.nodeProperty().addListener((obs, oldNode, node) -> {
-                    if (node != null) Tooltip.install(node, new Tooltip(label));
-                });
-            }
-        }
-
         // Drag-select zoom: draw a selection box; on release, zoom to that region.
         // Double-click resets to full view.
         Rectangle selectionRect = new Rectangle(0, 0, 0, 0);
@@ -3199,15 +3354,84 @@ public class UserManagementController implements Controller<SplitPane> {
             }
         });
 
+        Label desyncStatus = new Label(checkReplayDesyncsCheckBox.isSelected()
+                ? "Desync history: checking " + desyncGames.size() + " replay(s), newest first…"
+                : "Desync checking is disabled. Enable it before running the check.");
+        TextArea desyncLog = new TextArea("Detected desyncs will be listed here.");
+        desyncLog.setEditable(false);
+        desyncLog.setWrapText(false);
+        desyncLog.setStyle("-fx-font-family: monospace; -fx-font-size: 12;");
+        VBox desyncContent = new VBox(8, desyncStatus, new Label("Detected desyncs"), desyncLog);
+        VBox.setVgrow(desyncLog, javafx.scene.layout.Priority.ALWAYS);
+
+        if (checkReplayDesyncsCheckBox.isSelected()) CompletableFuture.runAsync(() -> {
+            int desyncCount = 0;
+            int checkedCount = 0;
+            HttpClient httpClient = HttpClient.newBuilder()
+                    .followRedirects(HttpClient.Redirect.NORMAL)
+                    .connectTimeout(java.time.Duration.ofSeconds(15))
+                    .build();
+            for (GamePlayerStatsFX gameStats : desyncGames) {
+                if (gameStats.getGame() == null || gameStats.getGame().getId() == null) continue;
+                Path replayFile = null;
+                    boolean desync = false;
+                try {
+                    String replayUrl = gameStats.getGame().getReplayUrl(replayDownLoadFormat);
+                    if (replayUrl == null || replayUrl.isBlank()) continue;
+                    replayFile = replayStorageService.createTemporaryReplayFile("rating-desync-");
+                    // Count replay downloads in the same rolling request budget shown in the title bar.
+                    FafApiCommunicationService.checkRateLimit();
+                    HttpRequest request = HttpRequest.newBuilder(URI.create(replayUrl))
+                            .timeout(java.time.Duration.ofSeconds(30))
+                            .build();
+                    HttpResponse<Path> response = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(replayFile));
+                    if (response.statusCode() != 200) continue;
+                    try (ReplayStorageService.PreparedReplay prepared = replayStorageService.prepareReplayForParsing(replayFile)) {
+                        ReplayDataParser parser = new ReplayDataParser(prepared.path(), objectMapper);
+                        desync = ReplayAnalysisController
+                                .checkReplayEventsForDesync(parser.getEvents())
+                                .desync();
+                    }
+                    checkedCount++;
+                    if (desync) desyncCount++;
+                    final boolean pointDesync = desync;
+                    final String gameId = String.valueOf(gameStats.getGame().getId());
+                    final OffsetDateTime pointTime = gameStats.getScoreTime() != null ? gameStats.getScoreTime() : gameStats.getGame().getStartTime();
+                    final String gameDate = pointTime == null
+                            ? "Unknown date"
+                            : pointTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+                    if (pointDesync) Platform.runLater(() -> {
+                        if (desyncLog.getText().equals("Detected desyncs will be listed here.")) {
+                            desyncLog.clear();
+                        }
+                        desyncLog.appendText("Game " + gameId + " | " + gameDate + " | Desync detected\n");
+                    });
+                } catch (Exception e) {
+                    log.debug("Could not check replay for game {}", gameStats.getGame().getId(), e);
+                } finally {
+                    if (replayFile != null) try { Files.deleteIfExists(replayFile); } catch (IOException ignored) { }
+                }
+                final int checked = checkedCount, found = desyncCount;
+                Platform.runLater(() -> desyncStatus.setText("Desync history: " + found + " desync(s), " + checked + "/" + desyncGames.size() + " replays checked."));
+            }
+            int finalCheckedCount = checkedCount;
+            Platform.runLater(() -> { if (finalCheckedCount == 0) desyncStatus.setText("Desync history: no replay data could be checked."); });
+        });
+
         // --- Tabbed dialog ---
         Tab analysisTab = new Tab("Analysis", textArea);
         analysisTab.setClosable(false);
         Tab chartTab = new Tab("Rating History", chartContainer);
         chartTab.setClosable(false);
+        Tab desyncTab = new Tab("Desync History", desyncContent);
+        desyncTab.setClosable(false);
         Tab settingsTab = new Tab("Settings", settingsGrid);
         settingsTab.setClosable(false);
 
-        TabPane tabPane = new TabPane(analysisTab, chartTab, settingsTab);
+        TabPane tabPane = new TabPane(analysisTab, chartTab, desyncTab, settingsTab);
+        if (ratedGames.isEmpty()) {
+            tabPane.getSelectionModel().select(desyncTab);
+        }
 
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.setTitle("Rating Manipulation Analysis — " + playerName);
@@ -3221,6 +3445,15 @@ public class UserManagementController implements Controller<SplitPane> {
 
     private static String formatCheckLine(boolean flagged, String checkName, String value) {
         return String.format("[%-4s]  %-45s %s%n", flagged ? "FLAG" : "OK", checkName, value);
+    }
+
+    private static int parsePositiveLimit(String text) {
+        try {
+            int value = Integer.parseInt(text == null ? "" : text.trim());
+            return value > 0 ? value : Integer.MAX_VALUE;
+        } catch (NumberFormatException ignored) {
+            return Integer.MAX_VALUE;
+        }
     }
 
     private void applyDialogStylesheet(Alert alert) {
@@ -3368,4 +3601,3 @@ public class UserManagementController implements Controller<SplitPane> {
         ViewHelper.saveColumnLayout(permissionsTableView, tab.getPermissionsTableColumnWidths(), tab.getPermissionsTableColumnOrder());
     }
 }
-

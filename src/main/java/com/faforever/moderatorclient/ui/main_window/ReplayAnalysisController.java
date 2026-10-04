@@ -510,7 +510,7 @@ public class ReplayAnalysisController implements Controller<VBox> {
         DETECTED
     }
 
-    public ModerationReportController.DesyncResult checkReplayEventsForDesync(List<Event> events) {
+    public static ModerationReportController.DesyncResult checkReplayEventsForDesync(List<Event> events) {
         String previousChecksum = null;
         int previousTick = -1;
         for (Event event : events) {

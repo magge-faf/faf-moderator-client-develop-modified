@@ -34,7 +34,9 @@ import org.springframework.web.client.RestOperations;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.io.InterruptedIOException;
 import java.io.Serializable;
+import java.nio.channels.ClosedByInterruptException;
 import java.lang.reflect.Array;
 import java.time.Duration;
 import java.util.*;
@@ -399,6 +401,9 @@ public class FafApiCommunicationService {
                     Array.newInstance(clazz, 0).getClass(),
                     params);
         } catch (RuntimeException t) {
+            if (isInterruptedRequest(t)) {
+                throw t;
+            }
             log.error("API returned error on getPage for route ''{}''", route, t);
             applicationEventPublisher.publishEvent(new FafApiFailGetEvent(t, route, routeBuilder.getDtoClass()));
             throw t;
@@ -433,10 +438,24 @@ public class FafApiCommunicationService {
                     Array.newInstance(clazz, 0).getClass(),
                     params);
         } catch (RuntimeException t) {
+            if (isInterruptedRequest(t)) {
+                throw t;
+            }
             log.error("API returned error on Smurf Village Lookup for route '{}'", route, t);
             applicationEventPublisher.publishEvent(new FafApiFailGetEvent(t, route, routeBuilder.getDtoClass()));
             throw t;
         }
+    }
+
+    private static boolean isInterruptedRequest(Throwable throwable) {
+        for (Throwable cause = throwable; cause != null; cause = cause.getCause()) {
+            if (cause instanceof InterruptedException
+                    || cause instanceof InterruptedIOException
+                    || cause instanceof ClosedByInterruptException) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static int getRequestsInLastMinute() {

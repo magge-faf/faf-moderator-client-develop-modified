@@ -210,6 +210,9 @@
 
         <HBox alignment="BOTTOM_RIGHT" GridPane.columnSpan="2147483647" GridPane.rowIndex="10" GridPane.vgrow="ALWAYS">
             <children>
+                <Button fx:id="directEditBanButton" mnemonicParsing="false" onAction="#onUnlockDirectEdit" text="Directly edit current ban"
+                        style="-fx-background-color: #b22222; -fx-text-fill: white; -fx-border-color: #7f0000; -fx-border-width: 2px;"/>
+
                 <Button fx:id="cancelButton" cancelButton="true" mnemonicParsing="false" onAction="#onAbort" text="Cancel"
                         style="-fx-background-color: red; -fx-text-fill: white; -fx-border-color: darkred; -fx-border-width: 2px;"/>
 
