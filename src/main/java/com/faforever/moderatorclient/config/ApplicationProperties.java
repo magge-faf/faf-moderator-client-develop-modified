@@ -13,6 +13,5 @@ import java.util.Map;
 @Validated
 public class ApplicationProperties {
     @NotEmpty
-    @Valid
-    private Map<String, EnvironmentProperties> environments;
+    private Map<String, @Valid EnvironmentProperties> environments;
 }
