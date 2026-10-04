@@ -104,6 +104,7 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -2432,8 +2433,34 @@ public class ModerationReportController implements Controller<Region> {
                 List<PaintingBrushStroke> paintingStrokes = extractPaintingStrokes(replayDataParser);
                 ReplayTimelineData replayTimelineData = extractReplayTimeline(replayDataParser);
                 List<ReplayDetailEntry> replayDetailEntries = extractReplayDetailEntries(replayDataParser);
-                ReplayMapPreview mapPreview = loadMapPreview(game, replayDataParser);
+                chatLogFiltered.append("\n").append(promptAI);
+
+                for (String line : filteredChatLog.split("\n")) {
+                    if (line.contains(reportedUser)) {
+                        chatLogFilteredOffenderOnly.append(line).append("\n");
+                    }
+                }
+
+                chatLogFilteredOffenderOnly.append("\n\n").append(promptAI);
+
                 Platform.runLater(() -> {
+                    if (!isSelectedReportGame(reportId, gameId)) {
+                        return;
+                    }
+                    copyChatLogButton.setId(chatLogFiltered.toString());
+                    copyChatLogButton.setText("Copy Chat Log");
+                    refreshOpenLogsInNotepadPlusPlusVisibility();
+
+                    copyChatLogButtonOffenderOnly.setText("Copy Chat Offender");
+                    copyChatLogButtonOffenderOnly.setId(chatLogFilteredOffenderOnly.toString());
+
+                    updateChatLogToColorTextFlow(chatLogTextFlow, String.valueOf(chatLogFiltered),
+                            reporterName, reportedUser);
+                });
+
+                // Preview generation can take minutes; release the chat-log queue while it runs.
+                CompletableFuture.supplyAsync(() -> loadMapPreview(game, replayDataParser), BACKGROUND_EXECUTOR)
+                        .thenAccept(mapPreview -> Platform.runLater(() -> {
                     if (!isSelectedReportGame(reportId, gameId)) {
                         return;
                     }
@@ -2484,31 +2511,9 @@ public class ModerationReportController implements Controller<Region> {
                     renderReplayMap(visiblePaintingStrokes(java.time.Duration.ZERO), java.time.Duration.ZERO);
                     renderPaintingOverview(java.time.Duration.ZERO);
                     renderReplayTimeline();
-                });
-
-                chatLogFiltered.append("\n").append(promptAI);
-
-                for (String line : filteredChatLog.split("\n")) {
-                    if (line.contains(reportedUser)) {
-                        chatLogFilteredOffenderOnly.append(line).append("\n");
-                    }
-                }
-
-                chatLogFilteredOffenderOnly.append("\n\n").append(promptAI);
-
-                Platform.runLater(() -> {
-                    if (!isSelectedReportGame(reportId, gameId)) {
-                        return;
-                    }
-                    copyChatLogButton.setId(chatLogFiltered.toString());
-                    copyChatLogButton.setText("Copy Chat Log");
-                    refreshOpenLogsInNotepadPlusPlusVisibility();
-
-                    copyChatLogButtonOffenderOnly.setText("Copy Chat Offender");
-                    copyChatLogButtonOffenderOnly.setId(chatLogFilteredOffenderOnly.toString());
-
-                    updateChatLogToColorTextFlow(chatLogTextFlow, String.valueOf(chatLogFiltered),
-                            reporterName, reportedUser);
+                })).exceptionally(error -> {
+                    log.warn("Could not load map preview for replay {}", gameId, error);
+                    return null;
                 });
             }
         } catch (Exception e) {
@@ -3415,12 +3420,23 @@ public class ModerationReportController implements Controller<Region> {
         double w = paintingCanvas.getWidth();
         double h = paintingCanvas.getHeight();
 
+        // Use globally-computed bounds so scale stays stable when filtering by time
+        float range = Math.max(Math.max(paintingMaxX - paintingMinX, paintingMaxZ - paintingMinZ), 1f);
+        double padding = 24;
+        double scale = (Math.min(w, h) - 2 * padding) / range;
+
         // Generated previews contain transparent margins. Paint an opaque base on every frame so a
         // previous replay can never show through a later replay's preview.
         gc.setFill(Color.rgb(42, 48, 54));
         gc.fillRect(0, 0, w, h);
         if (replayMapPreview != null && !replayMapPreview.isError() && replayMapPreview.getProgress() >= 1) {
-            gc.drawImage(replayMapPreview, 0, 0, w, h);
+            if (replayMapWidth > 0 && replayMapHeight > 0) {
+                gc.drawImage(replayMapPreview,
+                        padding - paintingMinX * scale, padding - paintingMinZ * scale,
+                        replayMapWidth * scale, replayMapHeight * scale);
+            } else {
+                gc.drawImage(replayMapPreview, 0, 0, w, h);
+            }
         } else {
             gc.setFill(Color.LIGHTGRAY);
             gc.setFont(javafx.scene.text.Font.font(15));
@@ -3436,11 +3452,6 @@ public class ModerationReportController implements Controller<Region> {
             gc.fillText("No replay map coordinates found in this replay.", 20, h / 2);
             return;
         }
-
-        // Use globally-computed bounds so scale stays stable when filtering by time
-        float range = Math.max(Math.max(paintingMaxX - paintingMinX, paintingMaxZ - paintingMinZ), 1f);
-        double padding = 24;
-        double scale = (Math.min(w, h) - 2 * padding) / range;
 
         // Assign one color per player using all strokes for a stable legend
         Map<String, Color> playerColors = new LinkedHashMap<>(currentReplayPlayerColors);

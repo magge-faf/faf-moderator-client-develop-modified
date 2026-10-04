@@ -316,11 +316,11 @@ public class UserManagementController implements Controller<SplitPane> {
 
     @FXML
     public void initialize() {
+        loadAutoContinueThresholdValues();
         allUserDetailTabs.addAll(userDetailsTabPane.getTabs());
         loadStateCheckBox();
         addListeners();
         loadContent();
-        loadAutoContinueThresholdValues();
         configureSearchHistoryVisibility();
         configureUserNotesVisibility();
         setLastSearchTerm();
@@ -1935,19 +1935,17 @@ public class UserManagementController implements Controller<SplitPane> {
     }
 
     private void loadAutoContinueThresholdValues() {
-        CompletableFuture.runAsync(() -> {
-            try {
-                if (AUTO_CONTINUE_THRESHOLD_FILE.exists() && AUTO_CONTINUE_THRESHOLD_FILE.length() > 0) {
-                    TypeReference<List<Map<String, String>>> typeRef = new TypeReference<>() {};
-                    List<Map<String, String>> entries =
-                            AUTO_CONTINUE_OBJECT_MAPPER.readValue(AUTO_CONTINUE_THRESHOLD_FILE, typeRef);
-                    entries.forEach(entry ->
-                            autoContinueThresholdKeys.add(autoContinueThresholdKey(entry.get("property"), entry.get("value"))));
-                }
-            } catch (IOException e) {
-                log.error("Failed to load auto-continue threshold values", e);
+        try {
+            if (AUTO_CONTINUE_THRESHOLD_FILE.exists() && AUTO_CONTINUE_THRESHOLD_FILE.length() > 0) {
+                TypeReference<List<Map<String, String>>> typeRef = new TypeReference<>() {};
+                List<Map<String, String>> entries =
+                        AUTO_CONTINUE_OBJECT_MAPPER.readValue(AUTO_CONTINUE_THRESHOLD_FILE, typeRef);
+                entries.forEach(entry ->
+                        autoContinueThresholdKeys.add(autoContinueThresholdKey(entry.get("property"), entry.get("value"))));
             }
-        });
+        } catch (IOException e) {
+            log.error("Failed to load auto-continue threshold values", e);
+        }
     }
 
     private void saveAutoContinueThresholdValue(String property, String value) {
@@ -3026,7 +3024,7 @@ public class UserManagementController implements Controller<SplitPane> {
                 .filter(g -> g.ratingChangeProperty().get() != null)
                 .toList();
 
-        if (ratedGames.isEmpty()) {
+        if (ratedGames.isEmpty() && !checkReplayDesyncsCheckBox.isSelected()) {
             Alert warn = new Alert(Alert.AlertType.WARNING, "No rating journal data available for the selected games.", ButtonType.OK);
             warn.setTitle("Rating Manipulation Check");
             applyDialogStylesheet(warn);
@@ -3034,7 +3032,7 @@ public class UserManagementController implements Controller<SplitPane> {
             return;
         }
 
-        String playerName = ratedGames.stream()
+        String playerName = (ratedGames.isEmpty() ? games : ratedGames).stream()
                 .map(g -> g.getPlayer() != null ? g.getPlayer().getLogin() : null)
                 .filter(Objects::nonNull)
                 .findFirst()
@@ -3087,6 +3085,10 @@ public class UserManagementController implements Controller<SplitPane> {
         final List<GamePlayerStatsFX> gamesFinal = games;
         final List<GamePlayerStatsFX> ratedGamesFinal = ratedGames;
         Runnable runAnalysis = () -> {
+            if (ratedGamesFinal.isEmpty()) {
+                textArea.setText("No rating journal data available for the selected games.");
+                return;
+            }
             double lossRatePct  = spLossRate.getValue();
             int netRatingMin    = spNetRating.getValue();
             int streakMin       = spStreak.getValue();
@@ -3427,6 +3429,9 @@ public class UserManagementController implements Controller<SplitPane> {
         settingsTab.setClosable(false);
 
         TabPane tabPane = new TabPane(analysisTab, chartTab, desyncTab, settingsTab);
+        if (ratedGames.isEmpty()) {
+            tabPane.getSelectionModel().select(desyncTab);
+        }
 
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.setTitle("Rating Manipulation Analysis — " + playerName);

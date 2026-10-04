@@ -34,7 +34,9 @@ import org.springframework.web.client.RestOperations;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.io.InterruptedIOException;
 import java.io.Serializable;
+import java.nio.channels.ClosedByInterruptException;
 import java.lang.reflect.Array;
 import java.time.Duration;
 import java.util.*;
@@ -446,11 +448,10 @@ public class FafApiCommunicationService {
     }
 
     private static boolean isInterruptedRequest(Throwable throwable) {
-        if (Thread.currentThread().isInterrupted()) {
-            return true;
-        }
         for (Throwable cause = throwable; cause != null; cause = cause.getCause()) {
-            if (cause instanceof InterruptedException) {
+            if (cause instanceof InterruptedException
+                    || cause instanceof InterruptedIOException
+                    || cause instanceof ClosedByInterruptException) {
                 return true;
             }
         }

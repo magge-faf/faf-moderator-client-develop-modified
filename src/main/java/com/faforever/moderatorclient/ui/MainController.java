@@ -376,6 +376,7 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     }
 
     public void openReportSettings() {
+        restoreMainTab(reportTab);
         root.getSelectionModel().select(reportTab);
         if (moderationReportController != null) {
             moderationReportController.selectReportSettingsTab();
@@ -383,9 +384,19 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     }
 
     public void openUserSettings() {
+        restoreMainTab(userManagementTab);
         root.getSelectionModel().select(userManagementTab);
         if (userManagementController != null) {
             userManagementController.selectUserSettingsTab();
+        }
+    }
+
+    private void restoreMainTab(Tab destination) {
+        if (!root.getTabs().contains(destination)) {
+            List<Tab> visibleTabs = getConfiguredMainTabs().stream()
+                    .filter(tab -> tab == destination || root.getTabs().contains(tab))
+                    .toList();
+            root.getTabs().setAll(visibleTabs);
         }
     }
 
