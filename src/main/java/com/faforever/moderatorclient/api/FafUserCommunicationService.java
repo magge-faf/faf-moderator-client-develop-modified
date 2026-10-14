@@ -14,6 +14,8 @@ import org.springframework.web.client.RestOperations;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.DefaultUriBuilderFactory;
 
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -21,6 +23,9 @@ import java.util.concurrent.CountDownLatch;
 @Service
 @Slf4j
 public class FafUserCommunicationService {
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration READ_TIMEOUT = Duration.ofSeconds(30);
+
     private final OAuthTokenInterceptor oAuthTokenInterceptor;
     private final HmacHeaderInterceptor hmacHeaderInterceptor;
     private final ApplicationEventPublisher applicationEventPublisher;
@@ -48,7 +53,11 @@ public class FafUserCommunicationService {
     @SneakyThrows
     @EventListener
     public void authorize(HydraAuthorizedEvent event) {
-        restTemplate = new RestTemplate(new JdkClientHttpRequestFactory());
+        // Ban saves call this client on the JavaFX thread, so a stalled request must not hang the UI.
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(
+                HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build());
+        requestFactory.setReadTimeout(READ_TIMEOUT);
+        restTemplate = new RestTemplate(requestFactory);
         restTemplate.setUriTemplateHandler(new DefaultUriBuilderFactory(environmentProperties.getUserBaseUrl()));
         restTemplate.setInterceptors(List.of(oAuthTokenInterceptor, hmacHeaderInterceptor));
         authorizedLatch.countDown();

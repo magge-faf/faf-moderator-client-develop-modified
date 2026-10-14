@@ -610,10 +610,11 @@ public class MainController implements Controller<TabPane>, DisposableBean {
                                 + "because your login is too old ({1}).\n\nYour browser opens now: log in again and the sessions "
                                 + "are ended automatically.", event.playerId(), event.detail()));
                 case REVOKED_AFTER_RELOGIN -> notice(Alert.AlertType.INFORMATION, "Player sessions ended",
-                        MessageFormat.format("All sessions of player {0} were ended after your login.", event.playerId()));
+                        MessageFormat.format("The refresh tokens of player {0} were revoked after your login, so their sessions "
+                                + "can no longer be renewed. An access token already issued stays valid until it expires.", event.playerId()));
                 case FAILED -> notice(Alert.AlertType.WARNING, "Player sessions were not ended",
-                        MessageFormat.format("The ban for player {0} is applied, but the player''s sessions could not be ended ({1}). "
-                                + "They stay valid until their access tokens expire.", event.playerId(), event.detail()));
+                        MessageFormat.format("The ban for player {0} is applied, but the player''s refresh tokens could not be revoked ({1}), "
+                                + "so their sessions can still be renewed.", event.playerId(), event.detail()));
             };
             alert.show();
         });

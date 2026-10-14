@@ -17,6 +17,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -39,6 +40,16 @@ class BanServiceTest {
     void setUp() {
         instance = new BanService(mock(BanInfoMapper.class), fafApi, fafUser, new EnvironmentProperties(),
                 browserReloginService, applicationEventPublisher);
+    }
+
+    @Test
+    void doesNotRevokeOrNotifyWhenBanWriteFails() {
+        when(fafApi.patch(any(), any(BanInfo.class))).thenThrow(new IllegalStateException("API down"));
+
+        assertThrows(IllegalStateException.class, () -> instance.updateBan(banFor("42")));
+
+        verify(fafUser, never()).tryPost(any(), any());
+        verify(applicationEventPublisher, never()).publishEvent(any(Object.class));
     }
 
     @Test
