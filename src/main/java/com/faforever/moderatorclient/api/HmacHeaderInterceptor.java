@@ -16,7 +16,7 @@ import java.io.IOException;
 @Slf4j
 public class HmacHeaderInterceptor implements ClientHttpRequestInterceptor {
     @Setter
-    private String hmac;
+    private volatile String hmac;
 
     @Override
     public ClientHttpResponse intercept(HttpRequest request, byte[] body, ClientHttpRequestExecution execution) throws IOException {

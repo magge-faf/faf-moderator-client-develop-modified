@@ -9,10 +9,12 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestOperations;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.DefaultUriBuilderFactory;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
@@ -65,19 +67,65 @@ public class FafUserCommunicationService {
 
     /**
      * Best-effort POST that never publishes a failure event or throws.
-     * Returns true on success, false on any error (caller is responsible for logging).
+     * Returns null on success, otherwise why it failed.
      */
-    public boolean tryPost(String url, Object object) {
+    public UserServiceFailure tryPost(String url, Object object) {
         try {
             authorizedLatch.await();
             restTemplate.postForObject(url, object, String.class);
-            return true;
+            return null;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return false;
+            return new UserServiceFailure("interrupted", false);
         } catch (Exception e) {
-            return false;
+            return describeFailure(e);
         }
+    }
+
+    /**
+     * The HMAC in the access token's ext claim is minted once at browser login and copied unchanged on every refresh,
+     * so long-lived auto-login sessions carry an HMAC that Cloudflare's timed check eventually rejects with a challenge.
+     * Fetches a freshly minted HMAC and makes it the X-HMAC header for subsequent requests.
+     * Returns null on success, otherwise why it failed.
+     */
+    public UserServiceFailure tryRefreshHmac() {
+        try {
+            authorizedLatch.await();
+            HmacChallengeToken challengeToken = restTemplate.getForObject("/challenge/token", HmacChallengeToken.class);
+            if (challengeToken == null || challengeToken.token() == null || challengeToken.token().isBlank()) {
+                return new UserServiceFailure("empty /challenge/token response", false);
+            }
+            hmacHeaderInterceptor.setHmac(challengeToken.token());
+            log.info("Refreshed X-HMAC from /challenge/token (issued at {})", hmacIssuedAt(challengeToken.token()));
+            return null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return new UserServiceFailure("interrupted", false);
+        } catch (Exception e) {
+            return describeFailure(e);
+        }
+    }
+
+    /** The HMAC format is {epochSeconds}-{signature}; only the public timestamp part is logged. */
+    private static String hmacIssuedAt(String hmac) {
+        try {
+            return Instant.ofEpochSecond(Long.parseLong(hmac.substring(0, hmac.indexOf('-')))).toString();
+        } catch (RuntimeException e) {
+            return "unknown";
+        }
+    }
+
+    private static UserServiceFailure describeFailure(Exception e) {
+        if (e instanceof RestClientResponseException responseException) {
+            String cfMitigated = responseException.getResponseHeaders() == null
+                    ? null : responseException.getResponseHeaders().getFirst("cf-mitigated");
+            return cfMitigated != null
+                    ? new UserServiceFailure("HTTP " + responseException.getStatusCode().value()
+                    + ", blocked by Cloudflare (cf-mitigated: " + cfMitigated + ")", true)
+                    : new UserServiceFailure("HTTP " + responseException.getStatusCode().value()
+                    + " " + responseException.getStatusText(), false);
+        }
+        return new UserServiceFailure(e.getClass().getSimpleName() + ": " + e.getMessage(), false);
     }
 
     @SneakyThrows
