@@ -6,6 +6,7 @@ import com.faforever.moderatorclient.config.local.LocalPreferences;
 import com.faforever.moderatorclient.login.OAuthValuesReceiver;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTParser;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +43,7 @@ public class TokenService {
     private final ApplicationEventPublisher applicationEventPublisher;
     private final HmacHeaderInterceptor hmacHeaderInterceptor;
     private RestTemplate restTemplate;
+    @Getter
     private EnvironmentProperties environmentProperties;
     private OAuth2AccessTokenResponse tokenCache;
     private final Object refreshLock = new Object();
@@ -127,6 +129,14 @@ public class TokenService {
     }
 
     public void loginWithAuthorizationCode(OAuthValuesReceiver.Values values) {
+        loginWithAuthorizationCode(values, true);
+    }
+
+    /**
+     * @param fireEvent false renews the session in place, without the re-authorization side effects of
+     *                  {@link HydraAuthorizedEvent} (rebuilt API clients, lobby disconnect)
+     */
+    public void loginWithAuthorizationCode(OAuthValuesReceiver.Values values, boolean fireEvent) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
         headers.setAccept(List.of(MediaType.APPLICATION_JSON));
@@ -142,9 +152,10 @@ public class TokenService {
         if (responseBody != null) {
             parseResponse(responseBody, null);
 
-            applicationEventPublisher.publishEvent(new HydraAuthorizedEvent());
+            if (fireEvent) {
+                applicationEventPublisher.publishEvent(new HydraAuthorizedEvent());
+            }
         }
-
     }
 
     private void parseResponse(Map<String, Object> responseBody, String fallbackRefreshToken) {

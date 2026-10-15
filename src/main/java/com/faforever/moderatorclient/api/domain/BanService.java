@@ -4,9 +4,13 @@ import com.faforever.commons.api.dto.BanInfo;
 import com.faforever.commons.api.elide.ElideNavigator;
 import com.faforever.commons.api.elide.ElideNavigatorOnCollection;
 import com.faforever.commons.api.elide.ElideNavigatorOnId;
+import com.faforever.moderatorclient.api.BrowserReloginService;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
 import com.faforever.moderatorclient.api.FafUserCommunicationService;
+import com.faforever.moderatorclient.api.UserServiceFailure;
 import com.faforever.moderatorclient.api.dto.hydra.RevokeRefreshTokenRequest;
+import com.faforever.moderatorclient.api.event.RefreshTokenRevocationEvent;
+import com.faforever.moderatorclient.api.event.RefreshTokenRevocationEvent.Status;
 import com.faforever.moderatorclient.config.EnvironmentProperties;
 import com.faforever.moderatorclient.mapstruct.BanInfoMapper;
 import com.faforever.moderatorclient.ui.domain.BanInfoFX;
@@ -14,6 +18,7 @@ import com.google.common.collect.ImmutableMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
@@ -21,6 +26,8 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeoutException;
 
 @Service
 @Slf4j
@@ -32,20 +39,24 @@ public class BanService {
     private final FafApiCommunicationService fafApi;
     private final FafUserCommunicationService fafUser;
     private final EnvironmentProperties environmentProperties;
+    private final BrowserReloginService browserReloginService;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     public void patchBanInfo(@NotNull BanInfoFX banInfoFX) {
         BanInfo banInfo = banInfoMapper.map(banInfoFX);
         log.debug("Patching BanInfo of id: {}", banInfo.getId());
-        tryRevokeTokens(banInfo.getPlayer().getId());
+        String playerId = banInfo.getPlayer().getId();
         banInfo.setAuthor(null);
         banInfo.setPlayer(null);
         fafApi.patch(ElideNavigator.of(BanInfo.class).id(banInfo.getId()), banInfo);
+        tryRevokeTokens(playerId);
     }
 
     public String createBan(@NotNull BanInfoFX banInfoFX) {
         BanInfo banInfo = banInfoMapper.map(banInfoFX);
+        String banId = fafApi.post(ElideNavigator.of(BanInfo.class).collection(), banInfo).getId();
         tryRevokeTokens(banInfo.getPlayer().getId());
-        return fafApi.post(ElideNavigator.of(BanInfo.class).collection(), banInfo).getId();
+        return banId;
     }
 
     public String revokeThenCreateBan(@NotNull BanInfoFX banInfoFX) {
@@ -76,18 +87,54 @@ public class BanService {
         ElideNavigatorOnId<BanInfo> navigator = ElideNavigator.of(BanInfo.class)
                 .id(banInfoUpdate.getId());
 
-        tryRevokeTokens(banInfoUpdate.getPlayer().getId());
         fafApi.patch(navigator, banInfoUpdate);
+        tryRevokeTokens(banInfoUpdate.getPlayer().getId());
     }
 
+    /** Call only after the ban write succeeded: the outcome notices tell the moderator the ban is applied. */
     private void tryRevokeTokens(String playerId) {
         // Best-effort session cleanup: revoking all refresh tokens forces the banned player to sign in again on FAF
-        // clients once their current access token expires. user.faforever.com may protect this endpoint against
-        // non-browser clients, so keep the request optional until the server can explicitly allow this client.
-        boolean revoked = fafUser.tryPost(REVOKE_ENDPOINT, RevokeRefreshTokenRequest.allClientsOf(playerId));
-        if (!revoked) {
-            log.warn("Could not revoke refresh tokens for player {}; the ban is applied, but existing sessions remain until their access tokens expire", playerId);
+        // clients once their current access token expires. A failure here must not undo the saved ban.
+        // Cloudflare only lets the request through with a recent X-HMAC, so mint a fresh one first.
+        UserServiceFailure hmacFailure = fafUser.tryRefreshHmac();
+        if (hmacFailure != null) {
+            log.warn("Could not refresh HMAC before revoking refresh tokens ({}); trying with the HMAC from login", hmacFailure);
         }
+        UserServiceFailure failure = fafUser.tryPost(REVOKE_ENDPOINT, RevokeRefreshTokenRequest.allClientsOf(playerId));
+        if (failure == null) {
+            log.info("Revoked all refresh tokens for player {}", playerId);
+        } else if (!failure.cloudflareChallenge()) {
+            notRevoked(playerId, failure.reason());
+        } else {
+            // Only a browser login mints a new HMAC. Run it in the background so the ban itself is not held up.
+            log.warn("Revoking refresh tokens for player {} was blocked by Cloudflare ({}); asking the moderator to log in again", playerId, failure);
+            publishRevocation(playerId, Status.RELOGIN_REQUIRED, failure.reason());
+            browserReloginService.relogin()
+                    .thenRun(() -> {
+                        UserServiceFailure retryFailure = fafUser.tryPost(REVOKE_ENDPOINT, RevokeRefreshTokenRequest.allClientsOf(playerId));
+                        if (retryFailure == null) {
+                            log.info("Revoked all refresh tokens for player {} after re-login", playerId);
+                            publishRevocation(playerId, Status.REVOKED_AFTER_RELOGIN, null);
+                        } else {
+                            notRevoked(playerId, "after re-login: " + retryFailure.reason());
+                        }
+                    })
+                    .exceptionally(error -> {
+                        Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+                        notRevoked(playerId, "browser login did not complete: "
+                                + (cause instanceof TimeoutException ? "timed out" : cause.toString()));
+                        return null;
+                    });
+        }
+    }
+
+    private void notRevoked(String playerId, String reason) {
+        log.warn("Could not revoke refresh tokens for player {} ({}); the ban is applied, but the player's sessions can still be renewed", playerId, reason);
+        publishRevocation(playerId, Status.FAILED, reason);
+    }
+
+    private void publishRevocation(String playerId, Status status, String detail) {
+        applicationEventPublisher.publishEvent(new RefreshTokenRevocationEvent(playerId, status, detail));
     }
 
     public CompletableFuture<List<BanInfoFX>> getLatestBans() {

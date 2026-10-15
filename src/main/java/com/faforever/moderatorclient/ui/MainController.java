@@ -8,6 +8,7 @@ import com.faforever.moderatorclient.api.TokenService;
 import com.faforever.moderatorclient.api.event.FafApiFailGetEvent;
 import com.faforever.moderatorclient.api.event.FafApiFailModifyEvent;
 import com.faforever.moderatorclient.api.event.FafUserFailModifyEvent;
+import com.faforever.moderatorclient.api.event.RefreshTokenRevocationEvent;
 import com.faforever.moderatorclient.api.event.TokenExpiredEvent;
 import com.faforever.moderatorclient.config.ApplicationPaths;
 import com.faforever.moderatorclient.config.ApplicationProperties;
@@ -598,6 +599,33 @@ public class MainController implements Controller<TabPane>, DisposableBean {
     public void onFafUserGetFailed(FafUserFailModifyEvent event) {
         Platform.runLater(() ->
                 ViewHelper.exceptionDialog("Sending updated data to User Service failed", MessageFormat.format("Something went wrong while sending data of type ''{0}'' to the User Service. The related change was not saved. You might wanna try again. Please check if the data you entered is valid. \n\nPlease contact the maintainer and give him the details from the box below.", event.getObjectClass().getSimpleName()), event.getCause(), Optional.of(event.getUrl())));
+    }
+
+    @EventListener
+    public void onRefreshTokenRevocation(RefreshTokenRevocationEvent event) {
+        Platform.runLater(() -> {
+            Alert alert = switch (event.status()) {
+                case RELOGIN_REQUIRED -> notice(Alert.AlertType.INFORMATION, "Login required to end the player's sessions",
+                        MessageFormat.format("The ban for player {0} is applied, but Cloudflare blocked ending the player''s sessions "
+                                + "because your login is too old ({1}).\n\nYour browser opens now: log in again and the sessions "
+                                + "are ended automatically.", event.playerId(), event.detail()));
+                case REVOKED_AFTER_RELOGIN -> notice(Alert.AlertType.INFORMATION, "Player sessions ended",
+                        MessageFormat.format("The refresh tokens of player {0} were revoked after your login, so their sessions "
+                                + "can no longer be renewed. An access token already issued stays valid until it expires.", event.playerId()));
+                case FAILED -> notice(Alert.AlertType.WARNING, "Player sessions were not ended",
+                        MessageFormat.format("The ban for player {0} is applied, but the player''s refresh tokens could not be revoked ({1}), "
+                                + "so their sessions can still be renewed.", event.playerId(), event.detail()));
+            };
+            alert.show();
+        });
+    }
+
+    private static Alert notice(Alert.AlertType type, String header, String content) {
+        Alert alert = new Alert(type);
+        alert.setTitle("Ban");
+        alert.setHeaderText(header);
+        alert.setContentText(content);
+        return alert;
     }
 
     @EventListener

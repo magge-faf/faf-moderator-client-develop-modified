@@ -5,44 +5,39 @@ import com.faforever.moderatorclient.api.event.HydraAuthorizedEvent;
 import com.faforever.moderatorclient.config.EnvironmentProperties;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import jakarta.annotation.PreDestroy;
-import org.apache.hc.client5.http.config.ConnectionConfig;
-import org.apache.hc.client5.http.config.RequestConfig;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
-import org.apache.hc.core5.util.Timeout;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
-import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestOperations;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.DefaultUriBuilderFactory;
 
-import java.io.IOException;
+import java.net.http.HttpClient;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 @Service
 @Slf4j
 public class FafUserCommunicationService {
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration READ_TIMEOUT = Duration.ofSeconds(30);
+
     private final OAuthTokenInterceptor oAuthTokenInterceptor;
     private final HmacHeaderInterceptor hmacHeaderInterceptor;
-    private final BrowserHeadersInterceptor browserHeadersInterceptor;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final CountDownLatch authorizedLatch;
-    private volatile CloseableHttpClient httpClient;
     private RestTemplate restTemplate;
     private EnvironmentProperties environmentProperties;
 
     public FafUserCommunicationService(OAuthTokenInterceptor oAuthTokenInterceptor,
                                        HmacHeaderInterceptor hmacHeaderInterceptor,
-                                       BrowserHeadersInterceptor browserHeadersInterceptor,
                                        ApplicationEventPublisher applicationEventPublisher) {
         this.oAuthTokenInterceptor = oAuthTokenInterceptor;
         this.hmacHeaderInterceptor = hmacHeaderInterceptor;
-        this.browserHeadersInterceptor = browserHeadersInterceptor;
         this.applicationEventPublisher = applicationEventPublisher;
         authorizedLatch = new CountDownLatch(1);
     }
@@ -55,45 +50,16 @@ public class FafUserCommunicationService {
         this.environmentProperties = environmentProperties;
     }
 
-    @PreDestroy
-    public void shutdown() {
-        closeHttpClient();
-    }
-
-    private void closeHttpClient() {
-        CloseableHttpClient old = this.httpClient;
-        if (old != null) {
-            try {
-                old.close();
-            } catch (IOException e) {
-                log.warn("Failed to close HTTP client", e);
-            }
-        }
-    }
-
     @SneakyThrows
     @EventListener
     public void authorize(HydraAuthorizedEvent event) {
-        closeHttpClient();
-
-        // Apache HttpClient 5 persists cookies (including CF clearance) across requests
-        // to the same domain, unlike JdkClientHttpRequestFactory which discards them.
-        PoolingHttpClientConnectionManager connManager = new PoolingHttpClientConnectionManager();
-        connManager.setDefaultConnectionConfig(ConnectionConfig.custom()
-                .setConnectTimeout(Timeout.ofSeconds(30))
-                .build());
-
-        httpClient = HttpClients.custom()
-                .setConnectionManager(connManager)
-                .setDefaultRequestConfig(RequestConfig.custom()
-                        .setConnectionRequestTimeout(Timeout.ofSeconds(30))
-                        .setResponseTimeout(Timeout.ofMinutes(5))
-                        .build())
-                .build();
-
-        restTemplate = new RestTemplate(new HttpComponentsClientHttpRequestFactory(httpClient));
+        // Ban saves call this client on the JavaFX thread, so a stalled request must not hang the UI.
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(
+                HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build());
+        requestFactory.setReadTimeout(READ_TIMEOUT);
+        restTemplate = new RestTemplate(requestFactory);
         restTemplate.setUriTemplateHandler(new DefaultUriBuilderFactory(environmentProperties.getUserBaseUrl()));
-        restTemplate.setInterceptors(List.of(oAuthTokenInterceptor, hmacHeaderInterceptor, browserHeadersInterceptor));
+        restTemplate.setInterceptors(List.of(oAuthTokenInterceptor, hmacHeaderInterceptor));
         authorizedLatch.countDown();
     }
 
@@ -110,19 +76,65 @@ public class FafUserCommunicationService {
 
     /**
      * Best-effort POST that never publishes a failure event or throws.
-     * Returns true on success, false on any error (caller is responsible for logging).
+     * Returns null on success, otherwise why it failed.
      */
-    public boolean tryPost(String url, Object object) {
+    public UserServiceFailure tryPost(String url, Object object) {
         try {
             authorizedLatch.await();
             restTemplate.postForObject(url, object, String.class);
-            return true;
+            return null;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return false;
+            return new UserServiceFailure("interrupted", false);
         } catch (Exception e) {
-            return false;
+            return describeFailure(e);
         }
+    }
+
+    /**
+     * The HMAC in the access token's ext claim is minted once at browser login and copied unchanged on every refresh,
+     * so long-lived auto-login sessions carry an HMAC that Cloudflare's timed check eventually rejects with a challenge.
+     * Fetches a freshly minted HMAC and makes it the X-HMAC header for subsequent requests.
+     * Returns null on success, otherwise why it failed.
+     */
+    public UserServiceFailure tryRefreshHmac() {
+        try {
+            authorizedLatch.await();
+            HmacChallengeToken challengeToken = restTemplate.getForObject("/challenge/token", HmacChallengeToken.class);
+            if (challengeToken == null || challengeToken.token() == null || challengeToken.token().isBlank()) {
+                return new UserServiceFailure("empty /challenge/token response", false);
+            }
+            hmacHeaderInterceptor.setHmac(challengeToken.token());
+            log.info("Refreshed X-HMAC from /challenge/token (issued at {})", hmacIssuedAt(challengeToken.token()));
+            return null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return new UserServiceFailure("interrupted", false);
+        } catch (Exception e) {
+            return describeFailure(e);
+        }
+    }
+
+    /** The HMAC format is {epochSeconds}-{signature}; only the public timestamp part is logged. */
+    private static String hmacIssuedAt(String hmac) {
+        try {
+            return Instant.ofEpochSecond(Long.parseLong(hmac.substring(0, hmac.indexOf('-')))).toString();
+        } catch (RuntimeException e) {
+            return "unknown";
+        }
+    }
+
+    private static UserServiceFailure describeFailure(Exception e) {
+        if (e instanceof RestClientResponseException responseException) {
+            String cfMitigated = responseException.getResponseHeaders() == null
+                    ? null : responseException.getResponseHeaders().getFirst("cf-mitigated");
+            return cfMitigated != null
+                    ? new UserServiceFailure("HTTP " + responseException.getStatusCode().value()
+                    + ", blocked by Cloudflare (cf-mitigated: " + cfMitigated + ")", true)
+                    : new UserServiceFailure("HTTP " + responseException.getStatusCode().value()
+                    + " " + responseException.getStatusText(), false);
+        }
+        return new UserServiceFailure(e.getClass().getSimpleName() + ": " + e.getMessage(), false);
     }
 
     @SneakyThrows
