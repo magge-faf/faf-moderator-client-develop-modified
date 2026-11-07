@@ -2234,8 +2234,6 @@ public class ModerationReportController implements Controller<Region> {
 
         String moderatorEventsLog = moderatorEvents.stream()
                 .filter(event -> {
-                    if (event.playerNameFromCommandSource() == null) return false;
-
                     String message = event.message();
                     boolean filterOut = false;
 
@@ -2270,6 +2268,7 @@ public class ModerationReportController implements Controller<Region> {
                 .map(event -> {
                     long timeMillis = event.time().toMillis();
                     String formattedChatMessageTime = formatChatMessageTime(timeMillis);
+                    String commandSource = Objects.toString(event.playerNameFromCommandSource(), "System");
 
                     String formattedMessage = event.message();
                     if (formattedMessage.contains("focus army from")) {
@@ -2310,7 +2309,7 @@ public class ModerationReportController implements Controller<Region> {
 
                     return String.format("%s from %s : %s",
                             formattedChatMessageTime,
-                            event.playerNameFromCommandSource(),
+                            commandSource,
                             formattedMessage
                     );
                 })
@@ -2415,7 +2414,7 @@ public class ModerationReportController implements Controller<Region> {
 
                 chatLogFiltered.append(header);
 
-                String metadataInfo = generateMetadataInfo(replayDataParser);
+                String metadataInfo = generateMetadataInfo(replayDataParser, report);
                 chatLogFiltered.append(metadataInfo);
 
                 String filteredChatLog = filterAndAppendChatLog(chatLog);
@@ -4119,7 +4118,7 @@ public class ModerationReportController implements Controller<Region> {
         return new DesyncResult(false, -1);
     }
 
-    private String generateMetadataInfo(ReplayDataParser replayDataParser) {
+    private String generateMetadataInfo(ReplayDataParser replayDataParser, ModerationReportFX moderationReport) {
         ReplayMetadata metadata = replayDataParser.getMetadata();
         List<GameOption> gameOptions = replayDataParser.getGameOptions();
         Map<String, Map<String, ?>> mods = replayDataParser.getMods();
@@ -4158,19 +4157,20 @@ public class ModerationReportController implements Controller<Region> {
             report.append("[!] Non-Default Common Army: ").append(commonArmy).append("\n");
         }
 
-        String reporterLoginName = String.valueOf(currentlySelectedItemNotNull.getReporter().getLogin());
-
-        boolean reporterParticipated = false;
-        for (Map.Entry<String, List<String>> entry : metadata.getTeams().entrySet()) {
-            List<String> playerNames = entry.getValue();
-            if (playerNames.contains(reporterLoginName)) {
-                reporterParticipated = true;
-                break;
+        if (moderationReport.getReporter() != null) {
+            String reporterLoginName = String.valueOf(moderationReport.getReporter().getLogin());
+            boolean reporterParticipated = false;
+            for (Map.Entry<String, List<String>> entry : metadata.getTeams().entrySet()) {
+                List<String> playerNames = entry.getValue();
+                if (playerNames.contains(reporterLoginName)) {
+                    reporterParticipated = true;
+                    break;
+                }
             }
-        }
 
-        if (!reporterParticipated) {
-            report.append(String.format("[!] Reporter '%s' does not exist in any of the team names.\n", reporterLoginName));
+            if (!reporterParticipated) {
+                report.append(String.format("[!] Reporter '%s' does not exist in any of the team names.\n", reporterLoginName));
+            }
         }
 
         report.append("\nHost: ").append(metadata.getHost()).append("\n")
