@@ -2,6 +2,8 @@ package com.faforever.moderatorclient.api.domain;
 
 import com.faforever.commons.api.dto.Mod;
 import com.faforever.commons.api.dto.ModVersion;
+import com.faforever.commons.api.dto.ModVersionReview;
+import com.faforever.commons.api.dto.ModVersionReviewsSummary;
 import com.faforever.commons.api.elide.ElideNavigator;
 import com.faforever.commons.api.elide.ElideNavigatorOnCollection;
 import com.faforever.moderatorclient.api.FafApiCommunicationService;
@@ -137,5 +139,24 @@ public class ModService {
         List<ModVersion> result = communicationService.getPage(ModVersion.class, navigator, 50, 1, Collections.emptyMap());
         log.trace("found {} modVersions", result.size());
         return modVersionMapper.mapToFX(result);
+    }
+
+    public ModVersionReviewData getModVersionReviewData(String modVersionId) {
+        List<ModVersionReview> reviews = communicationService.getAll(ModVersionReview.class,
+                ElideNavigator.of(ModVersionReview.class).collection().addInclude("player")
+                        .setFilter(ElideNavigator.qBuilder().string("modVersion.id").eq(modVersionId)));
+        ModVersionReviewsSummary summary = communicationService.getAll(ModVersion.class,
+                        ElideNavigator.of(ModVersion.class).collection().addInclude("reviewsSummary")
+                                .setFilter(ElideNavigator.qBuilder().string("id").eq(modVersionId)))
+                .stream().findFirst().map(ModVersion::getModVersionReviewsSummary).orElse(null);
+        return new ModVersionReviewData(reviews, summary);
+    }
+
+    public void deleteModVersionReview(String reviewId) {
+        log.debug("Deleting mod version review id: {}", reviewId);
+        communicationService.delete(new ModVersionReview().setId(reviewId));
+    }
+
+    public record ModVersionReviewData(List<ModVersionReview> reviews, ModVersionReviewsSummary summary) {
     }
 }
