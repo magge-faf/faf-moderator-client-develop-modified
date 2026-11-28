@@ -241,6 +241,30 @@ public class UserService {
     }
 
     public List<GamePlayerStats> getLastThousandPlayedGamesByFeaturedMod(@NotNull String userId, int page, FeaturedModFX featuredModFX) {
+        return fafApi.getPage(GamePlayerStats.class, playedGamesRoute(userId, featuredModFX), 1000, page, Collections.emptyMap());
+    }
+
+    public List<GamePlayerStats> getRecentPlayedGames(@NotNull String userId, FeaturedModFX featuredMod, int limit,
+                                                    IntConsumer loadedCountConsumer) {
+        final int pageSize = 1000;
+        ElideNavigatorOnCollection<GamePlayerStats> route = playedGamesRoute(userId, featuredMod)
+                .addSortingRule("id", false);
+        List<GamePlayerStats> games = new ArrayList<>();
+        for (int page = 1; games.size() < limit; page++) {
+            List<GamePlayerStats> results = fafApi.getPage(GamePlayerStats.class, route, pageSize, page, Collections.emptyMap());
+            int count = Math.min(results.size(), limit - games.size());
+            games.addAll(results.subList(0, count));
+            if (count > 0) {
+                loadedCountConsumer.accept(games.size());
+            }
+            if (results.size() < pageSize) {
+                break;
+            }
+        }
+        return games;
+    }
+
+    private ElideNavigatorOnCollection<GamePlayerStats> playedGamesRoute(String userId, FeaturedModFX featuredModFX) {
         log.debug("Searching for games played by player id: {}", userId);
         ElideNavigatorOnCollection<GamePlayerStats> navigator = ElideNavigator.of(GamePlayerStats.class)
                 .collection()
@@ -259,7 +283,7 @@ public class UserService {
         } else {
             navigator.setFilter(ElideNavigator.qBuilder().string("player.id").eq(userId));
         }
-        return fafApi.getPage(GamePlayerStats.class, navigator, 1000, page, Collections.emptyMap());
+        return navigator;
     }
 
     public List<GamePlayerStats> getLastHundredPlayedGames(@NotNull String userId, int page) {

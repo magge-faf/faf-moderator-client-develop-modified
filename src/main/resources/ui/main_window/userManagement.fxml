@@ -5,6 +5,7 @@
 <?import javafx.scene.control.ChoiceBox?>
 <?import javafx.scene.control.ComboBox?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ProgressIndicator?>
 <?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.SplitPane?>
 <?import javafx.scene.control.TabPane?>
@@ -246,39 +247,43 @@
         </Tab>
         <Tab fx:id="lastGamesTab" text="Last Games">
             <VBox spacing="5">
-                <HBox spacing="10">
+                <HBox alignment="CENTER_LEFT" spacing="8">
                     <VBox.margin>
-                        <Insets bottom="5.0" left="5.0" right="5.0" top="5.0"/>
+                        <Insets left="5.0" right="5.0" top="5.0"/>
                     </VBox.margin>
-                    <Label maxHeight="1.7976931348623157E308" maxWidth="1.7976931348623157E308"
-                           text="Show featured Mods:"/>
+                    <Label text="Featured mod"/>
                     <ChoiceBox fx:id="featuredModFilterChoiceBox" minWidth="150.0"/>
-                    <Label text="Enter manually or select two accounts from userTable"/>
-                    <Label text="Check for Shared Games between"/>
-                    <TextField fx:id="playerIDField1SharedGamesTextfield" minWidth="100.0" promptText="PlayerID"/>
-                    <Label text="and" alignment="CENTER"/>
-                    <TextField fx:id="playerIDField2SharedGamesTextfield" minWidth="100.0" promptText="PlayerID"/>
-                    <Button fx:id="checkSharedGamesButton" text="Check for Shared Games (Last 1,000)"
-                            onAction="#onCheckSharedGames" mnemonicParsing="false"/>
-                    <Label fx:id="progressLabelSharedGames" visible="false" minWidth="150"/>
                     <Separator orientation="VERTICAL"/>
-                    <Label text="Last"/>
-                    <TextField fx:id="ratingCheckGamesCountField" prefWidth="55" text="100" promptText="all"/>
-                    <Label text="games"/>
-                    <Button text="Check Rating Manipulation" onAction="#onCheckRatingManipulation" mnemonicParsing="false"/>
-                    <Separator orientation="VERTICAL"/>
-                    <CheckBox fx:id="checkReplayDesyncsCheckBox" text="Check replay desyncs" selected="false">
+                    <Label text="Games to analyze"/>
+                    <TextField fx:id="ratingCheckGamesCountField" accessibleText="Games to analyze" prefWidth="75" text="100" promptText="All games">
                         <tooltip>
-                            <Tooltip text="Optional and disabled by default. Every replay must be downloaded and verified individually. Large quantities are not recommended." wrapText="true"/>
-                        </tooltip>
-                    </CheckBox>
-                    <Label text="last"/>
-                    <TextField fx:id="desyncCheckGamesCountField" prefWidth="55" text="25" promptText="all">
-                        <tooltip>
-                            <Tooltip text="Number of recent games whose replays should be downloaded and checked for desyncs." wrapText="true"/>
+                            <Tooltip text="Number of recent games to use for rating history and indicators. Leave blank for all games."/>
                         </tooltip>
                     </TextField>
-                    <Label text="games for desyncs"/>
+                    <Button fx:id="openGameAnalysisButton" text="Open Game Analysis"
+                            onAction="#onOpenGameAnalysis" mnemonicParsing="false">
+                        <tooltip>
+                            <Tooltip text="View rating history, review rating indicators, or check replays for desyncs."/>
+                        </tooltip>
+                    </Button>
+                    <HBox fx:id="gameAnalysisLoading" alignment="CENTER_LEFT" spacing="6" visible="false" managed="false">
+                        <ProgressIndicator prefWidth="18.0" prefHeight="18.0" maxWidth="18.0" maxHeight="18.0"/>
+                        <Label fx:id="gameAnalysisLoadingLabel"/>
+                    </HBox>
+                </HBox>
+                <HBox alignment="CENTER_LEFT" spacing="8">
+                    <VBox.margin>
+                        <Insets left="5.0" right="5.0"/>
+                    </VBox.margin>
+                    <TextField fx:id="playerIDField1SharedGamesTextfield" minWidth="100.0" promptText="Player ID"/>
+                    <TextField fx:id="playerIDField2SharedGamesTextfield" minWidth="100.0" promptText="Player ID"/>
+                    <Button fx:id="checkSharedGamesButton" text="Find Shared Games"
+                            onAction="#onCheckSharedGames" mnemonicParsing="false">
+                        <tooltip>
+                            <Tooltip text="Enter two player IDs or select two players. Searches the last 1,000 games per player."/>
+                        </tooltip>
+                    </Button>
+                    <Label fx:id="progressLabelSharedGames" visible="false"/>
                 </HBox>
 
                 <TableView fx:id="userLastGamesTable" maxHeight="1.7976931348623157E308"

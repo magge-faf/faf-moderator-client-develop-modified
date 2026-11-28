@@ -152,6 +152,9 @@ public class UserManagementController implements Controller<SplitPane> {
     public Text statusTextRecentAccountsForSmurfs;
     @FXML
     public Button checkSharedGamesButton;
+    public Button openGameAnalysisButton;
+    public HBox gameAnalysisLoading;
+    public Label gameAnalysisLoadingLabel;
     public Button removeNoteButton;
     @FXML
     public TextField
@@ -159,11 +162,7 @@ public class UserManagementController implements Controller<SplitPane> {
             statusTextFieldProcessingItem,
             playerIDField1SharedGamesTextfield,
             playerIDField2SharedGamesTextfield,
-            ratingCheckGamesCountField,
-            desyncCheckGamesCountField;
-
-    @FXML
-    public CheckBox checkReplayDesyncsCheckBox;
+            ratingCheckGamesCountField;
 
     @FXML
     public CheckBox
@@ -1177,13 +1176,13 @@ public class UserManagementController implements Controller<SplitPane> {
                 playerID1 = selectedItems.get(0).getId();
                 playerID2 = selectedItems.get(1).getId();
             } else {
-                checkSharedGamesButton.setText("Check - Please select exactly two users or provide two player IDs.");
+                showSharedGamesInputWarning("Select two players or enter two player IDs.");
                 return;
             }
         }
 
         if (!isValidPlayerId(playerID1) || !isValidPlayerId(playerID2)) {
-            checkSharedGamesButton.setText("Check - Invalid player IDs provided.");
+            showSharedGamesInputWarning("Enter valid player IDs.");
             return;
         }
 
@@ -1267,6 +1266,13 @@ public class UserManagementController implements Controller<SplitPane> {
         new Thread(task).start();
     }
 
+
+    private void showSharedGamesInputWarning(String message) {
+        Alert alert = new Alert(Alert.AlertType.WARNING, message, ButtonType.OK);
+        alert.setTitle("Find Shared Games");
+        applyDialogStylesheet(alert);
+        alert.showAndWait();
+    }
 
     public void addListeners() {
         minimizeSearchHistoryButton.setOnAction(event -> {
@@ -2986,27 +2992,66 @@ public class UserManagementController implements Controller<SplitPane> {
         }
     }
 
-    public void onCheckRatingManipulation() {
-        List<GamePlayerStatsFX> allLoaded = new ArrayList<>(userLastGamesTable.getItems());
-        if (allLoaded.isEmpty()) {
-            Alert warn = new Alert(Alert.AlertType.WARNING, "No game data loaded. Select a player first.", ButtonType.OK);
-            warn.setTitle("Rating Manipulation Check");
-            applyDialogStylesheet(warn);
-            warn.showAndWait();
+    public void onOpenGameAnalysis() {
+        List<PlayerFX> selectedPlayers = userSearchTableView.getSelectionModel().getSelectedItems();
+        if (selectedPlayers.size() != 1) {
+            showRatingCheckAlert(Alert.AlertType.WARNING, "Select one player to check their game history.");
             return;
         }
 
-        // Determine how many games to analyse
-        int limit = Integer.MAX_VALUE;
-        String countText = ratingCheckGamesCountField.getText().trim();
-        if (!countText.isEmpty()) {
-            try {
-                limit = Integer.parseInt(countText);
-                if (limit <= 0) limit = Integer.MAX_VALUE;
-            } catch (NumberFormatException ignored) {}
+        PlayerFX player = selectedPlayers.getFirst();
+        FeaturedModFX featuredMod = featuredModFilterChoiceBox.getValue();
+        int limit = parsePositiveLimit(ratingCheckGamesCountField.getText());
+        if (limit < 0) {
+            showRatingCheckAlert(Alert.AlertType.WARNING, "Enter a positive game count or leave the field blank for all games.");
+            return;
         }
-        // Create defensive copy and sort by game start time (newest-first) to ensure most recent games are analyzed
-        List<GamePlayerStatsFX> sortedGames = allLoaded.stream()
+
+        openGameAnalysisButton.setDisable(true);
+        gameAnalysisLoadingLabel.setText("Loading game history...");
+        gameAnalysisLoading.setManaged(true);
+        gameAnalysisLoading.setVisible(true);
+        CompletableFuture.supplyAsync(() -> {
+                    var games = userService.getRecentPlayedGames(player.getId(), featuredMod, limit,
+                            loaded -> Platform.runLater(() -> gameAnalysisLoadingLabel.setText(
+                                    formatGameHistoryProgress(loaded, limit))));
+                    Platform.runLater(() -> gameAnalysisLoadingLabel.setText("Preparing game analysis..."));
+                    return gamePlayerStatsMapper.map(games);
+                })
+                .whenComplete((games, error) -> Platform.runLater(() -> {
+                    gameAnalysisLoading.setVisible(false);
+                    gameAnalysisLoading.setManaged(false);
+                    openGameAnalysisButton.setDisable(false);
+                    if (selectedPlayers.size() != 1 || selectedPlayers.getFirst() != player
+                            || !Objects.equals(featuredModFilterChoiceBox.getValue(), featuredMod)) {
+                        return;
+                    }
+                    if (error != null) {
+                        log.warn("Could not load game history for rating check of player {}", player.getId(), error);
+                        showRatingCheckAlert(Alert.AlertType.ERROR, "Could not load game history. Try again.");
+                    } else if (games.isEmpty()) {
+                        showRatingCheckAlert(Alert.AlertType.WARNING, "No games found for the selected player and filter.");
+                    } else {
+                        showGameAnalysis(player, featuredMod, games);
+                    }
+                }));
+    }
+
+    private static String formatGameHistoryProgress(int loaded, int limit) {
+        return limit == Integer.MAX_VALUE
+                ? String.format("%,d games loaded", loaded)
+                : String.format("%,d of %,d games loaded", loaded, limit);
+    }
+
+    private void showRatingCheckAlert(Alert.AlertType type, String message) {
+        Alert alert = new Alert(type, message, ButtonType.OK);
+        alert.setTitle("Game Analysis");
+        applyDialogStylesheet(alert);
+        alert.showAndWait();
+    }
+
+    private void showGameAnalysis(PlayerFX player, FeaturedModFX featuredMod, List<GamePlayerStatsFX> loadedGames) {
+        List<GamePlayerStatsFX> games = loadedGames.stream()
                 .sorted((g1, g2) -> {
                     OffsetDateTime t1 = g1.getGame() != null ? g1.getGame().getStartTime() : null;
                     OffsetDateTime t2 = g2.getGame() != null ? g2.getGame().getStartTime() : null;
@@ -3016,27 +3061,9 @@ public class UserManagementController implements Controller<SplitPane> {
                     return t2.compareTo(t1); // Descending order (newest first)
                 })
                 .toList();
-        List<GamePlayerStatsFX> games = sortedGames.stream().limit(limit).toList();
-        int desyncLimit = parsePositiveLimit(desyncCheckGamesCountField.getText());
-        List<GamePlayerStatsFX> desyncGames = sortedGames.stream().limit(desyncLimit).toList();
-
         List<GamePlayerStatsFX> ratedGames = games.stream()
                 .filter(g -> g.ratingChangeProperty().get() != null)
                 .toList();
-
-        if (ratedGames.isEmpty() && !checkReplayDesyncsCheckBox.isSelected()) {
-            Alert warn = new Alert(Alert.AlertType.WARNING, "No rating journal data available for the selected games.", ButtonType.OK);
-            warn.setTitle("Rating Manipulation Check");
-            applyDialogStylesheet(warn);
-            warn.showAndWait();
-            return;
-        }
-
-        String playerName = (ratedGames.isEmpty() ? games : ratedGames).stream()
-                .map(g -> g.getPlayer() != null ? g.getPlayer().getLogin() : null)
-                .filter(Objects::nonNull)
-                .findFirst()
-                .orElse("Unknown");
 
         // --- Settings tab: threshold spinners ---
         Spinner<Double> spLossRate     = new Spinner<>(new SpinnerValueFactory.DoubleSpinnerValueFactory(0, 100, 70, 5));
@@ -3082,10 +3109,8 @@ public class UserManagementController implements Controller<SplitPane> {
         textArea.setPrefHeight(420);
 
         // Recomputes the analysis text from the current spinner values and updates textArea
-        final List<GamePlayerStatsFX> gamesFinal = games;
-        final List<GamePlayerStatsFX> ratedGamesFinal = ratedGames;
         Runnable runAnalysis = () -> {
-            if (ratedGamesFinal.isEmpty()) {
+            if (ratedGames.isEmpty()) {
                 textArea.setText("No rating journal data available for the selected games.");
                 return;
             }
@@ -3099,24 +3124,22 @@ public class UserManagementController implements Controller<SplitPane> {
 
             int fc = 0;
             StringBuilder report = new StringBuilder();
-            report.append(String.format("Analyzed %d games (%d with rating data) for: %s%n%n",
-                    gamesFinal.size(), ratedGamesFinal.size(), playerName));
-            report.append(String.format("%-8s %-55s %s%n", "Status", "Check", "Value"));
+            report.append(String.format("%-8s %-53s %s%n", "Status", "Indicator", "Result"));
             report.append("─".repeat(100)).append("\n");
 
             // Check 1: Loss rate
-            long losses = ratedGamesFinal.stream()
+            long losses = ratedGames.stream()
                     .filter(g -> g.ratingChangeProperty().get().doubleValue() < 0)
                     .count();
-            double lossRate = (double) losses / ratedGamesFinal.size() * 100.0;
+            double lossRate = (double) losses / ratedGames.size() * 100.0;
             boolean lossRateFlag = lossRate > lossRatePct;
             if (lossRateFlag) fc++;
             report.append(formatCheckLine(lossRateFlag,
                     String.format("Loss Rate (threshold: >%.0f%%)", lossRatePct),
-                    String.format("%.1f%% (%d / %d games)", lossRate, losses, ratedGamesFinal.size())));
+                    String.format("%.1f%% (%d / %d games)", lossRate, losses, ratedGames.size())));
 
             // Check 2: Net rating trend
-            List<GamePlayerStatsFX> withFull = ratedGamesFinal.stream()
+            List<GamePlayerStatsFX> withFull = ratedGames.stream()
                     .filter(g -> g.beforeRatingProperty().get() != null && g.afterRatingProperty().get() != null)
                     .toList();
             int netRatingChange = 0;
@@ -3134,7 +3157,7 @@ public class UserManagementController implements Controller<SplitPane> {
 
             // Check 3: Max consecutive loss streak
             int maxStreak = 0, cur = 0;
-            for (GamePlayerStatsFX g : ratedGamesFinal) {
+            for (GamePlayerStatsFX g : ratedGames) {
                 if (g.ratingChangeProperty().get().doubleValue() < 0) { cur++; maxStreak = Math.max(maxStreak, cur); }
                 else cur = 0;
             }
@@ -3145,30 +3168,30 @@ public class UserManagementController implements Controller<SplitPane> {
                     maxStreak + " games in a row"));
 
             // Check 4: Heavy per-game rating drops
-            long heavyDrops = ratedGamesFinal.stream()
+            long heavyDrops = ratedGames.stream()
                     .filter(g -> g.ratingChangeProperty().get().doubleValue() <= -dropPerGame)
                     .count();
             boolean heavyDropFlag = heavyDrops >= dropCountMin;
             if (heavyDropFlag) fc++;
             report.append(formatCheckLine(heavyDropFlag,
-                    String.format("Games With Drop >= -%d Rating (threshold: >=%d games)", dropPerGame, dropCountMin),
+                    String.format("Rating drops of %d+ points (flag at %d+ games)", dropPerGame, dropCountMin),
                     heavyDrops + " games"));
 
             // Check 5: Invalid game ratio
-            long invalidCount = gamesFinal.stream()
+            long invalidCount = games.stream()
                     .filter(g -> g.getGame() != null
                             && g.getGame().getValidity() != null
                             && g.getGame().getValidity() != Validity.VALID)
                     .count();
-            double invalidRate = (double) invalidCount / gamesFinal.size() * 100.0;
+            double invalidRate = (double) invalidCount / games.size() * 100.0;
             boolean invalidFlag = invalidRate > invalidPct;
             if (invalidFlag) fc++;
             report.append(formatCheckLine(invalidFlag,
                     String.format("Invalid Games Ratio (threshold: >%.0f%%)", invalidPct),
-                    String.format("%.1f%% (%d / %d games)", invalidRate, invalidCount, gamesFinal.size())));
+                    String.format("%.1f%% (%d / %d games)", invalidRate, invalidCount, games.size())));
 
             // Check 6: Low/zero score pattern
-            List<GamePlayerStatsFX> scoredGames = gamesFinal.stream()
+            List<GamePlayerStatsFX> scoredGames = games.stream()
                     .filter(g -> g.getScore() != null).toList();
             if (!scoredGames.isEmpty()) {
                 long lowScoreCount = scoredGames.stream().filter(g -> g.getScore() <= 0).count();
@@ -3181,12 +3204,7 @@ public class UserManagementController implements Controller<SplitPane> {
             }
 
             report.append("─".repeat(100)).append("\n");
-            String verdict;
-            if (fc == 0)       verdict = "VERDICT: CLEAN — No suspicious patterns detected.";
-            else if (fc <= 2)  verdict = String.format("VERDICT: SUSPICIOUS — %d indicator(s) flagged. Manual review recommended.", fc);
-            else               verdict = String.format("VERDICT: HIGH RISK — %d indicators flagged. Strong signs of rating manipulation.", fc);
-            report.append("\n").append(verdict).append("\n");
-            textArea.setText(report.toString());
+            textArea.setText(String.format("%d indicators flagged%n%n", fc) + report);
         };
 
         runAnalysis.run();
@@ -3194,13 +3212,11 @@ public class UserManagementController implements Controller<SplitPane> {
 
         // --- Rating History chart tab ---
         // Reverse so index 0 = oldest game (left of chart)
-        List<GamePlayerStatsFX> chronological = new ArrayList<>(desyncGames);
+        List<GamePlayerStatsFX> chronological = new ArrayList<>(games);
         Collections.reverse(chronological);
 
         // Build one series per leaderboard, using epoch-seconds as X so the axis shows real dates.
         LinkedHashMap<String, XYChart.Series<Number, Number>> seriesMap = new LinkedHashMap<>();
-        // Parallel map: epoch-second → formatted date string, for tooltips
-        LinkedHashMap<Long, String> epochToLabel = new LinkedHashMap<>();
         long minEpoch = Long.MAX_VALUE;
         long maxEpoch = Long.MIN_VALUE;
 
@@ -3211,8 +3227,6 @@ public class UserManagementController implements Controller<SplitPane> {
             long epochSec = time.toEpochSecond();
             minEpoch = Math.min(minEpoch, epochSec);
             maxEpoch = Math.max(maxEpoch, epochSec);
-            epochToLabel.put(epochSec,
-                    time.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
 
             for (LeaderboardRatingJournalFX journal : g.getLeaderboardRatingJournals()) {
                 LeaderboardFX lb = journal.getLeaderboard();
@@ -3277,7 +3291,6 @@ public class UserManagementController implements Controller<SplitPane> {
         yAxis.setForceZeroInRange(false);
 
         LineChart<Number, Number> chart = new LineChart<>(xAxis, yAxis);
-        chart.setTitle("Rating History — " + playerName + " (last " + games.size() + " games)");
         chart.setAnimated(false);
         chart.setLegendVisible(seriesMap.size() > 1);
         chart.setCreateSymbols(totalPoints <= 150);
@@ -3354,105 +3367,176 @@ public class UserManagementController implements Controller<SplitPane> {
             }
         });
 
-        Label desyncStatus = new Label(checkReplayDesyncsCheckBox.isSelected()
-                ? "Desync history: checking " + desyncGames.size() + " replay(s), newest first…"
-                : "Desync checking is disabled. Enable it before running the check.");
-        TextArea desyncLog = new TextArea("Detected desyncs will be listed here.");
-        desyncLog.setEditable(false);
-        desyncLog.setWrapText(false);
-        desyncLog.setStyle("-fx-font-family: monospace; -fx-font-size: 12;");
-        VBox desyncContent = new VBox(8, desyncStatus, new Label("Detected desyncs"), desyncLog);
-        VBox.setVgrow(desyncLog, javafx.scene.layout.Priority.ALWAYS);
-
-        if (checkReplayDesyncsCheckBox.isSelected()) CompletableFuture.runAsync(() -> {
-            int desyncCount = 0;
-            int checkedCount = 0;
-            HttpClient httpClient = HttpClient.newBuilder()
-                    .followRedirects(HttpClient.Redirect.NORMAL)
-                    .connectTimeout(java.time.Duration.ofSeconds(15))
-                    .build();
-            for (GamePlayerStatsFX gameStats : desyncGames) {
-                if (gameStats.getGame() == null || gameStats.getGame().getId() == null) continue;
-                Path replayFile = null;
-                    boolean desync = false;
-                try {
-                    String replayUrl = gameStats.getGame().getReplayUrl(replayDownLoadFormat);
-                    if (replayUrl == null || replayUrl.isBlank()) continue;
-                    replayFile = replayStorageService.createTemporaryReplayFile("rating-desync-");
-                    // Count replay downloads in the same rolling request budget shown in the title bar.
-                    FafApiCommunicationService.checkRateLimit();
-                    HttpRequest request = HttpRequest.newBuilder(URI.create(replayUrl))
-                            .timeout(java.time.Duration.ofSeconds(30))
-                            .build();
-                    HttpResponse<Path> response = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(replayFile));
-                    if (response.statusCode() != 200) continue;
-                    try (ReplayStorageService.PreparedReplay prepared = replayStorageService.prepareReplayForParsing(replayFile)) {
-                        ReplayDataParser parser = new ReplayDataParser(prepared.path(), objectMapper);
-                        desync = ReplayAnalysisController
-                                .checkReplayEventsForDesync(parser.getEvents())
-                                .desync();
-                    }
-                    checkedCount++;
-                    if (desync) desyncCount++;
-                    final boolean pointDesync = desync;
-                    final String gameId = String.valueOf(gameStats.getGame().getId());
-                    final OffsetDateTime pointTime = gameStats.getScoreTime() != null ? gameStats.getScoreTime() : gameStats.getGame().getStartTime();
-                    final String gameDate = pointTime == null
-                            ? "Unknown date"
-                            : pointTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
-                    if (pointDesync) Platform.runLater(() -> {
-                        if (desyncLog.getText().equals("Detected desyncs will be listed here.")) {
-                            desyncLog.clear();
-                        }
-                        desyncLog.appendText("Game " + gameId + " | " + gameDate + " | Desync detected\n");
-                    });
-                } catch (Exception e) {
-                    log.debug("Could not check replay for game {}", gameStats.getGame().getId(), e);
-                } finally {
-                    if (replayFile != null) try { Files.deleteIfExists(replayFile); } catch (IOException ignored) { }
-                }
-                final int checked = checkedCount, found = desyncCount;
-                Platform.runLater(() -> desyncStatus.setText("Desync history: " + found + " desync(s), " + checked + "/" + desyncGames.size() + " replays checked."));
-            }
-            int finalCheckedCount = checkedCount;
-            Platform.runLater(() -> { if (finalCheckedCount == 0) desyncStatus.setText("Desync history: no replay data could be checked."); });
-        });
-
-        // --- Tabbed dialog ---
-        Tab analysisTab = new Tab("Analysis", textArea);
-        analysisTab.setClosable(false);
-        Tab chartTab = new Tab("Rating History", chartContainer);
-        chartTab.setClosable(false);
-        Tab desyncTab = new Tab("Desync History", desyncContent);
-        desyncTab.setClosable(false);
-        Tab settingsTab = new Tab("Settings", settingsGrid);
-        settingsTab.setClosable(false);
-
-        TabPane tabPane = new TabPane(analysisTab, chartTab, desyncTab, settingsTab);
-        if (ratedGames.isEmpty()) {
-            tabPane.getSelectionModel().select(desyncTab);
-        }
-
         Dialog<ButtonType> dialog = new Dialog<>();
-        dialog.setTitle("Rating Manipulation Analysis — " + playerName);
+        dialog.initOwner(openGameAnalysisButton.getScene().getWindow());
+        dialog.setTitle("Game Analysis - " + player.getLogin());
+        dialog.setResizable(true);
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
-        dialog.getDialogPane().setContent(tabPane);
+
+        Tab chartTab = new Tab("Rating History", totalPoints == 0
+                ? new StackPane(new Label("No rating history is available for these games."))
+                : chartContainer);
+        Tab indicatorsTab = new Tab("Rating Indicators", textArea);
+        Tab desyncTab = new Tab("Replay Desyncs", buildReplayDesyncControls(dialog, player.getId(), featuredMod));
+        Tab thresholdsTab = new Tab("Indicator Thresholds", settingsGrid);
+
+        TabPane tabPane = new TabPane(chartTab, indicatorsTab, desyncTab, thresholdsTab);
+        tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+
+        String modName = featuredMod == null ? "All featured mods" : featuredMod.getDisplayName();
+        Label scope = new Label(String.format("%s | %,d games loaded | %,d with rating data",
+                modName, games.size(), ratedGames.size()));
+        VBox content = new VBox(8, scope, tabPane);
+        VBox.setVgrow(tabPane, javafx.scene.layout.Priority.ALWAYS);
+        dialog.getDialogPane().setContent(content);
         dialog.getDialogPane().setPrefWidth(880);
-        dialog.getDialogPane().setPrefHeight(510);
+        dialog.getDialogPane().setPrefHeight(550);
         applyDialogStylesheet(dialog.getDialogPane());
         dialog.showAndWait();
     }
 
+    private VBox buildReplayDesyncControls(Dialog<?> dialog, String playerId, FeaturedModFX featuredMod) {
+        TextField countField = new TextField("25");
+        countField.setPromptText("All games");
+        countField.setPrefColumnCount(7);
+        Label countLabel = new Label("Recent replays");
+        countLabel.setLabelFor(countField);
+        Button checkButton = new Button("Check Replays");
+        HBox controls = new HBox(8, countLabel, countField, checkButton);
+        controls.setAlignment(Pos.CENTER_LEFT);
+
+        Label status = new Label("Each replay is downloaded and checked individually.");
+        TextArea results = new TextArea();
+        results.setEditable(false);
+        VBox content = new VBox(8, controls, status, results);
+        content.setPadding(new Insets(12));
+        VBox.setVgrow(results, javafx.scene.layout.Priority.ALWAYS);
+
+        checkButton.setOnAction(event -> {
+            int limit = parsePositiveLimit(countField.getText());
+            if (limit < 0) {
+                status.setText("Enter a positive replay count or leave the field blank for all games.");
+                return;
+            }
+
+            Task<Void> task = new Task<>() {
+                @Override
+                protected Void call() {
+                    updateMessage("Loading replay history...");
+                    List<GamePlayerStatsFX> games = gamePlayerStatsMapper.map(
+                            userService.getRecentPlayedGames(playerId, featuredMod, limit,
+                                    loaded -> updateMessage(formatGameHistoryProgress(loaded, limit))));
+                    if (!isCancelled()) {
+                        checkReplayDesyncs(games, this, results, this::updateMessage);
+                    }
+                    return null;
+                }
+            };
+
+            results.clear();
+            checkButton.setDisable(true);
+            countField.setDisable(true);
+            status.textProperty().bind(task.messageProperty());
+            task.setOnSucceeded(finished -> finishReplayCheck(status, countField, checkButton));
+            task.setOnFailed(failed -> {
+                finishReplayCheck(status, countField, checkButton);
+                log.warn("Could not check replays for player {}", playerId, task.getException());
+                status.setText("Could not load or check replay history. Try again.");
+            });
+            dialog.setOnHidden(hidden -> task.cancel());
+            CompletableFuture.runAsync(task);
+        });
+
+        return content;
+    }
+
+    private void finishReplayCheck(Label status, TextField countField, Button checkButton) {
+        String message = status.getText();
+        status.textProperty().unbind();
+        status.setText(message);
+        countField.setDisable(false);
+        checkButton.setDisable(false);
+    }
+
+    private void checkReplayDesyncs(List<GamePlayerStatsFX> games, Task<?> task, TextArea results,
+                                    java.util.function.Consumer<String> progress) {
+        HttpClient httpClient = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .connectTimeout(java.time.Duration.ofSeconds(15))
+                .build();
+        int checked = 0;
+        int found = 0;
+        for (int i = 0; i < games.size() && !task.isCancelled(); i++) {
+            GameFX game = games.get(i).getGame();
+            progress.accept(String.format("Checking replay %d of %d...", i + 1, games.size()));
+            if (game == null || game.getId() == null) {
+                continue;
+            }
+            Path replayFile = null;
+            try {
+                String replayUrl = game.getReplayUrl(replayDownLoadFormat);
+                if (replayUrl == null || replayUrl.isBlank()) {
+                    continue;
+                }
+                replayFile = replayStorageService.createTemporaryReplayFile("rating-desync-");
+                FafApiCommunicationService.checkRateLimit();
+                HttpRequest request = HttpRequest.newBuilder(URI.create(replayUrl))
+                        .timeout(java.time.Duration.ofSeconds(30))
+                        .build();
+                HttpResponse<Path> response = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(replayFile));
+                if (response.statusCode() != 200) {
+                    continue;
+                }
+                try (ReplayStorageService.PreparedReplay prepared = replayStorageService.prepareReplayForParsing(replayFile)) {
+                    ReplayDataParser parser = new ReplayDataParser(prepared.path(), objectMapper);
+                    boolean desync = ReplayAnalysisController.checkReplayEventsForDesync(parser.getEvents()).desync();
+                    checked++;
+                    if (desync) {
+                        found++;
+                        OffsetDateTime time = games.get(i).getScoreTime();
+                        if (time == null) {
+                            time = game.getStartTime();
+                        }
+                        String date = time == null ? "Unknown date" : time.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+                        Platform.runLater(() -> {
+                            if (!task.isCancelled()) {
+                                results.appendText("Game " + game.getId() + " | " + date + " | Desync detected\n");
+                            }
+                        });
+                    }
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            } catch (Exception e) {
+                log.debug("Could not check replay for game {}", game.getId(), e);
+            } finally {
+                if (replayFile != null) {
+                    try {
+                        Files.deleteIfExists(replayFile);
+                    } catch (IOException e) {
+                        log.debug("Could not delete temporary replay {}", replayFile, e);
+                    }
+                }
+            }
+        }
+        progress.accept(String.format("%d desyncs found. %d of %d replays checked.", found, checked, games.size()));
+    }
+
     private static String formatCheckLine(boolean flagged, String checkName, String value) {
-        return String.format("[%-4s]  %-45s %s%n", flagged ? "FLAG" : "OK", checkName, value);
+        return String.format("[%-4s]  %-53s %s%n", flagged ? "FLAG" : "OK", checkName, value);
     }
 
     private static int parsePositiveLimit(String text) {
-        try {
-            int value = Integer.parseInt(text == null ? "" : text.trim());
-            return value > 0 ? value : Integer.MAX_VALUE;
-        } catch (NumberFormatException ignored) {
+        String count = text.trim();
+        if (count.isEmpty() || count.equalsIgnoreCase("all")) {
             return Integer.MAX_VALUE;
+        }
+        try {
+            int value = Integer.parseInt(count);
+            return value > 0 ? value : -1;
+        } catch (NumberFormatException ignored) {
+            return -1;
         }
     }
 
